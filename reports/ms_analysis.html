@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS — Morgan Stanley | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4d90e0;
+  --accent-dim: #4d90e033;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+  <div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 12, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+  <!-- ============ HEADER ============ -->
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="ticker-block">
+          <span class="ticker-badge">MS</span>
+          <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+          <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Capital Markets — Investment Banking &amp; Wealth Management</span>
+          <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $343.5B</span>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #44</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #32</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: #23</span>
+          <span style="font-size:11px;color:var(--text-dim);">(approx. ranks by market cap — 3rd-largest US bank holding company behind JPMorgan ~$966B and Bank of America ~$448B; now larger than Goldman Sachs ~$317B)</span>
+        </div>
+        <h1 class="company-name" style="margin-top:14px;">Morgan Stanley</h1>
+      </div>
+      <div class="price-block">
+        <div class="price-current">$217.71</div>
+        <div class="price-change" style="color:var(--green);">+$2.69 (+1.25%)</div>
+        <div class="price-date">Close — Aug 12, 2026</div>
+        <div class="price-date">Aug 13 intraday: $218.71 (+0.46%)</div>
+      </div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item"><span>HQ:</span>1585 Broadway, New York, NY</div>
+      <div class="meta-item"><span>Employees:</span>~83,000</div>
+      <div class="meta-item"><span>Founded:</span>1924</div>
+      <div class="meta-item"><span>Next Earnings:</span>~Oct 15, 2026 (Q3 2026, est.)</div>
+    </div>
+  </div>
+
+  <!-- ============ 01 COMPANY OVERVIEW ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">01</span> Company Overview</div>
+    <p class="prose">Morgan Stanley is a global financial holding company that runs three businesses: <strong>Institutional Securities</strong> (investment banking advisory, equity and debt underwriting, and sales &amp; trading), <strong>Wealth Management</strong> (full-service brokerage, self-directed via E*TRADE, and workplace stock-plan administration), and <strong>Investment Management</strong> (long-only, alternatives, and private credit). Full-year 2025 net revenues were <strong>$70.6 billion, up 14.4%</strong> year over year, with net income of $16.9 billion, diluted <span class="tip" title="Earnings per share — net income attributable to common shareholders divided by diluted shares outstanding">EPS</span> of $10.21 and <span class="tip" title="Return on tangible common equity — net income to common shareholders divided by average tangible common equity; the standard profitability yardstick for banks because it strips out goodwill and intangibles">ROTCE</span> of 21.6%. On a <span class="tip" title="Trailing twelve months — the most recent four reported quarters combined">TTM</span> basis the firm has now done <strong>$77.8 billion of revenue, up 18.6% <span class="tip" title="Year over year — change versus the same period one year earlier">YoY</span></strong>, and at roughly $343 billion of market value it ranks about <strong>#44 globally</strong> and has overtaken Goldman Sachs as the most valuable pure capital-markets franchise in the world.</p>
+    <p class="prose" style="margin-top:14px;">The strategic story of the last decade is the deliberate re-weighting away from balance-sheet-intensive trading toward fee-based wealth and asset management. The 2020 acquisitions of E*TRADE ($13B) and Eaton Vance ($7B), layered on top of the 2009 Smith Barney joint venture, built a Wealth Management arm that ended Q2 2026 with <strong>$8.1 trillion of client assets</strong> — and, combined with Investment Management's $2.0 trillion of <span class="tip" title="Assets under management — client money the firm manages and charges a fee on">AUM</span>, pushed the firm through the <strong>$10 trillion total client asset milestone</strong> for the first time. That fee annuity is what lets Morgan Stanley trade at a premium to Goldman Sachs on forward earnings despite similar cyclicality in the institutional business.</p>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px;">Notable Executives &amp; Owners</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">Chief Executive Officer</div>
+        <div class="card-value" style="font-size:20px;">Ted Pick</div>
+        <div class="card-note">Edward "Ted" Pick became CEO on January 1, 2024 and added the Chairman title in 2025, succeeding James Gorman after a three-way internal succession race. A 1990 Middlebury graduate and 35-year Morgan Stanley lifer, he built his career running equities and then the Institutional Securities Group — which is why the Q2 2026 record equity result of $6.3 billion is very much his home turf.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Chief Financial Officer</div>
+        <div class="card-value" style="font-size:20px;">Sharon Yeshaya</div>
+        <div class="card-note">CFO since June 2021, previously head of investor relations and a long-time fixed-income strategist. She has anchored the firm's public targets — 30% Wealth Management pre-tax margin, ~$1 trillion of net new assets every three years, and a through-cycle ROTCE goal of 20%+ — all three of which the firm is currently running at or above.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Key Institutional Investors</div>
+        <div class="card-value" style="font-size:20px;">MUFG ~20%</div>
+        <div class="card-note">Mitsubishi UFJ Financial Group has held a roughly 20%+ strategic stake since its $9 billion crisis-era investment in October 2008, and equity-accounts its share of Morgan Stanley's earnings. Beyond MUFG the register is conventional index money: State Street (~7%), Vanguard (~7%), BlackRock (~6%), plus Capital Research and Geode. Percentages are approximate and drift with buybacks.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 02 CORE BUSINESSES ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">02</span> Core Businesses</div>
+    <p class="prose">Revenue mix by reportable segment, FY2025 net revenues of $70.6 billion (segment figures sum to $71.4 billion before intersegment eliminations of roughly -$0.8 billion).</p>
+    <div class="seg-bar">
+      <div style="flex:46;background:#4d90e0;">INSTITUTIONAL SECURITIES 46%</div>
+      <div style="flex:45;background:#a78bfa;">WEALTH MANAGEMENT 45%</div>
+      <div style="flex:9;background:#f59e0b;">IM 9%</div>
+    </div>
+    <div class="seg-legend">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4d90e0;"></span> Institutional Securities — $33.1B</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Wealth Management — $31.8B</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Investment Management — $6.5B</div>
+    </div>
+
+    <!-- Institutional Securities -->
+    <div class="biz-card" style="border-left: 3px solid #4d90e0; margin-top:28px;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Institutional Securities</div>
+          <span class="biz-badge dominant" style="margin-top:6px;">~20% GLOBAL M&amp;A SHARE (EST.)</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$33.1B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+          <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+18%</div><div class="biz-stat-label">YoY Growth</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">~20%</div><div class="biz-stat-label">M&amp;A Share (est.)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">46%</div><div class="biz-stat-label">Revenue Mix</div></div>
+        </div>
+      </div>
+      <p class="biz-desc">The institutional franchise splits three ways. <strong>Investment Banking</strong> ($7.6B FY2025) covers M&amp;A advisory plus <span class="tip" title="Equity capital markets — IPOs, follow-on offerings and convertible issuance">ECM</span> and <span class="tip" title="Debt capital markets — investment-grade and high-yield bond and loan underwriting">DCM</span> underwriting; Morgan Stanley is consistently a top-three global M&amp;A adviser (roughly 20% share of announced deal value, est.) and habitually contests the #1 slot in ECM at ~8–9% share, though it is a distant top-six in DCM at ~4–5% — a structural gap versus JPMorgan and Bank of America, whose lending balance sheets buy bond mandates. <strong>Equity</strong> ($15.6B FY2025) is the crown jewel and the largest equities business in the world by revenue, built on a prime brokerage platform that is #1 or #2 globally with an estimated 15–20% of industry prime balances — the plumbing for a hedge-fund complex whose leverage and balances have been at records. <strong>Fixed Income</strong> ($8.7B FY2025) is the deliberately smaller leg, re-scoped after 2015 to consume less risk-weighted asset capacity.</p>
+      <p class="biz-desc">Q2 2026 was the best institutional quarter in the firm's history: <strong>$11.0 billion of net revenues, up 44% YoY</strong>, with investment banking $2.4B (+58%), equity a record $6.3B (+69%) and fixed income $2.5B (+13%), producing $4.3 billion of pre-tax profit. Management characterized banking pipelines as "healthy but below historical peaks," with sponsor monetization "selectively gaining momentum" — i.e. the private-equity exit backlog is starting to clear but has not yet fully re-rated. Segment margins are operating-leverage-driven: incremental trading revenue drops through at high rates once compensation accruals are set, which is why the firm-wide expense efficiency ratio fell from 71% to 65% in a single year.</p>
+      <div class="biz-tam">📊 <strong>Industry Size:</strong> Global investment banking fee pool ~$135B (2026E, est.) plus a sales &amp; trading wallet of ~$250B; combined growth ~8–10% in 2026 after three flat years</div>
+      <div class="comp-bubbles">
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Goldman Sachs</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~23%</div><div class="comp-bubble-label">M&amp;A Share (est.)</div></div>
+            <div><div class="comp-bubble-val">$67.6B</div><div class="comp-bubble-label">TTM Revenue</div></div>
+            <div><div class="comp-bubble-val">+23.3%</div><div class="comp-bubble-label">YoY</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">JPMorgan Chase</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~20%</div><div class="comp-bubble-label">M&amp;A Share (est.)</div></div>
+            <div><div class="comp-bubble-val">~$70B</div><div class="comp-bubble-label">CIB Mkts+IB (est.)</div></div>
+            <div><div class="comp-bubble-val">+14%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">BofA Securities</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~12%</div><div class="comp-bubble-label">M&amp;A Share (est.)</div></div>
+            <div><div class="comp-bubble-val">~$32B</div><div class="comp-bubble-label">Global Mkts (est.)</div></div>
+            <div><div class="comp-bubble-val">+12%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wealth Management -->
+    <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Wealth Management</div>
+          <span class="biz-badge growth" style="margin-top:6px;">$8.1T CLIENT ASSETS — RECORD NET NEW ASSETS</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$31.8B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+          <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+12%</div><div class="biz-stat-label">YoY Growth</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">~6%</div><div class="biz-stat-label">US Advised Share (est.)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">45%</div><div class="biz-stat-label">Revenue Mix</div></div>
+        </div>
+      </div>
+      <p class="biz-desc">Three channels feed one funnel. The <strong>Financial Advisor channel</strong> (~15,000 advisers, the old Smith Barney book) serves high-net-worth households; <strong>E*TRADE</strong> covers self-directed retail; and <strong>Shareworks/Solium workplace</strong> administers corporate stock plans for millions of employees — the acquisition channel that converts vesting RSUs and IPO windfalls into advised relationships. Management explicitly flagged that <em>over half</em> of Q2 2026's record <strong>$148.1 billion of net new assets</strong> came from workplace and IPO-related flows, and called that channel "early innings." Revenue is roughly two-thirds asset-management fees on <span class="tip" title="Client assets in advisory accounts charged an annual percentage fee rather than per-trade commissions — recurring, market-linked revenue">fee-based</span> balances ($5.3B in Q2 2026, +19% YoY) and one-third net interest income on cash sweep and securities-based lending, which is the rate-sensitive part.</p>
+      <p class="biz-desc">Q2 2026 net revenues were a record <strong>$8.9 billion (+14% YoY)</strong> at a <strong>30.5% pre-tax margin</strong> — above the 30% target and up from 29.3% for full-year 2025 — on $2.7 billion of pre-tax profit. Fee-based flows of $39.1 billion were slightly below the prior year's $42.8 billion, which is the one soft spot: total asset gathering is exceptional, but the conversion of those assets into higher-fee advisory wrappers slowed, partly because workplace and self-directed inflows arrive in lower-yielding vehicles first. Deposit costs remain the swing factor — every basis point of sweep repricing lands directly in segment <span class="tip" title="Net interest income — interest earned on loans and securities minus interest paid on deposits and borrowings">NII</span>; management guided Q3 2026 NII "modestly higher" sequentially.</p>
+      <div class="biz-tam">📊 <strong>Industry Size:</strong> US advised/retail investable assets ~$70T+; global high-net-worth wealth ~$110T; industry AUM growth ~6–8% annually, of which roughly half is market appreciation</div>
+      <div class="comp-bubbles">
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Charles Schwab</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">$13.1T</div><div class="comp-bubble-label">Client Assets</div></div>
+            <div><div class="comp-bubble-val">$26.0B</div><div class="comp-bubble-label">TTM Revenue</div></div>
+            <div><div class="comp-bubble-val">+20.3%</div><div class="comp-bubble-label">YoY</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Merrill / BofA Wealth</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~$4.5T</div><div class="comp-bubble-label">Client Balances (est.)</div></div>
+            <div><div class="comp-bubble-val">~$25B</div><div class="comp-bubble-label">Segment Rev (est.)</div></div>
+            <div><div class="comp-bubble-val">+9%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">UBS Global Wealth</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~$4.6T</div><div class="comp-bubble-label">Invested Assets (est.)</div></div>
+            <div><div class="comp-bubble-val">$53.0B</div><div class="comp-bubble-label">Group TTM Rev</div></div>
+            <div><div class="comp-bubble-val">+10.7%</div><div class="comp-bubble-label">YoY</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Investment Management -->
+    <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Investment Management</div>
+          <span class="biz-badge emerging" style="margin-top:6px;">$2.0T AUM — ALTERNATIVES-LED GROWTH</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$6.5B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+          <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+10%</div><div class="biz-stat-label">YoY Growth</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">~1.5%</div><div class="biz-stat-label">Global AUM Share (est.)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+        </div>
+      </div>
+      <p class="biz-desc">The smallest and lowest-multiple segment, assembled largely through the 2021 Eaton Vance deal (which brought Parametric's direct-indexing and tax-overlay franchise and Calvert's ESG brand) alongside legacy MSIM equity and the private-credit and real-assets platforms. AUM crossed <strong>$2.0 trillion in Q2 2026, up 17% YoY</strong>, on $1.6 billion of quarterly net revenues (+6%) and $7.5 billion of long-term net inflows. Parametric's customized separately managed accounts are the strategic asset here — they are structurally hard for a passive ETF to replace because the value is in tax-loss harvesting at the individual account level, and they cross-sell straight into the Wealth Management adviser base.</p>
+      <p class="biz-desc">The economics are lower quality than the headline suggests: performance-based fees and carried interest on alternatives are lumpy quarter to quarter, and base-fee compression in traditional long-only continues industry-wide. Growth of 6% on 17% AUM growth is precisely that fee-rate compression showing up. This segment is best understood as a margin-accretive attachment to Wealth Management rather than a standalone competitor to BlackRock.</p>
+      <div class="biz-tam">📊 <strong>Industry Size:</strong> Global AUM ~$140T; private markets/alternatives ~$16T growing ~11% annually versus ~5% for traditional long-only</div>
+      <div class="comp-bubbles">
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">BlackRock</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~$13T</div><div class="comp-bubble-label">AUM (est.)</div></div>
+            <div><div class="comp-bubble-val">~$25B</div><div class="comp-bubble-label">TTM Revenue (est.)</div></div>
+            <div><div class="comp-bubble-val">+14%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Goldman Sachs AWM</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~$3.3T</div><div class="comp-bubble-label">AUS (est.)</div></div>
+            <div><div class="comp-bubble-val">~$17B</div><div class="comp-bubble-label">Segment Rev (est.)</div></div>
+            <div><div class="comp-bubble-val">+11%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Franklin / Invesco</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~$3.5T</div><div class="comp-bubble-label">Combined AUM (est.)</div></div>
+            <div><div class="comp-bubble-val">~$15B</div><div class="comp-bubble-label">Combined Rev (est.)</div></div>
+            <div><div class="comp-bubble-val">+5%</div><div class="comp-bubble-label">YoY (est.)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 03 MOAT ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+    <div class="moat-list">
+      <span class="moat-pill">#1 GLOBAL EQUITIES</span>
+      <span class="moat-pill">PRIME BROKERAGE SCALE</span>
+      <span class="moat-pill">$8.1T ADVISED ASSETS</span>
+      <span class="moat-pill">WORKPLACE→WEALTH FUNNEL</span>
+      <span class="moat-pill">M&amp;A LEAGUE-TABLE BRAND</span>
+      <span class="moat-pill">REGULATORY CAPITAL BARRIER</span>
+      <span class="moat-pill">MUFG ALLIANCE (JAPAN)</span>
+    </div>
+    <p class="prose" style="margin-top:24px;">Morgan Stanley's moat is a two-sided one that few competitors hold simultaneously. On the institutional side, prime brokerage is a genuine scale business: the largest hedge funds concentrate financing with two or three counterparties because balance-sheet capacity, securities-lending inventory, cross-margining and risk systems are not commoditizable, and once a fund's book is margined at Morgan Stanley the switching cost is measured in months of operational work. That relationship then feeds the equities cash and derivatives franchise — the $6.3 billion record equity quarter in Q2 2026 is a scale outcome, not a trading call. On the wealth side, the moat is behavioral and structural: advised assets have annual attrition in the low single digits, fee-based accounts renew automatically, and the workplace channel supplies a stream of pre-qualified prospects at essentially zero acquisition cost — half of a record $148 billion quarterly net-new-asset haul. Layered over both is a regulatory capital barrier: operating a G-SIB requires a 14.8% <span class="tip" title="Common Equity Tier 1 ratio — the core regulatory capital measure; the highest-quality capital divided by risk-weighted assets">CET1</span> ratio and stress-test approval, which is why no new entrant has taken meaningful share in bulge-bracket trading in twenty years. The result is a firm earning 26.6% ROTCE on a business mix that would have earned mid-teens a decade ago.</p>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px;">Key Vulnerabilities</div>
+    <div class="prose">
+      <p style="margin-bottom:16px;"><strong>Cyclicality dressed as durability.</strong> Roughly 46% of revenue still comes from Institutional Securities, and the current quarter is being flattered by extraordinary conditions — a 69% YoY jump in equity revenue is not a run-rate. In 2023, the same franchise produced $73 per share of stock price and $5.18 of EPS during an M&amp;A drought. Analysts modelling $12.97 of 2026 EPS off a first half that annualizes near $13.80 are implicitly assuming normalization, and a genuine capital-markets air pocket would take earnings power back toward $9–10 quickly.</p>
+      <p style="margin-bottom:16px;"><strong>Deposit and sweep-rate pressure in Wealth Management.</strong> Roughly a third of wealth revenue is net interest income earned on client cash. Regulatory and competitive pressure on cash-sweep yields — the subject of litigation and enforcement attention across the brokerage industry since 2024 — compresses that spread structurally, and a falling policy rate compresses it cyclically. Fee-based flows of $39.1 billion in Q2 2026 already came in below the prior year's $42.8 billion, indicating that asset gathering and asset monetization are not moving in lockstep.</p>
+      <p style="margin-bottom:16px;"><strong>Fee compression in asset and wealth management.</strong> Investment Management grew AUM 17% but revenue only 6% — a five-year pattern of blended fee rates grinding lower as passive, direct indexing and model portfolios take share. The same dynamic is slowly reaching the adviser channel via lower advisory-fee schedules for large households and the rise of RIA custodial platforms (Schwab at $13.1 trillion of client assets is the aggregator competitor, not a like-for-like adviser competitor).</p>
+      <p><strong>Concentration in a single relationship and a single geography.</strong> MUFG's ~20% holding is a stabilizer but also an overhang: any decision by MUFG to monetize would be a multi-tens-of-billions supply event. Separately, the workplace channel that management calls "early innings" is disproportionately US technology-sector equity compensation — a channel whose net-new-asset contribution is levered to the same IPO and stock-price cycle that drives the investment bank.</p>
+    </div>
+  </div>
+
+  <!-- ============ 04 FINANCIAL METRICS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+    <p class="prose">All figures as of the August 12, 2026 close unless noted. Industry averages reflect US capital-markets / diversified-broker peers (Goldman Sachs, Schwab, Raymond James, Jefferies, Interactive Brokers and the trading arms of the universal banks). Several conventional ratios are structurally meaningless for a bank holding company — those rows are retained and annotated rather than fabricated.</p>
+    <table class="fin-table">
+      <thead>
+        <tr><th>Metric</th><th>MS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tip" title="Price-to-earnings ratio — share price divided by earnings per share over the last twelve months">Trailing P/E</span></td>
+          <td style="color:var(--amber);">17.6</td><td>~16.5</td><td>~27.5</td>
+          <td>A slight premium to broker peers and a large discount to the index. The premium over Goldman Sachs (16.1) is the market paying for wealth-fee durability.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Share price divided by consensus earnings per share for the next twelve months">Forward P/E</span></td>
+          <td style="color:var(--amber);">16.6</td><td>~14.5</td><td>~23.0</td>
+          <td>Only 1.0 turn of multiple compression built in — consensus 2026 EPS of $12.97 versus $12.38 TTM implies analysts expect H2 2026 to soften from the H1 run-rate.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Price/earnings-to-growth ratio — the P/E divided by the expected earnings growth rate; below 1.0 is conventionally cheap">PEG Ratio</span></td>
+          <td style="color:var(--amber);">1.53</td><td>~1.40</td><td>~2.30</td>
+          <td>Distorted by cyclical earnings: the denominator is a recovery-year growth rate, not a sustainable one. Treat PEG as low-signal for a broker-dealer.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td>
+          <td>$12.38</td><td>—</td><td>—</td>
+          <td>Up 40% YoY. H1 2026 alone delivered $6.89 ($3.43 in Q1 + $3.46 in Q2), against $10.21 for all of 2025.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Change in total net revenues versus the same period one year earlier">Revenue Growth (YoY)</span></td>
+          <td style="color:var(--green);">+18.6%</td><td>~+15.0%</td><td>~+7.0%</td>
+          <td>TTM net revenues of $77.8B. Q2 2026 alone grew 27%, led by a 44% institutional gain — well above both comparisons but from a cyclically depressed base.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue">Gross Margin</span></td>
+          <td style="color:var(--text-dim);">—</td><td>—</td><td>~35.4%</td>
+          <td>Not meaningful. Banks report net revenues (already net of interest expense) with no cost-of-goods line. The analogous figure is the <span class="tip" title="Pre-tax income divided by net revenues">pre-tax margin</span> of 34% in Q2 2026, up from ~29% in FY2025.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Net income as a percentage of revenue, after all expenses and taxes">Net Profit Margin</span></td>
+          <td style="color:var(--green);">25.1%</td><td>~21.5%</td><td>~13.2%</td>
+          <td>TTM net income of $19.5B on $77.8B. The expense efficiency ratio fell from 71% to 65% YoY — operating leverage, not cost cutting.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Annual dividend per share divided by the share price">Dividend Yield</span></td>
+          <td style="color:var(--green);">2.11%</td><td>~1.60%</td><td>~1.20%</td>
+          <td>$4.60 annualized after a 15% hike to $1.15/quarter announced with Q2 2026; 12 consecutive years of increases, 37% payout ratio, plus a 1.3% buyback yield.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Shares sold short as a percentage of shares outstanding — a gauge of bearish positioning">Short Interest %</span></td>
+          <td style="color:var(--green);">~1.1%</td><td>~1.8%</td><td>~2.0%</td>
+          <td>Negligible bearish positioning; approximate and reported with a two-week lag. No short-squeeze dynamic either way.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td>
+          <td style="color:var(--amber);">8.27x</td><td>~6.5x</td><td>~1.05x</td>
+          <td>Comparison to the index is meaningless — leverage is the business model. Versus peers MS runs heavier, reflecting prime-brokerage financing. The binding constraint is CET1 at 14.8% standardized / 16.2% advanced, roughly 300–350bp of excess capital.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure">Current Ratio</span></td>
+          <td style="color:var(--text-dim);">—</td><td>—</td><td>~1.25</td>
+          <td>Not meaningful. Bank balance sheets are not split into current and non-current. The relevant liquidity gauges are the LCR (liquidity coverage ratio) and a global liquidity reserve that has run above $340B.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Free cash flow — operating cash flow minus capital expenditures">Free Cash Flow</span></td>
+          <td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td>
+          <td>Not meaningful: operating cash flow for a dealer swings by tens of billions on trading-inventory and financing movements. Capital return is the better read — roughly $9.5B returned over the last twelve months ($1.5B of buybacks in Q2 2026 alone plus the raised dividend).</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Return on equity — net income divided by average shareholders' equity">ROE</span></td>
+          <td style="color:var(--amber);">17.7%</td><td>~14.0%</td><td>~19.0%</td>
+          <td>Well above peers, marginally below the index. Q2 2026 annualized ROE was 20.7% and ROTCE 26.6% versus a stated through-cycle ROTCE target of 20%+ — the firm is running hot, not at trend.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="Return on invested capital — after-tax operating profit divided by total invested capital">ROIC</span></td>
+          <td style="color:var(--text-dim);">n/m (2.2%)</td><td>—</td><td>~11.0%</td>
+          <td>The reported 2.2% is an artifact of dividing by a $1.4T balance sheet and should be ignored. ROTCE of 21.6% (FY2025) / 26.6% (Q2 2026) is the correct capital-efficiency measure.</td>
+        </tr>
+        <tr>
+          <td><span class="tip" title="A measure of a stock's volatility relative to the overall market; 1.0 moves with the market">Beta</span></td>
+          <td style="color:var(--red);">1.21</td><td>~1.20</td><td>1.00</td>
+          <td>In line with brokers, ~20% more volatile than the index. Realized volatility has historically run higher than beta implies during credit or capital-markets stress.</td>
+        </tr>
+        <tr>
+          <td>52-Week Range</td>
+          <td>$141.03 – $232.25</td><td>—</td><td>—</td>
+          <td>A 65% peak-to-trough spread. The low was set in the weeks after mid-August 2025; the $232.25 high came in the late-February 2026 melt-up, from which the stock has yet to make a new high.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px;">Notable One-Off Items</div>
+    <div class="prose">
+      <p style="margin-bottom:14px;"><strong>Q1 2026 severance of $178 million.</strong> Morgan Stanley took a charge tied to a headcount reduction of roughly 2% of the global workforce, spread across all three segments and all geographies and described as an operational-efficiency action. It reduced Q1 2026 EPS by roughly $0.09 and is non-recurring; the resulting cost base is part of why the expense efficiency ratio has held at 65% in both Q1 and Q2 2026.</p>
+      <p style="margin-bottom:14px;"><strong>No material legal or regulatory provisions disclosed in either Q1 or Q2 2026.</strong> That is itself notable given the sector backdrop — brokerage cash-sweep practices and anti-money-laundering client-vetting standards in wealth management have both drawn enforcement attention industry-wide since 2024. The absence of a booked provision is not the absence of exposure; it means nothing has been deemed probable and estimable.</p>
+      <p style="margin-bottom:14px;"><strong>Quality-of-earnings flag on the equity line.</strong> The $6.3 billion equity result in Q2 2026 (+69% YoY) is a record and is not an accounting one-off, but it is a conditions-driven one-off: elevated volatility, record prime balances and heavy client leverage. Roughly $1.5–2.0 billion of that quarter's revenue would not repeat in a normal volatility regime, which is worth $0.7–1.0 of annualized EPS.</p>
+      <p><strong>Capital actions, not charges.</strong> Q2 2026 included a 15% dividend increase to $1.15 per quarter and $1.5 billion of buybacks — evidence of a favorable 2026 stress capital buffer outcome rather than a P&amp;L distortion. Tax rate guidance was maintained at 22–23%, so no discrete tax items are expected to flatter H2.</p>
+    </div>
+  </div>
+
+  <!-- ============ 05 ANALYST CONSENSUS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">Consensus Rating</div>
+        <div class="card-value" style="color:var(--green);">Moderate Buy</div>
+        <div class="card-note">25–26 covering analysts. Constructive but not consensus-bullish: the majority of the sell side moved price targets up sharply after Q2 while keeping Hold-equivalent ratings — a classic "great quarter, full valuation" posture.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Average Price Target</div>
+        <div class="card-value">$236.62</div>
+        <div class="card-note" style="color:var(--green);">+8.7% upside from $217.71. Note the dispersion across aggregators: MarketBeat computes $224.75 (+3.2%) on a 26-analyst panel. Either way, single-digit implied upside.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Target Range</div>
+        <div class="card-value" style="font-size:20px;">$184 – $262</div>
+        <div class="card-note">The low target sits 15% <em>below</em> the current price (JPMorgan's Kian Abouhossein at $195 is the notable low-side name); the high is Barclays at $262, +20%.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Rating Breakdown</div>
+        <div class="card-value" style="font-size:20px;">11 Buy · 13 Hold · 1 Sell</div>
+        <div class="card-note">9 Strong Buy, 2 Buy, 13 Hold, 0 Sell, 1 Strong Sell (25 analysts). An unusually heavy Hold contingent for a stock making all-time-high earnings.</div>
+      </div>
+    </div>
+    <div class="analyst-bar">
+      <div style="flex:36;background:var(--green);"></div>
+      <div style="flex:8;background:#4ade80;"></div>
+      <div style="flex:52;background:var(--amber);"></div>
+      <div style="flex:4;background:var(--red);"></div>
+    </div>
+    <div class="seg-legend" style="margin-top:8px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy 36%</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 8%</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold 52%</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell 4%</div>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px;">Key Recent Analyst Calls</div>
+    <div class="prose">
+      <p style="margin-bottom:14px;"><span style="color:var(--green);">●</span> <strong>Barclays — Jason Goldberg</strong> (Jul 16, 2026): Overweight, price target raised from $230 to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$262</span>, the street high. Goldberg's case rests on the durability of the institutional recovery plus a wealth pre-tax margin now sustainably above 30%, arguing the market is still capitalizing MS on trough-cycle assumptions.</p>
+      <p style="margin-bottom:14px;"><span style="color:var(--green);">●</span> <strong>Keefe, Bruyette &amp; Woods — Christopher McGratty</strong> (Jul 16, 2026): Outperform, target lifted $225 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$250</span>. The bank-specialist shop leans on record $148B net new assets and the workplace channel, framing the wealth franchise as the reason MS should trade at a structural premium to Goldman Sachs. Bank of America's Ebrahim Poonawala (Buy) and BMO's Brennan Hawken (Outperform) both landed at the same <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$250</span> the same week.</p>
+      <p style="margin-bottom:14px;"><span style="color:var(--amber);">●</span> <strong>Wells Fargo — Mike Mayo</strong> (Jul 16, 2026): Equal Weight maintained, target $225 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$240</span>. Mayo — the sector's most persistent skeptic on bank cost structures — acknowledged the operating leverage but kept the neutral rating, the cleanest expression of the "results are real, price already reflects them" view. Goldman Sachs' Richard Ramsden (Neutral, $211 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$233</span>) and Citi's Keith Horowitz (Neutral, $220 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$235</span>) sit in the same camp.</p>
+      <p><span style="color:var(--red);">●</span> <strong>JPMorgan — Kian Abouhossein</strong> (Jul 16, 2026): Neutral, target $187 → <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$195</span> — roughly 10% <em>below</em> the current price and the most bearish mainstream number on the tape. His argument is normalization: Q2 equity revenue of $6.3B is unrepeatable, and applying a mid-cycle institutional revenue assumption produces materially lower earnings power than consensus. HSBC's Dominic Ball (Hold, $190 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$215</span>) sits just below spot on similar reasoning.</p>
+    </div>
+  </div>
+
+  <!-- ============ 06 CATALYSTS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">Jul 15, 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Q2 2026: Record Across All Three Segments</div>
+          <div class="tl-desc">Net revenues of $21.3B (+27% YoY) and EPS of $3.46 crushed consensus of $19.62B and $2.93. ROTCE hit 26.6%, institutional revenue set an all-time record at $11.0B, and wealth crossed $8.1T of client assets. Remarkably, the stock <em>fell</em> 0.27% on the day — a clear tell that expectations were already elevated going in.</div>
+          <span class="tl-impact neutral">Beat, but muted reaction — expectations priced</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Jul 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">15% Dividend Increase and $1.5B of Buybacks</div>
+          <div class="tl-desc">The quarterly dividend rose to $1.15 from $1.00 (12th consecutive annual increase) alongside $1.5B of repurchases in the quarter, implying a benign 2026 stress capital buffer outcome from the Federal Reserve's CCAR process. Management reiterated it runs 300–350bp of excess capital above requirements — a meaningful buyback reservoir if the Basel endgame proposal stays diluted.</div>
+          <span class="tl-impact up">Already happened — capital return reset higher</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">~Oct 15, 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Q3 2026 Earnings (Estimated Date)</div>
+          <div class="tl-desc">The single most important near-term event and the first real test of the normalization debate. Watch three lines: whether equity revenue holds anywhere near the $6.3B Q2 record, whether wealth net new assets can follow $148B with anything above $75–100B, and whether the wealth pre-tax margin stays above 30%. Management has guided Q3 net interest income "modestly higher" sequentially and a 22–23% tax rate.</div>
+          <span class="tl-impact neutral">Key near-term event</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">H2 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">IPO and Sponsor-Monetization Pipeline Recovery</div>
+          <div class="tl-desc">Management described banking pipelines as "healthy but below historical peaks" with sponsor exits "selectively gaining momentum" and activity broadening across the Americas, Asia and Europe. Morgan Stanley is a perennial top-two global ECM underwriter, so a genuine IPO reopening is disproportionately its trade — and it double-counts, because IPO proceeds feed the workplace-to-wealth net-new-asset funnel that supplied over half of Q2's $148B.</div>
+          <span class="tl-impact up">Potential upside catalyst</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Q4 2026 – 2027</div>
+        <div class="tl-content">
+          <div class="tl-title">Rate Path, Deposit Costs and Wealth NII</div>
+          <div class="tl-desc">Wealth Management's net interest income is levered to both the policy rate and to sweep-deposit repricing. A faster easing cycle compresses the spread on roughly $350B of deposits, while continued regulatory attention on cash-sweep yields would compress it structurally. Conversely, sticky rates with stable balances is the quiet bull case for a segment the market values on fee durability.</div>
+          <span class="tl-impact neutral">Two-sided — largest single modelling swing factor</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Ongoing 2026–27</div>
+        <div class="tl-content">
+          <div class="tl-title">Basel Endgame Reproposal and Capital Deregulation</div>
+          <div class="tl-desc">A materially softened US Basel III endgame — plus proposed recalibration of the G-SIB surcharge and the enhanced supplementary leverage ratio — would free capital held against exactly the trading and prime-brokerage exposures where Morgan Stanley is most concentrated. Each 50bp of released CET1 requirement is roughly $4–5B of deployable capital at current risk-weighted assets, most plausibly returned via buyback.</div>
+          <span class="tl-impact up">Potential upside catalyst</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+    <div class="chart-container">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:4px;">MS — MONTHLY CLOSES, SEP 2021 → AUG 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:16px;">⚠ STATIC DATA AS OF AUG 12, 2026</div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:18px;height:3px;background:#4d90e0;vertical-align:middle;margin-right:6px;"></span>Price</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (1-mo)</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (3-mo)</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (10-mo)</span>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+
+    <div class="chart-container">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF AUG 12, 2026</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">In plain English: RSI measures how one-sided recent price moves have been. Above 70 means buyers have been in control long enough that the move may be stretched; below 30 means the opposite. It is a momentum gauge, not a valuation signal.</div>
+      <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+    </div>
+
+    <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> Morgan Stanley closed at $97.32 in September 2021 and at $217.71 on August 12, 2026 — a <strong>+123.7% price return</strong>, or roughly <strong>+143% total return</strong> including approximately $18 per share of dividends collected along the way. That compounds to about 19.4% annually. But the path was anything but linear: the stock gave back nearly a quarter of its value into the 2022 bear market, then round-tripped again to a cycle low of $73.29 in October 2023 when the M&amp;A and IPO markets simply stopped functioning and 10-year yields touched 5%. Essentially the entire five-year return was generated in the 22 months from November 2023 onward, as the capital-markets cycle turned and the wealth franchise proved its fee base held up regardless. The 200-day moving average sits at $186.93 against a spot price of $217.71 — the stock is 16% above its own long-run trend, which is a good description of both the strength and the fragility of the current setup.</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">Jun 2022</div>
+        <div class="tl-content">
+          <div class="tl-title">Bear-Market Trough — $76.06</div>
+          <div class="tl-desc">Down 22% from the December 2021 close as the Fed's hiking cycle shut the IPO window and the sponsor-financing pipeline. Institutional Securities revenue fell for the year; FY2022 EPS dropped 23% to $6.15.</div>
+          <span class="tl-impact down">-22% from cycle high</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Mar 2023</div>
+        <div class="tl-content">
+          <div class="tl-title">Regional Banking Crisis Spillover</div>
+          <div class="tl-desc">SVB and Credit Suisse dragged the whole sector down despite Morgan Stanley having no comparable exposure. The stock fell from $95.28 in February to $80.60 by May — a pure correlation drawdown that in hindsight was a buying opportunity.</div>
+          <span class="tl-impact down">-15% in three months</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Oct 2023</div>
+        <div class="tl-content">
+          <div class="tl-title">Cycle Low — $73.29</div>
+          <div class="tl-desc">The bottom. FY2023 EPS of $5.18 was down 16% on a dead M&amp;A tape, wealth net-new-asset growth had slowed sharply, and James Gorman's succession was unresolved. The stock traded at roughly 14x depressed earnings — trough multiple on trough earnings.</div>
+          <span class="tl-impact down">5-year low</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Nov 2024</div>
+        <div class="tl-content">
+          <div class="tl-title">Post-Election Deregulation Rally — $131.20</div>
+          <div class="tl-desc">Capital-markets names re-rated violently on expectations of lighter Basel endgame capital rules, faster antitrust clearance and an M&amp;A revival. MS gained 25% in two months and closed 2024 at $125.71, with FY2024 EPS up 53% to $7.95.</div>
+          <span class="tl-impact up">+25% in two months</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Apr 2025</div>
+        <div class="tl-content">
+          <div class="tl-title">Tariff-Shock Drawdown — $115.71</div>
+          <div class="tl-desc">A 16% drawdown from the January 2025 close of $138.15 as trade-policy volatility froze deal announcements and widened credit spreads. Trading revenue actually benefited from the volatility; the multiple did not.</div>
+          <span class="tl-impact down">-16% from January high</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Dec 2025</div>
+        <div class="tl-content">
+          <div class="tl-title">Record FY2025 — Close $177.47</div>
+          <div class="tl-desc">Net revenues of $70.6B (+14.4%), EPS $10.21 (+28%), ROTCE 21.6% and $356B of full-year net new assets. The stock finished 2025 up 41% and re-rated from 14x to 17x on the argument that wealth fees had made the earnings stream structurally less cyclical.</div>
+          <span class="tl-impact up">+41% for the year</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Feb 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">All-Time High — $232.25 Intraday</div>
+          <div class="tl-desc">The melt-up peak, driven by a strong Q4 2025 print and expectations of a full capital-markets reopening. The stock then corrected roughly 20% into April 2026 as the rate path repriced, and has spent the six months since grinding back without reclaiming the high.</div>
+          <span class="tl-impact up">52-week high</span>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Jul 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Record Q2 — Muted Price Reaction</div>
+          <div class="tl-desc">A 27% revenue beat and 62% EPS growth produced a 0.27% decline on the day. That non-reaction to an exceptional print is the most informative datapoint in the whole chart: the good news is in the price.</div>
+          <span class="tl-impact neutral">Flat on a large beat</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Over the five years to August 12, 2026, MS returned roughly <strong>+143% total</strong> versus approximately <strong>+76% for the S&amp;P 500</strong> (roughly +65% on price) and an estimated <strong>+85% for the financials sector</strong> as proxied by the XLF ETF — so Morgan Stanley beat both its sector and the index by wide margins, with essentially all of the outperformance generated after November 2023. Against Goldman Sachs, the closer comparison, MS has traded at a persistent 1–2 turn forward-P/E premium since the E*TRADE and Eaton Vance deals closed; that premium widened again in 2026 as wealth pre-tax margins pushed through 30%. Over the trailing twelve months MS is up roughly 50% versus the S&amp;P 500's high-teens gain — an unusually large sector-relative move that leaves the stock with a demanding bar. Index and sector return figures are approximate and should be verified against a current data source.</p>
+  </div>
+
+  <!-- ============ 08 SUMMARY & RISKS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+    <div class="case-grid">
+      <div class="case-card bull">
+        <h4>Bull Case</h4>
+        <p>The mix shift is real and the market still capitalizes Morgan Stanley as a cyclical broker. Wealth Management now contributes 45% of revenue at a 30.5% pre-tax margin on $8.1 trillion of client assets, gathering a record $148 billion of net new assets in a single quarter with over half arriving from a workplace channel management calls "early innings." Layer on an institutional franchise that is #1 in global equities and top-two in M&amp;A and ECM into a reopening deal cycle, 300–350bp of excess CET1 available for buybacks, and a Basel endgame that keeps getting softer, and a 16.6x forward multiple on a 26.6% ROTCE business looks like the market pricing mean reversion that may not come.</p>
+      </div>
+      <div class="case-card bear">
+        <h4>Bear Case</h4>
+        <p>This is peak everything. A 69% YoY jump in equity revenue and a 26.6% ROTCE are not run-rates — they are what the best quarter of a cycle looks like, and roughly $1.5–2.0 billion of Q2 revenue depends on a volatility and prime-leverage regime that mean-reverts. The stock has already re-rated from 14x trough earnings to 17.6x peak earnings, sits 16% above its 200-day average, and did not rise on a 27% revenue beat. Consensus offers 3–9% upside depending on the panel, 52% of analysts are on Hold, and JPMorgan's low target of $195 sits 10% below spot. Wealth NII faces both a falling-rate cycle and regulatory pressure on sweep yields at the same time.</p>
+      </div>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 4px;">Top 3 Risks</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Capital-markets normalization.</strong> Institutional Securities is 46% of revenue and its Q2 2026 result was 44% above the prior year. A return to mid-cycle trading and banking conditions — not a recession, merely normal — would take EPS from a ~$13.80 H1 annualized pace back toward $10–11 and expose a 17.6x multiple built on peak numbers. The 2023 experience ($5.18 EPS, $73 stock) is the tail-case reminder.</div></div>
+      <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">Wealth Management net interest income compression.</strong> Roughly a third of the segment's revenue is spread income on client cash. A faster Fed easing path cyclically compresses that spread while ongoing regulatory and litigation pressure on brokerage cash-sweep yields compresses it structurally. Fee-based flows of $39.1B already trailed the prior year's $42.8B, so the fee line cannot be assumed to fully offset.</div></div>
+      <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Tail risk in prime brokerage and concentrated counterparties.</strong> The prime franchise that generates the equity revenue is also the firm's largest source of idiosyncratic loss risk — Archegos cost the industry roughly $10 billion in 2021, and Morgan Stanley's own $911 million hit was among the larger ones. Record hedge-fund leverage plus record prime balances is exactly the configuration in which a single counterparty failure produces an outsized, un-modelled charge.</div></div>
+    </div>
+  </div>
+
+  <!-- ============ INDUSTRY COMMENTARY ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Matters Right Now</div>
+    <div class="card-grid">
+      <div class="card" style="border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div class="card-value" style="font-size:17px;">Capital-Markets Reopening</div>
+          <span class="biz-badge growth">EMERGING TAILWIND</span>
+        </div>
+        <div class="card-note">After a three-year drought that bottomed in late 2023, the deal machine is restarting. The global investment banking fee pool is tracking toward roughly $135 billion in 2026 (est.), up 8–10%, and Morgan Stanley's Q2 investment banking revenue of $2.4 billion grew 58% YoY. Crucially, management describes pipelines as "healthy but below historical peaks" with sponsor monetization only "selectively gaining momentum" — meaning the private-equity exit backlog, built over four years of blocked IPOs and constrained strategic M&amp;A, is largely still ahead. For a firm that is top-two in global ECM, the second-derivative matters more than the level: the IPO channel is also the largest single feeder into Wealth Management's net new assets.</div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--amber);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div class="card-value" style="font-size:17px;">Wealth Fee Durability vs. the Rate Path</div>
+          <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+        </div>
+        <div class="card-note">The entire premium multiple rests on the claim that wealth fees are an annuity. The evidence is genuinely strong — $148 billion of quarterly net new assets, $5.3 billion of asset-management revenue (+19%), a 30.5% pre-tax margin — but two forces work against it. First, fee-rate compression: Investment Management grew AUM 17% and revenue only 6%, and the same passive/direct-indexing pressure is slowly reaching advisory schedules. Second, deposit economics: roughly a third of wealth revenue is net interest income on sweep cash, exposed simultaneously to a falling policy rate and to industry-wide regulatory scrutiny of sweep yields. Fee-based flows falling to $39.1 billion from $42.8 billion a year earlier, even as total asset gathering set a record, is the early tell worth watching in the October print.</div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div class="card-value" style="font-size:17px;">Deregulation, Basel Endgame — Bull vs. Bear</div>
+          <span class="biz-badge growth">EMERGING TAILWIND</span>
+        </div>
+        <div class="card-note"><strong style="color:var(--text);">The setup:</strong> the US Basel III endgame has been repeatedly re-proposed in softer form, with parallel recalibration of the G-SIB surcharge and the enhanced supplementary leverage ratio. Morgan Stanley runs 14.8% standardized CET1 with 300–350bp of stated excess and just raised its dividend 15% while buying back $1.5 billion of stock — a firm positioned to convert regulatory relief straight into per-share value. <strong style="color:var(--text);">Bull implication:</strong> each 50bp of released capital requirement frees roughly $4–5 billion for buyback at current risk-weighted assets, and lighter leverage rules disproportionately help prime brokerage and market-making, MS's two most capital-hungry strengths. <strong style="color:var(--text);">Bear implication:</strong> deregulation is a one-time re-rating already partially in the price since November 2024, it does nothing for earnings if the cycle turns, and it raises system-wide risk appetite precisely as hedge-fund leverage and prime balances sit at records — historically the setup for the kind of counterparty event that erases several quarters of the benefit in a week.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DISCLAIMER ============ -->
+  <div class="disclaimer">
+    <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of August 12, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+    <p style="max-width:860px;margin:0 auto 12px;">Sources: Morgan Stanley 2Q 2026 and 4Q 2025 earnings releases and financial supplements (morganstanley.com investor relations), Morgan Stanley SEC filings (10-K, 10-Q, 8-K), the Q2 2026 earnings call transcript, StockAnalysis.com for price, valuation, ratio and consensus-forecast data, MarketBeat for the analyst rating panel and price-target history, and CompaniesMarketCap for market-capitalization rankings. Segment revenues, net new assets, client assets, AUM, ROTCE, CET1 and expense efficiency ratios are as reported by the company. Competitor market shares, league-table shares (M&amp;A, ECM, DCM, prime brokerage), industry TAM figures, wealth-industry asset totals, sector and index returns, and all figures labelled "est." are estimates compiled from public data and third-party research; they should be treated as directional approximations and independently verified before use. The 5-year monthly price series is hardcoded, split-adjusted where applicable, and anchored to the August 12, 2026 close and the reported 52-week range; intermediate monthly closes in the 2025–2026 period are reconstructed from multiple aggregators and may differ modestly from exchange records. Short interest, index averages and industry averages are approximations. Verify all data against primary sources before acting on it.</p>
+    <p style="max-width:860px;margin:0 auto;">This document is for informational and educational purposes only. It is not investment advice, an offer to buy or sell any security, or a recommendation of any investment strategy. It does not take account of any individual's financial situation, objectives or risk tolerance. Past performance does not predict future results. Investing in equities involves risk of loss, including total loss of principal. Consult a qualified financial professional before making investment decisions. The author may hold positions in the securities mentioned.</p>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// STATIC DATA — MS monthly closes, Sep 2021 → Aug 2026 (60 pts)
+// Anchored to the Aug 12, 2026 close of $217.71 and the
+// reported 52-week range of $141.03 – $232.25.
+// ============================================================
+const labels = [
+  'Sep 21','Oct 21','Nov 21','Dec 21',
+  'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+  'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+  'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+
+const prices = [
+  97.32, 101.86, 97.15, 98.15,
+  98.31, 94.86, 87.36, 80.20, 83.06, 76.06, 84.19, 85.61, 79.05, 85.98, 92.47, 85.02,
+  97.03, 95.28, 87.79, 87.30, 80.60, 85.42, 89.09, 83.24, 81.68, 73.29, 83.44, 93.24,
+  86.87, 86.70, 93.99, 91.36, 96.72, 97.19, 104.14, 102.36, 104.44, 118.08, 131.20, 125.71,
+  138.15, 130.60, 116.87, 115.71, 128.31, 140.99, 145.10, 149.80, 146.20, 157.40, 168.30, 177.47,
+  190.60, 214.80, 198.40, 186.20, 208.00, 209.04, 210.42, 217.71
+];
+
+// Simple moving average helper (window in monthly periods)
+function sma(arr, window) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - window + 1; j <= i; j++) s += arr[j];
+    out.push(+(s / window).toFixed(2));
+  }
+  return out;
+}
+
+// 20-day MA ~= 1 month, 50-day ~= 3 months, 200-day ~= 10 months
+const ma20 = sma(prices, 1);
+const ma50 = sma(prices, 3);
+const ma200 = sma(prices, 10);
+
+// Annotated inflection points
+const events = [
+  { idx: 9,  label: "Jun '22 — bear-market trough $76.06",       color: '#ef4444' },
+  { idx: 18, label: "Mar '23 — regional banking crisis spillover", color: '#ef4444' },
+  { idx: 25, label: "Oct '23 — cycle low $73.29, M&A drought",    color: '#ef4444' },
+  { idx: 38, label: "Nov '24 — post-election deregulation rally", color: '#22c55e' },
+  { idx: 43, label: "Apr '25 — tariff-shock drawdown",            color: '#ef4444' },
+  { idx: 51, label: "Dec '25 — record FY25, ROTCE 21.6%",         color: '#22c55e' },
+  { idx: 53, label: "Feb '26 — all-time high $232.25 intraday",   color: '#22c55e' },
+  { idx: 58, label: "Jul '26 — record Q2, EPS $3.46",             color: '#22c55e' }
+];
+
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const pointRadii = prices.map((_, i) => eventMap[i] ? 6 : 0);
+const pointColors = prices.map((_, i) => eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)');
+
+// ---------- PRICE CHART ----------
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(77, 144, 224, 0.20)');
+grad.addColorStop(1, 'rgba(77, 144, 224, 0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'MS Price',
+        data: prices,
+        borderColor: '#4d90e0',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      {
+        label: '20-Day MA',
+        data: ma20,
+        borderColor: '#f59e0b',
+        borderWidth: 1.2,
+        borderDash: [4, 4],
+        fill: false,
+        pointRadius: 0,
+        tension: 0.25,
+        order: 2
+      },
+      {
+        label: '50-Day MA',
+        data: ma50,
+        borderColor: '#3b82f6',
+        borderWidth: 1.2,
+        borderDash: [6, 4],
+        fill: false,
+        pointRadius: 0,
+        tension: 0.25,
+        order: 3
+      },
+      {
+        label: '200-Day MA',
+        data: ma200,
+        borderColor: '#ef4444',
+        borderWidth: 1.2,
+        borderDash: [8, 5],
+        fill: false,
+        pointRadius: 0,
+        tension: 0.25,
+        order: 4
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const i = items[0].dataIndex;
+            return eventMap[i] ? ['', eventMap[i].label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 14
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+// ---------- RSI ----------
+function computeRSI(data, period) {
+  const rsi = new Array(data.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const ch = data[i] - data[i - 1];
+    if (ch >= 0) gains += ch; else losses -= ch;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  rsi[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  for (let i = period + 1; i < data.length; i++) {
+    const ch = data[i] - data[i - 1];
+    const g = ch > 0 ? ch : 0;
+    const l = ch < 0 ? -ch : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    rsi[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  }
+  return rsi.map(v => v === null ? null : +v.toFixed(1));
+}
+
+const rsiVals = computeRSI(prices, 6);
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsiVals,
+      borderColor: '#a78bfa',
+      borderWidth: 2,
+      fill: false,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      tension: 0.25,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 10,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            let tag = 'neutral';
+            if (ctx.parsed.y >= 70) tag = 'overbought';
+            else if (ctx.parsed.y <= 30) tag = 'oversold';
+            return 'RSI: ' + ctx.parsed.y.toFixed(1) + '  (' + tag + ')';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function(ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.45)';
+            return 'rgba(30,41,59,0.6)';
+          },
+          lineWidth: function(ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
