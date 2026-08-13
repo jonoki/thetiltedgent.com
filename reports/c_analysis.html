@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C — Citigroup Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #056dae;
+  --accent-dim: #056dae33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 12, 2026 (market close) — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">C</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE &nbsp;·&nbsp; <span style="color:var(--text-dim);">Industry:</span> Banks — Diversified (Money-Center) &nbsp;·&nbsp; <span style="color:var(--text-dim);">Mkt Cap:</span> $231.1B</span>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-family:'JetBrains Mono',monospace;">
+        <span style="color:var(--accent);margin-right:8px;">Mkt Cap Ranking:</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #76</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;margin-left:6px;">US: #50</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;margin-left:6px;">NYSE: ~#30</span>
+      </div>
+      <h1 class="company-name" style="margin-top:14px;">Citigroup Inc.</h1>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$137.58</div>
+      <div class="price-change" style="color:var(--green);">+$1.81 (+1.33%)</div>
+      <div class="price-date">Close, Tue Aug 12, 2026</div>
+      <div class="price-date">Next session (Aug 13, intraday): $138.49 (+0.66%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 388 Greenwich St., New York, NY</div>
+    <div class="meta-item"><span>Employees:</span> ~226,000 (224,000 direct staff at 3/31/26)</div>
+    <div class="meta-item"><span>Founded:</span> 1812</div>
+    <div class="meta-item"><span>Next Earnings:</span> ~Oct 13, 2026 (Q3 2026, est.)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Citigroup is one of four U.S. money-center banks and the most globally distributed of them: it holds banking licenses in roughly 90 countries, clears in about 180 currencies, and moves on the order of <strong>$5 trillion of client flows every business day</strong> through its Treasury &amp; Trade Solutions rails. Full-year 2025 revenues net of interest expense were <strong>$85.2 billion, up 6% <span class="tip" title="Year over Year — versus the same period last year">YoY</span></strong>, with net income of $14.3 billion and diluted <span class="tip" title="Earnings Per Share">EPS</span> of $6.99; the first half of 2026 accelerated sharply, with Q1 revenue of $24.63B (+14%) and Q2 revenue of $24.77B (+14.5%), producing <span class="tip" title="Return on Average Tangible Common Equity — net income to common over average tangible common equity; the standard profitability yardstick for banks">RoTCE</span> of 13.1% in Q1 against a full-year target of only 10–11%. At roughly <strong>$231 billion of market value</strong> Citi is the world's 76th and the United States' 50th most valuable public company — the fourth-largest U.S. bank behind JPMorgan (~$966B), Bank of America (~$448B) and Wells Fargo (~$269B), and the cheapest of the four on <span class="tip" title="Price to Tangible Book Value — market price divided by tangible book value per share; the core valuation yardstick for banks">price-to-tangible-book</span>.</p>
+  <p class="prose" style="margin-top:14px;">The investment case is not a growth story — it is a <strong>self-help story</strong>. Since 2021, CEO Jane Fraser has exited fourteen international consumer franchises, collapsed the old two-division structure into five reporting businesses that report directly to her, cut direct staff from roughly 240,000 to <strong>224,000</strong> (down 2% YoY as of March 31, 2026), and spent billions remediating the 2020 Federal Reserve and <span class="tip" title="Office of the Comptroller of the Currency — the primary federal regulator of national banks">OCC</span> consent orders on risk, data and controls. Management says roughly <strong>90% of transformation programs are at or near target state</strong>. The market has begun to pay for it: the stock has compounded from a $39.49 monthly close in October 2023 to $137.58, and the <span class="tip" title="Price to Tangible Book Value">P/TBV</span> multiple has gone from roughly 0.6x to about 1.36x.</p>
+  <div class="card-grid" style="margin-top:24px;">
+    <div class="card">
+      <div class="card-label">FY2025 Revenue</div>
+      <div class="card-value">$85.2B</div>
+      <div class="card-note">+6% YoY, net of interest expense. Net income $14.3B; diluted EPS $6.99. TTM revenue through Q2 2026 is approximately $91B.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">RoTCE — Q1 2026</div>
+      <div class="card-value" style="color:var(--green);">13.1%</div>
+      <div class="card-note">Versus 9.1% a year earlier and a 10–11% full-year target. FY2025 was 7.7%, depressed by the Q4 Russia notable item.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CET1 / SLR — Q1 2026</div>
+      <div class="card-value">12.75% / 5.25%</div>
+      <div class="card-note">CET1 down 66 basis points YoY as buybacks consumed capital. Year-end 2025 CET1 was 13.2%, roughly 160bps above requirement.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Tangible Book Value / Share</div>
+      <div class="card-value">$99.01</div>
+      <div class="card-note">Q1 2026 actual, +8% YoY (FY2025 year-end: $97.06). Estimated ~$101 at June 30 — the stock trades at roughly 1.36x that.</div>
+    </div>
+  </div>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Jane Fraser</div>
+      <div class="card-note">CEO since March 2021 and the first woman to run a major U.S. bank. A Scottish-born former McKinsey partner, she previously led Citi's Latin America business, the private bank, and Global Consumer Banking. Her tenure is defined by the simplification program: exiting consumer banking in 14 markets, the Banamex separation, and the consent-order remediation.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Gonzalo Luchetti</div>
+      <div class="card-note">Listed as CFO in current company profile data (as of August 2026), having previously run U.S. Personal Banking. <strong>Mark Mason</strong> — CFO from 2019 through the transformation years and the public face of Citi's expense and capital targets — is shown as Executive Vice Chairman and Senior Executive Advisor. <em>Flagged: this leadership transition should be verified against Citi's investor-relations page before use.</em></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">~71.7% Institutional</div>
+      <div class="card-note">Institutions hold roughly 71.7% of shares outstanding. The register is dominated by index complexes — Vanguard (~9%), BlackRock (~7–8%) and State Street (~4–5%) are the perennial top three (percentages estimated; not verified for the current quarter). Berkshire Hathaway built a Citi position in 2022 that it trimmed through 2025 — current size not verified here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Revenue mix below is <strong>FY2025 actual</strong> (revenues net of interest expense, $85.2B total). Note a reporting change: beginning in 2026 Citi reports <strong>U.S. Consumer Cards (USCC)</strong> in place of the old U.S. Personal Banking segment, with retail banking and deposits folded elsewhere; Q1 2026 comparatives were restated accordingly. Segment detail for Q2 2026 was <em>not</em> retrievable from the sources used here — the Q2 total ($24.77B, +14.5%) is verified, but the segment split below the total is Q1 2026 actual.</p>
+  <div class="seg-bar">
+    <div style="flex:25.0;background:#056dae;">SERVICES 25%</div>
+    <div style="flex:25.8;background:#3b82f6;">MARKETS 26%</div>
+    <div style="flex:24.6;background:#a78bfa;">US CARDS 25%</div>
+    <div style="flex:10.1;background:#f59e0b;">WEALTH 10%</div>
+    <div style="flex:9.6;background:#6b7280;color:#fff;">BANKING 10%</div>
+    <div style="flex:4.9;background:#475569;color:#fff;">OTHER 5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#056dae;"></span> Services — $21.3B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Markets — $22.0B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> U.S. Consumer Cards — $21.0B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Wealth — $8.6B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span> Banking — $8.2B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#475569;"></span> All Other (incl. Legacy/Mexico) — $4.4B</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #056dae;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Services — Treasury &amp; Trade Solutions + Securities Services</div>
+        <span class="biz-badge dominant">CROWN JEWEL — ~#1 IN CROSS-BORDER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$21.3B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+8%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~12% est.</div><div class="biz-stat-label">Custody Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> global transaction-banking revenue pool ~$450–500B (cash management, payments, trade finance); global assets under custody ~$230T — both est., growing mid-single digits</div>
+    <p class="biz-desc"><strong>Treasury &amp; Trade Solutions (TTS)</strong> is the plumbing multinationals use to hold cash, sweep it across borders, pay suppliers, and finance trade in ~180 currencies. <strong>Securities Services</strong> is custody, fund administration and issuer services, with roughly <strong>$29 trillion of assets under custody</strong> (est.). Together they generated <strong>$6.10B in Q1 2026, up 17% YoY</strong> — the fastest growth of any Citi segment and the highest-returning: Services runs well above the firm's blended RoTCE because it is deposit-funded, fee-heavy and capital-light. The revenue is also unusually sticky: once a Fortune 500 treasurer's ERP is wired into Citi's rails across 40 countries, switching is a multi-year project, not a pricing decision. The offset is rate sensitivity — a meaningful slice of TTS revenue is net interest income on ~$700B+ of operating deposits, so a fast easing cycle compresses it.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">J.P. Morgan Payments</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~4% est.</div><div class="comp-bubble-label">Pool Share</div></div><div><div class="comp-bubble-val">~$18B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+6% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">HSBC Global Payments</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~3% est.</div><div class="comp-bubble-label">Pool Share</div></div><div><div class="comp-bubble-val">~$12B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+3% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">BNY (custody)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$55T</div><div class="comp-bubble-label">AUC est.</div></div><div><div class="comp-bubble-val">~$19B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+7% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Standard Chartered</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~1.5% est.</div><div class="comp-bubble-label">Pool Share</div></div><div><div class="comp-bubble-val">~$6B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+5% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Markets — FICC &amp; Equities</div>
+        <span class="biz-badge growth">~9% GLOBAL SHARE — CYCLE-PEAK REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$22.0B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~9% est.</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> top-12 investment-bank markets revenue pool ~$240–250B in 2025 (est., Coalition Greenwich basis) — at a cyclical high on rates and FX volatility</div>
+    <p class="biz-desc">Citi is a top-tier <span class="tip" title="Fixed Income, Currencies and Commodities — the rates, credit, FX and commodities trading businesses">FICC</span> house — consistently #1 or #2 in global foreign exchange and a leader in emerging-market rates and local-currency debt, businesses that lever directly off the same country network that powers TTS. Markets delivered <strong>$7.25B in Q1 2026, up 19% YoY</strong>, and was the single largest contributor to the 1H26 earnings beat. That is the problem as well as the point: markets revenue is the most cyclical line in the company, it consumes the most <span class="tip" title="Risk-Weighted Assets — the denominator of regulatory capital ratios">RWA</span>, and 2025–26 volumes reflect elevated volatility that will not persist indefinitely. Equities has been the improvement story (prime balances and derivatives), while commodities and munis have been managed down. A normalization of trading wallet toward ~$200B would take several dollars off Citi's run-rate revenue.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Markets</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~13% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$33B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+12% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Goldman Sachs</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~13% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$32B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+14% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bank of America</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~9% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$22B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+10% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">U.S. Consumer Cards (formerly U.S. Personal Banking)</div>
+        <span class="biz-badge emerging">~12% OF U.S. CARD BALANCES</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$21.0B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~12% est.</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~$1.35T of U.S. credit-card balances outstanding (est.), growing ~5–6%/yr; Citi carries roughly $165B across branded cards and retail-partner cards</div>
+    <p class="biz-desc">Two books: <strong>Branded Cards</strong> (Double Cash, Custom Cash, Costco, AAdvantage) and <strong>Retail Services</strong> (private-label and co-brand programs for retailers such as Best Buy, Home Depot and Macy's). Citi is the #3 U.S. card issuer by balances behind JPMorgan and American Express. The segment reported <strong>$4.76B in Q1 2026, up 4% YoY</strong> — the slowest grower, and deliberately so: this is the credit-exposed part of the franchise, where <span class="tip" title="Net Credit Losses — charged-off loan balances net of recoveries, as a percent of average loans">NCL</span> rates in Retail Services run in the high-single digits versus low-to-mid single digits in branded cards. The 2026 renaming reflects the strategic point: Citi is not trying to be a mass-market U.S. retail bank. It runs roughly 600 branches in six metro clusters, versus ~3,600 for JPMorgan, and monetizes the U.S. consumer primarily through card economics and partnerships.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Card</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~18% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$240B</div><div class="comp-bubble-label">Balances est.</div></div><div><div class="comp-bubble-val">~+8% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">American Express</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~11% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$145B</div><div class="comp-bubble-label">Loans est.</div></div><div><div class="comp-bubble-val">~+9% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Capital One</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~19% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$255B</div><div class="comp-bubble-label">Balances est.</div></div><div><div class="comp-bubble-val">~+6% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Wealth</div>
+        <span class="biz-badge emerging">SUB-SCALE — TURNAROUND IN PROGRESS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$8.6B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+14%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~2% est.</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> global wealth-management revenue pool ~$300B+ (est.); Citi's client investment assets ~$0.6T of ~$1.1T total client balances — a fraction of Morgan Stanley's ~$8T</div>
+    <p class="biz-desc">Citi Private Bank (ultra-high-net-worth, roughly a quarter of the world's billionaires as clients), Wealth at Work (law firms and professional partnerships), and Citigold. Revenue rose to <strong>$3.07B in Q1 2026, up 11% YoY</strong>, helped by the 2026 re-segmentation that brought U.S. retail deposits alongside the advisory book. Under Andy Sieg (hired from Merrill in 2023) the unit has cut expenses, replaced most of its top leadership, and pushed fee-based penetration higher; margins remain well below Morgan Stanley's ~28% pre-tax. This is the segment with the most upside per dollar of capital if execution holds — and the one most likely to disappoint, because wealth is a recruiting and platform business where Citi has been losing to larger competitors for a decade.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Morgan Stanley</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$8T</div><div class="comp-bubble-label">Client Assets est.</div></div><div><div class="comp-bubble-val">~$29B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+9% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">UBS GWM</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$4.5T</div><div class="comp-bubble-label">Invested Assets est.</div></div><div><div class="comp-bubble-val">~$25B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+6% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Merrill + BofA Private Bank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$4.4T</div><div class="comp-bubble-label">Client Balances est.</div></div><div><div class="comp-bubble-val">~$23B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">~+7% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Banking — Investment Banking &amp; Corporate Lending</div>
+        <span class="biz-badge growth">FASTEST FY25 GROWTH: +32%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$8.2B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+32%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~5% est.</div><div class="biz-stat-label">IB Fee Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> global investment-banking fee pool ~$110–120B in 2025 (est., Dealogic basis), recovering from the 2023 trough as M&amp;A and IPO volumes reopened</div>
+    <p class="biz-desc">Advisory, equity and debt underwriting, and corporate lending. Vis Raghavan — hired from JPMorgan in 2024 — rebuilt the coverage model around industry verticals and a hard rule that lending capital follows fee wallet, not the other way round. The payoff shows in the FY2025 jump (+32% on a loan-hedge-adjusted basis) and <strong>$1.77B in Q1 2026, up 15% YoY</strong>. Citi is a perennial top-five fee house, strongest in debt capital markets and cross-border M&amp;A where its country network is a genuine differentiator, and structurally weaker in U.S. technology equity underwriting where Goldman and Morgan Stanley dominate. It is the smallest segment but the highest-beta one to a capital-markets cycle that is currently running hot.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan IB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~8.5% est.</div><div class="comp-bubble-label">Fee Share</div></div><div><div class="comp-bubble-val">~$9.5B est.</div><div class="comp-bubble-label">IB Fees</div></div><div><div class="comp-bubble-val">~+20% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Goldman Sachs IB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~7.5% est.</div><div class="comp-bubble-label">Fee Share</div></div><div><div class="comp-bubble-val">~$8.5B est.</div><div class="comp-bubble-label">IB Fees</div></div><div><div class="comp-bubble-val">~+22% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Morgan Stanley IB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~6% est.</div><div class="comp-bubble-label">Fee Share</div></div><div><div class="comp-bubble-val">~$7B est.</div><div class="comp-bubble-label">IB Fees</div></div><div><div class="comp-bubble-val">~+18% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #475569;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">All Other — Legacy Franchises &amp; Corporate/Other</div>
+        <span class="biz-badge emerging">SHRINKING BY DESIGN — MEXICO IS THE LAST PIECE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4.4B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−41%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/m</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> n/a — this is a wind-down bucket. Legacy Franchises revenue was $2.2B in Q1 2026, up 33% on Mexican peso translation and Banamex volumes</div>
+    <p class="biz-desc">Everything Citi is trying to stop being: the remaining international consumer exits, corporate treasury items, and <strong>Grupo Financiero Banamex</strong>, the Mexican consumer and small-business bank Citi has been separating since 2022. Per the Q1 2026 10-Q, Citi agreed in February 2026 to sell 24% of Banamex to investors for roughly <strong>MXN 43 billion</strong>, closed 22.6% of it on <strong>April 29, 2026</strong>, and expected the residual 1.4% by mid-2026 — taking cumulative disposals to <strong>49%</strong>. An <span class="tip" title="Initial Public Offering">IPO</span> of the remainder remains the stated path. The accounting matters more than the economics: Citi carried roughly <strong>$9 billion of unrealized currency-translation losses</strong> attributable to Banamex at March 31, 2026, and on deconsolidation that <span class="tip" title="Cumulative Translation Adjustment — accumulated foreign-currency translation gains and losses parked in equity until the foreign entity is sold or deconsolidated">CTA</span> loss flows through earnings, hitting reported EPS and RoTCE while reversing a temporary capital benefit. The April tranche alone added ~$1.7B to stockholders' equity (a $2.1B CTA reclassification to noncontrolling interests, less a ~$0.4B net loss on sale).</p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">90+ COUNTRY LICENSES</span>
+    <span class="moat-pill">~180 CURRENCIES</span>
+    <span class="moat-pill">~$5T DAILY FLOWS</span>
+    <span class="moat-pill">~$29T ASSETS UNDER CUSTODY</span>
+    <span class="moat-pill">TREASURER SWITCHING COSTS</span>
+    <span class="moat-pill">G-SIB REGULATORY BARRIER</span>
+    <span class="moat-pill">#1–2 GLOBAL FX FRANCHISE</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">Citi's moat is not its balance sheet — every money-center bank has one — it is the <strong>proprietary global network</strong>. Building a rival to TTS would require obtaining banking licenses in dozens of jurisdictions, each with its own capital, local-board and data-residency requirements, then wiring them into a single ledger that can settle a Brazilian subsidiary's payroll and a Vietnamese supplier payment on the same platform. No U.S. peer has attempted it since Citi built it; JPMorgan and HSBC are the only credible substitutes and neither matches Citi's breadth in frontier and emerging markets. The economic signature of a real moat is visible in the numbers: Services grew <strong>17% YoY in Q1 2026</strong> in a mature industry, with client attrition low enough that management treats deposit balances as effectively structural. The same network subsidizes Markets (local-currency rates and FX flow the network generates) and Banking (cross-border M&amp;A mandates from multinationals already banking with TTS). Add the regulatory moat: as a <span class="tip" title="Global Systemically Important Bank — the largest banks, subject to extra capital surcharges and supervision">G-SIB</span>, Citi carries a capital surcharge that is a cost to it and an insurmountable barrier to any new entrant.</p>
+  <p class="prose" style="margin-top:16px;">What the moat conspicuously does <em>not</em> cover is the rest of the company. Markets is a share business competing head-on with JPMorgan and Goldman on price and balance sheet; Banking is a relationship business where Citi is a solid #4–5 rather than a leader; Wealth is sub-scale against Morgan Stanley and UBS; and U.S. Consumer Cards is a credit business with no structural advantage over Capital One or American Express. Roughly 70% of Citi's revenue therefore comes from businesses with ordinary competitive dynamics, funded by a franchise that is genuinely extraordinary. That is the core argument for the persistent conglomerate discount — and the reason activists have periodically pushed for further separation.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Regulatory execution risk is the company's defining flaw.</strong> The 2020 Federal Reserve and OCC consent orders on risk management, data governance and internal controls remain open. Citi paid a $400M OCC penalty in 2020 and a further ~$136M in combined Fed/OCC civil money penalties in July 2024 for insufficient progress (historical figures — verify current status). Management says ~90% of transformation programs are at or near target state, but "near target state" is not the same as an order being terminated, and the remediation spend is a permanent drag on the expense base until it is.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Earnings quality is levered to a cycle-peak trading wallet.</strong> Markets was ~26% of FY2025 revenue and grew 19% in Q1 2026. A reversion in FX and rates volatility toward normal levels would take several billion dollars off revenue with high incremental margin loss, and would arrive precisely when the multiple is no longer at a distressed starting point.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Consumer credit concentration in partner cards.</strong> Retail Services is a subprime-skewed, retailer-dependent book where loss rates run materially above branded cards and where partner economics (loss-sharing arrangements) can shift with a single contract renegotiation. Provisions were $2.78B in Q1 2026 — roughly 11% of revenue — and a genuine U.S. consumer downturn hits this line first.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Emerging-market and FX exposure, with Banamex the live example.</strong> The ~$9B Banamex CTA loss sitting in equity is a known, quantified charge waiting on a deconsolidation date. Beyond Mexico, Citi's revenue and capital are exposed to currency translation across dozens of countries, and 2025 already produced a Russia-related notable item that cut Q4 2025 EPS from ~$1.81 to $1.19.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Money-center bank averages below cover JPM, BAC, WFC, GS and MS (estimated). Several standard ratios — gross margin, current ratio, free cash flow, <span class="tip" title="Return on Invested Capital — after-tax operating profit over debt plus equity; ill-defined for banks because deposits and debt are raw material, not financing">ROIC</span> — are not meaningful for a bank and are marked "—"; the bank-native analogs (<span class="tip" title="Return on Average Tangible Common Equity">RoTCE</span>, <span class="tip" title="Common Equity Tier 1 ratio — common equity divided by risk-weighted assets; the primary regulatory capital measure">CET1</span>, efficiency ratio, price-to-tangible-book) appear in the Context column. All prices reference the <strong>August 12, 2026 close of $137.58</strong>.</p>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>C</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings ratio — share price divided by the last 12 months of earnings per share">Trailing P/E</span></td><td style="color:var(--amber);">14.96</td><td>~14.5</td><td>~26.5</td><td>Now roughly in line with money-center peers after years at a 25–35% discount, and ~44% below the index. On <span class="tip" title="Trailing Twelve Months">TTM</span> <span class="tip" title="Earnings Per Share">EPS</span> of $9.20. The discount that defined Citi for a decade has largely closed on earnings — it has <em>not</em> closed on book value.</td></tr>
+      <tr><td><span class="tip" title="Price divided by expected earnings over the next twelve months">Forward P/E</span></td><td style="color:var(--amber);">11.78</td><td>~11.5</td><td>~21.5</td><td>Consensus FY2026 EPS of ~$11.15–11.20 (+48% vs. FY2025's $6.99, which was depressed by the Q4 Russia item). FY2027 consensus implies ~$12.95 and a ~10.6x multiple. The cheapness is real but assumes a peak-cycle markets wallet holds.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — P/E divided by the expected earnings growth rate; near 1.0 is considered fair">PEG Ratio</span></td><td style="color:var(--green);">0.48</td><td>~1.1</td><td>~2.0</td><td>Flattered by a recovery base effect rather than secular growth. Normalize growth to a mid-teens medium-term rate and PEG is ~1.0 — fair, not exceptional.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months">EPS (TTM)</span></td><td style="color:var(--text-dim);">$9.20</td><td>—</td><td>—</td><td>$9.26 on a diluted TTM basis through Q2 2026. 1H26 alone delivered $6.21 ($3.06 in Q1, $3.15 in Q2) versus $3.92 in 1H25. Buyback shrinkage is adding roughly 4–5%/yr to the per-share line.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year over Year — versus the same period last year">YoY</span>)</td><td style="color:var(--green);">+12.1% (TTM)</td><td>~+9%</td><td>~+6%</td><td>Reported basis: FY2025 $85.2B (+6%), Q1 2026 $24.63B (+14%), Q2 2026 $24.77B (+14.5%). TTM reported revenue ≈ $91B. Growth is broad — every segment grew double digits in Q1 except U.S. cards (+4%).</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold as a percent of revenue — not a line banks report">Gross Margin</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~34%</td><td>Not meaningful for banks. Bank analog: <strong>efficiency ratio of ~58%</strong> in Q1 2026 ($14.31B expenses on $24.63B revenue), improved from ~65% in FY2024 — positive operating leverage is the core of the story.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percent of total revenue">Net Profit Margin</span></td><td style="color:var(--amber);">~21.8%</td><td>~28%</td><td>~13%</td><td>Below peers because Citi still carries a heavier expense base and higher card provisions. TTM net income ~$17.8B. Q1 2026 net margin was 23.5% — closing the gap quarter by quarter.</td></tr>
+      <tr><td><span class="tip" title="Annual dividends per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">1.95%</td><td>~2.2%</td><td>~1.2%</td><td>$0.67/quarter, $2.68 annualized; ex-date Aug 3, 2026, payable Aug 28. Payout ratio only ~29% — the capital return is overwhelmingly buyback-weighted (~$13B repurchased in FY2025, ~$6.3B in Q1 2026 alone).</td></tr>
+      <tr><td><span class="tip" title="Percent of the tradable float sold short — a gauge of bearish positioning">Short Interest</span></td><td style="color:var(--amber);">~1.69%</td><td>~1.4%</td><td>~2.0%</td><td>Up ~5.7% month-over-month but still immaterial. Sources disagree — one screen shows 0.03% of float, which is almost certainly a data error; the ~1.7% figure is the more credible.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholder equity">Debt-to-Equity</span></td><td style="color:var(--text-dim);">~4.6x</td><td>~2.5x</td><td>~1.1x</td><td>Structurally uninformative — long-term debt is funding inventory for a global dealer, and deposits (the largest liability) sit outside the ratio. The regulatory lens: <strong>CET1 of 12.75%</strong> at Q1 2026 (down 66bps YoY on buybacks) and an <span class="tip" title="Supplementary Leverage Ratio — tier 1 capital over total leverage exposure, a non-risk-weighted backstop">SLR</span> of 5.25%.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure banks do not report">Current Ratio</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~1.2</td><td>Not meaningful for banks. Analog: ~$1.1T of cash and equivalents on balance sheet and a liquidity coverage ratio comfortably above the 100% requirement.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditure; distorted beyond usefulness at banks by loan and deposit flows">Free Cash Flow</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>—</td><td>Screens report −$24.5B, an artifact of trading-asset and loan movements, not cash burn. Capital-generation lens: ~$17.8B of TTM earnings funding ~$4.5B of dividends and a buyback running at a $25B+ annualized pace against a <strong>$30B authorization</strong>.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income as a percent of average shareholder equity">ROE</span></td><td style="color:var(--red);">~8.5%</td><td>~12%</td><td>~19.5%</td><td>The number that has capped this stock for fifteen years. It is improving fast: <strong>RoTCE of 13.1% in Q1 2026</strong> versus 9.1% a year earlier, against a full-year target of 10–11%. Management has framed returns "above that level in the years ahead"; the market is now underwriting mid-teens.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — ill-defined for banks, where debt and deposits are raw material rather than financing">ROIC</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~11%</td><td>Use RoTCE instead: 13.1% (Q1 2026), 7.7% (FY2025, depressed by the Q4 Russia notable item), 7.0% (FY2024). <span class="tip" title="Return on Assets — net income as a percent of average total assets">ROA</span> is ~0.66% versus a ~1.0%+ standard for a healthy large bank.</td></tr>
+      <tr><td><span class="tip" title="Volatility versus the market; 1.0 moves in line with the S&amp;P 500">Beta</span></td><td style="color:var(--red);">1.10</td><td>~1.05</td><td>1.00</td><td>Understates tail risk. Citi fell ~48% peak-to-trough between January 2022 and October 2023 while the index fell ~25%. Beta measures average co-movement, not behavior in a banking stress event.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$90.68–$147.96</td><td>—</td><td>—</td><td>Closed Aug 12 at $137.58, +51.7% off the 52-week low and 7.0% below the high set in June 2026. <strong>Price/tangible book ~1.36x</strong> on estimated TBVPS of ~$101 (Q1 actual: $99.01) — versus ~0.6x in late 2023 and ~0.8x at end-2024. Citi traded <em>below</em> tangible book almost continuously from 2016 to early 2025; that era is over.</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:24px;">
+    <p class="prose"><strong>Notable One-Off Items:</strong> Citi's reported numbers are unusually noisy and the direction of the noise is about to reverse. <strong>(1) The Q4 2025 Russia notable item</strong> cut that quarter's EPS from roughly $1.81 to $1.19 and net income from ~$3.6B to $2.5B — an implied ~$1.1B hit that also dragged FY2025 RoTCE down to 7.7%; comparisons against FY2025 are therefore flattered. <strong>(2) Banamex is a two-sided distortion.</strong> The April 29, 2026 sale of a 22.6% stake produced a ~$0.4B net loss on sale but <em>added</em> ~$1.7B to stockholders' equity through the reclassification of ~$2.1B of accumulated CTA losses to noncontrolling interests. The larger item is still pending: roughly <strong>$9B of unrealized CTA losses attributable to Banamex</strong> at March 31, 2026 will be recognized in earnings when Citi's ownership falls below 50% and it loses substantive participation rights, "impacting EPS and RoTCE and reversing the temporary capital benefit," per the 10-Q. That is a large, known, one-time charge with an unknown date. <strong>(3) Severance and restructuring</strong> continued to inflate expenses in Q1 2026 — management cited "higher severance charges" alongside lower legal, stranded-cost and transformation expense — as headcount fell from 229,000 to 224,000 over the year. <strong>(4) Consent-order remediation</strong> spend remains embedded in the run-rate expense base rather than disclosed as a one-off; the ~$136M of combined Fed/OCC civil money penalties in July 2024 and the $400M OCC penalty in 2020 are the visible historical costs. <strong>(5) Credit reserves:</strong> Q1 2026 provisions of $2.78B (+3% YoY) reflected loan growth rather than deterioration — there is no meaningful reserve release flattering 1H26 earnings. <strong>Bottom line: 1H26 EPS of $6.21 is close to a clean number, but a Banamex deconsolidation charge is a visible pothole in the road to it.</strong></p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <p class="prose">Two aggregators disagree materially on Citi's consensus target — $154.50 across 21 analysts versus $145.22 across 19 — because the second includes unrefreshed targets from before the 2025–26 re-rating (its published low is $87, roughly 37% below the current price). Treat the $145–155 band as the honest range, implying <strong>5–12% upside</strong>. The more informative signal is the direction of revisions: targets were being raised through late June and early July, then trimmed after Q2, which is the sell side telling you the same thing the price action did — the beat was good, the composition was not.</p>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">BUY</div><div class="card-note">21 covering analysts. A second aggregator shows "Moderate Buy" across 19 analysts — the difference is classification, not sentiment.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$154.50</div><div class="card-note"><span style="color:var(--green);">+12.3% upside</span> from the $137.58 close. A rival consensus reads $145.22 (+5.6%), dragged down by stale low targets.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$129 – $176</div><div class="card-note">The widest published low is $87, an unrefreshed target from before the 2025–26 re-rating. High of $176 is Bank of America's (raised July 7, 2026).</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">11 / 5 / 5 / 0</div><div class="card-note">Strong Buy / Buy / Hold / Sell. No sell ratings outstanding, but the hold bucket has grown since June as the valuation gap closed.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:11;background:var(--green);"></div>
+    <div style="flex:5;background:#4ade80;"></div>
+    <div style="flex:5;background:var(--amber);"></div>
+    <div style="flex:0.001;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 11 (52%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 5 (24%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 5 (24%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 0 (0%)</div>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;text-transform:uppercase;">Key Recent Analyst Calls</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Bank of America — Ebrahim Poonawala (Jul 7, 2026):</strong> reiterated <em>Buy</em>, raised target to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$176</span>, the street high. The bull framing: RoTCE running above the 10–11% target with the Banamex overhang finite and quantified, which supports a multiple approaching 1.6–1.7x tangible book.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Morgan Stanley — Betsy Graseck (Jun 29, 2026):</strong> <em>Overweight</em>, target raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$164</span>. Thesis rests on expense discipline plus buyback capacity — a $30B authorization against a ~$231B market cap is roughly 13% of shares.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Truist — John McDonald (Jul 15, 2026):</strong> maintained <em>Buy</em> but <strong>lowered</strong> the target to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$154</span> after Q2. A useful signal: the Q2 beat ($3.15 vs. $2.74) was quality-questioned because markets revenue did the heavy lifting.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>UBS — Erika Najarian (Aug 3, 2026):</strong> <em>Neutral</em>, target lowered to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$142</span> — roughly 3% above the current price. The bear-adjacent case is entirely about valuation: at ~1.36x tangible book, buybacks are no longer self-evidently accretive and the easy re-rating is done.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Oppenheimer — Chris Kotowski (Jun 30, 2026):</strong> <strong>downgraded</strong> to <em>Market Perform</em> from Outperform on valuation, after the stock had roughly doubled in twelve months. RBC's Gerard Cassidy (Jul 15) and JPMorgan's Vivek Juneja (Jul 6) sit in between at <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$150</span> and <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$149</span>.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <p class="prose">Two of the six items below are scheduled, three are undated but highly probable, and one has already happened and is instructive. Note the asymmetry: the largest identified event — Banamex deconsolidation — is a <em>negative</em> reported-earnings catalyst that most of the sell side already treats as non-economic. How the stock trades through it is the cleanest available test of whether the 2025–26 re-rating reflects genuine conviction in the franchise or momentum.</p>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">~Oct 13, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (estimated date, before market open)</div>
+        <div class="tl-desc">The first read on whether the 1H26 revenue pace — two consecutive ~$24.7B quarters, both up ~14% — survives a quieter trading environment. Watch three lines: Services growth (17% in Q1 is the cleanest quality signal), the efficiency ratio versus the ~58% Q1 level, and whether full-year RoTCE guidance is formally raised above the 10–11% target that 1H results have already cleared.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Banamex deconsolidation / IPO of the residual stake</div>
+        <div class="tl-desc">Citi closed 22.6% of a 24% agreed sale on April 29, 2026 and expected the residual 1.4% by mid-year, bringing cumulative disposals to 49%. Crossing below 50% ownership with loss of substantive participation rights triggers recognition of roughly <strong>$9B of accumulated translation losses</strong> in earnings — a large non-cash hit to reported EPS and RoTCE that also reverses a temporary capital benefit. An IPO of what remains is the stated endgame and would close a four-year strategic chapter.</div>
+        <div class="tl-impact neutral">Key near-term event — quantified but undated</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">$30B buyback authorization (approved May 7, 2026)</div>
+        <div class="tl-desc">Roughly 13% of the current market capitalization. Citi repurchased ~$13B in FY2025 and ~$6.3B in Q1 2026 alone, with a total payout ratio of 134% in the quarter. The mechanics have changed, though: repurchases below tangible book (as through 2023–24) mechanically build TBVPS, while buying at ~1.36x tangible book <em>dilutes</em> it. This is now a capital-return story rather than a book-value-accretion story.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026–2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Consent-order remediation and potential order termination</div>
+        <div class="tl-desc">Management states ~90% of transformation programs are at or near target state across risk, controls, compliance and finance. The genuine catalyst is not further progress commentary but a formal termination or material amendment of the 2020 Fed/OCC orders — which would release remediation expense, reduce the perceived execution discount, and remove a constraint that has shadowed capital planning since 2020.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results: EPS $3.15 vs. $2.74 consensus — and the stock fell anyway</div>
+        <div class="tl-desc">Revenue of $24.77B (+14.5% YoY) and net income of $5.83B beat comfortably, yet shares slid from a $140.71 close on July 13 to $128.72 by July 20, an ~8.5% drawdown. The market read the beat as markets-driven and therefore low-quality, arriving into a stock that had already doubled off its 2025 lows. It has since recovered to $137.58.</div>
+        <div class="tl-impact down">Reaction already happened — beat sold off</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate path, NII trajectory and card credit normalization</div>
+        <div class="tl-desc">A meaningful slice of Services revenue is net interest income on operating deposits, so an accelerating easing cycle compresses the best business Citi owns while simultaneously helping card credit. Watch the U.S. Consumer Cards NCL trend (the segment grew only 4% in Q1 2026) and any change to the CET1 requirement following the annual stress-test cycle, with CET1 at 12.75% and falling as buybacks run.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">CITIGROUP (C) — MONTHLY CLOSES, SEP 2021 → AUG 2026</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF AUG 12, 2026 — final point is the Aug 12, 2026 close, not a completed month</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#056dae;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (1-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (3-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (10-mo)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a78bfa;vertical-align:middle;margin-right:6px;"></span>Key events</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF AUG 12, 2026</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">In plain English: RSI measures how much of the recent price movement has been upward. Above 70 the stock has run hard and may be stretched; below 30 it has been sold hard and may be washed out. On monthly data these signals are slow — Citi has spent most of 2025–26 in the 60–80 zone, which is what a sustained re-rating looks like, not necessarily a sell signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Five-year trajectory.</strong> From the September 2021 monthly close of $70.18, Citi returned <strong>+96.0% in price to the August 12, 2026 close of $137.58</strong> — but that number badly understates the path. The stock first lost roughly 44% into the October 2023 monthly close of <strong>$39.49</strong>, its lowest point in the period, as the 2022 rate shock, the March 2023 regional-bank crisis and doubts about Fraser's restructuring compounded on each other. Everything since has been recovery and re-rating: <strong>+248% from that October 2023 trough</strong>, including +42.5% in the trailing twelve months alone and +17.9% year-to-date in 2026. Adding roughly $12 of cumulative dividends over the period takes the five-year total return to approximately +113%.</p>
+  <p class="prose" style="margin-top:14px;">The mechanism is not earnings growth alone — it is multiple expansion off a distressed base. Citi's price-to-tangible-book went from roughly <strong>0.4x at the October 2023 low</strong> to <strong>~1.36x today</strong>, while tangible book per share itself compounded from ~$86 to ~$101. Put differently: about two-thirds of the recovery is the market agreeing that Citi is a normal bank again, and about one-third is Citi actually earning more. That asymmetry is the crux of the current debate — the re-rating leg has largely been spent.</p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Mar 2022</div><div class="tl-content"><div class="tl-title">Russia exposure and the start of the rate shock — $53.40</div><div class="tl-desc">Citi disclosed the largest Russia exposure of any U.S. bank as the invasion began, colliding with the Fed's first hike. The stock fell 18% in the quarter.</div><div class="tl-impact down">−18% Q1 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Bear-market low at $41.67</div><div class="tl-desc">Peak rate-shock pessimism: recession forecasts, credit-normalization fears and a restructuring with no visible payoff. Citi traded at roughly 0.45x tangible book.</div><div class="tl-impact down">−41% from Sep 2021</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2023</div><div class="tl-content"><div class="tl-title">Regional-bank crisis — $46.89 monthly close</div><div class="tl-desc">SVB and Signature failed in March and Credit Suisse was absorbed by UBS. Citi actually <em>gained</em> deposits as a flight-to-quality beneficiary and closed the month above February's low, but the sector de-rating capped the stock for the rest of 2023.</div><div class="tl-impact neutral">Deposit inflows, multiple compression</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Cycle low — $39.49, roughly 0.4x tangible book</div><div class="tl-desc">The maximum-pessimism point. Weeks later Fraser announced the five-segment reorganization and the elimination of the regional management layer; the stock has not revisited $40 since.</div><div class="tl-impact down">Trough — subsequent +248%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">Reorganization credibility — $63.24</div><div class="tl-desc">The first quarter reported under the new segment structure, plus a 20,000-role reduction plan, converted skeptics. Citi outperformed every large-cap U.S. bank over the following two quarters.</div><div class="tl-impact up">+60% off the trough</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2025</div><div class="tl-content"><div class="tl-title">Tariff shock drawdown — $68.38</div><div class="tl-desc">A 16% drop from the February 2025 close of $79.95 as global trade policy uncertainty hit the most internationally exposed U.S. bank hardest. It proved to be the last good entry point.</div><div class="tl-impact down">−16% in two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">Breakout through $100 to a $116.69 close</div><div class="tl-desc">Q3 2025 results plus a ~$13B full-year buyback pushed the stock decisively above tangible book for the first time in a decade, even as a Q4 Russia notable item cut reported Q4 EPS to $1.19.</div><div class="tl-impact up">+66% in 2025</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Record territory — $145.67 intra-month, $139.96 close</div><div class="tl-desc">Q1 2026 RoTCE of 13.1% blew through the 10–11% full-year target. The 52-week high of $147.96 dates from this stretch; the July post-earnings pullback to $128.72 has since been mostly recovered.</div><div class="tl-impact up">+20% in H1 2026</div></div></div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Over the same Sep 2021 → Aug 2026 window the <strong>S&amp;P 500 (SPY) rose from $429.14 to $772.49, or +80.0% in price</strong>; Citi's +96.0% beat it by roughly 16 percentage points — remarkable given that Citi was down 44% at the midpoint. The outperformance is entirely a 2025–26 phenomenon: over the trailing twelve months Citi returned +42.5% versus roughly +22.4% total return for the index, and year-to-date 2026 +17.9% versus +13.3%. Against banking peers the picture is more nuanced. Citi has been the best-performing money-center name off the 2023 lows precisely because it started cheapest, but it still trades at ~1.36x tangible book versus roughly 2.3x for Bank of America and a materially higher multiple for JPMorgan — the valuation gap has narrowed, not closed, and closing it further requires sustained mid-teens RoTCE rather than another sentiment shift.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <p class="prose">Citi at $137.58 is priced for a bank earning roughly 12–13% on tangible common equity — which is approximately what it earned in the first half of 2026, and roughly two points above its own full-year target. That symmetry is the whole debate. Buy the stock and you are underwriting that 1H26 is the new normal rather than a cyclically assisted peak; avoid it and you are betting that a decade of disappointing execution reasserts itself, or simply that a 1.36x tangible-book multiple already pays for the good news. A useful frame: each additional point of sustainable RoTCE is worth roughly 0.15–0.20x of tangible book, so the gap between a 12% and a 15% Citi is on the order of $45–60 per share.</p>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The turnaround is working and the numbers now prove it: RoTCE of 13.1% in Q1 2026 against a 10–11% full-year target, revenue up ~14% in both 1H26 quarters, an efficiency ratio down to ~58%, and Services — the highest-return, hardest-to-replicate business in the company — growing 17%. At 11.8x forward earnings and ~1.36x tangible book, Citi remains the cheapest of the four U.S. money-center banks, with a $30B buyback (13% of the market cap) shrinking the share count and a Banamex separation that removes the last strategic distraction. If mid-teens RoTCE proves durable, a 1.6–1.8x tangible-book multiple is defensible — roughly the street-high $176 target.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The cheap-stock argument has already been arbitraged: the P/E discount to peers is gone, the stock has doubled in twelve months, and buybacks above tangible book no longer mechanically build book value. The earnings driving the re-rating lean on a cycle-peak trading wallet (Markets was 26% of revenue and +19% in Q1), a ~$9B Banamex translation charge sits undated in equity waiting to hit EPS and RoTCE, and the 2020 consent orders remain open with remediation spend embedded in the cost base. UBS's $142 target — 3% above spot — is the honest bear-adjacent view: fairly valued, priced for continued execution, with limited margin for error.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Banamex deconsolidation charge.</strong> Roughly $9B of accumulated currency-translation losses will be recognized in earnings when ownership drops below 50% with loss of participation rights. It is non-cash and largely telegraphed, but it will produce an ugly reported quarter, dent RoTCE, and reverse a temporary capital benefit — and the timing is not in Citi's full control.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Markets revenue normalization.</strong> Roughly a quarter of revenue comes from the most cyclical line in banking, currently running at elevated volatility-driven levels. A reversion toward a normal trading wallet, combined with a faster easing cycle compressing deposit-related Services NII, could stall EPS growth just as the multiple has stopped being defensive.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Regulatory execution.</strong> The Fed and OCC consent orders remain open six years on, after $536M of cumulative penalties. Any new supervisory finding, penalty, or growth restriction would re-open the execution discount the market has spent two years closing — and would do so from a starting valuation that no longer prices in failure.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Matters Most Right Now</div>
+  <div class="card" style="border-left:3px solid var(--amber);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">The Value Re-Rating Has Done Most of Its Work</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">Citi's entire 2024–26 return is best understood as the market re-pricing a bank from "structurally broken" to "normal." Price-to-tangible-book went from ~0.4x in October 2023 to ~1.36x today, with tangible book per share compounding from roughly $86 to ~$101 alongside. The consequences are mechanical and unforgiving. First, buybacks change character: repurchasing shares below tangible book adds to TBVPS, while the current $30B program executed at 1.36x <em>subtracts</em> from it — the same dollars buy less book value per share, so future TBVPS growth must come from retained earnings alone. Second, the margin of safety is gone: a 10x forward multiple on a bank earning 9% RoTCE embeds skepticism; 11.8x on a bank earning 13% embeds success. Third, the marginal buyer changes — deep-value funds that bought at 0.5x book are sellers into strength, replaced by quality-growth buyers who require RoTCE durability rather than cheapness. Watch the hold-rating count (5 of 21, rising) and UBS's $142 target as the tell.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--red);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">Regulatory Remediation: Six Years and Counting</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">The October 2020 Federal Reserve and OCC consent orders — issued over deficiencies in risk management, data governance, internal controls and regulatory reporting — remain the single largest company-specific constraint on Citi. The bill so far: a $400M OCC penalty in 2020, roughly $136M more in combined Fed/OCC civil money penalties in July 2024 for insufficient progress, and billions of annual transformation spend absorbed into the run-rate expense base rather than disclosed as a one-off. Management now reports that <strong>~90% of transformation programs are at or near target state</strong> across risk, controls, compliance and finance, and 1H26's ~58% efficiency ratio suggests the peak spending year is behind. But the orders are still open, and until they are terminated Citi carries three distinct penalties: an expense drag, a supervisory constraint on capital and strategic actions, and a valuation discount for the risk that a new finding lands. Formal termination would be the highest-conviction non-earnings catalyst in the story. Conversely, a new adverse finding is the fastest route back to a sub-1x tangible-book multiple.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green);">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">The Global Transaction-Banking Moat — and What Could Erode It</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">Services is the asset that makes Citi worth owning at all: ~$21.3B of FY2025 revenue growing 17% in Q1 2026, deposit-funded, capital-light, running above the firm's blended return, and effectively impossible to replicate — licenses in ~90 countries, settlement in ~180 currencies, ~$5T of daily flows, ~$29T of assets under custody. Cross-border commerce, supply-chain reconfiguration and the institutionalization of digital-asset custody all push volumes toward the handful of banks that can settle everywhere; Citi, JPMorgan and HSBC are that list. <strong>Bull framing:</strong> if Services keeps compounding low-double-digits while Markets merely holds flat, Citi earns mid-teens RoTCE without any heroic assumption, and the multiple should converge toward the 1.8–2.0x tangible book the market pays for high-quality payments franchises — the path to $170+. <strong>Bear framing:</strong> a meaningful slice of that revenue is net interest income on operating deposits, so a fast easing cycle compresses the crown jewel exactly when card credit is normalizing; and new rails — stablecoin settlement, real-time cross-border networks, fintech treasury platforms — attack the pricing of the payments layer even if they cannot replicate the licensing footprint. The moat is around <em>access</em>, not necessarily around <em>margin</em>.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of August 12, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Citigroup SEC filings (Q1 2026 Form 10-Q filed May 7, 2026; Form 8-K earnings releases dated January 14, 2026 and April 14, 2026 with Exhibit 99.1 press releases) for segment revenue, RoTCE, CET1, SLR, tangible book value per share, headcount, Banamex sale terms and CTA disclosures; StockAnalysis.com for prices, monthly price history, key statistics, quarterly financials and forecast consensus; MarketBeat for analyst ratings, individual price targets, short interest, institutional ownership, buyback authorization and the Q2 2026 earnings comparison; CompaniesMarketCap for market-capitalization rankings. <strong>Flagged as unverified or estimated:</strong> Q2 2026 <em>segment-level</em> revenue was not retrievable from these sources (the Q2 total of $24.77B, net income of $5.83B and EPS of $3.15 are verified; the segment split shown is Q1 2026 actual). The CFO transition (Gonzalo Luchetti listed as CFO, Mark Mason as Executive Vice Chairman) comes from a third-party company profile and should be confirmed with Citi investor relations. The NYSE market-cap rank (~#30) is an approximation derived from the US rank of #50. All competitor market shares, industry revenue-pool sizes, total-addressable-market figures, peer revenues and growth rates are estimates drawn from industry sources (Coalition Greenwich, Dealogic and comparable trackers) and are labeled "est."; money-center bank averages and S&amp;P 500 averages are approximations. The Q3 2026 earnings date of ~October 13, 2026 is an estimate. Historical penalty figures (2020 OCC $400M; July 2024 ~$136M combined) are from prior reporting and were not re-verified here.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. Financial data may contain errors or omissions and should be independently verified against primary sources before any investment decision. Past performance is not indicative of future results. Banking stocks carry credit, interest-rate, regulatory and market risk, and losses can be substantial. Consult a qualified financial adviser regarding your individual circumstances.</p>
+</div>
+
+</div>
+
+<script>
+// ============ STATIC DATA — AUG 12, 2026 ============
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [70.18,69.16,63.70,60.39,65.12,59.23,53.40,48.21,53.41,45.99,51.90,48.81,41.67,45.86,48.41,45.23,52.22,50.69,46.89,47.07,44.32,46.04,47.66,41.29,41.13,39.49,46.10,51.44,56.17,55.49,63.24,61.33,62.31,63.46,64.88,62.64,62.60,64.17,70.87,70.39,81.43,79.95,70.99,68.38,75.32,85.12,93.70,96.57,101.50,101.23,103.60,116.69,115.71,110.19,113.41,127.98,125.90,139.96,132.45,137.58];
+
+function sma(arr, w) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < w - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += arr[j];
+    out.push(+(s / w).toFixed(2));
+  }
+  return out;
+}
+const ma1 = sma(prices, 1);
+const ma3 = sma(prices, 3);
+const ma10 = sma(prices, 10);
+
+const events = [
+  { idx: 6,  label: 'Mar 22 · Russia exposure + first Fed hike', color: '#ef4444' },
+  { idx: 12, label: 'Sep 22 · Bear-market low $41.67', color: '#ef4444' },
+  { idx: 18, label: 'Mar 23 · Regional-bank crisis', color: '#f59e0b' },
+  { idx: 25, label: 'Oct 23 · Cycle low $39.49 (~0.4x TBV)', color: '#ef4444' },
+  { idx: 30, label: 'Mar 24 · Reorg credibility, +60% off low', color: '#22c55e' },
+  { idx: 43, label: 'Apr 25 · Tariff-shock drawdown $68.38', color: '#f59e0b' },
+  { idx: 51, label: 'Dec 25 · Breakout above tangible book', color: '#22c55e' },
+  { idx: 57, label: 'Jun 26 · Record run, RoTCE 13.1%', color: '#22c55e' }
+];
+const eventPoints = prices.map((p, i) => {
+  const e = events.find(ev => ev.idx === i);
+  return e ? p : null;
+});
+const eventColors = prices.map((p, i) => {
+  const e = events.find(ev => ev.idx === i);
+  return e ? e.color : 'transparent';
+});
+
+const pc = document.getElementById('priceChart').getContext('2d');
+const grad = pc.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(5, 109, 174, 0.28)');
+grad.addColorStop(1, 'rgba(5, 109, 174, 0)');
+
+new Chart(pc, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Price', data: prices, borderColor: '#056dae', backgroundColor: grad, borderWidth: 2.5, fill: true, tension: 0.25, pointRadius: 0, pointHoverRadius: 5, order: 4 },
+      { label: '20-Day MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, order: 3 },
+      { label: '50-Day MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [6, 4], fill: false, tension: 0.25, pointRadius: 0, order: 2 },
+      { label: '200-Day MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [8, 5], fill: false, tension: 0.25, pointRadius: 0, order: 1 },
+      { label: 'Events', data: eventPoints, borderColor: 'transparent', backgroundColor: eventColors, pointBackgroundColor: eventColors, pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointRadius: 6, pointHoverRadius: 8, showLine: false, order: 0 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.dataset.label === 'Events') {
+              const e = events.find(ev => ev.idx === ctx.dataIndex);
+              return e ? '● ' + e.label : null;
+            }
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b', drawTicks: false }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: v => '$' + v } }
+    }
+  }
+});
+
+function computeRSI(arr, period) {
+  const rsi = new Array(arr.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = arr[i] - arr[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let ag = gains / period, al = losses / period;
+  rsi[period] = al === 0 ? 100 : 100 - (100 / (1 + ag / al));
+  for (let i = period + 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    ag = (ag * (period - 1) + g) / period;
+    al = (al * (period - 1) + l) / period;
+    rsi[i] = al === 0 ? 100 : 100 - (100 / (1 + ag / al));
+  }
+  return rsi.map(v => v === null ? null : +v.toFixed(1));
+}
+const rsiData = computeRSI(prices, 6);
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{ label: 'RSI(6)', data: rsiData, borderColor: '#a78bfa', borderWidth: 2, fill: false, tension: 0.25, pointRadius: 0, pointHoverRadius: 4 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            let tag = ' (neutral)';
+            if (ctx.parsed.y >= 70) tag = ' (overbought)';
+            else if (ctx.parsed.y <= 30) tag = ' (oversold)';
+            return 'RSI: ' + ctx.parsed.y.toFixed(1) + tag;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b', drawTicks: false }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+      y: {
+        min: 0, max: 100,
+        grid: {
+          color: function(ctx) { return (ctx.tick.value === 70 || ctx.tick.value === 30) ? '#334155' : '#161f31'; },
+          lineWidth: function(ctx) { return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1; }
+        },
+        ticks: {
+          stepSize: 10,
+          color: function(ctx) {
+            if (ctx.tick.value === 70) return '#ef4444';
+            if (ctx.tick.value === 30) return '#22c55e';
+            return '#64748b';
+          },
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
