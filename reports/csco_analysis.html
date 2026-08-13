@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSCO — Cisco Systems, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #00bceb; /* Cisco blue */
+  --accent-dim: #00bceb33; /* brand color + 33 alpha */
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<!-- STATIC DATA BANNER -->
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 12, 2026 (market close) — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- HEADER -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">CSCO</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Communication Equipment / Networking Hardware</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $488.3B</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #28</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #19</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: #12</span>
+        <span style="font-size:11px;color:var(--text-dim);">(approx. ranks by market cap)</span>
+      </div>
+      <h1 class="company-name" style="margin-top:14px;">Cisco Systems, Inc.</h1>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$123.88</div>
+      <div class="price-change" style="color:var(--green);">▲ +$3.45 (+2.86%)</div>
+      <div class="price-date">Close: Wednesday, August 12, 2026</div>
+      <div class="price-date" style="color:var(--red);">After-hours: $118.18 (−4.6%) — Q4 FY26 results released post-close</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>San Jose, California</div>
+    <div class="meta-item"><span>Employees:</span>~86,200</div>
+    <div class="meta-item"><span>Founded:</span>1984</div>
+    <div class="meta-item"><span>Next Earnings:</span>~Nov 11, 2026 (Q1 FY27, est.)</div>
+  </div>
+</div>
+
+<!-- SECTION 01: COMPANY OVERVIEW -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">
+    Cisco builds the plumbing of the internet — Ethernet switches, routers, custom networking silicon, optics, wireless access, security software and the observability platform that watches it all — and sells it to enterprises, telecom carriers and, increasingly, the hyperscale cloud operators building AI data centers. Fiscal 2026 (ended July 25, 2026) was the best year in the company's modern history: revenue of <strong>$63.3B, up 12% <span class="tip" title="Year-over-Year — compared with the same period one year earlier">YoY</span></strong>, with product revenue up 16% and a fourth quarter that hit <strong>$17.3B (+18%)</strong> — the fastest growth Cisco has printed in more than a decade. The engine is artificial intelligence: <strong>$9.3B of AI infrastructure orders from webscale customers in FY26</strong>, roughly 4.5x the prior year, with management guiding to $7.5B of AI-related <em>revenue</em> in FY2027. That re-rating has carried Cisco to a <strong>$488B market cap, the world's 28th most valuable company</strong>, after a decade in which it was widely dismissed as a value trap.
+  </p>
+  <div style="margin-top:28px;">
+    <div class="card-label" style="margin-bottom:14px;">Notable Executives &amp; Owners</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">Chairman &amp; Chief Executive Officer</div>
+        <div class="card-value" style="font-size:20px;">Chuck Robbins</div>
+        <div class="card-note">CEO since July 2015 and Chairman since 2017; joined Cisco in 1997 and ran worldwide field operations before succeeding John Chambers. Architect of the shift from box-selling to software and subscriptions, and of the $28B Splunk acquisition.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Chief Financial Officer</div>
+        <div class="card-value" style="font-size:20px;">Mark Patterson</div>
+        <div class="card-note">CFO since July 2025, succeeding Scott Herren. A 20-year Cisco veteran who was previously Chief Strategy Officer and ran the Americas region; has framed the AI order book, gross-margin trajectory and the FY27 $72B+ revenue guide to the Street.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Key Institutional Investors</div>
+        <div class="card-value" style="font-size:20px;">Index Giants (~79%)</div>
+        <div class="card-note">Vanguard ~10.0% (~396M shares), BlackRock ~8–9%, State Street ~4–5%, Geode ~2.5%, plus Legal &amp; General, Dimensional and Norges. Institutions hold roughly 79% of shares — a classic mega-cap index-dominated register with no activist presence.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 02: CORE BUSINESSES -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose" style="margin-bottom:8px;">FY2026 revenue mix (total $63.3B; fiscal year ended July 25, 2026). Cisco reports four product categories plus a large recurring Services line. Networking is now nearly 55% of the company and supplied essentially all of the year's incremental growth.</p>
+  <div class="seg-bar">
+    <div style="flex:54.8;background:var(--accent);">55%</div>
+    <div style="flex:23.7;background:#3b82f6;">24%</div>
+    <div style="flex:13.0;background:#a78bfa;">13%</div>
+    <div style="flex:6.8;background:#f59e0b;">7%</div>
+    <div style="flex:1.7;background:#6b7280;color:#e2e8f0;">2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--accent);"></div>Networking — $34.7B (+22%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#3b82f6;"></div>Services — $15.0B (flat)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#a78bfa;"></div>Security — $8.2B (+2%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#f59e0b;"></div>Collaboration — $4.3B (+4%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#6b7280;"></div>Observability — $1.1B (+4%)</div>
+  </div>
+
+  <!-- NETWORKING -->
+  <div class="biz-card" style="border-left: 3px solid var(--accent);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Networking</div>
+        <span class="biz-badge dominant" style="margin-top:6px;">~29% WORLDWIDE ETHERNET SWITCHING SHARE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$34.7B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+22%</div><div class="biz-stat-label">FY26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~29.3%</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">54.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">
+      Switches (Catalyst for campus, Nexus for data center), enterprise and service-provider routers, <strong style="color:var(--text);">Silicon One</strong> merchant/custom networking <span class="tip" title="Application-Specific Integrated Circuit — a chip designed for one purpose, here packet switching and routing">ASICs</span>, optical systems, Wi-Fi 7 access points, and <span class="tip" title="Software-Defined Wide Area Network — software that manages traffic across an enterprise's branch and cloud connections">SD-WAN</span>. Q4 FY26 networking revenue was <strong style="color:var(--text);">$9.8B, +28% YoY</strong>, with product orders up 35% overall, service-provider and cloud orders up 95%, data-center switching orders up ~40% and campus orders at a record (+20% for the year). The AI story is concrete rather than aspirational: <strong style="color:var(--text);">$9.3B of webscale AI infrastructure orders in FY26</strong> (versus an original $5B target raised to $9B mid-year), of which roughly $4B converted to revenue; a further $1.3B came from neocloud, sovereign and enterprise AI customers, up ~150%. Cisco disclosed three new Silicon One design wins in Q4. The catch is mix: this hardware carries structurally lower margin, and product <span class="tip" title="Revenue minus cost of goods sold, as % of revenue">gross margin</span> fell to 64.8% from 67.5% a year earlier.
+    </p>
+    <div class="biz-tam"><strong>Industry Size:</strong> Ethernet switching running at ~$62B annualized (Q1 2026: $15.4B, +39.8% YoY per IDC) plus ~$15B routing; AI back-end networking TAM est. $80B+ by 2028 (~30%+ CAGR)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">NVIDIA (Spectrum-X / InfiniBand)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~21.5%</div><div class="comp-bubble-label">DC Ethernet Share</div></div>
+          <div><div class="comp-bubble-val">~$31B</div><div class="comp-bubble-label">FY26 Networking Rev</div></div>
+          <div><div class="comp-bubble-val">+150%+</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Arista Networks</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~14.6%</div><div class="comp-bubble-label">Switch Share</div></div>
+          <div><div class="comp-bubble-val">~$12.6B</div><div class="comp-bubble-label">CY26 Rev Guide</div></div>
+          <div><div class="comp-bubble-val">+35–38%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">HPE + Juniper</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~6.4%</div><div class="comp-bubble-label">Switch Share</div></div>
+          <div><div class="comp-bubble-val">~$4B est.</div><div class="comp-bubble-label">Switching Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+15%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVICES -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Services</div>
+        <span class="biz-badge emerging" style="margin-top:6px;">HIGH-MARGIN ANNUITY — FLAT GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$15.0B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~0%</div><div class="biz-stat-label">FY26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">Attach-based</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">
+      Technical support contracts (SMARTnet), advanced and professional services, and software support attached to the installed base. This is Cisco's ballast: roughly $15B of highly predictable, high-margin revenue with <strong style="color:var(--text);">$16.0B of services deferred revenue (+4%)</strong> and <strong style="color:var(--text);">$23.3B of services <span class="tip" title="Remaining Performance Obligations — contracted revenue not yet recognized; a forward visibility metric">RPO</span> (+6%)</strong> behind it. It was also the year's disappointment — flat in FY26 and flat again in Q4 — because service attach lags product shipments by two to four quarters and because webscale AI hardware carries far lower support attach than enterprise campus gear. The bull reading is that FY26's product surge mechanically pulls services growth up through FY27–28; the bear reading is that hyperscalers self-support and the attach ratio structurally declines as mix shifts. Services gross margins run near 70%, so every point of mix shift toward product hardware compresses the consolidated margin.
+    </p>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~$60B network support, maintenance and managed-network services market; low-to-mid single-digit growth</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">HPE Pointnext / Juniper Care</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~$7B est.</div><div class="comp-bubble-label">Services Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+MSD%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Third-party maintainers (Park Place, Curvature)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~$3B est.</div><div class="comp-bubble-label">Segment Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">Price-led</div><div class="comp-bubble-label">Threat Vector</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECURITY -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Security (incl. Splunk)</div>
+        <span class="biz-badge" style="margin-top:6px;background:var(--amber-dim);color:var(--amber);">~7% OF A FRAGMENTED $120B MARKET</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$8.2B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+2%</div><div class="biz-stat-label">FY26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~7%</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">
+      Splunk (the <span class="tip" title="Security Information and Event Management — software that aggregates and analyses security logs to detect threats">SIEM</span> franchise Cisco bought for $28B in March 2024, still a share leader at roughly a quarter of that market), Secure Firewall, Duo identity, Umbrella cloud security, XDR, plus newer AI-native products — Hypershield for workload segmentation and AI Defense for securing model deployments. FY26 growth of just <strong style="color:var(--text);">+2%</strong> was the ugliest number in the release, reflecting the lapping of the Splunk acquisition, sales-motion disruption from integrating two go-to-market organizations, and genuine share loss to platform consolidators. But the exit rate matters more than the year: <strong style="color:var(--text);">Q4 security revenue grew 14% to $2.2B</strong>, the fastest quarterly print since the deal closed, which management attributes to Splunk cross-sell into the Cisco installed base finally landing. Whether that reacceleration holds through FY27 is the single biggest swing factor in the "Cisco is more than a hardware company" thesis.
+    </p>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~$120B global cybersecurity market growing ~12% CAGR; SIEM/security analytics ~$20B growing ~15%</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Palo Alto Networks</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~9%</div><div class="comp-bubble-label">Market Share</div></div>
+          <div><div class="comp-bubble-val">~$11.4B</div><div class="comp-bubble-label">FY26 Revenue</div></div>
+          <div><div class="comp-bubble-val">+24%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Microsoft Security</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~20%</div><div class="comp-bubble-label">Market Share</div></div>
+          <div><div class="comp-bubble-val">~$25B est.</div><div class="comp-bubble-label">Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+20%+</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CrowdStrike / Fortinet</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~5% ea.</div><div class="comp-bubble-label">Market Share</div></div>
+          <div><div class="comp-bubble-val">~$5–6B ea.</div><div class="comp-bubble-label">Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+12–20%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLLABORATION -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Collaboration</div>
+        <span class="biz-badge" style="margin-top:6px;background:var(--amber-dim);color:var(--amber);">MATURE — SHARE UNDER STRUCTURAL PRESSURE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4.3B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4%</div><div class="biz-stat-label">FY26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~8%</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">
+      Webex meetings and calling, Webex Contact Center, and the meeting-room device portfolio (boards, desk devices, cameras). This is the segment where Cisco lost a platform war: Microsoft Teams is bundled into Microsoft 365 and Zoom owns the standalone mindshare, leaving Webex with a defensible but shrinking niche in regulated industries, government and rooms hardware. FY26 revenue rose 4%, with a better <strong style="color:var(--text);">Q4 at +12% ($1.2B)</strong> driven by a return-to-office device refresh cycle and early traction in AI-assisted contact center agents. Investors should treat this line as a cash-generating annuity rather than a growth asset; the strategic question is whether contact center (a ~$25B market where Cisco competes with Genesys, NICE and Five9) can be grown enough to offset meetings erosion.
+    </p>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~$50B unified communications &amp; collaboration market; low-single-digit growth, contact-center sub-segment ~$25B growing ~10%</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Microsoft Teams</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~45%+</div><div class="comp-bubble-label">Meetings Share</div></div>
+          <div><div class="comp-bubble-val">Bundled</div><div class="comp-bubble-label">Monetization</div></div>
+          <div><div class="comp-bubble-val">Growing</div><div class="comp-bubble-label">Trajectory</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Zoom Communications</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~15%</div><div class="comp-bubble-label">Meetings Share</div></div>
+          <div><div class="comp-bubble-val">~$4.9B</div><div class="comp-bubble-label">Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+3%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OBSERVABILITY -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Observability</div>
+        <span class="biz-badge emerging" style="margin-top:6px;">EMERGING — SUB-SCALE VERSUS PURE-PLAYS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.1B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4%</div><div class="biz-stat-label">FY26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~3%</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">1.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">
+      Splunk Observability Cloud, AppDynamics application performance monitoring, and ThousandEyes internet/network intelligence. At <strong style="color:var(--text);">$275M in Q4 (+6%)</strong> and $1.1B for the year, this is Cisco's smallest and slowest-growing line — awkward, because observability is precisely the category the Splunk deal was supposed to unlock, and because AI infrastructure visibility should be a natural adjacency to selling the network underneath it. Cisco's advantage is telemetry: it owns the switches, the routers and now the log platform, which in principle allows correlation from packet to application that Datadog cannot replicate. Execution has not matched the logic. Watch whether management begins reporting an Observability + Security "software" metric in FY27 — a common tell that a standalone line isn't working.
+    </p>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~$40B observability &amp; APM market growing ~13% CAGR; AI-workload observability the fastest sub-segment</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Datadog</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~11%</div><div class="comp-bubble-label">Market Share</div></div>
+          <div><div class="comp-bubble-val">~$4.3B est.</div><div class="comp-bubble-label">Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+25%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Dynatrace</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~5%</div><div class="comp-bubble-label">Market Share</div></div>
+          <div><div class="comp-bubble-val">~$1.9B est.</div><div class="comp-bubble-label">Rev/Yr</div></div>
+          <div><div class="comp-bubble-val">+16%</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Grafana / Elastic / OpenTelemetry</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">Open-source</div><div class="comp-bubble-label">Price Pressure</div></div>
+          <div><div class="comp-bubble-val">~$2B est.</div><div class="comp-bubble-label">Commercial Rev</div></div>
+          <div><div class="comp-bubble-val">+15%+</div><div class="comp-bubble-label">YoY Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 03: MOAT -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="card-label">Sources of Moat</div>
+  <div class="moat-list">
+    <span class="moat-pill">Installed Base &amp; Switching Costs</span>
+    <span class="moat-pill">IOS / Certification Ecosystem</span>
+    <span class="moat-pill">Silicon One Custom ASICs</span>
+    <span class="moat-pill">Global Channel Partner Network</span>
+    <span class="moat-pill">Services Attach Annuity</span>
+    <span class="moat-pill">Splunk Data Platform</span>
+    <span class="moat-pill">Supply Chain &amp; Balance-Sheet Scale</span>
+  </div>
+  <p class="prose" style="margin-top:24px;">
+    Cisco's moat is built on inertia, and inertia is a genuinely durable asset in enterprise infrastructure. Networks are the one layer of the stack that companies rip and replace least often: gear has 5–7 year lives, configurations accumulate institutional knowledge, and the operating staff is credentialed on Cisco's own curriculum — the <strong>CCNA/CCNP/CCIE certification pyramid is an industry-wide labor standard</strong> that quietly converts every network engineer into a distribution channel. Layer on tens of thousands of resellers and integrators worldwide, a services attach that funds ~$15B of high-margin annuity revenue, and a supply chain able to absorb component shortages that strand smaller vendors, and you get a business that loses share slowly even when it loses technology races. The newest pillar is silicon: <strong>Silicon One</strong> lets Cisco sell either whole systems or bare chips to hyperscalers who would otherwise design their own, which is how a company perceived as an enterprise dinosaur booked $9.3B of AI orders from the very customers most capable of disintermediating it. Splunk adds a data layer that, in theory, makes the network observable and defensible in software. The moat's honest limitation: it protects <em>pricing and retention</em> in campus and enterprise far better than it protects Cisco in the data center, where buyers are a handful of sophisticated engineering organizations with no brand loyalty at all.
+  </p>
+  <div style="margin-top:28px;">
+    <div class="card-label" style="margin-bottom:14px;">Key Vulnerabilities</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:var(--text);">NVIDIA's vertical integration.</strong> NVIDIA's networking division did roughly <strong style="color:var(--text);">$31B in FY2026 — more than Cisco's entire $34.7B networking segment</strong> — including an $11B quarter, and took the #1 position in data-center Ethernet switching with Spectrum-X in about two years. When the accelerator vendor bundles the fabric with the GPU and the software stack, Cisco is selling into a socket that has already been designed out. This is the single most important structural threat in the story.</div></div>
+      <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:var(--text);">Arista and merchant-silicon commoditization.</strong> Arista is guiding to ~$12.6B of 2026 revenue growing ~35–38% with a software-first (EOS) model, and white-box switches built on Broadcom Tomahawk/Jericho silicon let hyperscalers buy hardware at near-component cost. Cisco's answer — sell Silicon One chips into those same white boxes — protects revenue but at materially lower gross margin than selling a Nexus system.</div></div>
+      <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:var(--text);">Security and observability under-performance.</strong> Two years after paying $28B for Splunk, the Security segment grew 2% in FY26 while Palo Alto grew 24% and Microsoft bundled its way to roughly 20% share. Observability grew 4% while Datadog grew ~25%. If the Q4 reacceleration (+14% security) proves to be a comparison artifact rather than cross-sell traction, the software diversification thesis fails and Cisco is simply a cyclical hardware company at 24x forward earnings.</div></div>
+      <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:var(--text);">Customer concentration and margin dilution.</strong> The growth is coming from a handful of webscalers whose orders are lumpy, whose negotiating leverage is extreme, and whose hardware carries product gross margins of 64.8% versus 67.5% a year ago. Management guided Q1 FY27 non-GAAP gross margin to <strong style="color:var(--text);">65–66%</strong>, roughly 300bps below the pre-AI run rate — the exact reason shares fell after an otherwise excellent print.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 04: FINANCIAL METRICS -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>CSCO</th><th>Industry Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings ratio — share price divided by earnings per share; how much you pay per $1 of profit">P/E</span> (Trailing)</td><td style="color:var(--red);">37.2x</td><td>~32x</td><td>~33x</td><td>On <span class="tip" title="Generally Accepted Accounting Principles — standardized US financial reporting rules">GAAP</span> FY26 EPS of $3.33. On non-GAAP EPS of $4.33 the multiple is 28.6x — the gap is mostly Splunk intangible amortization.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price-to-Earnings ratio based on next-12-month expected earnings">P/E</span></td><td style="color:var(--green);">24.4x</td><td>~27x</td><td>~28x</td><td>Against management's FY27 non-GAAP EPS guide of $5.05–$5.11. Street consensus was $4.80 pre-print and is being revised up.</td></tr>
+      <tr><td><span class="tip" title="P/E divided by expected earnings growth rate — below 1.0 suggests growth is cheaply priced">PEG</span> Ratio</td><td style="color:var(--green);">1.87</td><td>~2.1</td><td>~1.9</td><td>Screener-based on long-run growth. On guided FY27 EPS growth of ~17%, forward PEG drops to roughly 1.4 — the bull's preferred framing.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, Trailing Twelve Months — net income per share over the last four quarters">EPS (TTM)</span></td><td style="color:var(--text-dim);">$3.33 GAAP / $4.33 adj.</td><td>—</td><td>—</td><td>GAAP EPS +31% YoY; non-GAAP +14%. FY27 guide implies $4.00–$4.06 GAAP, $5.05–$5.11 non-GAAP.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year — compared with the same period one year earlier">YoY</span>)</td><td style="color:var(--amber);">+11.8%</td><td>~+18%</td><td>~+12%</td><td>FY26 total; but Q4 alone was +18% and FY27 is guided to ~+15% ($72.2–73.4B). Trails AI-native networking peers growing 25–150%.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as % of revenue — pricing power and production efficiency">Gross Margin</span></td><td style="color:var(--green);">64.5%</td><td>~58%</td><td>~50%</td><td>GAAP FY26 (66.9% non-GAAP). Still elite for hardware, but down from 68.7% non-GAAP on AI hardware mix and memory cost inflation.</td></tr>
+      <tr><td><span class="tip" title="Net income as % of revenue — bottom-line profitability">Net Profit Margin</span></td><td style="color:var(--green);">21.0%</td><td>~14%</td><td>~15%</td><td>$13.3B of GAAP net income on $63.3B of revenue, +30% YoY. Non-GAAP net income was $17.2B (27.2% margin).</td></tr>
+      <tr><td><span class="tip" title="Annual dividends per share divided by share price">Dividend Yield</span></td><td style="color:var(--green);">1.36%</td><td>~1.0%</td><td>~0.8%</td><td>$0.42/quarter declared Aug 2026 (payable Oct 21), $1.68 annualized. ~50% payout ratio; raised in each of the last 15 years.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as % of freely tradable shares — a gauge of bearish positioning">Short Interest</span></td><td style="color:var(--green);">1.68%</td><td>~2.4%</td><td>~1.8%</td><td>~66M shares short. Minimal bearish positioning — this is an index-owned mega-cap, not a battleground stock.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — balance-sheet leverage">Debt-to-Equity</span></td><td style="color:var(--amber);">0.59</td><td>~0.50</td><td>~1.2</td><td>$29.5B total debt (of which $10.2B short-term, up from $5.2B) against $15.9B cash and investments. Splunk-related borrowings still amortizing.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — near-term liquidity">Current Ratio</span></td><td style="color:var(--red);">0.93</td><td>~2.1</td><td>~1.9</td><td>Below 1.0 — optically weak, but driven by $13.8B of product deferred revenue (a non-cash obligation) and $10.2B of near-term debt. Not a liquidity concern given $12.8B annual FCF.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditures">FCF</span> (TTM)</td><td style="color:var(--text-dim);">$12.77B</td><td>—</td><td>—</td><td>From $14.18B of operating cash flow. Cisco returned $12.7B in FY26 ($6.6B dividends, $6.1B buybacks) — roughly 100% of FCF.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">27.3%</td><td>~19%</td><td>~22%</td><td>Strong and rising, helped by buybacks shrinking the equity base and by the FY26 earnings inflection.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by total invested capital">ROIC</span></td><td style="color:var(--green);">20.6%</td><td>~14%</td><td>~16%</td><td>Comfortably above any plausible cost of capital, and improving as the $28B Splunk capital base finally starts generating growth.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to overall market moves — 1.0 moves with the market; higher means more volatile">Beta</span></td><td style="color:var(--green);">1.00</td><td>~1.2</td><td>~1.1</td><td>Historically a low-volatility mega-cap. Note this backward-looking beta almost certainly understates current risk: the stock moved ±9% around this print.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$65.75–$130.37</td><td>—</td><td>—</td><td>A 98% range. The close sits ~5% below the June all-time high and ~88% above the 52-week low set in late summer 2025.</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:24px;">
+    <p class="prose"><strong>Notable One-Off Items:</strong> The largest recurring distortion is <strong>Splunk purchase accounting</strong>. Cisco closed the $28B acquisition in March 2024, and amortization of acquisition-related intangibles plus integration costs account for the bulk of the ~$1.00 per share gap between FY26 GAAP EPS ($3.33) and non-GAAP EPS ($4.33) — roughly $4B pre-tax annually, a charge that is non-cash but reflects real capital deployed. Second, Cisco announced a <strong>restructuring in May 2026 affecting roughly 4,000 employees (~4% of headcount)</strong>, reallocating spend toward AI infrastructure engineering; associated severance and facilities charges hit FY26 GAAP operating expense and partly explain why GAAP operating margin (24.3%) sits ~10 points below non-GAAP (34.8%). Third, the FY26 <strong>short-term debt balance nearly doubled to $10.2B</strong> as Splunk-era borrowings rolled into current maturities — a refinancing event to watch in FY27, not a solvency issue. Finally, note the <strong>gross-margin comparison base</strong>: FY25's 68.7% non-GAAP gross margin benefited from a favourable software/services mix that will not recur while AI hardware scales, so year-over-year margin declines through FY27 are mix-driven rather than evidence of price erosion. Verify all figures against Cisco's FY2026 Form 10-K when filed (expected September 2026).</p>
+  </div>
+</div>
+
+<!-- SECTION 05: ANALYST CONSENSUS -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">BUY</div><div class="card-note">26 covering analysts. No Sell ratings outstanding — unusual conviction for a company this size, and a crowded-long risk in its own right.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$135.64</div><div class="card-note">+9.5% versus the $123.88 close. This average is stale by hours: at least five firms raised targets the morning after the print.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value">$115 – $165</div><div class="card-note">A 43% spread. The low end sits <em>below</em> the current price — the bear case is now about multiple compression, not earnings.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:18px;">13 SB · 4 B · 9 H · 0 S</div><div class="card-note">Strong Buy / Buy / Hold / Sell. ~65% bullish, 35% neutral, zero bears.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:13;background:var(--green);"></div>
+    <div style="flex:4;background:#4ade80;"></div>
+    <div style="flex:9;background:var(--amber);"></div>
+    <div style="flex:0.4;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--green);"></div>Strong Buy (13)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#4ade80;"></div>Buy (4)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--amber);"></div>Hold (9)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--red);"></div>Sell / Strong Sell (0)</div>
+  </div>
+  <div class="card-label" style="font-family:'JetBrains Mono',monospace;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">•</span><div><strong>Rosenblatt Securities — Mike Genovese</strong> (Aug 13, 2026): Buy, PT raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$165</span> from $150. Street-high. Argues the market is mispricing a durable networking supercycle: $9.3B of FY26 AI orders converting to $7.5B of FY27 revenue, three new Silicon One design wins, and campus orders at records — and that hardware-mix margin dilution is the correct trade for 15% top-line growth.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">•</span><div><strong>Wells Fargo</strong> (Aug 13, 2026): Overweight, PT raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$150</span>. Views the FY27 revenue guide of $72.2–73.4B versus $68.7B consensus as the largest guidance beat Cisco has delivered in a decade, and sees the post-print selloff as a mix-driven overreaction.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">•</span><div><strong>Morgan Stanley — Meta Marshall</strong> (Aug 13, 2026): Overweight, PT raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$135</span> from $130. Constructive on order momentum (product orders +35%, service-provider/cloud +95%) but models gross margin settling in the 65–66% band, capping multiple expansion. KeyBanc's Brandon Nispel made the same $130→$135 move on similar logic.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">•</span><div><strong>Barclays</strong> (Aug 13, 2026): Equal Weight, PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$123</span> — below the current price. The bear-adjacent view: AI order growth is real but the incremental dollars come at ~500bps lower gross margin, security is growing 2%, and at 24x forward earnings Cisco is priced like a growth company for the first time since 2000.</div></div>
+  </div>
+</div>
+
+<!-- SECTION 06: CATALYSTS -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">MAY 13, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY26: record $15.8B revenue, AI order target raised $5B → $9B</div>
+        <div class="tl-desc">Revenue grew 12% to a then-record $15.8B with non-GAAP gross margin of 66.0%. The headline was management more than tripling the original FY26 webscale AI order target, with $5.3B already booked through three quarters. Cisco simultaneously announced ~4,000 job cuts to fund AI engineering. Shares, then near $102, ran to $120+ over the following weeks.</div>
+        <span class="tl-impact up">Positive reaction — already occurred</span>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">AUG 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 FY26 and FY27 guidance — beat on everything except margin</div>
+        <div class="tl-desc">Q4 revenue $17.3B (+18%, vs. $16.82B consensus) and non-GAAP EPS $1.22 (vs. $1.17). FY27 guided to $72.2–73.4B of revenue and $5.05–5.11 non-GAAP EPS against $68.7B / $4.80 consensus. Shares closed the regular session up 2.86% at $123.88, then fell ~4.6% after hours and roughly 7–9% the following morning as investors focused on Q1 FY27 gross-margin guidance of 65–66% versus 68.4% a year ago.</div>
+        <span class="tl-impact down">Negative reaction — already occurred</span>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">SEP – OCT 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">AI order-to-revenue conversion and FY2026 Form 10-K</div>
+        <div class="tl-desc">The FY26 10-K (expected September) will disclose the exact restructuring charge, Splunk intangible amortization schedule and any customer-concentration disclosure tied to webscale AI. Any new Silicon One design win or a named hyperscaler commitment would be the cleanest evidence that the $7.5B FY27 AI revenue target is conservative.</div>
+        <span class="tl-impact up">Potential upside catalyst</span>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">OCT 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend payment; $8.1B buyback authorization remaining</div>
+        <div class="tl-desc">The declared $0.42 quarterly dividend is payable October 21. Cisco returned $12.7B in FY26 (63% of Q4 free cash flow in Q4 alone) and repurchased 13M shares at an average $111.53 in Q4 — meaningfully below the current price, which is a useful signal about management's own valuation anchor.</div>
+        <span class="tl-impact neutral">Key near-term event</span>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~NOV 11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 FY2027 earnings (date estimated)</div>
+        <div class="tl-desc">Guidance: revenue $18.0–18.2B, non-GAAP EPS $1.32–1.34, non-GAAP gross margin 65–66%. This is the first quarter where the margin question gets answered with actuals rather than guidance. Watch security growth (does the Q4 +14% hold?), services growth inflecting off the FY26 product surge, and whether AI orders sustain a ~$3–4B quarterly pace.</div>
+        <span class="tl-impact neutral">Key near-term event</span>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Splunk cross-sell proof point and enterprise refresh cycle</div>
+        <div class="tl-desc">Two multi-quarter swing factors. First, whether Splunk-into-Cisco cross-sell sustains security growth in the low-to-mid teens after a 2% FY26. Second, the campus refresh: orders grew 20% in FY26 as Wi-Fi 7 and post-pandemic gear ages out, and this is the highest-margin demand pool Cisco has — a strong campus cycle is the most credible path back toward 67%+ gross margins.</div>
+        <span class="tl-impact up">Potential upside catalyst</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 07: 5-YEAR PRICE -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">CSCO — MONTHLY CLOSES, AUG 2021 – AUG 2026 <span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 12, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">Monthly closing prices (unadjusted for dividends); moving averages computed on the monthly series as proxies for daily MAs.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:var(--accent);vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--amber);vertical-align:middle;margin-right:6px;"></span>20-Day MA (~1-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--blue);vertical-align:middle;margin-right:6px;"></span>50-Day MA (~3-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed var(--red);vertical-align:middle;margin-right:6px;"></span>200-Day MA (~10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY <span style="color:var(--amber);">⚠ STATIC AS OF AUG 12, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">RSI measures recent momentum on a 0–100 scale: above 70 suggests the stock may be overbought (due for a pause), below 30 oversold (potentially washed out).</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+    <div style="display:flex;gap:18px;margin-top:10px;font-size:11px;font-family:'JetBrains Mono',monospace;">
+      <span style="color:var(--red);">70 — OVERBOUGHT</span>
+      <span style="color:var(--text-dim);">50 — Neutral</span>
+      <span style="color:var(--green);">30 — OVERSOLD</span>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;">
+    For four of these five years, CSCO was the definitive "cheap, boring, going nowhere" mega-cap. From <strong>$59.02 in August 2021</strong> the stock peaked at $63.37 that December, then spent 2022 being repriced downward by rate hikes, a China-lockdown supply shock (shares fell ~13% in a single session in May 2022 after management cut guidance) and a bear-market low near <strong>$40 in September 2022</strong>. The next two years were a range: roughly $42 to $57, punctuated by the September 2023 announcement of the <strong>$28B Splunk acquisition</strong> — the largest deal in Cisco's history, initially received with scepticism — and its March 2024 close. As late as March 2026 the stock closed at <strong>$77.59</strong>, valued at about 18x forward earnings.
+  </p>
+  <p class="prose" style="margin-top:16px;">
+    Then the AI networking trade found it. April 2026 closed at $91.50 (+18% in a month) as order data confirmed webscale demand; the May 13 Q3 print — record revenue plus the $5B→$9B AI order raise — produced a <strong>+32% month</strong> to $120.42; and by <strong>June 4, 2026 the stock set an all-time closing high of $130.00 (intraday 52-week high $130.37)</strong>, finally eclipsing its March 2000 dot-com peak on a split-adjusted basis. Total five-year price return: <strong>+110%</strong>, or roughly <strong>+130% including dividends</strong> — but with essentially all of it delivered in the final twelve months (+73% year-on-year, +61% year-to-date). The RSI panel tells the same story: monthly momentum has been pinned in overbought territory since April, which is exactly the condition under which a good earnings report can still produce a 9% drawdown.
+  </p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">MAY 2022</div><div class="tl-content"><div class="tl-title">−13% in one session on China lockdowns and supply-chain guidance cut</div><div class="tl-desc">Management withdrew the growth outlook as component shortages and Shanghai shutdowns hit shipments; the stock broke $50 and did not reclaim it for 15 months.</div><span class="tl-impact down">Negative inflection</span></div></div>
+    <div class="tl-item"><div class="tl-date">SEP 2022</div><div class="tl-content"><div class="tl-title">Bear-market low near $40</div><div class="tl-desc">Peak rate-hike fear plus enterprise IT budget anxiety took CSCO to ~$40, a ~37% drawdown from the December 2021 close and a sub-12x forward multiple.</div><span class="tl-impact down">Negative inflection (low)</span></div></div>
+    <div class="tl-item"><div class="tl-date">SEP 2023</div><div class="tl-content"><div class="tl-title">$28B Splunk acquisition announced</div><div class="tl-desc">Cisco's largest-ever deal, funded largely with debt. Shares fell ~4% on the news amid concerns about price paid and integration risk; the strategic logic (a data and security software layer) took three years to show up in reported numbers.</div><span class="tl-impact down">Negative reaction</span></div></div>
+    <div class="tl-item"><div class="tl-date">MAR 2024</div><div class="tl-content"><div class="tl-title">Splunk deal closes</div><div class="tl-desc">Completed March 18, 2024. Immediately added ~$4B of annualized software revenue and roughly $1B/year of intangible amortization, permanently widening the GAAP/non-GAAP gap.</div><span class="tl-impact neutral">Structural change</span></div></div>
+    <div class="tl-item"><div class="tl-date">NOV 2024 – FEB 2025</div><div class="tl-content"><div class="tl-title">First re-rating: stock breaks $59, then $64</div><div class="tl-desc">Early AI order commentary and the first clean post-Splunk quarters pushed CSCO out of its multi-year range; the stock made new post-2000 highs for the first time.</div><span class="tl-impact up">Positive inflection</span></div></div>
+    <div class="tl-item"><div class="tl-date">APR 2026</div><div class="tl-content"><div class="tl-title">Breakout: $77.59 → $91.50 in one month</div><div class="tl-desc">Hyperscaler capex upgrades and channel checks on data-center switching orders repriced Cisco as an AI infrastructure name rather than an enterprise-refresh cyclical.</div><span class="tl-impact up">Positive inflection</span></div></div>
+    <div class="tl-item"><div class="tl-date">MAY 2026</div><div class="tl-content"><div class="tl-title">Q3 FY26: AI order target raised to $9B; +32% month</div><div class="tl-desc">The single most important datapoint of the cycle. Record $15.8B revenue, $2.1B of AI orders in the quarter, and a restructuring redirecting 4,000 roles toward AI engineering.</div><span class="tl-impact up">Positive inflection</span></div></div>
+    <div class="tl-item"><div class="tl-date">JUN 2026</div><div class="tl-content"><div class="tl-title">All-time high — $130.00 close on June 4 ($130.37 intraday)</div><div class="tl-desc">Cisco cleared its dot-com-era peak for the first time in 26 years, then consolidated through July as the market debated whether AI hardware margins justify a 25x multiple.</div><span class="tl-impact neutral">Peak / consolidation</span></div></div>
+    <div class="tl-item"><div class="tl-date">AUG 2026</div><div class="tl-content"><div class="tl-title">Q4 FY26 record; FY27 guided to $72–73B; shares fall ~9%</div><div class="tl-desc">The largest guidance raise in a decade met a 300bps gross-margin guide-down. A textbook example of a good-news, bad-reaction print in a crowded momentum name.</div><span class="tl-impact down">Negative reaction</span></div></div>
+  </div>
+  <p class="prose" style="margin-top:24px;">
+    <strong>Relative performance:</strong> over the trailing twelve months CSCO's ~+73% has comfortably outpaced both the S&amp;P 500 and the NASDAQ-100, an unusual outcome for a company that spent the prior decade as a chronic index laggard. Over the full five years the picture is more sober: <strong>+110% price return roughly matches or modestly exceeds the S&amp;P 500</strong> over the same window (estimate — verify against index data), while badly trailing the pure-play networking comparison. Arista compounded revenue at 25%+ throughout the period and delivered multiples of Cisco's return; NVIDIA, which did not meaningfully sell networking gear in 2021 and now runs a ~$31B networking business, is not comparable on any measure. The honest framing is that Cisco has been a <em>late</em> beneficiary of the AI buildout — it monetizes the second derivative (the fabric between accelerators) rather than the accelerators themselves — and that the entire five-year excess return was earned in four months of 2026. A beta of 1.00 dramatically understates how the stock now trades.
+  </p>
+</div>
+
+<!-- SECTION 08: SUMMARY & RISKS -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>▲ Bull Case</h4>
+      <p>Cisco has converted from a value trap into a genuine AI infrastructure participant without losing its cash-machine characteristics: 66.9% non-GAAP gross margin, 20.6% ROIC, $12.8B of free cash flow, and a 1.4% dividend. FY27 is guided to ~15% revenue growth ($72.2–73.4B) — the fastest in the company's modern history — on the back of $9.3B of booked AI orders, record campus orders, and a security business that just reaccelerated to +14% in Q4. At 24x guided forward earnings, roughly in line with the NASDAQ-100 and below networking peers, investors are paying a market multiple for above-market growth backed by an installed base nobody can replicate.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>▼ Bear Case</h4>
+      <p>The growth is being bought with margin. Non-GAAP gross margin fell from 68.7% to 66.9% and is guided to 65–66% next quarter, because AI hardware sold to a handful of hyperscalers is structurally less profitable than campus switches sold through channel. Those same customers — and NVIDIA, whose $31B networking division now exceeds Cisco's entire networking segment — are the ones capable of designing Cisco out. Meanwhile the $28B Splunk bet produced 2% security growth and 4% observability growth for the year. Strip out the AI narrative and this is a low-growth hardware company trading at 37x trailing GAAP earnings after a 73% run.</p>
+    </div>
+  </div>
+  <div style="margin-top:28px;">
+    <div class="card-label" style="margin-bottom:8px;">Top 3 Risks</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Gross-margin compression becomes structural.</strong> Guidance of 65–66% for Q1 FY27 assumes mix stabilizes. If AI hardware keeps outgrowing campus and services, or if memory and optics component inflation persists, margins can drift toward the low 60s — which would cut the FY27 EPS bridge even if revenue lands at the top of the range.</div></div>
+      <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">AI capex digestion and order lumpiness.</strong> $9.3B of orders from a small number of webscalers is not an annuity. Hyperscale capex plans have historically been revised in step-functions; a single large customer deferring a build would create an air pocket in a stock that has just been repriced on order momentum.</div></div>
+      <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">The software thesis fails to deliver.</strong> Security (+2%) and Observability (+4%) collectively grew slower than GDP in FY26 despite $28B of acquired assets. If Q4's +14% security print does not sustain, the market will re-underwrite Cisco as a cyclical hardware vendor — and the appropriate multiple for that is well below 24x forward.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- INDUSTRY COMMENTARY -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary: What Matters Right Now</div>
+  <div class="biz-card" style="border-left: 3px solid var(--green);">
+    <div class="biz-header">
+      <div class="biz-name">The AI Networking Buildout Has Reached the Fabric Layer</div>
+      <span class="biz-badge growth">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc">For three years the AI trade was almost entirely about accelerators. It has now spilled into the interconnect: worldwide Ethernet switching grew <strong style="color:var(--text);">39.8% year-over-year to $15.4B in Q1 2026 alone</strong>, with the data-center segment up 61% and 800G ports accounting for 35.8% of revenue (IDC). Training clusters are bandwidth-bound as much as compute-bound, and every incremental GPU rack pulls switches, optics and routing behind it. That is why Cisco's service-provider and cloud orders grew 95% in Q4 and why AI orders scaled 4.5x to $9.3B. Importantly, the tailwind is broadening beyond back-end AI: campus/branch switching also grew 12.3% as enterprises refresh aging Wi-Fi and access gear — partly on genuine demand, partly on memory-driven price increases. Cisco is the only vendor with meaningful positions in both pools.</p>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid var(--red);">
+    <div class="biz-header">
+      <div class="biz-name">Margin Is the Toll on AI Revenue</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc">The market's reaction to an 18% revenue quarter — down 4.6% after hours, roughly 7–9% the next morning — was entirely about one line: non-GAAP gross margin of <strong style="color:var(--text);">66.3% versus 68.4% a year ago</strong>, with product gross margin at 64.8% versus 67.5%, and Q1 FY27 guided to 65–66%. Two forces are at work. First, mix: hyperscale AI systems are lower-margin than campus switches, and the flat Services line (23.7% of revenue at ~70% margins) is not growing to offset it. Second, input costs: DRAM and high-bandwidth memory pricing has inflated across the networking supply chain, and vendors have only partially passed it through. Cisco is running the classic hardware trade-off — accept 300–500bps of margin to capture a step-change in volume — and the equity market is, so far, discounting the margin more heavily than it is capitalizing the volume.</p>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div class="biz-name">Competition: NVIDIA Above, Arista Beside, White-Box Below</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc">Cisco is being squeezed from three directions at once. <strong style="color:var(--text);">Above</strong>, NVIDIA has taken the #1 position in data-center Ethernet switching (~21.5% share, ~$31B of FY26 networking revenue, an $11B quarter) by bundling Spectrum-X with GPUs — selling the fabric as an extension of the accelerator. <strong style="color:var(--text);">Beside</strong>, Arista grew 37% to ~14.6% switch share with a software-defined model and deep hyperscaler relationships, guiding to ~$12.6B for 2026. <strong style="color:var(--text);">Below</strong>, white-box switches on Broadcom merchant silicon commoditize the hardware layer, and Cisco's own Silicon One strategy — selling chips into other people's boxes — is a rational but margin-dilutive hedge. Huawei (5.8% share, +27%) remains dominant outside the US. <strong style="color:var(--text);">Framing the debate:</strong> bulls point out that Cisco still holds ~29.3% of a market growing 40%, grew switching revenue 24% in Q1 2026, and gets paid regardless of whose box wins if Silicon One is inside it. Bears note that every one of those defensive moves trades share of a growing pie for a smaller slice of each dollar — and that a company whose largest competitor's networking division alone is bigger than its own networking segment does not deserve a re-rating to 24x forward earnings. The $115–$165 analyst target range is that argument, priced.</p>
+  </div>
+</div>
+
+<!-- DISCLAIMER -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of August 12, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Cisco SEC filings and the Q4/FY2026 earnings press release (Exhibit 99.1, filed August 12, 2026), Cisco Newsroom and Investor Relations, StockAnalysis.com, MacroTrends, Digrin, CompaniesMarketCap, IDC Quarterly Ethernet Switch Tracker (1Q26), Dell'Oro Group, Benzinga and 24/7 Wall St. analyst-action summaries, Investing.com, CNBC, and company reports for Arista, NVIDIA, HPE, Palo Alto Networks, Datadog and Zoom. Competitor revenues, market shares, TAM figures, industry and index averages, market-cap rankings, and the estimated next-earnings date are approximations or third-party estimates and should be independently verified. Note that Cisco reported Q4 FY2026 results <em>after</em> the August 12 close used for pricing here; the after-hours and next-session reactions are noted where relevant but the headline price, market cap and valuation multiples reflect the August 12 close. Chart data is hardcoded at monthly granularity.</p>
+  <p style="max-width:900px;margin:0 auto;">This document is for informational and educational purposes only and does not constitute investment advice, an offer, or a solicitation to buy or sell any security. Past performance does not guarantee future results. Do your own research and consult a licensed financial advisor before investing.</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ---- STATIC DATA AS OF AUG 12, 2026 — monthly closes, unadjusted ----
+const labels = ['Aug 21','Sep 21','Oct 21','Nov 21','Dec 21',
+  'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+  'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+  'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [59.02, 54.43, 55.97, 54.84, 63.37,
+  55.67, 55.77, 55.76, 48.98, 45.05, 42.64, 45.37, 44.72, 40.00, 45.43, 49.72, 47.64,
+  48.67, 48.42, 52.28, 47.25, 49.67, 51.74, 52.04, 57.35, 53.76, 52.13, 48.38, 50.52,
+  50.18, 48.37, 49.91, 46.98, 46.50, 47.51, 48.45, 50.54, 53.22, 54.77, 59.21, 59.20,
+  60.60, 64.11, 61.71, 57.73, 63.04, 69.38, 68.08, 69.09, 68.42, 73.11, 76.94, 77.03,
+  78.32, 79.46, 77.59, 91.50, 120.42, 117.46, 115.99, 123.88];
+
+// Simple moving average helper (window in months)
+function sma(data, w) {
+  return data.map((_, i) => {
+    if (i < w - 1) return null;
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += data[j];
+    return +(s / w).toFixed(2);
+  });
+}
+
+// Wilder-smoothed RSI
+function computeRSI(data, period) {
+  const rsi = new Array(data.length).fill(null);
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i < data.length; i++) {
+    const ch = data[i] - data[i - 1];
+    const gain = ch > 0 ? ch : 0, loss = ch < 0 ? -ch : 0;
+    if (i <= period) {
+      avgGain += gain / period; avgLoss += loss / period;
+      if (i === period) rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    } else {
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      rsi[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    }
+  }
+  return rsi.map(v => v === null ? null : +v.toFixed(1));
+}
+
+const ma20 = sma(prices, 1);   // ~20 trading days ≈ 1 month
+const ma50 = sma(prices, 3);   // ~50 trading days ≈ 3 months
+const ma200 = sma(prices, 10); // ~200 trading days ≈ 10 months
+const rsiData = computeRSI(prices, 6);
+
+// Key event annotations {index, label, color}
+const events = [
+  { idx: 9,  label: 'May 2022: −13% day on China lockdowns / guidance cut', color: '#ef4444' },
+  { idx: 13, label: 'Sep 2022: bear-market low ~$40', color: '#ef4444' },
+  { idx: 25, label: 'Sep 2023: $28B Splunk acquisition announced', color: '#f59e0b' },
+  { idx: 31, label: 'Mar 2024: Splunk deal closes', color: '#3b82f6' },
+  { idx: 39, label: 'Nov 2024: breaks multi-year range on AI order commentary', color: '#22c55e' },
+  { idx: 56, label: 'Apr 2026: AI breakout — $77.59 to $91.50', color: '#22c55e' },
+  { idx: 57, label: 'May 2026: Q3 FY26 — AI order target raised to $9B', color: '#22c55e' },
+  { idx: 58, label: 'Jun 2026: all-time high $130.00 close (Jun 4)', color: '#f59e0b' },
+  { idx: 60, label: 'Aug 2026: Q4 FY26 record; FY27 guide $72.2–73.4B', color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(e => eventMap[e.idx] = e);
+const pointRadii = prices.map((_, i) => eventMap[i] ? 6 : 0);
+const pointColors = prices.map((_, i) => eventMap[i] ? eventMap[i].color : 'transparent');
+
+// ---- PRICE CHART ----
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(0, 188, 235, 0.2)');
+grad.addColorStop(1, 'rgba(0, 188, 235, 0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'CSCO Price', data: prices,
+        borderColor: '#00bceb', backgroundColor: grad, fill: true,
+        borderWidth: 2.5, tension: 0.3,
+        pointRadius: pointRadii, pointBackgroundColor: pointColors,
+        pointBorderColor: '#0a0e17', pointBorderWidth: 1.5, pointHoverRadius: 7
+      },
+      { label: '20-Day MA (~1-mo)', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '50-Day MA (~3-mo)', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '200-Day MA (~10-mo)', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0.3 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+        borderColor: '#1e293b', borderWidth: 1, padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace" },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          afterTitle: function(items) {
+            const e = eventMap[items[0].dataIndex];
+            return e ? '◆ ' + e.label : '';
+          },
+          label: function(ctx) {
+            return ctx.raw === null ? null : ' ' + ctx.dataset.label + ': $' + Number(ctx.raw).toFixed(2);
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(30, 41, 59, 0.5)' }, ticks: { color: '#64748b', maxTicksLimit: 12, font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+      y: { grid: { color: 'rgba(30, 41, 59, 0.5)' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 11 }, callback: v => '$' + v } }
+    }
+  }
+});
+
+// ---- RSI CHART ----
+const rctx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6-period, monthly)', data: rsiData,
+      borderColor: '#00bceb', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.3
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+        borderColor: '#1e293b', borderWidth: 1, padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace" },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: ctx => ctx.raw === null ? null : ' RSI: ' + ctx.raw }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', maxTicksLimit: 12, font: { family: "'JetBrains Mono', monospace", size: 9 } } },
+      y: {
+        min: 0, max: 100,
+        grid: {
+          color: ctx => (ctx.tick.value === 70 || ctx.tick.value === 30) ? 'rgba(148, 163, 184, 0.4)' : 'rgba(30, 41, 59, 0.4)',
+          lineWidth: ctx => (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.5 : 1
+        },
+        ticks: {
+          stepSize: 10, color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) {
+            if (v === 70) return '70 — Overbought';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — Oversold';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
