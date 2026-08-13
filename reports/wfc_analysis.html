@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFC — Wells Fargo &amp; Company | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #ffcd41;
+  --accent-dim: #ffcd4133;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of Aug 12, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <div class="ticker-badge">WFC</div>
+        <div style="font-size:13px;color:var(--text-muted);">
+          <span style="color:var(--text-dim);">Exchange:</span> NYSE &nbsp;·&nbsp;
+          <span style="color:var(--text-dim);">Industry:</span> Financials — Diversified Banks &nbsp;·&nbsp;
+          <span style="color:var(--text-dim);">Mkt Cap:</span> ~$268.6B
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-family:'JetBrains Mono',monospace;">
+        <span style="color:var(--accent);">Mkt Cap Ranking:</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">Global: #57</span>
+        <span style="color:var(--text-dim);">·</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">US: #41</span>
+        <span style="color:var(--text-dim);">·</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">NYSE: #29</span>
+        <span style="color:var(--text-dim);font-size:10px;">&nbsp;(approximate)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Wells Fargo &amp; Company</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$88.93</div>
+      <div class="price-change" style="color:var(--green);">+$1.48 (+1.69%)</div>
+      <div class="price-date">Close — Tue, Aug 12, 2026</div>
+      <div class="price-date">Next session (Aug 13, intraday): $88.33 (−0.67%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> San Francisco, California</div>
+    <div class="meta-item"><span>Employees:</span> ~205,000</div>
+    <div class="meta-item"><span>Founded:</span> 1852</div>
+    <div class="meta-item"><span>Next Earnings:</span> ~Oct 14, 2026 (est.)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Wells Fargo is the fourth-largest bank in the United States by assets and the third-largest by domestic deposits, running roughly <strong>$1.47 trillion of average deposits</strong> and <strong>$1.03 trillion of average loans</strong> across consumer banking, commercial banking, corporate and investment banking, and wealth management. Full-year 2025 revenue was approximately <strong>$83.7B</strong>, up about <strong>2.5% <span class="tip" title="Year-over-Year — this period compared with the same period one year earlier">YoY</span></strong>, on net income of $20.3B and diluted <span class="tip" title="Earnings Per Share — net income available to common shareholders divided by diluted shares outstanding">EPS</span> of $6.26. The far more important number is the current one: Q2 2026 revenue of <strong>$22.6B (+9% YoY)</strong> and EPS of <strong>$2.00 (+25%)</strong>, the first clean quarter to show what the franchise looks like with the Federal Reserve's seven-year asset cap finally gone — average loans grew 12% and deposits 10%, growth rates this bank was legally prohibited from producing between February 2018 and June 2025.</p>
+  <p class="prose" style="margin-top:14px;">The stock is the odd one out among the money-center banks in 2026: at $88.93 it is <strong>down roughly 4.6% year-to-date</strong> against an S&amp;P 500 up about 13%, despite posting the sector's cleanest earnings inflection. The market spent 2024 and 2025 paying up for the asset-cap-removal story; 2026 has been the year of asking what the removal actually earns, and whether a <span class="tip" title="Common Equity Tier 1 ratio — the primary regulatory capital measure, common equity divided by risk-weighted assets">CET1</span> ratio that has fallen from 11.1% to 10.3% is the price of admission.</p>
+
+  <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Notable Executives &amp; Holders</div>
+  <div class="card-grid" style="margin-top:14px;">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Charlie Scharf</div>
+      <div class="card-note">CEO since October 2019, recruited from BNY Mellon (and before that Visa and JPMorgan) explicitly to fix the regulatory mess. He closed more than a dozen consent orders, cut headcount by roughly a quarter, exited correspondent mortgage, and delivered the asset-cap removal in June 2025 — the defining achievement of his tenure. His current framing is deliberately restrained: "selective about how much and where to grow."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Mike Santomassimo</div>
+      <div class="card-note">CFO since October 2020, also from BNY Mellon and previously CFO of JPMorgan's corporate and investment bank. He owns the expense narrative — the efficiency ratio has come from the mid-70s at the trough to <strong>60% in Q2 2026</strong> — and the capital plan now redeploying the balance sheet into loans, trading assets, and buybacks.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Vanguard · BlackRock</div>
+      <div class="card-note">Institutional ownership is roughly <strong>76%</strong>, led by Vanguard (~9–10%), BlackRock (~7–8%) and State Street (~4–5%) — index money, not conviction money. Worth flagging: <strong>Berkshire Hathaway fully exited in Q1 2022</strong> after more than three decades as a cornerstone holder. Buffett's exit removed the single most-cited bull anchor and has never been reversed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Revenue mix below reflects <strong>Q2 2026 reported segment revenue</strong> (gross of intersegment eliminations, total $23.1B). Wells Fargo is still fundamentally a consumer and commercial bank — roughly 58% of revenue comes from lending to households and mid-sized companies — but the fastest-growing dollars are now in the corporate and investment bank.</p>
+  <div class="seg-bar">
+    <div style="flex:44.6;background:#ffcd41;">CB&amp;L 44.6%</div>
+    <div style="flex:23.4;background:#3b82f6;">CIB 23.4%</div>
+    <div style="flex:16.9;background:#a78bfa;">WIM 16.9%</div>
+    <div style="flex:13.4;background:#f59e0b;">COMM 13.4%</div>
+    <div style="flex:1.7;background:#6b7280;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ffcd41;"></span> Consumer Banking &amp; Lending — $10.3B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Corporate &amp; Investment Banking — $5.4B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Wealth &amp; Investment Management — $3.9B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Commercial Banking — $3.1B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span> Corporate — $0.41B</div>
+  </div>
+
+  <!-- Segment 1 -->
+  <div class="biz-card" style="border-left: 3px solid #ffcd41; margin-top:28px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Consumer Banking &amp; Lending</div>
+        <span class="biz-badge dominant">~7.5% US DEPOSIT SHARE — #3 RETAIL BANK</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$38.5B</div><div class="biz-stat-label">FY25 Rev (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+6%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~7.5%</div><div class="biz-stat-label">Deposit Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">44.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US retail banking &amp; consumer lending revenue pool ≈ $700B, growing ~4%/yr</div>
+    <p class="biz-desc" style="margin-top:14px;">Branch banking, consumer deposits, credit and debit cards, auto lending, personal lending and home lending. Q2 2026 revenue of <strong>$10.3B (+6%)</strong> on net income of $2.3B (+19%), with average deposits of $828B (+3%) and average loans of $338B (+6%). The deposit base is the crown jewel — roughly 4,000 branches and a customer base in the tens of millions produce the low-cost funding that makes every other segment work. Growth is now coming from products Wells Fargo spent five years shrinking: <strong>auto revenue rose 33% YoY</strong> as originations restarted, credit-card account growth is described as strong, and primary-checking growth is accelerating. The visible scar is mortgage: after exiting correspondent lending in January 2023 and selling most third-party servicing, home-lending share fell from roughly 13% of US originations in 2019 to an estimated <strong>2–3% today</strong>. That was a deliberate trade — mortgage was the source of much of the regulatory pain — but it permanently removed a fee stream that JPMorgan and the nonbanks kept. Card balances of roughly $60B imply about 5% of the ~$1.25T US revolving-credit market.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Chase</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~12.5%</div><div class="comp-bubble-label">Deposit Share</div></div>
+        <div><div class="comp-bubble-val">~$80B</div><div class="comp-bubble-label">CCB Revenue</div></div>
+        <div><div class="comp-bubble-val">+8%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bank of America</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~10.5%</div><div class="comp-bubble-label">Deposit Share</div></div>
+        <div><div class="comp-bubble-val">~$44B</div><div class="comp-bubble-label">Consumer Rev</div></div>
+        <div><div class="comp-bubble-val">+6%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Citigroup</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~4%</div><div class="comp-bubble-label">US Dep Share</div></div>
+        <div><div class="comp-bubble-val">$24.8B</div><div class="comp-bubble-label">Q2'26 Total Rev</div></div>
+        <div><div class="comp-bubble-val">+8%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Segment 2 -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Corporate &amp; Investment Banking</div>
+        <span class="biz-badge growth">~3% IB FEE SHARE — FASTEST GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$19.0B</div><div class="biz-stat-label">FY25 Rev (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~3%</div><div class="biz-stat-label">IB Fee Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global investment banking + markets revenue pool ≈ $450B, growing ~6%/yr</div>
+    <p class="biz-desc" style="margin-top:14px;">Banking (advisory, equity and debt capital markets, lending), commercial real estate, and markets (rates, credit, FX, equities). This is where the asset-cap removal shows up most violently: <strong>average CIB loans grew 26% YoY</strong> and segment net income rose 34% to $2.3B on revenue of $5.4B (+16%). Investment banking fees were up 36% and markets revenue up 24%, with <strong>equities up 64%</strong> — a business Wells Fargo could barely fund when every incremental trading asset competed against consumer loans for space under a hard $1.95T balance-sheet ceiling. The firm remains a top-10 but not top-5 franchise, with roughly 3% of the global IB fee wallet and mid-single-digit share of sales and trading; the strategic bet is that a genuinely deep US corporate lending relationship base converts into fee share over the next several years. Commercial real estate is the wildcard — Wells Fargo has long been among the largest US CRE lenders, and CRE revenue fell 1% YoY on lower rate benefits even as capital-markets activity offset it.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~9%</div><div class="comp-bubble-label">IB Fee Share</div></div>
+        <div><div class="comp-bubble-val">$58.0B</div><div class="comp-bubble-label">Q2'26 Revenue</div></div>
+        <div><div class="comp-bubble-val">+27%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Goldman Sachs</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~8%</div><div class="comp-bubble-label">IB Fee Share</div></div>
+        <div><div class="comp-bubble-val">~$16B</div><div class="comp-bubble-label">Q2'26 Rev (est.)</div></div>
+        <div><div class="comp-bubble-val">+20%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">BofA Securities</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~7%</div><div class="comp-bubble-label">IB Fee Share</div></div>
+        <div><div class="comp-bubble-val">$31.6B</div><div class="comp-bubble-label">Q2'26 Total Rev</div></div>
+        <div><div class="comp-bubble-val">+15%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Segment 3 -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Wealth &amp; Investment Management</div>
+        <span class="biz-badge emerging">~$2.4T CLIENT ASSETS — ~5% US SHARE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$13.8B</div><div class="biz-stat-label">FY25 Rev (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~5%</div><div class="biz-stat-label">Wealth Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US wealth &amp; advisory revenue pool ≈ $300B, growing ~6%/yr</div>
+    <p class="biz-desc" style="margin-top:14px;">Wells Fargo Advisors, private banking and brokerage. Revenue of <strong>$3.9B (+13%)</strong> on client assets of <strong>$2.4T (+15%)</strong>, with net income up 28% to $537M. The economics here are the segment's problem: net income of $537M on $3.9B of revenue is a roughly 14% net margin, far below Morgan Stanley's wealth franchise, because the model is still heavily employee-advisor and brokerage-driven with a large fee-sharing payout. Asset growth has been strong — market appreciation plus a stabilizing advisor headcount after years of attrition — and the deposit-sweep and banking cross-sell into the wealth base is the most obvious internal revenue synergy management points to. It is a scale-disadvantaged #3 or #4 player in a market where the top two are pulling away.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Morgan Stanley</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~$10T</div><div class="comp-bubble-label">Client Assets</div></div>
+        <div><div class="comp-bubble-val">$8.9B</div><div class="comp-bubble-label">Q2'26 WM Rev</div></div>
+        <div><div class="comp-bubble-val">+14%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Merrill / BofA Wealth</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~$4.3T</div><div class="comp-bubble-label">Client Balances</div></div>
+        <div><div class="comp-bubble-val">~$6.5B</div><div class="comp-bubble-label">Q2'26 Rev (est.)</div></div>
+        <div><div class="comp-bubble-val">+10%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Charles Schwab</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~$11T</div><div class="comp-bubble-label">Client Assets</div></div>
+        <div><div class="comp-bubble-val">~$23B</div><div class="comp-bubble-label">TTM Revenue</div></div>
+        <div><div class="comp-bubble-val">+15%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Segment 4 -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Commercial Banking</div>
+        <span class="biz-badge dominant">TOP-2 US MIDDLE MARKET</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$11.7B</div><div class="biz-stat-label">FY25 Rev (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+6%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~10%</div><div class="biz-stat-label">Mid-Mkt Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US commercial &amp; business banking revenue pool ≈ $350B, growing ~4%/yr</div>
+    <p class="biz-desc" style="margin-top:14px;">Middle-market banking, asset-based lending, equipment finance and treasury management for companies roughly $10M–$2B in revenue. Revenue of <strong>$3.1B (+6%)</strong> and net income of $1.2B (+8%), on average loans of $237B (+5%) and deposits of $189B (+6%). This is the quiet, high-return core of the franchise — Wells Fargo is consistently ranked #1 or #2 in US middle-market lead-bank relationships, and the treasury-management and payments fees attached to those relationships are sticky and capital-light. Loan growth here has been the most measured of any segment, which is consistent with management's stated caution about underwriting late in a credit cycle rather than any lack of capacity.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Commercial</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~12%</div><div class="comp-bubble-label">Mid-Mkt Share</div></div>
+        <div><div class="comp-bubble-val">~$4.0B</div><div class="comp-bubble-label">Q2'26 Rev (est.)</div></div>
+        <div><div class="comp-bubble-val">+6%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">U.S. Bancorp</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~5%</div><div class="comp-bubble-label">Mid-Mkt Share</div></div>
+        <div><div class="comp-bubble-val">~$7.3B</div><div class="comp-bubble-label">Q2'26 Total Rev</div></div>
+        <div><div class="comp-bubble-val">+4%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">PNC Financial</div><div class="comp-bubble-stats">
+        <div><div class="comp-bubble-val">~4%</div><div class="comp-bubble-label">Mid-Mkt Share</div></div>
+        <div><div class="comp-bubble-val">~$5.9B</div><div class="comp-bubble-label">Q2'26 Total Rev</div></div>
+        <div><div class="comp-bubble-val">+5%</div><div class="comp-bubble-label">YoY (est.)</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Segment 5 -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Corporate</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">DECLINING — RUN-OFF &amp; TREASURY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$2.0B</div><div class="biz-stat-label">FY25 Rev (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−26%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/a</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">1.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Not a market-facing segment — corporate treasury, ALM and legacy portfolios</div>
+    <p class="biz-desc" style="margin-top:14px;">Corporate treasury, asset-liability management, affiliated venture capital and private equity, and non-strategic run-off portfolios. Revenue of $413M (−26%) and net income of $75M (−77%) — the swing here is dominated by investment marks, hedge results and the shrinking legacy book, not by any operating business. It is small enough to ignore in a thesis but large enough to move a quarter's EPS by a few cents, and it is the line item where securities-repositioning decisions land.</p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <div class="moat-pill">$1.47T Deposit Base</div>
+    <div class="moat-pill">#3 US Deposit Share</div>
+    <div class="moat-pill">~4,000 Branches</div>
+    <div class="moat-pill">Top-2 Middle Market</div>
+    <div class="moat-pill">$2.4T Client Assets</div>
+    <div class="moat-pill">G-SIB Regulatory Barrier</div>
+    <div class="moat-pill">Post-Asset-Cap Optionality</div>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is funding, and it is a real one. Roughly <strong>$1.47 trillion of average deposits</strong> — a large share of it in operating and primary-checking accounts that reprice slowly and leave slowly — gives Wells Fargo a cost of funds that non-bank lenders, fintechs and most regional banks structurally cannot match. That advantage is reinforced by regulation: as a US <span class="tip" title="Global Systemically Important Bank — the largest banks, subject to extra capital surcharges and supervision">G-SIB</span>, Wells Fargo operates behind capital, liquidity and stress-testing requirements that are punishing to comply with but nearly impossible for a new entrant to replicate — the regulatory burden is simultaneously the biggest cost and the deepest barrier. Layered on top are switching costs that are genuinely high in the businesses that matter: middle-market treasury-management relationships, where payments plumbing is embedded in a client's operations, and primary-checking households, where direct deposit and bill pay create inertia measured in years. What Wells Fargo does <em>not</em> have is a proprietary technology edge, a differentiated product, or a fee franchise on JPMorgan's scale. This is a distribution and balance-sheet business, and the thesis is that a distribution and balance-sheet business finally allowed to grow its balance sheet should out-earn its recent past.</p>
+
+  <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Key Vulnerabilities</div>
+  <div class="prose" style="margin-top:14px;">
+    <p><strong>1. Regulatory and operational-risk track record.</strong> The asset cap is gone, but the institution that earned it is the same institution. Wells Fargo has closed more than a dozen consent orders since 2019, yet a handful of outstanding regulatory agreements remain and the firm continues to carry elevated compliance and remediation spending inside its expense base. A new supervisory action — in any business, from sales practices to anti-money-laundering to fair lending — would not just cost money; it would reset the credibility that took Scharf seven years to rebuild, and the market would immediately re-underwrite the growth story.</p>
+    <p style="margin-top:12px;"><strong>2. Net interest income sensitivity to the rate path.</strong> Roughly 54% of revenue is <span class="tip" title="Net Interest Income — the difference between interest earned on loans and securities and interest paid on deposits and debt">net interest income</span>, and Wells Fargo's asset mix is more floating-rate and shorter-duration than Bank of America's. That helped enormously in 2022–23 and hurts on the way down: each Fed cut reprices loan yields quickly while deposit costs — especially in wealth sweep and commercial operating accounts — grind lower only with a lag. Q2 2026 NII of $12.3B (+5%) is being driven by <em>volume</em>, not spread, and volume growth requires capital.</p>
+    <p style="margin-top:12px;"><strong>3. Thin fee diversification and a lost mortgage franchise.</strong> The strategic retreat from home lending removed a business that once produced double-digit origination share and a large servicing book. Compared with JPMorgan (payments, asset management, card) or Morgan Stanley (wealth), Wells Fargo's fee mix is narrower, and its wealth business earns a materially lower margin. If capital-markets revenue mean-reverts from what looks like cycle-peak activity, there is less non-cyclical fee income to cushion it.</p>
+    <p style="margin-top:12px;"><strong>4. Commercial real estate concentration.</strong> Wells Fargo has historically been among the largest US CRE lenders, with an office exposure that has already required reserve building. The allowance for credit losses stands at $14.4B, or <strong>1.40% of loans, down from 1.58%</strong> a year ago — a ratio decline that flatters current provisions. If office valuations or non-office CRE deteriorate from here, the reserve build required would come straight out of an EPS line that consensus has running to $7.20.</p>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Money-center bank averages cover JPM, BAC, C, GS and MS. Several standard ratios (gross margin, current ratio, free cash flow, <span class="tip" title="Return on Invested Capital — after-tax operating profit divided by invested capital">ROIC</span>) are not meaningful for banks and are marked accordingly — bank-native analogs (<span class="tip" title="Net Interest Margin — net interest income as a percent of average interest-earning assets">NIM</span>, <span class="tip" title="Return on Average Tangible Common Equity — the standard profitability yardstick for banks">ROTCE</span>, <span class="tip" title="Common Equity Tier 1 ratio — the primary regulatory capital measure, common equity divided by risk-weighted assets">CET1</span>, efficiency ratio) appear in the Context column.</p>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>WFC</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings ratio — share price divided by the last 12 months of earnings per share">Trailing P/E</span></td><td style="color:var(--green);">12.9</td><td>~14.5</td><td>~24.5</td><td>Cheapest of the large money-center banks and roughly 47% below the index. WFC has de-rated in 2026 even as earnings inflected — the multiple was ~14.5x at the December 2025 high.</td></tr>
+      <tr><td><span class="tip" title="Price divided by expected earnings per share for the next fiscal year">Forward P/E</span></td><td style="color:var(--green);">~12.3</td><td>~13.0</td><td>~22.0</td><td>On consensus FY2026 <span class="tip" title="Earnings Per Share">EPS</span> of $7.20 (+14%). On the next-twelve-months figure it is closer to 11.9x. Either way, WFC trades at a discount to peers despite the best YoY EPS growth in the group.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — the P/E ratio divided by the expected earnings growth rate; below 1 is generally considered cheap">PEG Ratio</span></td><td style="color:var(--green);">~0.9</td><td>~1.5</td><td>~1.9</td><td>Flattered by the post-asset-cap growth spurt. Against a normalized 7–8% earnings growth rate, PEG is closer to 1.6 — the question is whether 2026's growth rate is a level shift or a one-time catch-up.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, Trailing Twelve Months — net income per diluted share over the last four quarters">EPS (TTM)</span></td><td style="color:var(--text-dim);">$6.88</td><td>—</td><td>—</td><td>FY2025 was $6.26; H1 2026 alone delivered $3.60 ($1.60 in Q1, $2.00 in Q2). Buybacks are contributing roughly 4–5%/yr to per-share growth — the share count has shrunk by about a third since 2019.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year — this period versus the same period a year earlier">YoY</span>)</td><td style="color:var(--amber);">+7.0% (TTM)</td><td>~+9%</td><td>~+5.5%</td><td>Q2 2026 +9% ($22.6B company-reported), FY2025 +2.5%. Ahead of the index, behind peers whose capital-markets mix is larger. NII +5%, noninterest income +13%.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as a percent of revenue">Gross Margin</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~34%</td><td>Not meaningful for banks. Bank analogs: NIM of roughly 2.75% (estimated from $12.3B of quarterly NII) and an efficiency ratio of <strong>60% in Q2 2026</strong>, improved from 64% a year ago and the mid-70s at the 2020 trough.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percent of revenue">Net Profit Margin</span></td><td style="color:var(--amber);">~26%</td><td>~28%</td><td>~12.5%</td><td>TTM net income of $21.6B on $83.0B of revenue. Q2 2026 alone ran at ~28% as the expense base grew just 2% against 9% revenue growth — seven points of positive operating leverage.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price">Dividend Yield</span></td><td style="color:var(--green);">2.25%</td><td>~2.0%</td><td>~1.2%</td><td>Q3 2026 dividend raised 11% to <strong>$0.50/quarter</strong> ($2.00 annualized), subject to board approval. Payout ratio only ~29% — buybacks ($7B in H1 2026, ~$3.0B and 37.4M shares in Q2 alone) are running about 3.5x the dividend.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percent of the tradable float — a gauge of bearish positioning">Short Interest %</span></td><td style="color:var(--green);">~1.0%</td><td>~1.4%</td><td>~1.5%</td><td>Negligible bearish positioning; WFC is a core index and institutional holding at ~76% institutional ownership. Note that one data provider is currently reporting an implausibly low raw short figure — treat the precise number as unreliable, the direction as not.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td><td style="color:var(--green);">~1.15x</td><td>~1.4x</td><td>~1.6x</td><td>Structurally uninformative for a bank — leverage <em>is</em> the business model, and deposits (the largest liability) sit outside the ratio. The meaningful lens: CET1 of <strong>10.3%</strong>, down from 11.1% a year ago as balance-sheet growth and buybacks consumed the cushion.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure">Current Ratio</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~1.3</td><td>Not meaningful for banks. Analog: the liquidity coverage ratio remains comfortably above the 100% regulatory minimum, and deposits of ~$1.47T fund loans of ~$1.03T — a loan-to-deposit ratio of ~70%, leaving substantial room to lend.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditures">Free Cash Flow</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>—</td><td>Not meaningful for banks (reported operating cash flow of ~$19B is an artifact of trading and loan flows). Capital-generation lens: ~$21.6B of TTM earnings funding ~$6B of dividends and a ~$14B/yr buyback pace, with CET1 still above requirement.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity">ROE</span></td><td style="color:var(--amber);">12.6%</td><td>~12.5%</td><td>~18.5%</td><td>TTM figure; the run-rate is much better — <strong>15.0% in Q2 2026</strong> versus 12.8% a year earlier. Still short of JPMorgan, but the gap is closing for the first time in a decade.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital">ROIC</span></td><td style="color:var(--text-dim);">—</td><td>—</td><td>~10%</td><td>Ill-defined for banks. Use ROTCE: <strong>17.7% in Q2 2026</strong> (from 15.2%), 16.1% for the first half, versus roughly 14% for FY2025. That trajectory is the entire bull case in one number.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market; 1.0 moves with the market">Beta</span></td><td style="color:var(--green);">0.92</td><td>~1.10</td><td>1.00</td><td>Lower than the bank average, but beta understates bank tail risk — WFC fell 20% in a single month during the March 2023 regional-bank crisis. Beta measures average co-movement, not behavior in a funding shock.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$72.78–$97.76</td><td>—</td><td>—</td><td>Closed Aug 12 at $88.93 — about 9% below the 52-week high set around the turn of the year and 22% above the low. Price/book of 1.63x and roughly 1.9x tangible book (estimated), versus ~2.3x for Bank of America.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable One-Off Items:</strong> Q2 2026 is a relatively clean quarter, but three distortions deserve flagging. First, <strong>reserve ratio release</strong>: the allowance for credit losses fell to 1.40% of loans from 1.58% a year ago while the loan book grew 12%. Provision of $914M was actually <em>below</em> net charge-offs of $876M plus the reserve build a 12% larger book would ordinarily require — the mix shift toward lower-loss commercial and CIB lending is real, but it means provision expense is currently a tailwind to EPS rather than a neutral. Second, <strong>severance and restructuring</strong>: management cited a 7% headcount reduction, and Wells Fargo has run recurring severance charges through the expense line for several years now, which makes the 2% expense growth figure a mix of genuine efficiency and a shrinking one-off base — the "core" expense trend is likely a touch worse than reported. Third, <strong>consent-order remediation and operating losses</strong>: the compliance build-out that consumed billions between 2019 and 2024 is winding down, and its runoff is an underappreciated structural tailwind to the efficiency ratio, but the pace of that runoff is not separately disclosed. Historically the comparisons also carry the FDIC special assessment (~$1.9B pre-tax in Q4 2023 plus a top-up in 2024) and securities-repositioning losses taken when low-yield bonds were sold to reinvest at higher rates. Bottom line: reported Q2 2026 EPS of $2.00 is probably $0.10–0.15 better than a fully normalized number once provision normalization is assumed — verify against the 10-Q before relying on it.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">BUY</div>
+      <div class="card-note">26 analysts. A second aggregator scores it "Moderate Buy" with a $98.61 average — the split reflects a genuinely divided sell side, not a data error.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$100.02</div>
+      <div class="card-note"><span style="color:var(--green);">+12.5% upside</span> from the $88.93 close on Aug 12, 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$90 – $115</div>
+      <div class="card-note">Low $90 (+1.2%), high $115 (+29.3%), median $100. Notably, even the bear case target is above the current price — the sell side's disagreement is about magnitude, not direction.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">13 / 3 / 10 / 0</div>
+      <div class="card-note">Strong Buy / Buy / Hold / Sell. No sell ratings, but ten holds — an unusually large fence-sitting contingent for a bank beating estimates.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:13;background:var(--green);"></div>
+    <div style="flex:3;background:#4ade80;"></div>
+    <div style="flex:10;background:var(--amber);"></div>
+    <div style="flex:0.3;background:var(--red);"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-dim);">
+    <span><span style="color:var(--green);">■</span> Strong Buy 50%</span>
+    <span><span style="color:#4ade80;">■</span> Buy 12%</span>
+    <span><span style="color:var(--amber);">■</span> Hold 38%</span>
+    <span><span style="color:var(--red);">■</span> Sell 0%</span>
+  </div>
+
+  <div style="margin-top:32px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Key Recent Analyst Calls</div>
+  <div class="prose" style="margin-top:14px;">
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>Bank of America — Ebrahim Poonawala</strong> (Jul 7, 2026): reiterated <strong style="color:var(--green);">Buy</strong>, raised target from $95 to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$102</span>. The most constructive of the majors — the argument is that post-asset-cap loan growth plus expense discipline can drive ROTCE sustainably into the high teens, and that WFC's discount to BAC on tangible book is unwarranted at that level of returns.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>UBS — Erika Najarian</strong> (Jul 7, 2026): maintained <strong style="color:var(--green);">Buy</strong>, trimmed target from $105 to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$104</span> — still the second-highest published target. The small cut is a rate-path and NII-trajectory adjustment rather than a change of view on the franchise.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>Morgan Stanley — Betsy Graseck</strong> (Jun 29, 2026): <strong style="color:var(--amber);">Equal Weight</strong>, target raised from $97 to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$102</span>. The tell here is a target 15% above the market with a neutral rating — Graseck's numbers work, but she sees comparable upside elsewhere in the group.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>KBW — David Konrad</strong> (Jul 15, 2026): <strong style="color:var(--amber);">Market Perform</strong>, target <em>cut</em> from $98 to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$94</span> — the only meaningful downward revision after Q2. The bank-specialist shop's concern is capital: CET1 at 10.3% limits how much of the growth-plus-buyback combination can run simultaneously.</p>
+    <p><span style="color:var(--amber);">●</span> <strong>JPMorgan — Vivek Juneja</strong> (Jul 29, 2026): <strong style="color:var(--amber);">Neutral</strong>, target raised from $93.50 to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$95.50</span>. Also on the fence, with a target implying only ~7% upside. Truist's John McDonald (Buy, $90→$94, Jun 26) and Baird's David George (Neutral, $85→$92, Jul 15) round out a cluster of targets in the low-to-mid $90s that is well below the $100 headline average.</p>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">~Oct 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (estimated date)</div>
+        <div class="tl-desc">The single most important event on the calendar. The market will focus on three things: whether NII growth holds above 5% as the rate path shifts, whether CET1 stabilizes near 10.3% or keeps drifting lower under loan growth plus buybacks, and whether the allowance ratio stops declining. Consensus for FY2026 sits at $7.20 in EPS on $88.9B of revenue, implying roughly $1.80–1.85 for Q3.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 Beat — Revenue $22.6B, EPS $2.00</div>
+        <div class="tl-desc">Revenue +9%, EPS +25%, ROTCE 17.7%, efficiency ratio 60%. Every segment except Corporate grew, with CIB net income +34% and average CIB loans +26%. The stock's reaction was muted — it traded around $85–88 through late July — which is itself the story: the market has largely stopped paying for the operational improvement.</div>
+        <div class="tl-impact up">Already reported — beat, muted reaction</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend Increase to $0.50/Quarter (+11%)</div>
+        <div class="tl-desc">Subject to board approval, the Q3 dividend rises from $0.45 to $0.50, taking the annualized rate to $2.00 and the yield to about 2.25% at the current price. With a payout ratio near 29%, the dividend is well covered; the more material capital return is the buyback, which ran ~$7B in the first half (37.4M shares for $3.0B in Q2 alone).</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep / Dec 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FOMC Meetings — The NII Swing Factor</div>
+        <div class="tl-desc">Roughly 54% of revenue is net interest income, and Wells Fargo's balance sheet is more asset-sensitive than Bank of America's. A faster easing path compresses loan yields ahead of deposit costs and pressures NIM; a pause or a steeper curve does the opposite. Management has guided to volume-driven NII growth, which means the rate path determines whether 2027 NII grows mid-single digits or stalls.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-Asset-Cap Balance-Sheet Redeployment</div>
+        <div class="tl-desc">Fourteen months after the Federal Reserve lifted the $1.95T asset cap in June 2025, the deployment is visible: average loans +12%, deposits +10%, CIB loans +26%, markets revenue +24% with equities +64%. Each additional quarter of this is incremental revenue the pre-2025 Wells Fargo was structurally prohibited from earning — and each quarter also consumes CET1, which is the constraint that replaced the cap.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026–2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Remaining Consent Orders &amp; Regulatory Milestones</div>
+        <div class="tl-desc">More than a dozen consent orders have been terminated since 2019, including the 2016 sales-practices order and the growth restriction itself. A handful of regulatory agreements remain open. Each additional termination removes compliance cost from the expense base and, more importantly, removes tail risk from the multiple — while any new action would do the reverse, immediately and violently.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Federal Reserve Stress Test / Stress Capital Buffer Reset</div>
+        <div class="tl-desc">With CET1 down to 10.3% from 11.1%, the annual stress test and the resulting stress capital buffer matter more than they have in years. A favorable outcome unlocks a larger buyback authorization; an unfavorable one forces the bank to choose between loan growth and repurchases — precisely the tension KBW flagged in cutting its target.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">WFC Monthly Closes — Aug 2021 to Aug 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF AUG 12, 2026</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#ffcd41;vertical-align:middle;"></span> Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;"></span> 20-Day MA (1-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;"></span> 50-Day MA (3-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;"></span> 200-Day MA (10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC AS OF AUG 12, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">Plain English: RSI measures how fast the stock has risen versus fallen recently. Above 70 the stock has been bought hard and may be stretched; below 30 it has been sold hard and may be washed out. It measures momentum, not value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Five-year trajectory.</strong> Wells Fargo went from <strong>$45.70</strong> in August 2021 to <strong>$88.93</strong> on August 12, 2026 — a price return of about <strong>+95%</strong>, or roughly <strong>+118% including dividends</strong> (about 16.8% annualized). That is a strong five years, and it was earned in an unusual shape: almost nothing happened for the first two and a half years, and then everything happened at once. The stock spent 2022 and 2023 chopping between $37 and $54 while the asset cap capped the earnings power and the March 2023 regional-bank crisis briefly repriced every deposit franchise in America. The move began in earnest in October 2024, accelerated through the November 2024 election on deregulation expectations, and peaked at a monthly close of <strong>$93.20 in December 2025</strong>, six months after the Federal Reserve lifted the asset cap. 2026 has been a give-back year: the stock is down about 4.6% year-to-date against an S&amp;P 500 up roughly 13%, and it now sits about 9% below its 52-week high of $97.76 even as ROTCE reached a cycle-best 17.7%.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jan 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate-Hike Optimism Peak — $53.80</div>
+        <div class="tl-desc">The stock topped out as the market priced an aggressive Fed hiking cycle as pure NII upside for asset-sensitive banks. It would not see that level again until early 2024.</div>
+        <div class="tl-impact neutral">Cycle high, then a 27% drawdown</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Bear-Market Trough — $39.17</div>
+        <div class="tl-desc">Recession fears, credit-normalization worries and a broad equity de-rating took the stock down 27% from the January high in five months, despite rising NII.</div>
+        <div class="tl-impact down">−27% from January peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Regional-Bank Crisis — $37.38, the five-year low close</div>
+        <div class="tl-desc">The failures of Silicon Valley Bank, Signature and later First Republic triggered indiscriminate selling across every deposit-funded institution. WFC fell about 20% in a single month even though it was a net beneficiary of the deposit flight to the largest banks — a reminder of how quickly the sector's tail risk reprices.</div>
+        <div class="tl-impact down">−20% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate-Peak Low — $39.77</div>
+        <div class="tl-desc">Ten-year yields near 5% and mounting unrealized securities losses across the industry produced a second bottom. From here the stock nearly doubled in fourteen months.</div>
+        <div class="tl-impact down">Second bottom of the cycle</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-Election Deregulation Rally — $76.17</div>
+        <div class="tl-desc">A 17% single-month gain on expectations of lighter capital rules, a friendlier supervisory posture, and — specific to WFC — a rising probability that the asset cap would finally be lifted.</div>
+        <div class="tl-impact up">+17% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Tariff Shock Drawdown — $71.01</div>
+        <div class="tl-desc">A macro-driven risk-off episode pulled the stock down roughly 10% from its February level on recession and credit-cost fears. It proved to be the last good entry point before the asset-cap news.</div>
+        <div class="tl-impact down">−10% from Feb 2025</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Federal Reserve Lifts the Asset Cap — $80.12</div>
+        <div class="tl-desc">The defining event of the five years. After seven years and more than a dozen closed consent orders, the Fed removed the $1.95T growth restriction imposed in February 2018. The stock jumped roughly 7% for the month and 13% over the following quarter, and the balance sheet began growing immediately.</div>
+        <div class="tl-impact up">+7% on the month, +13% over the quarter</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">All-Time-High Zone — $93.20 monthly close, $97.76 intraday 52-week high</div>
+        <div class="tl-desc">The peak of the post-asset-cap re-rating, at roughly 14.5x trailing earnings. Everything since has been the market's attempt to work out what the growth is actually worth.</div>
+        <div class="tl-impact up">Peak of the re-rating</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb–May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2026 De-Rating — down to $77.54</div>
+        <div class="tl-desc">A 17% slide from the December high on rate-cut-driven NII concerns, a falling CET1 ratio, and rotation out of banks into higher-growth sectors. Earnings kept rising throughout — this was entirely a multiple compression, and it is why the forward P/E now sits at ~12.3x.</div>
+        <div class="tl-impact down">−17% peak to trough, multiple-driven</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Current — $88.93</div>
+        <div class="tl-desc">Recovered 15% off the May low on the Q2 beat and buyback support, but still 9% below the 52-week high and negative year-to-date. The 200-day (10-month) moving average has been support throughout the 2026 pullback.</div>
+        <div class="tl-impact neutral">+15% off the May low, −4.6% YTD</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> Over the full five years WFC's roughly +118% total return comfortably beat the S&amp;P 500's approximately +82% (index levels here are approximate — verify against an index source before relying on the exact figure), and it beat Bank of America's ~+75% over the same window. The picture inverts over shorter horizons: year-to-date WFC is <strong>−4.6% against the index's +13.3%</strong>, one of the worst showings among the large banks in a year when BAC is up 19%. Against the KBW Bank Index, Wells Fargo led from late 2024 through the asset-cap announcement and has lagged since December 2025 — the classic pattern of a stock that pre-traded its catalyst. The setup today is the mirror image of 2024: then, the operating results were poor and the multiple was pricing a fix; now the operating results are the best in a decade and the multiple has compressed back toward the sector floor.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Wells Fargo is the only large US bank whose earnings power was artificially suppressed for seven years and has just been released. The first full year of unconstrained operation delivered 12% loan growth, 26% CIB loan growth, 24% markets growth, ROTCE of 17.7% and an efficiency ratio down to 60% — while the stock <em>de-rated</em> to 12.3x forward earnings, a discount to peers and less than half the index multiple. If ROTCE holds in the mid-to-high teens, a bank compounding tangible book value while retiring 4–5% of its shares a year at 1.9x tangible book does not stay at 12x for long. Consensus $100 average target implies +12.5%, and even the lowest published target sits above today's price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The market may be right to discount it. CET1 has fallen from 11.1% to 10.3% in a year — the growth is being funded out of the capital cushion, and it cannot run alongside a $14B/yr buyback indefinitely. The allowance ratio dropped 18bp to 1.40% of loans, meaning provision expense is currently flattering EPS rather than normalizing it, against a CRE book that is among the largest in the country. Roughly 54% of revenue is rate-dependent NII in a cutting cycle, and a meaningful slice of the growth came from capital-markets and trading revenue running at cycle-peak levels. Strip out peak markets revenue and sub-normal provisions and the "clean" earnings number is materially below $7.20 — which is exactly what ten hold ratings are saying.</p>
+    </div>
+  </div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Capital constraint replaces the regulatory constraint.</strong> CET1 of 10.3% against roughly a 9.5–10% requirement leaves a thin buffer. Continued 12% loan growth plus $14B of annual buybacks is arithmetically incompatible with a stable capital ratio; something gives, and the 2027 stress test will determine which. A forced buyback slowdown would remove 4–5 points of annual EPS growth.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Credit normalization, concentrated in commercial real estate.</strong> Net charge-offs of $876M are falling and the reserve ratio is declining, both of which are late-cycle behaviors. Wells Fargo's CRE and office exposure is among the largest in US banking. A normalization of the allowance back toward 1.6% of a $1.03T loan book would require roughly $2B of incremental reserve build — about $0.50 of EPS.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>A new regulatory action.</strong> The asset cap took seven years and an entirely rebuilt management team to remove. The market has only just stopped applying a governance discount. Any new consent order, supervisory finding or enforcement action would re-impose that discount immediately, and given this institution's history the market would assume the worst before waiting for details.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Matters Most Right Now</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Post-Asset-Cap Growth Runway</div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">In February 2018 the Federal Reserve capped Wells Fargo's total assets at roughly <strong>$1.95 trillion</strong> in response to the sales-practices scandal — an unprecedented growth prohibition that lasted seven years and, by most estimates, cost the bank billions in forgone revenue while competitors compounded. <strong>The Fed lifted it in June 2025.</strong> The effect is now measurable: average loans +12% YoY, deposits +10%, CIB loans +26%, markets revenue +24% with equities +64%, and trading assets expanding for the first time in years. Critically, the constraint was binding on the highest-return marginal businesses — every dollar of trading inventory competed directly with a consumer loan for space under the cap. The runway is real, but it is not free: CET1 fell from 11.1% to 10.3% financing it, and management is explicitly rationing it ("selective about how much and where to grow"). More than a dozen consent orders have been terminated since 2019; a handful of regulatory agreements remain outstanding, and the compliance cost still embedded in the expense base is an underappreciated source of future operating leverage.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Rate Cycle and NII Trajectory</div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Net interest income of <strong>$12.3B in Q2 2026 (+5%)</strong> is about 54% of revenue, and the entire increase came from volume — average earning assets grew roughly 10% while NIM (estimated at ~2.75%) was flat-to-lower. That is the crux of the 2026 de-rating: the market will pay a growth multiple for spread expansion and a value multiple for volume growth funded by capital. Wells Fargo's asset mix reprices faster than Bank of America's, which makes it a relative winner when rates rise and a relative loser when they fall; deposit costs, particularly in wealth sweep and commercial operating accounts, lag on the way down. Meanwhile noninterest income (+13%) is doing more of the work, but a meaningful share of that is investment banking fees (+36%) and trading — cyclical revenue that no one should extrapolate. The honest read: NII growth from here is a function of how much balance sheet the CET1 ratio permits, not of the rate environment doing the bank any favors.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Credit Normalization &amp; CRE — Bull vs Bear</div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Credit metrics look excellent and that is precisely why they deserve scrutiny. Net charge-offs of <strong>$876M fell 11% YoY</strong>, nonperforming assets dropped $824M sequentially, and the allowance for credit losses declined to <strong>1.40% of loans from 1.58%</strong> — on a loan book that grew 12%. <strong>Bull framing:</strong> the mix shift is genuine. Growth is concentrated in CIB and commercial lending with structurally lower loss content than the consumer and mortgage assets Wells Fargo shed, so a lower allowance ratio is the correct answer, and provision expense should stay benign while unemployment holds. <strong>Bear framing:</strong> reserve ratios that decline into a growing loan book are the textbook late-cycle setup, Wells Fargo carries one of the largest US commercial real estate books with unresolved office exposure, and a reversion of the allowance to 1.6% would cost roughly $2B pre-tax — about $0.50 of EPS, or seven percent of the year. Both readings are defensible from the same disclosure, which is why ten analysts are sitting on hold ratings while thirteen call it a strong buy.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER ============ -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;margin-bottom:12px;">Data as of August 12, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: Wells Fargo &amp; Company Q2 2026 earnings release (July 14, 2026) and prior quarterly releases for segment revenue, net income, loans, deposits, NII, efficiency ratio, ROE, ROTCE, CET1, allowance for credit losses, buybacks and dividends; SEC filings (10-K, 10-Q, 8-K) for historical financials; StockAnalysis.com for price history, valuation multiples, TTM financials, ownership and consensus forecasts (26 analysts, S&amp;P Global Market Intelligence); MarketBeat for individual analyst ratings and price-target changes; Federal Reserve enforcement announcements for the February 2018 growth restriction and its June 2025 removal; FDIC Summary of Deposits and Coalition Greenwich-style industry wallet estimates for market-share and TAM figures.</p>
+  <p style="max-width:900px;margin:0 auto 12px;"><strong style="color:var(--amber);">Estimated data flagged:</strong> FY2025 segment revenues are approximated by annualizing reported quarterly segment disclosures and are labeled "est."; all market-share, TAM and competitor revenue/growth figures are estimates derived from public filings and industry research and should not be treated as reported figures; NIM, tangible book value per share, debt-to-equity and the CET1 requirement are computed or approximated rather than taken from a single disclosed line; S&amp;P 500 index return figures are approximate. Short-interest data from at least one provider appears inconsistent. Segment revenue mix is shown gross of intersegment eliminations, so company-reported total revenue ($22.6B) is below the sum of segments ($23.1B). Company-reported revenue and third-party TTM revenue differ by roughly $3.7B annually due to differing definitions — both bases are used above and labeled.</p>
+  <p style="max-width:900px;margin:0 auto;">This analysis is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. Banking is a leveraged, regulated business in which capital ratios, credit cycles and supervisory actions can change outcomes rapidly and without warning. Past performance does not predict future results. Verify all figures against primary sources — Wells Fargo's SEC filings and investor-relations materials — before making any investment decision. Consult a qualified financial adviser regarding your own circumstances.</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ===== STATIC DATA — monthly closes, Aug 2021 through Aug 12, 2026 =====
+const labels = ['Aug 21','Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [45.70,46.41,51.16,47.78,47.98,53.80,53.37,48.46,43.63,45.77,39.17,43.87,43.71,40.22,45.99,47.95,41.29,46.87,46.77,37.38,39.75,39.81,42.68,46.16,41.29,40.86,39.77,44.59,49.22,50.18,55.59,57.96,59.32,59.92,59.39,59.34,58.47,56.49,64.92,76.17,70.24,78.80,78.32,71.79,71.01,74.78,80.12,80.63,82.18,83.82,86.97,85.85,93.20,90.49,81.45,79.61,82.23,77.54,82.64,86.45,88.93];
+
+function sma(data, window) {
+  const out = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let sum = 0;
+    for (let j = i - window + 1; j <= i; j++) sum += data[j];
+    out.push(+(sum / window).toFixed(2));
+  }
+  return out;
+}
+
+function computeRSI(data, period) {
+  const out = new Array(data.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(1);
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const gain = d > 0 ? d : 0;
+    const loss = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(1);
+  }
+  return out;
+}
+
+const ma20 = sma(prices, 1);
+const ma50 = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi = computeRSI(prices, 6);
+
+const events = [
+  { idx: 5,  label: 'Jan 2022 — rate-hike optimism peak $53.80', color: '#f59e0b' },
+  { idx: 10, label: 'Jun 2022 — bear-market trough $39.17',      color: '#ef4444' },
+  { idx: 19, label: 'Mar 2023 — regional-bank crisis $37.38',    color: '#ef4444' },
+  { idx: 39, label: 'Nov 2024 — deregulation rally $76.17',      color: '#22c55e' },
+  { idx: 44, label: 'Apr 2025 — tariff shock $71.01',            color: '#ef4444' },
+  { idx: 46, label: 'Jun 2025 — Fed lifts asset cap $80.12',     color: '#22c55e' },
+  { idx: 52, label: 'Dec 2025 — cycle high close $93.20',        color: '#22c55e' },
+  { idx: 57, label: 'May 2026 — 2026 de-rating low $77.54',      color: '#ef4444' },
+  { idx: 60, label: 'Aug 12, 2026 — current $88.93',             color: '#ffcd41' }
+];
+const eventMap = {};
+events.forEach(function (e) { eventMap[e.idx] = e; });
+
+const pointRadii = prices.map(function (p, i) { return eventMap[i] ? 6 : 0; });
+const pointColors = prices.map(function (p, i) { return eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)'; });
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255, 205, 65, 0.20)');
+grad.addColorStop(1, 'rgba(255, 205, 65, 0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'WFC Price',
+        data: prices,
+        borderColor: '#ffcd41',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      { label: '20-Day MA (1-mo)',  data: ma20,  borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4, 4], fill: false, pointRadius: 0, tension: 0.25, order: 2 },
+      { label: '50-Day MA (3-mo)',  data: ma50,  borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5, 5], fill: false, pointRadius: 0, tension: 0.25, order: 3 },
+      { label: '200-Day MA (10-mo)', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [6, 4], fill: false, pointRadius: 0, tension: 0.25, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#ffcd41',
+        bodyColor: '#e2e8f0',
+        padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function (items) {
+            const e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(30,41,59,0.6)' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 60, minRotation: 45, autoSkip: true, maxTicksLimit: 20 } },
+      y: { grid: { color: 'rgba(30,41,59,0.6)' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function (v) { return '$' + v; } } }
+    }
+  }
+});
+
+const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rsiCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#ffcd41',
+        bodyColor: '#e2e8f0',
+        padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null) return null;
+            let tag = 'Neutral';
+            if (ctx.parsed.y >= 70) tag = 'Overbought';
+            else if (ctx.parsed.y <= 30) tag = 'Oversold';
+            return 'RSI: ' + ctx.parsed.y.toFixed(1) + '  (' + tag + ')';
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 60, minRotation: 45, autoSkip: true, maxTicksLimit: 14 } },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function (ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.45)';
+            return 'rgba(30,41,59,0.6)';
+          },
+          lineWidth: function (ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function (v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
