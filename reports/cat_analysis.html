@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAT — Caterpillar Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #ffcd11; /* Caterpillar yellow */
+  --accent-dim: #ffcd1133; /* Caterpillar yellow + 33 alpha */
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<!-- ============ STATIC DATA BANNER ============ -->
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 12, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">CAT</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE &nbsp;·&nbsp; <span style="color:var(--text-dim);">Industry:</span> Farm &amp; Heavy Construction Machinery &nbsp;·&nbsp; <span style="color:var(--text-dim);">Mkt Cap:</span> $393.3B</span>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-family:'JetBrains Mono',monospace;">
+        <span style="color:var(--accent);font-weight:600;margin-right:10px;">Mkt Cap Ranking:</span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">Global: #37</span>
+        <span style="color:var(--text-dim);"> · </span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">US: #28</span>
+        <span style="color:var(--text-dim);"> · </span>
+        <span style="color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;font-size:11px;">NYSE: #12</span>
+      </div>
+      <h1 class="company-name" style="margin-top:14px;">Caterpillar Inc.</h1>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$855.60</div>
+      <div class="price-change" style="color:var(--green);">+$12.23 (+1.45%)</div>
+      <div class="price-date">Close · August 12, 2026</div>
+      <div class="price-date">Aug 13 intraday: $858.01 (+0.28%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Irving, Texas, USA</div>
+    <div class="meta-item"><span>Employees:</span>~113,000</div>
+    <div class="meta-item"><span>Founded:</span>1925 (Holt + C.L. Best merger; centennial 2025)</div>
+    <div class="meta-item"><span>Next Earnings:</span>~Oct 28, 2026 (Q3 FY26, est.)</div>
+  </div>
+</div>
+
+<!-- ============ SECTION 01: COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">
+    Caterpillar is the world's largest manufacturer of construction and mining equipment, and — increasingly — one of the largest suppliers of on-site electrical power generation on the planet. It sells excavators, dozers, wheel loaders, mining trucks, reciprocating engines, gas turbines and locomotives through a network of roughly 156 independent dealers serving nearly 190 countries, and finances a large share of those machines through its own captive lender, Cat Financial. FY2025 revenue was <strong>$67.6B</strong>, up 4.3% <span class="tip" title="Year-over-Year — compares a period to the same period one year earlier">YoY</span>, but that headline badly understates the current run-rate: trailing-twelve-month revenue is now <strong>$74.7B (+18.3%)</strong> and Q2 2026 was the first $20B quarter in company history. The company holds roughly <strong>15.2% of the $246.6B global construction-equipment market</strong> — nearly 40% more share than second-place Komatsu — and at a $393B market cap ranks around #37 globally, #28 among U.S.-listed companies, and roughly #12 on the NYSE.
+  </p>
+  <p class="prose" style="margin-top:14px;">
+    The re-rating is the story. Two years ago Caterpillar was a late-cycle machinery stock trading near 15x earnings. Today it trades at 36.9x trailing earnings because the Power &amp; Energy segment — large reciprocating engines and turbines used for behind-the-meter data-center power — has turned a cyclical industrial into an AI-infrastructure supplier. Order backlog hit a record <strong>$72.1B in Q2 2026, up 92% YoY</strong>. Whether that multiple survives is the entire investment debate.
+  </p>
+  <div class="card-grid" style="margin-top:24px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Joe Creed</div>
+      <div class="card-note">CEO since May 1, 2025 (succeeding Jim Umpleby) and Chairman since April 1, 2026. A 1997 Caterpillar hire who ran Energy &amp; Transportation as group president and then served as COO — meaning the man now running the company built the segment driving the re-rating.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Kyle Epley</div>
+      <div class="card-note">CFO effective May 1, 2026, a near-three-decade Caterpillar veteran (ex-corporate controller, division CFO, SVP Global Finance Services). Predecessor Andrew Bonfield — CFO for eight years and architect of the current capital-allocation framework — stays in an advisory role until retiring Oct 1, 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">BlackRock · State Street · Vanguard</div>
+      <div class="card-note">Approximately 8.1%, 7.6% and ~9.1% (across Vanguard entities) respectively per latest 13F filings; State Farm Mutual holds ~3.2% and the Gates Foundation Trust ~1.4% — a legacy position. Institutional ownership totals ~72% of shares outstanding.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 02: CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">FY2025 segment sales and revenues (including inter-segment sales, which is how Caterpillar reports the segments; consolidated revenue of $67.6B is net of roughly $6.4B of eliminations). Note the shift: Power &amp; Energy — renamed from Energy &amp; Transportation — is now the largest segment by revenue <em>and</em> profit, and supplied all of 2025's growth while the two machine segments were flat-to-down.</p>
+  <div class="seg-bar">
+    <div style="flex:43;background:var(--accent);">Power &amp; Energy 43%</div>
+    <div style="flex:34;background:#3b82f6;">Construction 34%</div>
+    <div style="flex:17;background:var(--purple);">Resource 17%</div>
+    <div style="flex:6;background:var(--amber);">6%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--accent);"></div>Power &amp; Energy — $32.2B (~43%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#3b82f6;"></div>Construction Industries — $25.1B (~34%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--purple);"></div>Resource Industries — $12.5B (~17%)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--amber);"></div>Financial Products — $4.2B (~6%)</div>
+  </div>
+
+  <!-- Power & Energy -->
+  <div class="biz-card" style="border-left: 3px solid var(--accent); margin-top:24px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Power &amp; Energy (formerly Energy &amp; Transportation)</div>
+        <span class="biz-badge dominant" style="margin-top:8px;">~20–25% OF LARGE GENSETS — THE RE-RATING ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$32.2B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11.6%</div><div class="biz-stat-label">FY25 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~20–25%e</div><div class="biz-stat-label">Large Genset Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~43%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Reciprocating engines, gas turbines (Solar Turbines), generator sets, marine and rail. This is where the AI trade lives: in Q2 2026 the segment did <strong style="color:var(--text);">$8.24B of sales (+17% YoY)</strong> with <strong style="color:var(--text);">$2.03B of profit at a 24.6% margin</strong> (up 250 <span class="tip" title="Basis points — one basis point equals 0.01 percentage point">bps</span>), and power generation sales-to-users grew <strong style="color:var(--text);">72%</strong> on "very strong demand for large gen sets and turbines used in data center applications." Backlog for large reciprocating engines is up more than 3.5x since January 2024, six separate customer agreements each cover at least 1 gigawatt of capacity, and management says some customers are ordering as far out as 2030. Caterpillar is restarting its 10-megawatt medium-speed gas reciprocating platform (idled since 2022) to add 1.5 GW of capacity with first shipments in Q4 2026, on top of a plan to roughly <strong style="color:var(--text);">triple large-engine capacity versus 2024</strong> with heavy investment across 2027–2029 and cash payback targeted by end-2030. Highest-margin segment in the portfolio; also the one carrying the most valuation expectation.
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global generator sets ~$27B growing ~8%/yr; the broader data-center power equipment pool (gensets, turbines, switchgear, BTM generation) is $80B+ and compounding at double digits as U.S. electricity demand rises for the first time in two decades</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Cummins (Power Systems)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~15%e</div><div class="comp-bubble-label">Genset Share</div></div><div><div class="comp-bubble-val">$2.3B/qtr</div><div class="comp-bubble-label">Q2'26 Revenue</div></div><div><div class="comp-bubble-val">+19%</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">GE Vernova</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">116 GW</div><div class="comp-bubble-label">Turbine Backlog</div></div><div><div class="comp-bubble-val">$11.1B/qtr</div><div class="comp-bubble-label">Q2'26 Revenue</div></div><div><div class="comp-bubble-val">+22%</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Rolls-Royce mtu / Wärtsilä</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~10%e</div><div class="comp-bubble-label">Combined Share</div></div><div><div class="comp-bubble-val">~$12Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+12%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Construction Industries -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Construction Industries</div>
+        <span class="biz-badge dominant" style="margin-top:8px;">~15.2% GLOBAL MARKET SHARE — #1 WORLDWIDE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$25.1B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−1.6%</div><div class="biz-stat-label">FY25 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~15.2%</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~34%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Excavators, backhoes, dozers, wheel loaders, compact machines and asphalt/paving equipment sold to contractors, rental fleets and infrastructure builders. FY2025 was a down year — volumes fell and segment profit dropped to $4.68B (18.7% margin) from $6.17B — but the turn has been violent: <strong style="color:var(--text);">Q2 2026 sales of $8.35B were +35% YoY</strong> with profit +57% to $1.95B and margin at 23.3%, a sixth consecutive quarter of sales-to-users growth, and North American sales up 50% to $5.1B on data-center site work, dealer restocking and infrastructure spending. Roughly $1.76B of the $2.16B increase was volume, $309M price. The offset: this is the segment most exposed to Chinese low-cost competition (XCMG, Sany) internationally and the most sensitive to interest rates and non-residential construction.
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global construction equipment reached a record $246.6B in 2025 (+3.8%, per KHL's Yellow Table); projected mid-single-digit growth with infrastructure and data-center site work the leading drivers</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Komatsu</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~11%</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">~$27.1B</div><div class="comp-bubble-label">FY Revenue</div></div><div><div class="comp-bubble-val">+0.7%</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">XCMG</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~5.8%</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">$14.2B</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+9%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Deere (Constr. &amp; Forestry)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~5.4%</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">$13.2B</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+29%</div><div class="comp-bubble-label">Q2'26 YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Volvo CE</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~4.3%e</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">$10.5B</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+4%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Resource Industries -->
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Resource Industries (Mining &amp; Heavy Construction)</div>
+        <span class="biz-badge growth" style="margin-top:8px;">~35–40% LARGE MINING TRUCKS — CYCLE TURNING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$12.5B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+0.7%</div><div class="biz-stat-label">FY25 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~35–40%e</div><div class="biz-stat-label">Mining Truck Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~17%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Ultra-class mining trucks, large dozers and shovels, off-highway equipment, plus the aftermarket parts and autonomy software (Cat MineStar, one of the largest autonomous haulage fleets in operation) that come with them. The smallest of the three machine segments and the most volatile: FY2025 profit fell to $1.99B (15.9% margin) as tariffs and mix compressed results, and Q1 2026 margin briefly collapsed to 10.0%. <strong style="color:var(--text);">Q2 2026 sales of $4.65B (+20% YoY)</strong> with profit +23% to $693M signals the mining capex cycle re-accelerating — copper, gold and critical-minerals demand tied to electrification and, again, data centers. Aftermarket parts on a very large installed base make this segment's earnings more durable than its equipment orders imply.
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global mining equipment ~$150B, growing ~6%/yr; replacement cycles for fleets bought in the 2011–2013 supercycle are now overdue</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Komatsu (Mining)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~25%e</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">~$11Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">−3%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Epiroc</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~7%e</div><div class="comp-bubble-label">Market Share</div></div><div><div class="comp-bubble-val">~$6.2Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+7%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Sandvik / Liebherr</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~12%e</div><div class="comp-bubble-label">Combined Share</div></div><div><div class="comp-bubble-val">~$18Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+5%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Financial Products -->
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Financial Products (Cat Financial)</div>
+        <span class="biz-badge emerging" style="margin-top:8px;">CAPTIVE FINANCE — DEMAND ENABLER, NOT A GROWTH STORY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4.2B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4.1%</div><div class="biz-stat-label">FY25 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/a</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Retail and dealer financing, leasing and insurance for Cat equipment. Small in revenue, strategically large: it lets dealers move machines when credit is tight and locks customers into the Caterpillar ecosystem. <strong style="color:var(--text);">Q2 2026 revenue of $1.15B (+10%) with profit up 32% to $328M</strong> on better past-dues and portfolio growth. The critical analytical point: Cat Financial's balance sheet is <em>consolidated</em>, which is why headline <span class="tip" title="Total debt divided by shareholder equity — balance-sheet leverage">debt-to-equity</span> of 2.33 looks alarming for an industrial. Strip out the finance arm and the Machinery, Power &amp; Energy (ME&amp;T) balance sheet is conservatively levered — a distinction most screens miss.
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global equipment finance ~$1.5T of originations; captive lenders hold roughly a third of the heavy-equipment slice</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">John Deere Financial</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$6.5Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+3%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Komatsu Financial</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$1.2Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+2%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">DLL / bank lessors</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$3Be</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">+4%e</div><div class="comp-bubble-label">Rev YoY</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 03: MOAT & VULNERABILITIES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <div class="moat-pill">Global Dealer Network (~156)</div>
+    <div class="moat-pill">Installed Base &amp; Aftermarket Parts</div>
+    <div class="moat-pill">Brand — "Cat Yellow"</div>
+    <div class="moat-pill">Engine &amp; Emissions Certification</div>
+    <div class="moat-pill">Manufacturing Scale</div>
+    <div class="moat-pill">Captive Financing</div>
+    <div class="moat-pill">Capacity Reservation Lock-In</div>
+  </div>
+  <p class="prose" style="margin-top:20px;">
+    Caterpillar's moat is not the machine — it is everything around the machine. Roughly 156 independent dealers, most of them multi-generational family businesses, operate thousands of service locations across nearly 190 countries; a mine in Chile or a contractor in Indonesia buys Cat partly because a technician and a part can reach the site within hours, and downtime on a $6M mining truck costs far more than the price premium. That network sustains a <strong>~$24B services revenue stream</strong> at structurally higher margins than new equipment, and it is close to unreplicable — Chinese entrants can match the steel, not thirty years of dealer capital. The Power &amp; Energy franchise adds a second, newer moat: emissions-certified large engines are slow to design, slower to certify, and capacity is now sold out for years, so hyperscalers are signing gigawatt-scale reservations rather than shopping on price. Backlog at $72.1B (59% shipping within twelve months) is the moat made visible.
+  </p>
+  <div style="margin-top:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">Key Vulnerabilities</div>
+    <p class="prose" style="margin-bottom:14px;"><strong>Cyclicality — the oldest problem, now hidden.</strong> Construction and mining capex are among the most cyclical spending lines in the economy, and Caterpillar's operating leverage cuts both ways: FY2025 adjusted EPS fell 13% to $19.06 on a mere volume dip plus tariffs. The record backlog masks this, but a backlog is a promise, not a contract in the strict sense — orders placed for 2029–2030 delivery can be deferred if the AI capex cycle cools.</p>
+    <p class="prose" style="margin-bottom:14px;"><strong>Chinese competition and export share.</strong> XCMG ($14.2B) has passed Deere to become the world's #3 construction-equipment maker and Sany is close behind; both compete aggressively on price across Asia, Africa, Latin America and the Middle East — markets where the dealer-network premium is thinnest. Caterpillar has already ceded meaningful share in China itself, and each cycle of Chinese overcapacity exports deflation into Caterpillar's non-U.S. pricing.</p>
+    <p class="prose" style="margin-bottom:14px;"><strong>Data-center concentration and permitting backlash.</strong> The segment carrying the valuation is exposed to a small number of hyperscaler customers and to a policy environment turning hostile: New York enacted a data-center moratorium, Texas froze new project approvals pending a state audit in August 2026, and water, zoning and tax-incentive fights are spreading. Baird's July 29 downgrade explicitly cited this as a multiple-compression risk, and the stock fell ~7% that day. Concentration risk plus regulatory risk in the same revenue line is a genuinely poor combination.</p>
+    <p class="prose"><strong>Technology disruption and trade policy.</strong> Two slower-burning threats sit under the moat. First, electrification and autonomy are re-opening a product category that has been closed for decades: battery-electric compact machines invite new entrants who do not need Caterpillar's engine expertise, and autonomous haulage shifts value from iron toward software and fleet-management platforms where Komatsu, Epiroc and pure-play technology vendors compete on different terms. Caterpillar leads today with Cat MineStar and a large autonomous fleet, but leadership in a software category is a very different defensive proposition than leadership in diesel engines. Second, trade policy is an ongoing structural cost: roughly $1.8B of tariffs in 2025 and ~$2.2B guided for 2026 against FY2025 operating profit near $11B. Pricing has recovered part of it ($595M of favorable price realization in Q2 2026 alone), but pass-through depends on a demand environment strong enough to absorb it — and demand environments change faster than tariff schedules.</p>
+  </div>
+</div>
+
+<!-- ============ SECTION 04: KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Caterpillar vs. the heavy-machinery peer group and the S&amp;P 500. Green = better than both comparisons, red = worse than both, amber = mixed. Machinery and index averages are approximate composites as of August 2026.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>CAT</th><th>Machinery Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings ratio — share price divided by the last 12 months of earnings per share">P/E</span></td><td style="color:var(--red);">36.9</td><td>~26</td><td>~26.4</td><td>A machinery company priced like a growth stock. Two years ago CAT traded near 15x; the entire gap is the data-center power thesis.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by expected next-12-month earnings per share">P/E</span></td><td style="color:var(--red);">29.8</td><td>~22</td><td>~22.5</td><td>Implies ~$28.70 of forward EPS. Trailing earnings still carry $1.8B of 2025 tariff drag, so forward compression is real — but so is the premium.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — P/E divided by expected earnings growth rate; below 1 is classically 'cheap for the growth'">PEG</span> Ratio</td><td style="color:var(--green);">1.64</td><td>~2.2</td><td>~2.2</td><td>The one valuation metric that flatters CAT: growth is running fast enough to partly justify the multiple. Sensitive to whether backlog converts on schedule.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, Trailing Twelve Months — total profit per share over the last year">EPS (TTM)</span></td><td style="color:var(--text-dim);">$23.21</td><td>—</td><td>—</td><td>Up from FY2025's $18.81 GAAP. Q2 2026 alone delivered $7.77 GAAP / $8.17 adjusted, +73% YoY.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year — versus the same period a year earlier">YoY</span>)</td><td style="color:var(--green);">+18.3%</td><td>~+6%</td><td>~+7%</td><td>TTM basis. FY2025 was only +4.3%; the acceleration is Q1–Q2 2026 (+22% and +24%). Guidance is mid-to-high-teens growth for FY2026.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as a % of revenue">Gross Margin</span></td><td style="color:var(--amber);">29.7%</td><td>~28%</td><td>~35%</td><td>Above machinery peers, below the index — normal for a heavy manufacturer. Tariffs have held this ~150bps below its pre-2025 level.</td></tr>
+      <tr><td><span class="tip" title="Bottom-line profit as a % of revenue">Net Profit Margin</span></td><td style="color:var(--green);">14.5%</td><td>~10%</td><td>~13%</td><td>Best-in-class for the sector. Q2 2026 adjusted operating margin of 21.9% was up 430bps YoY on volume leverage and price.</td></tr>
+      <tr><td><span class="tip" title="Annual dividends per share divided by share price">Dividend Yield</span></td><td style="color:var(--red);">0.76%</td><td>~1.3%</td><td>~1.2%</td><td>$6.52/yr ($1.63 quarterly, raised 8% in June 2026). <strong>32 consecutive years of increases — a Dividend Aristocrat</strong>, with dividends paid every year since 1933. The yield is low only because the stock doubled.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a % of freely tradable shares — a gauge of bearish positioning">Short Interest</span></td><td style="color:var(--green);">1.79%</td><td>~2.5%</td><td>~2.0%</td><td>~8.1M shares short. Strikingly light for a stock up 108% in a year — nobody is pressing the valuation short.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholder equity — balance-sheet leverage">Debt-to-Equity</span></td><td style="color:var(--red);">2.33</td><td>~0.9</td><td>~1.1</td><td><strong>Read with care:</strong> $45.2B of total debt mostly sits at Cat Financial, the consolidated captive lender. The industrial (ME&amp;T) balance sheet is far more conservative; this ratio is a reporting artifact, not distress.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--amber);">1.37</td><td>~1.7</td><td>~1.2</td><td>Below machinery peers (who carry heavier inventory), above the index. $6.7B of enterprise cash and $4.4B of Q2 operating cash flow provide ample cover.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditures; cash truly available to shareholders">FCF</span> (TTM)</td><td style="color:var(--text-dim);">$8.99B</td><td>—</td><td>—</td><td>Q2 2026 ME&amp;T free cash flow was $5.1B. FY2026 guided to the top half of the $6–15B range against ~$3.5B of capex — capacity expansion is being self-funded.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholder equity">ROE</span></td><td style="color:var(--green);">57.0%</td><td>~19%</td><td>~19%</td><td>Spectacular — and partly manufactured. Years of aggressive buybacks ($5.2B in 2025, $1.5B in Q2 2026 alone) have shrunk the equity base, flattering the denominator.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by total invested capital; the key measure of capital discipline">ROIC</span></td><td style="color:var(--green);">18.3%</td><td>~11%</td><td>~11%</td><td>The cleaner quality signal, and it is genuinely strong. Watch it through 2027–2029 as the capacity build absorbs capital before revenue arrives.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to overall market moves; 1.0 = moves with the market">Beta</span></td><td style="color:var(--red);">1.60</td><td>~1.25</td><td>1.00</td><td>Has risen sharply as CAT began trading with the AI complex rather than with the construction cycle. Expect drawdowns to track Nvidia headlines more than housing starts.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$405.46–$1,073.46</td><td>—</td><td>—</td><td>A 165% low-to-high span in twelve months — extraordinary for a $393B industrial. Current price sits ~20% below the June 2026 high and ~111% above the low.</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:24px;">
+    <p class="prose"><strong>Notable One-Off Items:</strong> Trailing figures are unusually distorted. <strong>Tariffs</strong> are the dominant item: roughly <strong>$1.8B of cost in 2025</strong> (raised through the year from an initial $1.3–1.5B estimate) and guided at approximately <strong>$2.2B gross in 2026</strong>, partially offset by <strong>$392M of IEEPA</strong> (International Emergency Economic Powers Act) <strong>tariff recoveries booked in Q2 2026</strong> — a genuine one-off, with management explicitly guiding no further recoveries in the second half. Q2 2026's headline 21.9% adjusted operating margin therefore overstates the underlying run-rate by roughly 190bps. <strong>Restructuring</strong> cost $444M in FY2025, of which $319M landed in Q4, including write-downs in the Rail division. Caterpillar also books an annual <strong>Q4 mark-to-market remeasurement of pension and OPEB plans</strong>, which routinely swings fourth-quarter GAAP results by hundreds of millions in either direction and is the main reason GAAP and adjusted EPS diverge most in Q4. Finally, the <strong>segment renaming and re-segmentation</strong> (Energy &amp; Transportation → Power &amp; Energy) restated prior-period segment revenue, so pre-2025 segment comparisons drawn from older filings will not tie.</p>
+  </div>
+</div>
+
+<!-- ============ SECTION 05: ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Moderate Buy</div><div class="card-note">16 analysts with ratings in the last 3 months (TipRanks, as of Aug 12, 2026). Broader polls covering ~28 firms show a similar "Buy" tilt with a lower average target near $958–$971.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$1,012.67</div><div class="card-note" style="color:var(--green);">+18.4% upside vs. $855.60 — targets were raised broadly after the Aug 4 print, but the stock has not reclaimed its June high</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value">$879–$1,225</div><div class="card-note">Even the Street low implies +2.7% upside. That is not a bearish tape — it is a tape where nobody wants to model the AI power cycle ending.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:18px;">8 Buy · 8 Hold · 0 Sell</div><div class="card-note">A perfectly split book, and unusually so: the disagreement is entirely about multiple, not about the business.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:8;background:var(--green);"></div>
+    <div style="flex:8;background:var(--amber);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--green);"></div>Buy / Strong Buy (8)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--amber);"></div>Hold (8)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--red);"></div>Sell (0)</div>
+  </div>
+  <div style="margin-top:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">Key Recent Analyst Calls</div>
+    <ul style="list-style:none;">
+      <li style="padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);"><span style="color:var(--green);">●</span>&nbsp; <strong style="color:var(--text);">Truist Financial</strong> (Jamie Cook) — Aug 5, 2026 — Buy, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$1,225</span>. Street high. Argues the market still models Power &amp; Energy as a cyclical engine business rather than a multi-year capacity-constrained franchise, and that the 3x large-engine capacity plan is under-earned in consensus 2028 estimates.</li>
+      <li style="padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);"><span style="color:var(--green);">●</span>&nbsp; <strong style="color:var(--text);">J.P. Morgan</strong> (Tami Zakaria) — Aug 5, 2026 — Overweight, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$1,100</span>. Points to the 92% backlog growth with 59% shipping inside twelve months as unusually high near-term revenue visibility for a machinery name, plus Construction Industries inflecting (+35%) after a soft 2025. Citi (Kyle Menges) matched at $1,100 the same day.</li>
+      <li style="padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);"><span style="color:var(--red);">●</span>&nbsp; <strong style="color:var(--text);">Robert W. Baird</strong> (Mircea Dobre) — Jul 29, 2026 — <strong>Downgrade to Neutral</strong>, PT cut $1,200 → <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$900</span> (since nudged to $970). The most consequential call of the quarter: argued data-center permitting resistance is now nationwide — "not a blue vs. red state issue" — spanning water, energy, zoning and tax-incentive rollbacks, and that this compresses the multiple regardless of near-term orders. CAT fell ~7% on the day.</li>
+      <li style="padding:10px 0;font-size:14px;color:var(--text-muted);"><span style="color:var(--amber);">●</span>&nbsp; <strong style="color:var(--text);">The Hold Camp</strong> — Barclays (Adam Seiden, $900, Aug 6), D.A. Davidson (Michael Shlisky, $882, Aug 6), Morgan Stanley (Angel Castillo, $915), UBS (Steven Fisher, $925), RBC (Sabahat Khan, $897) — PTs clustered <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$880–$925</span>. Common thread: no quarrel with execution, but 30x forward earnings already discounts a capacity ramp that does not begin shipping in volume until Q4 2026 and does not fully land until 2029.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ SECTION 06: UPCOMING CATALYSTS & NEWS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">JUL 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Baird downgrade on data-center permitting backlash</div>
+        <div class="tl-desc">Baird cut CAT to Neutral and slashed its target from $1,200 to $900, flagging a nationwide spread of data-center moratoriums, water and energy restrictions, zoning enforcement and tax-incentive rollbacks. Shares fell as much as 8% intraday and closed −6.9% at $782.71 — the worst single day of the year and the definitive marker that policy risk now trades in this stock.</div>
+        <div class="tl-impact down">Market reaction: −6.9% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">AUG 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Texas freezes new data-center approvals pending state audit</div>
+        <div class="tl-desc">Texas — the single largest U.S. market for behind-the-meter gas generation — halted new data-center project approvals while the state audits grid and water impacts, following New York's moratorium. Roughly 40% of announced U.S. data-center capacity sits in states now debating restrictions. This is the live overhang on the Power &amp; Energy order book.</div>
+        <div class="tl-impact neutral">Key near-term event — watch state legislative calendars</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">AUG 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026: first $20B quarter in company history</div>
+        <div class="tl-desc">Sales of $20.54B (+24% YoY) beat comfortably; adjusted EPS of $8.17 rose 73%; adjusted operating margin hit 21.9% (+430bps). Backlog jumped to a record $72.1B, up 92% YoY and $9B sequentially. Management raised FY2026 sales growth guidance to mid-to-high teens and cut the tariff estimate to ~$2.2B. Shares closed +5.6% at $876.54 — but faded over the following week.</div>
+        <div class="tl-impact up">Market reaction: +5.6% on the print</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">10-MW gas reciprocating engine platform restarts — first shipments</div>
+        <div class="tl-desc">Caterpillar is bringing back the medium-speed 10-megawatt gas platform idled in 2022, adding 1.5 GW of capacity with shipments beginning in Q4 and ramping over roughly 18 months. This is the nearest-term proof point that capacity — not demand — has been the binding constraint on the power-generation business.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~OCT 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings (estimated date)</div>
+        <div class="tl-desc">Consensus sits near $6.89 EPS on ~$20.2B of revenue. Three things matter more than the print: whether backlog grows again off $72.1B, whether tariff costs land at or below the $2.2B full-year guide without further IEEPA recoveries, and whether Construction Industries can hold the +35% momentum against a harder comparison and dealer inventory that was loaded in Q2.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027–2029</div>
+      <div class="tl-content">
+        <div class="tl-title">The capacity investment cycle — roughly 3x large-engine capacity vs. 2024</div>
+        <div class="tl-desc">Management plans heavy investment from 2027 through 2029 to nearly triple large reciprocating engine capacity relative to 2024, targeting positive cash payback on the entire program by the end of 2030 and a 6–9% sales CAGR from 2024 to 2030. Capex is ~$3.5B in 2026 and rises from there. The bull case requires this to be filled; the bear case is a capacity build meeting a cooling AI capex cycle.</div>
+        <div class="tl-impact up">Structural growth driver — and the key execution risk</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SECTION 07: 5-YEAR STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">CAT — 5-YEAR MONTHLY CLOSES &nbsp;<span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 12, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">Monthly closing prices, Sep 2021 – Aug 2026 (Aug 2026 = Aug 12 close). Moving averages approximated on monthly data.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;">
+      <span style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:22px;height:3px;background:var(--accent);border-radius:2px;"></span>Price</span>
+      <span style="display:flex;align-items:center;gap:6px;color:var(--amber);"><span style="display:inline-block;width:22px;height:0;border-top:2px dashed var(--amber);"></span>20-Day MA (~1mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;color:var(--blue);"><span style="display:inline-block;width:22px;height:0;border-top:2px dashed var(--blue);"></span>50-Day MA (~3mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;color:var(--red);"><span style="display:inline-block;width:22px;height:0;border-top:2px dashed var(--red);"></span>200-Day MA (~10mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY &nbsp;<span style="color:var(--amber);">⚠ STATIC AS OF AUG 12, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">RSI measures momentum from 0–100. Above 70 = potentially overbought (rally may be stretched); below 30 = potentially oversold (selling may be exhausted).</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+    <div style="display:flex;gap:24px;margin-top:10px;font-size:11px;font-family:'JetBrains Mono',monospace;">
+      <span style="color:var(--red);">70 — OVERBOUGHT</span>
+      <span style="color:var(--text-dim);">50 — Neutral</span>
+      <span style="color:var(--green);">30 — OVERSOLD</span>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:24px;">
+    Five years, three completely different stocks. From <strong>$191.97 in September 2021</strong>, CAT spent 2022 as a rate-shock casualty, bottoming at $164.08 in September 2022 before the industrial re-opening trade lifted it through 2023. Phase two (2023 through late 2024) was a conventional, well-executed machinery bull market: pricing power, buybacks and margin expansion carried the stock from ~$230 to a November 2024 peak of $406.11 — and then it broke. April 2025 saw a <strong>tariff-shock low of $309.27</strong>, down 24% from the peak, as the market handicapped a $1.5–1.8B cost hit against decelerating machine volumes. Phase three began in the autumn of 2025 and is unlike anything in the company's history: as hyperscalers discovered that grid interconnection queues were longer than their build schedules, Caterpillar's reciprocating engines became a scarce AI input. The stock went <strong>$477 (Sep 25) → $577 (Oct 25) → $657 (Jan 26) → $890 (Apr 26) → $1,064.90 (Jun 26)</strong>, printing a 52-week high of <strong>$1,073.46</strong>. July 2026 delivered the first real test — a 17% monthly drawdown on the Baird downgrade and data-center permitting backlash — with the record Q2 print only partially repairing it. <strong>Total 5-year price return: approximately +346% (roughly +375% with dividends reinvested)</strong>, versus approximately +100% for the S&amp;P 500 and roughly +115% for the S&amp;P 500 Industrials sector over the same window (index figures approximate). CAT has beaten its benchmark by more than 3x — but note that essentially all of that excess return was earned in the eleven months from September 2025 onward, and the stock currently sits ~20% below its high.
+  </p>
+  <p class="prose" style="margin-top:18px;">
+    <strong>Momentum read.</strong> The 6-period monthly <span class="tip" title="Relative Strength Index — a momentum oscillator from 0 to 100; above 70 suggests an overbought market, below 30 an oversold one">RSI</span> spent nine straight months above 70 from October 2025 through June 2026 — one of the most extended overbought stretches in the stock's history and a textbook sign of a crowded trade. July's 17% drawdown pulled it back to roughly 60, which is neutral-to-constructive rather than washed out: this is a stock that has corrected its price but not yet its positioning. For context, the last genuinely oversold monthly reading (below 35) came in April 2025 at the tariff-shock low — an entry point that would have doubled since.
+  </p>
+  <p class="prose" style="margin-top:14px;">
+    <strong>Relative performance.</strong> Against the S&amp;P 500, CAT's five-year excess return is roughly 245 percentage points, but the path matters: from September 2021 through August 2025 CAT compounded at a respectable but unremarkable pace and traded broadly in line with the industrials complex. The divergence began in September 2025. In the eleven months since, CAT is up roughly 104% while the S&amp;P 500 and the industrials sector have advanced far more modestly — meaning an investor buying today is underwriting a re-rating that has already happened, not one that is still to come. That is the central discipline point of this analysis.
+  </p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">SEP 2022</div><div class="tl-content"><div class="tl-title">Rate-shock trough: $164.08</div><div class="tl-desc">Peak Fed-tightening fear and recession positioning took CAT to its five-year low. It traded near 12x earnings with a 2.5% yield — a reminder of what this stock looks like when nobody believes in the cycle.</div><div class="tl-impact down">Five-year low</div></div></div>
+    <div class="tl-item"><div class="tl-date">DEC 2023</div><div class="tl-content"><div class="tl-title">Record margins meet the soft-landing rally</div><div class="tl-desc">Pricing power stuck, cost inflation faded, and adjusted operating margins hit records. CAT closed 2023 at $295.67, up 80% from the September 2022 low.</div><div class="tl-impact up">+80% off the trough</div></div></div>
+    <div class="tl-item"><div class="tl-date">NOV 2024</div><div class="tl-content"><div class="tl-title">Post-election infrastructure peak: $406.11</div><div class="tl-desc">Expectations of deregulation and infrastructure spending marked the top of the conventional cycle. Machine volumes were already softening underneath the price action.</div><div class="tl-impact up">Cycle peak — then a 24% drawdown</div></div></div>
+    <div class="tl-item"><div class="tl-date">APR 2025</div><div class="tl-content"><div class="tl-title">Tariff-shock low: $309.27</div><div class="tl-desc">Sweeping U.S. tariffs on imported equipment, steel and components hit a globally-sourced manufacturer directly. Management guided to a $1.3–1.5B cost (later $1.8B) and the stock lost nearly a quarter of its value.</div><div class="tl-impact down">−24% from the November peak</div></div></div>
+    <div class="tl-item"><div class="tl-date">OCT 2025</div><div class="tl-content"><div class="tl-title">The data-center power thesis takes hold: +21% in a month</div><div class="tl-desc">Q3 2025 results and hyperscaler commentary made the reciprocating-engine shortage visible. CAT closed October at $577.26 — the month the market stopped valuing it as a construction company.</div><div class="tl-impact up">Re-rating begins</div></div></div>
+    <div class="tl-item"><div class="tl-date">APR 2026</div><div class="tl-content"><div class="tl-title">Q1 2026: backlog $62.7B (+79%), capacity plan tripled</div><div class="tl-desc">Sales of $17.4B (+22%) and a raised capacity target — from 2x to nearly 3x 2024 large-engine capacity — pushed the stock to $890.11 by month-end, up 35% year-to-date.</div><div class="tl-impact up">+26% monthly gain</div></div></div>
+    <div class="tl-item"><div class="tl-date">JUN 2026</div><div class="tl-content"><div class="tl-title">All-time high — 52-week high $1,073.46</div><div class="tl-desc">CAT closed June at $1,064.90, briefly making it one of the twenty largest U.S. companies by market cap. Trailing P/E peaked above 45x.</div><div class="tl-impact up">All-time high</div></div></div>
+    <div class="tl-item"><div class="tl-date">JUL–AUG 2026</div><div class="tl-content"><div class="tl-title">−17% month on AI-capex and permitting fears, then a record Q2</div><div class="tl-desc">The Baird downgrade (Jul 29, −6.9%), state moratorium headlines and a broad AI-complex de-rating knocked the stock to $782.71. The Aug 4 record quarter recovered part of it (+5.6%), leaving CAT at $855.60 — roughly 20% below the high and 111% above the 52-week low.</div><div class="tl-impact down">First real test of the thesis</div></div></div>
+  </div>
+</div>
+
+<!-- ============ SECTION 08: SUMMARY & KEY RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>▲ Bull Case</h4>
+      <p>Caterpillar has become the physical bottleneck in AI infrastructure: grid interconnection queues run years long, so hyperscalers buy their own power, and large reciprocating engines and turbines are capacity-constrained through 2030. A $72.1B backlog (+92% YoY, 59% shipping within twelve months) plus six separate gigawatt-scale customer agreements gives revenue visibility no machinery company has ever had. Meanwhile the cyclical businesses are inflecting at the same time — Construction +35% and Resource +20% in Q2 — while capacity triples versus 2024 and the whole program is funded from $9B of trailing free cash flow. At 1.64x PEG with 57% ROE and 32 straight years of dividend increases, you are paying a growth multiple for an entrenched franchise with a fortress distribution moat.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>▼ Bear Case</h4>
+      <p>You are paying 36.9x trailing and 29.8x forward earnings for a company whose revenue is still 60%+ tied to construction and mining cycles, at a beta of 1.60, after a 108% twelve-month move. The July 2026 drawdown showed how fast this unwinds: one downgrade on <em>permitting policy</em> — not orders, not earnings — took 7% out in a day and 17% out in a month. Data-center backlash is spreading from New York to Texas, roughly $2.2B of annual tariff cost is structural, and the 2027–2029 capacity build commits capital years before the revenue arrives. If AI capex normalizes even modestly, CAT is left with tripled engine capacity, a de-rated multiple, and two cyclical segments facing tough comparisons. The 8-Buy/8-Hold split is the Street saying exactly this.</p>
+    </div>
+  </div>
+  <div style="margin-top:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Top 3 Risks</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">AI capex normalization / multiple compression.</strong> The gap between a 36.9x machinery stock and a 15x machinery stock is roughly 60% of the share price. Any credible sign that hyperscaler power procurement is slowing — order deferrals, a hyperscaler capex cut, or simply a cooling AI tape — removes the premium far faster than backlog can be delivered. Beta of 1.60 means the stock now moves with the AI complex, not with housing starts.</div></div>
+      <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">Data-center policy and permitting.</strong> New York's moratorium and Texas's August 2026 approval freeze pending a state audit are the leading edge of a nationwide fight over water, grid capacity, zoning and tax incentives. Baird's downgrade thesis is that this compresses the multiple regardless of near-term orders — and the July price action proved the market agrees. Concentration in a handful of hyperscaler customers amplifies it.</div></div>
+      <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Tariffs, trade policy and cost pass-through.</strong> Roughly $1.8B of tariff cost in 2025 and ~$2.2B guided for 2026 against ~$11B of FY2025 operating profit. Q2's margin was flattered by $392M of IEEPA recoveries that management says will not repeat in the second half. Pass-through has worked while demand is red-hot; in a softer order environment the same tariffs would hit margins directly — and further trade escalation, or an adverse legal outcome on tariff refunds, would widen the hit.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary: The Macro Backdrop</div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div class="biz-name">Data-Center Power Demand: A Genuinely New Growth Vector</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <div class="biz-desc">
+      U.S. electricity demand is rising for the first time in roughly two decades, and the constraint is not generation capacity in aggregate — it is <em>time</em>. Utility interconnection queues stretch years, so hyperscalers increasingly build behind-the-meter generation: gas reciprocating engines and turbines sited at the data center. That is Caterpillar's product. Power generation sales-to-users grew <strong style="color:var(--text);">72% in Q2 2026</strong>; large-engine backlog is up more than 3.5x since January 2024; six customer agreements each cover 1 GW or more; and management reports orders being placed as far out as <strong style="color:var(--text);">2030</strong>. Peers confirm the same picture from different angles — GE Vernova's gas turbine backlog hit 116 GW (targeting 125 GW by year-end) with orders +88% organically, and Cummins says its Power Systems business is "selling out into the second half of 2028." This is not a Caterpillar-specific narrative; it is an industry-wide capacity shortage. The analytical caution: an industry-wide shortage invites industry-wide capacity addition, and Caterpillar, Cummins, GE Vernova, Mitsubishi and Wärtsilä are all expanding at once into a demand curve nobody can forecast past 2028.
+    </div>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div class="biz-name">Tariffs: A $2B+ Annual Tax on a Globally-Sourced Manufacturer</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <div class="biz-desc">
+      Caterpillar builds in the U.S., Europe, Japan, China, India, Brazil and Mexico, and moves components across all of them — which makes it one of the most tariff-exposed large-cap industrials in America. The 2025 hit escalated through the year from an initial $1.3–1.5B estimate to roughly <strong style="color:var(--text);">$1.8B</strong>, and drove the $1.03B of unfavorable manufacturing costs that crushed Q4 2025 margins (13.9% GAAP operating margin, down from 18.0%). For 2026, guidance is approximately <strong style="color:var(--text);">$2.2B gross</strong> — trimmed from $2.5B — with <strong style="color:var(--text);">$392M of IEEPA recoveries</strong> booked in Q2 and none expected in the second half. Section 232 duties on construction equipment and parts, at rates up to 50%, sit on top of that. Pricing has offset a meaningful share ($595M of favorable price realization in Q2 2026), and adjusted operating margin still expanded 430bps — but that only works while the order book is this strong. The honest read: tariffs are currently a manageable, disclosed, quantified headwind; in a demand downturn they become an unhedged margin problem.
+    </div>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #3b82f6;">
+    <div class="biz-header">
+      <div class="biz-name">The Old Cycle Is Turning Too — and That Is the Real Bull/Bear Divide</div>
+      <span class="biz-badge" style="background:var(--blue-dim);color:var(--blue);">CYCLICAL INFLECTION — FRAMES THE DEBATE</span>
+    </div>
+    <div class="biz-desc">
+      Lost in the AI story: the traditional businesses are inflecting simultaneously. Global construction equipment hit a record $246.6B in 2025 (+3.8%), North American Construction Industries sales rose 50% to $5.1B in Q2 2026, and Resource Industries grew 20% as mining fleets bought in the 2011–2013 supercycle finally age out against copper and critical-minerals demand. Infrastructure spending and data-center site work are reinforcing each other — every gigawatt of compute needs earthmoving before it needs engines. <strong style="color:var(--text);">The frame for investors:</strong> the bull argues you are getting a cyclical recovery and a secular power franchise at the same time, with a $72B backlog, 18.3% ROIC and 32 years of dividend growth underwriting the wait. The bear argues you are buying two peaks at once — a construction cycle that has already run six quarters and an AI capex cycle whose first policy speed bump cost the stock 17% in a month — at 30x forward earnings and a 1.60 beta. Both are describing the same $393B company. The difference is not the analysis of Caterpillar; it is what you assume about hyperscaler capital spending in 2028, and that assumption, not the stock selection, is the actual wager.
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER ============ -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of August 12, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:800px;margin:0 auto 12px;">Sources: Caterpillar Q2 2026 earnings release and conference call (Aug 4, 2026), Q1 2026 results (Apr 30, 2026), Q4 and full-year 2025 results (Jan 29, 2026), SEC filings (10-K FY2025, 8-K exhibits), Caterpillar investor-relations materials and executive-appointment press releases (Joe Creed CEO/Chairman; Kyle Epley CFO effective May 1, 2026), StockAnalysis.com quote and key-statistics data, TipRanks analyst consensus (Aug 12, 2026), WallStreetZen 13F ownership data, KHL "Yellow Table" global construction-equipment rankings via Equipment World, Komatsu FY results (Apr 28, 2026), Cummins and GE Vernova Q2 2026 releases, CNBC, Reuters, Manufacturing Dive and Utility Dive reporting, and companiesmarketcap.com / StockTitan market-cap rankings (Aug 2026). Competitor revenue, market-share and growth figures marked "e" are estimates compiled from public filings and third-party research and may differ from actuals. Machinery-industry and S&amp;P 500 averages are approximate composites. Market-cap rankings are approximate as of mid-August 2026. Caterpillar renamed and re-segmented its Energy &amp; Transportation segment as "Power &amp; Energy," restating prior periods — segment figures drawn from older filings will not reconcile. Segment revenues shown include inter-segment sales and therefore exceed consolidated revenue. Debt-to-equity of 2.33 reflects consolidation of Cat Financial and materially overstates industrial leverage. Verify all figures against primary sources before making decisions.</p>
+  <p style="max-width:800px;margin:0 auto;">This document is for informational and educational purposes only and does not constitute investment advice, an offer, or a solicitation to buy or sell any security. Past performance does not guarantee future results. Investing involves risk, including possible loss of principal. Consult a qualified financial advisor before making investment decisions. The author may hold positions in securities discussed.</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ============ STATIC CHART DATA — AS OF AUGUST 12, 2026 ============
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21',
+'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+
+const prices = [191.97,204.01,193.35,206.74,
+201.56,187.58,222.82,210.54,215.85,178.76,198.25,184.71,164.08,216.46,236.41,239.56,
+252.29,239.55,228.84,218.80,205.75,246.05,265.17,281.13,273.00,226.05,250.72,295.67,
+300.31,333.96,366.43,334.57,338.52,333.10,346.20,356.10,391.12,376.20,406.11,362.76,
+371.44,343.95,329.80,309.27,348.03,388.21,438.02,419.04,477.15,577.26,575.76,572.87,
+657.36,742.83,708.46,890.11,875.87,1064.90,888.73,855.60];
+
+// Simple moving average on monthly data (window in months)
+function sma(data, window) {
+  return data.map((_, i) => {
+    if (i < window - 1) return null;
+    let sum = 0;
+    for (let j = i - window + 1; j <= i; j++) sum += data[j];
+    return +(sum / window).toFixed(2);
+  });
+}
+
+// 6-period RSI (Wilder smoothing) on monthly closes
+function computeRSI(data, period) {
+  const rsi = new Array(data.length).fill(null);
+  let gain = 0, loss = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gain += d; else loss -= d;
+  }
+  let avgGain = gain / period, avgLoss = loss / period;
+  rsi[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    rsi[i] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(1);
+  }
+  return rsi;
+}
+
+const ma20 = sma(prices, 1);   // 20-day MA ≈ 1-month window
+const ma50 = sma(prices, 3);   // 50-day MA ≈ 3-month window
+const ma200 = sma(prices, 10); // 200-day MA ≈ 10-month window
+const rsiData = computeRSI(prices, 6);
+
+// Annotated inflection points
+const events = [
+  { idx: 12, label: 'Sep 22: Rate-shock trough $164.08 — 5-yr low', color: '#ef4444' },
+  { idx: 27, label: 'Dec 23: Record margins + soft-landing rally', color: '#22c55e' },
+  { idx: 38, label: 'Nov 24: Post-election infrastructure peak $406', color: '#22c55e' },
+  { idx: 43, label: 'Apr 25: Tariff-shock low $309 (−24% from peak)', color: '#ef4444' },
+  { idx: 49, label: 'Oct 25: Data-center power thesis takes hold (+21%)', color: '#22c55e' },
+  { idx: 55, label: 'Apr 26: Backlog $62.7B (+79%), capacity plan tripled', color: '#22c55e' },
+  { idx: 57, label: 'Jun 26: All-time high — 52-wk high $1,073.46', color: '#22c55e' },
+  { idx: 58, label: 'Jul 26: AI-capex + permitting selloff (−17% month)', color: '#ef4444' }
+];
+const evMap = {};
+events.forEach(e => evMap[e.idx] = e);
+
+const ptRadius = prices.map((_, i) => evMap[i] ? 6 : 0);
+const ptColor = prices.map((_, i) => evMap[i] ? evMap[i].color : 'rgba(0,0,0,0)');
+
+const tooltipStyle = {
+  backgroundColor: '#1a2235',
+  borderColor: '#1e293b',
+  borderWidth: 1,
+  titleColor: '#e2e8f0',
+  bodyColor: '#94a3b8',
+  padding: 12,
+  titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+  bodyFont: { family: "'DM Sans', sans-serif", size: 12 }
+};
+
+// ============ PRICE CHART ============
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255, 205, 17, 0.2)');
+grad.addColorStop(1, 'rgba(255, 205, 17, 0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'CAT Price',
+        data: prices,
+        borderColor: '#ffcd11',
+        backgroundColor: grad,
+        fill: true,
+        borderWidth: 2.5,
+        tension: 0.3,
+        pointRadius: ptRadius,
+        pointBackgroundColor: ptColor,
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 1.5,
+        pointHoverRadius: 7
+      },
+      { label: '20-Day MA (~1mo)', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '50-Day MA (~3mo)', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '200-Day MA (~10mo)', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: Object.assign({}, tooltipStyle, {
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const e = evMap[items[0].dataIndex];
+            return e ? ['', '◆ ' + e.label] : [];
+          }
+        }
+      })
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30, 41, 59, 0.5)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxTicksLimit: 12 }
+      },
+      y: {
+        grid: { color: 'rgba(30, 41, 59, 0.5)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: v => '$' + v }
+      }
+    }
+  }
+});
+
+// ============ RSI CHART ============
+const rctx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6-period)', data: rsiData, borderColor: '#a78bfa', borderWidth: 1.8, pointRadius: 0, fill: false, tension: 0.3 },
+      { label: 'Overbought (70)', data: labels.map(() => 70), borderColor: 'rgba(239, 68, 68, 0.55)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false },
+      { label: 'Oversold (30)', data: labels.map(() => 30), borderColor: 'rgba(34, 197, 94, 0.55)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: Object.assign({}, tooltipStyle, {
+        filter: item => item.datasetIndex === 0,
+        callbacks: { label: ctx => ctx.parsed.y === null ? null : 'RSI: ' + ctx.parsed.y }
+      })
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxTicksLimit: 10 }
+      },
+      y: {
+        min: 0, max: 100,
+        grid: {
+          color: function(ctx) {
+            if (ctx.tick.value === 70) return 'rgba(239, 68, 68, 0.35)';
+            if (ctx.tick.value === 30) return 'rgba(34, 197, 94, 0.35)';
+            return 'rgba(30, 41, 59, 0.4)';
+          },
+          lineWidth: function(ctx) { return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.5 : 1; }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
