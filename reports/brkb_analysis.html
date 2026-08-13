@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRK.B — Berkshire Hathaway Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #a4343a; /* Berkshire maroon */
+  --accent-dim: #a4343a33; /* brand color + 33 alpha */
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<!-- STATIC DATA BANNER -->
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- HEADER -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">BRK.B</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Diversified Holding — Insurance / Rail / Energy</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> ~$1.13T</span>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);font-weight:600;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #11</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #9</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: #2</span>
+      </div>
+      <div class="company-name" style="margin-top:12px;">Berkshire Hathaway Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$529.42</div>
+      <div class="price-change" style="color:var(--green);">+$7.62 (+1.46%)</div>
+      <div class="price-date">Close — August 10, 2026 · After-hours: $530.00 (+0.11%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Omaha, Nebraska</div>
+    <div class="meta-item"><span>Employees:</span> ~392,000</div>
+    <div class="meta-item"><span>Founded:</span> 1839 (Buffett control since 1965)</div>
+    <div class="meta-item"><span>Next Earnings:</span> ~Nov 7, 2026 (Q3 FY26)</div>
+  </div>
+</div>
+
+<!-- SECTION 01: COMPANY OVERVIEW -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">
+    Berkshire Hathaway is the largest diversified holding company in the world — an insurance-anchored conglomerate that owns GEICO, the BNSF railroad, Berkshire Hathaway Energy, and dozens of manufacturing, service, and retail businesses outright, alongside a ~$320B public equity portfolio and roughly <strong>$365.5B in cash and Treasury bills</strong>. FY2025 revenue was <strong>$371.4B, essentially flat (+0.0%) year over year</strong>, while trailing-twelve-month revenue has since accelerated to $384.7B (+3.9%). At ~$1.13T of market cap it ranks approximately #9 among US companies and is the largest US company that is not primarily a technology business. 2026 marks its first year under CEO <strong>Greg Abel</strong>, who succeeded Warren Buffett on January 1, 2026 after Buffett's 60-year run.
+  </p>
+  <div style="margin-top:24px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;">Notable Executives</div>
+  <div class="card-grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="card-label">CEO (since Jan 1, 2026)</div>
+      <div class="card-value" style="font-size:20px;">Greg Abel</div>
+      <div class="card-note">Long-time head of Berkshire Hathaway Energy and Vice Chairman of non-insurance operations; hand-picked successor to Warren Buffett, who remains Chairman. Ajit Jain continues to run all insurance operations as Vice Chairman.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">SVP &amp; CFO</div>
+      <div class="card-value" style="font-size:20px;">Marc Hamburg</div>
+      <div class="card-note">Berkshire's chief financial officer for over three decades, running the famously lean Omaha headquarters (~25 people) that oversees ~392,000 employees across subsidiaries.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Vanguard · BlackRock</div>
+      <div class="card-note">Vanguard (~10%) and BlackRock (~8%) lead B-share ownership, with State Street (~6%) next. Buffett himself still controls ~30% of voting power via A shares, pledged to charity over time.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 02: CORE BUSINESSES -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">FY2025 revenue mix across reported groups (~$371.4B total). Note that Berkshire's earnings power skews far more toward insurance and railroads than the revenue mix implies — McLane (grocery distribution, inside MSR) and Pilot run enormous revenue at thin margins.</p>
+  <div class="seg-bar">
+    <div style="flex:44;background:#3b82f6;">MSR 44%</div>
+    <div style="flex:26;background:var(--accent);">INS 26%</div>
+    <div style="flex:11;background:#6b7280;">PILOT 11%</div>
+    <div style="flex:7;background:var(--amber);">BHE 7%</div>
+    <div style="flex:6;background:var(--purple);">BNSF 6%</div>
+    <div style="flex:6;background:#22c55e;">6%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#3b82f6;"></div>Manufacturing, Service &amp; Retail (incl. McLane) — 44%</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--accent);"></div>Insurance (premiums + investment income) — 26%</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#6b7280;"></div>Pilot Travel Centers — 11%</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--amber);"></div>Berkshire Hathaway Energy — 7%</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--purple);"></div>BNSF Railway — 6%</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:#22c55e;"></div>Leasing &amp; Other — 6%</div>
+  </div>
+
+  <!-- Insurance -->
+  <div class="biz-card" style="border-left: 3px solid var(--accent);margin-top:24px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Insurance — GEICO, Berkshire Hathaway Reinsurance, Primary Group</div>
+        <span class="biz-badge dominant" style="margin-top:8px;">~12% US AUTO SHARE (GEICO) — #3</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$98B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~+2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~12%</div><div class="biz-stat-label">Mkt Share (Auto)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">26%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US P&amp;C premiums ~$1.05T (2025), growing ~4–5%/yr; global reinsurance capital ~$720B</div>
+    <p class="biz-desc" style="margin-top:14px;">
+      The engine of the whole machine. Insurance generates <strong style="color:var(--text);">$177.5B of float</strong> (premiums held before claims are paid) that funds Berkshire's investments at effectively negative cost when underwriting is profitable — and it has been: GEICO posted an 84.7% combined ratio (claims + expenses as % of premiums; below 100% = underwriting profit) in FY2025 and 91.2% in Q2 2026 as it leaned back into advertising and growth. FY2025 underwriting profit was roughly $6B with another ~$13.9B of insurance investment income. In Q2 2026 underwriting earnings fell 13.1% YoY to $1.73B on higher GEICO claims frequency/severity and ad spend, and investment income fell 9.1% to $3.06B as short-term rates declined — the two lines to watch as the pricing cycle softens.
+    </p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Progressive</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~16%</div><div class="comp-bubble-label">Auto Share</div></div><div><div class="comp-bubble-val">~$85B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+13%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">State Farm</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~18%</div><div class="comp-bubble-label">Auto Share</div></div><div><div class="comp-bubble-val">~$105B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+8%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Allstate</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~10%</div><div class="comp-bubble-label">Auto Share</div></div><div><div class="comp-bubble-val">~$66B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+10%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- MSR -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Manufacturing, Service &amp; Retailing (MSR)</div>
+        <span class="biz-badge growth" style="margin-top:8px;">Q2'26 PRETAX EARNINGS +25.8% YoY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$168B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.8%*</div><div class="biz-stat-label">YoY Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">Varies</div><div class="biz-stat-label">Mkt Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">44%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Spans aerospace castings (~$30B), US homebuilding (~$480B), grocery distribution, industrial products; growth ~3–6%/yr by vertical</div>
+    <p class="biz-desc" style="margin-top:14px;">
+      A collection of dozens of wholly-owned businesses: Precision Castparts (aerospace — Q2 2026 earnings +34.2% on the commercial aero upcycle), Clayton Homes (manufactured housing and mortgages), Lubrizol, Marmon, IMC, Shaw, Benjamin Moore, McLane (low-margin grocery/foodservice distribution, ~$52B revenue), plus retail (See's, Borsheims, auto dealerships) and NetJets/FlightSafety in services (+20.6% in Q2). FY2025 pretax earnings grew +3.8%; Q2 2026 accelerated to +25.8%. The <strong style="color:var(--text);">$6.8B all-cash Taylor Morrison acquisition (closed July 24, 2026)</strong> adds a top-5 US homebuilder and signals Abel's willingness to deploy capital into whole businesses.
+    </p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Howmet Aerospace (vs PCC)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~25%</div><div class="comp-bubble-label">Castings Share</div></div><div><div class="comp-bubble-val">~$8B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+12%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">D.R. Horton (vs Clayton/TM)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~13%</div><div class="comp-bubble-label">US Starts Share</div></div><div><div class="comp-bubble-val">~$36B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">-3%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Sysco (vs McLane)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~17%</div><div class="comp-bubble-label">Distr. Share</div></div><div><div class="comp-bubble-val">~$82B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+4%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- BNSF -->
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">BNSF Railway</div>
+        <span class="biz-badge dominant" style="margin-top:8px;">~1 OF 2 WESTERN US CLASS I RAILS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$23.5B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+9%*</div><div class="biz-stat-label">YoY Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~45%</div><div class="biz-stat-label">W. US Duopoly</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US Class I freight rail ~$95B revenue, growing ~2–3%/yr with GDP + intermodal share gains</div>
+    <p class="biz-desc" style="margin-top:14px;">
+      One of two railroads spanning the western United States (32,500 route miles), hauling consumer intermodal, grain, coal, and industrial products. FY2025 operating earnings grew ~9% ($5.5B) on cost discipline, and Q2 2026 added +6.3% earnings on +6.5% volume — its best volume run in years. The strategic question is existential: the pending <strong style="color:var(--text);">Union Pacific–Norfolk Southern merger (~$85B, announced July 2025, awaiting STB review)</strong> would create the first true transcontinental railroad, pressuring BNSF to respond — most analysts assume a counter-bid for CSX, which Berkshire could fund entirely in cash.
+    </p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Union Pacific</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~45%</div><div class="comp-bubble-label">W. US Share</div></div><div><div class="comp-bubble-val">~$24.5B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+3%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CSX</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~E. US</div><div class="comp-bubble-label">Region</div></div><div><div class="comp-bubble-val">~$14.5B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+2%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- BHE -->
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Berkshire Hathaway Energy (BHE)</div>
+        <span class="biz-badge emerging" style="margin-top:8px;">Q2'26 EARNINGS +26.9% YoY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$26B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">-1.1%*</div><div class="biz-stat-label">FY25 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~5.2M</div><div class="biz-stat-label">Customers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US electric utility revenue ~$500B, with data-center load growth driving the strongest demand outlook in decades (+2–3%/yr load growth)</div>
+    <p class="biz-desc" style="margin-top:14px;">
+      Regulated utilities (MidAmerican, PacifiCorp, NV Energy), natural gas pipelines carrying ~15% of US interstate gas, and one of America's largest renewable fleets. Now run day-to-day by Abel lieutenants after his elevation. FY2025 after-tax earnings dipped 1.1% (PacifiCorp wildfire litigation accruals remain the overhang), but Q2 2026 earnings jumped 26.9% on stronger US utility and pipeline results. Data-center-driven load growth in Iowa and Nevada is an underappreciated multi-year tailwind, though BHE retains earnings (no dividend to Omaha) to fund ~$10B/yr capex.
+    </p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">NextEra Energy</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">#1</div><div class="comp-bubble-label">US Renewables</div></div><div><div class="comp-bubble-val">~$28B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+9%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Duke Energy</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~8.4M</div><div class="comp-bubble-label">Customers</div></div><div><div class="comp-bubble-val">~$31B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+5%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Pilot -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pilot Travel Centers</div>
+        <span class="biz-badge growth" style="margin-top:8px;">TURNAROUND — Q2'26 EARNINGS +143.7%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$42B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">-69%*</div><div class="biz-stat-label">FY25 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">#1</div><div class="biz-stat-label">US Travel Centers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US truck-stop / travel-center market ~$120B, growing ~3%/yr with freight tonnage</div>
+    <p class="biz-desc" style="margin-top:14px;">
+      The largest US travel-center operator (~750 locations), fully owned since January 2024 after a contentious buyout from the Haslam family. Huge revenue, thin fuel margins: FY2025 pretax earnings collapsed 69% amid weak diesel spreads and management churn, but Q2 2026 earnings rebounded +143.7% YoY — an early Abel-era operational win. Alongside the wholly-owned businesses sits the <strong style="color:var(--text);">$553.3B insurance investment portfolio (58% stocks / 38% cash)</strong>: Apple (~$64B, still #1 after being trimmed from 900M to ~280M shares), American Express (~$50B, 21.6% stake), Bank of America, Coca-Cola (400M shares, ~$28B), Chevron (~$17B), Occidental (~27% stake), ~9–10% of five Japanese trading houses, and a new <strong style="color:var(--text);">$10B Alphabet position</strong> — plus $365.5B in cash and T-bills.
+    </p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Love's Travel Stops</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~650</div><div class="comp-bubble-label">Locations</div></div><div><div class="comp-bubble-val">~$26B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+4%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">TA (bp)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~280</div><div class="comp-bubble-label">Locations</div></div><div><div class="comp-bubble-val">~$10B</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">+1%</div><div class="comp-bubble-label">YoY</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="font-size:12px;color:var(--text-dim);">*Earnings growth shown where segment revenue growth is not separately disclosed; FY2025 figures per 10-K and company reports, Q2 2026 per the August 8, 2026 release.</p>
+</div>
+
+<!-- SECTION 03: MOAT -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;">Sources of Moat</div>
+  <div class="moat-list">
+    <span class="moat-pill">$177.5B Insurance Float</span>
+    <span class="moat-pill">$365B Fortress Balance Sheet</span>
+    <span class="moat-pill">Permanent Capital / No Redemptions</span>
+    <span class="moat-pill">Buyer-of-Choice Reputation</span>
+    <span class="moat-pill">Irreplaceable Rail + Utility Assets</span>
+    <span class="moat-pill">Radical Decentralization</span>
+    <span class="moat-pill">Tax-Efficient Compounding</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">
+    Berkshire's moat is structural, not product-based. The insurance operation generates $177.5B of float — money it holds and invests before paying claims — at negative cost in most years (GEICO's FY2025 combined ratio of 84.7% means it was <em>paid</em> ~15 cents per premium dollar to hold that money). That float, plus $365.5B of cash, gives it the only balance sheet in corporate America that can write a $10B+ check in a weekend without financing contingencies — which is why sellers (Taylor Morrison in July 2026, Alleghany in 2022) and counterparties (Goldman and BofA in past crises, Alphabet reportedly at a negotiated discount in 2026) come to Omaha first. BNSF and BHE own physically irreplaceable networks with regulated or duopoly returns. And because Berkshire never pays a dividend, every dollar of the ~$45B in annual operating earnings compounds internally, tax-deferred, at the holding-company level.
+  </p>
+  <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;">Key Vulnerabilities</div>
+  <div class="prose" style="margin-top:14px;max-width:900px;">
+    <p style="margin-bottom:14px;"><strong>Post-Buffett capital allocation.</strong> The moat was partly a person. Abel is a proven operator, but the "Buffett premium" — deal flow, crisis-era optionality, shareholder patience with $365B earning T-bill yields — may not fully transfer. The stock has lagged the S&amp;P 500 by ~10 points YTD 2026 (+3.5% vs +14.1% through Aug 7), suggesting the market is already applying a discount.</p>
+    <p style="margin-bottom:14px;"><strong>GEICO's telematics gap.</strong> Progressive grew policies-in-force double digits for years while GEICO shrank to rebuild margins; GEICO's Q2 2026 underwriting profit fell 13.1% as it spent up on advertising to re-accelerate growth. Progressive's decade head start in usage-based pricing data is a genuine technology disadvantage in the largest float-generating business.</p>
+    <p style="margin-bottom:14px;"><strong>Size and the law of large numbers.</strong> At $1.13T of market cap and ~$390B of revenue, few acquisitions move the needle. Buffett himself warned repeatedly that Berkshire's future returns will only be "slightly better" than the average American corporation. Cash at 28.9% of assets is a drag as short rates fall.</p>
+    <p><strong>Regulatory and catastrophe exposure.</strong> PacifiCorp wildfire liabilities (multi-billion accruals, still litigating), STB approval risk around any rail-consolidation response, insurance regulation, and super-cat reinsurance exposure to a major hurricane or earthquake year can each swing results by billions.</p>
+  </div>
+</div>
+
+<!-- SECTION 04: FINANCIAL METRICS -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>BRK.B</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by the last 12 months of earnings per share">P/E</span></td><td style="color:var(--green);">13.1</td><td>16.0</td><td>25.8</td><td>Optically cheap — but GAAP earnings include huge unrealized investment gains. On operating earnings the multiple is ~24x.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by expected earnings over the next 12 months">P/E</span></td><td style="color:var(--red);">23.9</td><td>14.8</td><td>22.6</td><td>On consensus 2026 operating EPS (~$22.9/B share). Rich vs insurers; roughly market multiple for a below-market-growth business.</td></tr>
+      <tr><td><span class="tip" title="P/E ratio divided by expected earnings growth rate — a growth-adjusted valuation gauge">PEG</span> Ratio</td><td style="color:var(--red);">~2.8</td><td>1.8</td><td>2.3</td><td>Estimated on ~8–11% operating earnings growth. Nobody buys BRK for growth-adjusted value; they buy the balance sheet.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, Trailing Twelve Months">EPS (TTM)</span></td><td style="color:var(--text-dim);">$39.77 <span style="color:var(--text-dim);font-weight:400;">GAAP</span></td><td>—</td><td>—</td><td>Operating EPS (ex-investment gains) is ~$21.50 TTM — the number management says to use. See one-off items below.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year over Year — compared to the same period one year earlier">YoY</span>)</td><td style="color:var(--red);">+3.9%</td><td>+6.0%</td><td>+5.5%</td><td>TTM revenue $384.7B. FY2025 was flat; Q2 2026 re-accelerated (~+10% YoY) on aerospace, services and Pilot fuel volumes.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--text-dim);">~24% est</td><td>~28%</td><td>~45%</td><td>Not meaningful for an insurance/rail/distribution conglomerate — McLane and Pilot run low-single-digit gross margins by design.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--amber);">22.3%</td><td>~12%</td><td>~12.8%</td><td>GAAP figure inflated by unrealized gains. Operating margin on revenue is ~12%, in line with peers.</td></tr>
+      <tr><td><span class="tip" title="Annual dividends per share divided by share price">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>1.9%</td><td>1.2%</td><td>Has never paid a dividend under Buffett (one 1967 exception he joked he must have been "in the bathroom" for). Buybacks resumed instead: $4.5B in Q2 2026.</td></tr>
+      <tr><td><span class="tip" title="Percentage of tradable shares currently sold short — a bet the price will fall">Short Interest</span></td><td style="color:var(--green);">~1.0%</td><td>~2.1%</td><td>~1.8%</td><td>Minimal. Few investors bet against a company holding $365B in cash.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a measure of balance-sheet leverage">Debt-to-Equity</span></td><td style="color:var(--green);">~0.20</td><td>~0.80</td><td>~1.10</td><td>~$130B debt vs ~$680B equity, and nearly all of it is non-recourse debt at BNSF/BHE. Parent is effectively unlevered with net cash.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — ability to cover near-term obligations">Current Ratio</span></td><td style="color:var(--green);">~2.6</td><td>~1.3</td><td>~1.35</td><td>Dominated by the T-bill mountain. Liquidity is the entire point of the enterprise design; $30B minimum cash pledge.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditures">FCF</span> (TTM)</td><td style="color:var(--text-dim);">~$12B</td><td>—</td><td>—</td><td>Understates cash generation: ~$20B+/yr of capex is growth investment at BNSF/BHE, and float growth adds investable cash on top.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--amber);">~12.9%</td><td>~12.0%</td><td>~19.5%</td><td>GAAP, gain-inflated. Normalized ROE ~7–9% — the mathematical cost of holding a third of assets in T-bills.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by debt plus equity">ROIC</span></td><td style="color:var(--amber);">~8.0%</td><td>~8.0%</td><td>~10.5%</td><td>Regulated-utility and railroad returns anchor this near industry norms; the option value of the cash isn't captured here.</td></tr>
+      <tr><td><span class="tip" title="Volatility relative to the overall market; 1.0 moves with the market, below 1.0 is less volatile">Beta</span></td><td style="color:var(--green);">0.61</td><td>~0.85</td><td>1.00</td><td>Classic defensive: historically falls far less than the market in drawdowns (and lags in melt-ups, as in 2026 YTD).</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$463.50–$537.74</td><td>—</td><td>—</td><td>Closed Aug 10 within ~1.5% of the 52-week high after touching $537.74 intraday post-Q2 earnings.</td></tr>
+    </tbody>
+  </table>
+  <div style="margin-top:28px;">
+    <p class="prose"><strong>Notable One-Off Items.</strong> The dominant distortion is accounting, and it is recurring: under <span class="tip" title="Accounting Standards Update 2016-01, effective 2018: requires unrealized gains and losses on equity holdings to flow through reported net income each quarter">ASU 2016-01</span>, quarterly swings in Berkshire's ~$320B equity portfolio flow straight through <span class="tip" title="Generally Accepted Accounting Principles — the standardized US reporting framework">GAAP</span> net income. Q2 2026 "net income" of $25.67B included $12.68B of investment gains ($10.9B unrealized); Q2 2025's comparable was $12.37B. This is why trailing GAAP EPS of $39.77 and the 13.1x trailing P/E are close to meaningless — Buffett and Abel both direct shareholders to <strong>operating earnings ($12.98B in Q2 2026, +16.3% YoY)</strong>. Genuine one-offs: FY2025 results absorbed impairment charges (management excluded them from the -6% operating earnings decline) and continued PacifiCorp wildfire accruals; the Pilot earnings collapse (-69% FY2025) and violent rebound (+143.7% Q2 2026) whipsaws MSR-adjacent comparisons; and the Taylor Morrison acquisition (closed Jul 24, 2026) makes H2 2026 revenue not comparable YoY.</p>
+  </div>
+</div>
+
+<!-- SECTION 05: ANALYST CONSENSUS -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <p class="prose" style="margin-bottom:16px;">Coverage is unusually thin for a $1.13T company — roughly 4–6 active analysts, versus 40+ for mega-cap tech. Berkshire hosts no earnings calls and gives no guidance, so sell-side models diverge widely.</p>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">4 analysts in consensus (2 Strong Buy, 2 Hold); KBW's Underperform sits outside the averaged set.</div></div>
+    <div class="card"><div class="card-label">Avg Price Target</div><div class="card-value">$531.67</div><div class="card-note">+0.4% vs $529.42 close — essentially "fairly valued" after the post-earnings run.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value">$481–$604</div><div class="card-note">-9.2% downside to +14.1% upside. B-share-equivalent street targets span roughly $463 (KBW) to $604 (UBS).</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value">2 / 2 / 0</div><div class="card-note">Strong Buy / Hold / Sell among consensus analysts. No consensus Sell ratings; one Underperform off-panel.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:2;background:var(--green);"></div>
+    <div style="flex:2;background:var(--amber);"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--green);"></div>Strong Buy / Buy (2)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--amber);"></div>Hold (2)</div>
+    <div class="seg-legend-item"><div class="seg-dot" style="background:var(--red);"></div>Sell (0)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Key Recent Analyst Calls</div>
+  <div class="prose" style="max-width:900px;">
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>UBS</strong> (Brian Meredith) — Buy, PT raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$604</span> from $585 (Aug 10, 2026): Q2 beat, buyback resumption at 1.4x book, and Abel's $19.8B of net equity purchases signal a more shareholder-friendly capital-return posture.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--red);">●</span> <strong>KBW</strong> (Meyer Shields) — Underperform, PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$695,000</span> on BRK.A (≈$463/B share, May 2026): trimmed 2026–27 estimates on energy-exposed margins and lower-than-expected repurchases; sees the operating-earnings multiple as elevated vs P&amp;C peers.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>Argus Research</strong> (Kevin Heal) — Buy, PT ~<span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$560</span>: smooth CEO transition, insurance float compounding, and the Taylor Morrison deal as evidence the cash pile is finally being put to work.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>DBS</strong> (Edmond Fok) — Hold, PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$500</span>: quality unquestioned, but sees limited near-term upside with cash yields declining and GEICO underwriting margins normalizing off the 2025 peak.</p>
+  </div>
+</div>
+
+<!-- SECTION 06: CATALYSTS -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">AUG 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 earnings: Abel opens the wallet</div>
+        <div class="tl-desc">Operating earnings $12.98B (+16.3% YoY); $4.5B of buybacks (first meaningful repurchases since May 2024, at ~1.4x book); $19.8B net equity purchases ending 14 straight quarters of net selling; cash down $32B to $365.5B; $10B Alphabet stake disclosed. Shares rallied to a 52-week high $537.74 intraday Aug 10.</div>
+        <div class="tl-impact up">Positive reaction — occurred</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">AUG 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 13F filing — full portfolio disclosure</div>
+        <div class="tl-desc">The quarterly SEC holdings report will detail exactly what the ~$20B of net equity buying went into beyond Alphabet, and whether Apple, Bank of America or Occidental positions changed. 13F reveals routinely move the underlying names and shape the Abel-era narrative.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Taylor Morrison integration + further M&amp;A</div>
+        <div class="tl-desc">The $6.8B cash acquisition (closed Jul 24) is Abel's first whole-company deal as CEO, pairing a top-5 homebuilder with Clayton Homes. With ~$362B of deployable cash and falling T-bill yields, the market is handicapping more elephant-sized deals — every large-cap take-private rumor now includes Berkshire.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">LATE 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">STB ruling watch: Union Pacific–Norfolk Southern merger</div>
+        <div class="tl-desc">Surface Transportation Board review of the ~$85B UP–NS combination continues. Approval would create the first transcontinental US railroad and force a strategic response from BNSF — most plausibly a cash bid for CSX, which only Berkshire could do without debt. Either outcome reshapes BNSF's competitive position.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~NOV 7, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings (Saturday-morning release)</div>
+        <div class="tl-desc">Watch: buyback pace (did $4.5B/quarter continue above $500?), GEICO combined ratio vs the 91.2% Q2 print, hurricane-season cat losses in reinsurance, and cash trajectory. Also the ongoing wind-down math on Japanese trading-house stakes, which Berkshire has said it intends to hold for decades and keeps nudging toward 10% each.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FEB 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 results + Abel's first solo annual letter</div>
+        <div class="tl-desc">The first full-year report card on the post-Buffett era, and the letter that sets Abel's capital-allocation doctrine in writing — dividend policy (never say never post-Buffett), buyback philosophy, and succession depth below him. Buffett has said he will still write a Thanksgiving message as Chairman.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 07: 5-YEAR PRICE -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">BRK.B — 5-YEAR MONTHLY CLOSES <span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 10, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">Monthly closing prices, Sep 2021 – Aug 2026. Moving averages approximated on monthly data.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:14px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#a4343a;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (~1mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (~3mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (~10mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY <span style="color:var(--amber);">⚠ AS OF AUG 10, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">RSI measures momentum on a 0–100 scale: readings above 70 suggest the stock is overbought (due for a pause), below 30 oversold (due for a bounce).</div>
+    <div class="chart-canvas-wrap" style="height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+  <p class="prose" style="margin-top:24px;">
+    Over five years BRK.B has climbed from ~$273 (Sep 2021) to $529.42 — a <strong>total return of roughly +94%</strong> (no dividends, so price return equals total return), beating the S&amp;P 500's ~+65% total return over the same window despite lagging badly in 2026. The path: a grind to all-time highs in early 2022 as the market rotated to value, a shallow-vs-market drawdown in the 2022 bear (roughly -25% peak-to-trough vs -25% for the index, but recovering faster), a monster 2024 (+27%) as record insurance profits and $47B of operating earnings coincided with the Apple trim that swelled cash past $300B, and a peak near $540 into the May 2025 annual meeting — where <strong>Buffett's surprise retirement announcement (May 3, 2025) knocked ~5% off within days</strong> and began a year of "Buffett premium" compression. The stock chopped sideways-to-down through Abel's January 2026 takeover, bottoming near $463 in spring 2026, then re-rated sharply in July–August 2026 as Q2 proved the new regime would actually deploy capital.
+  </p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">MAR 2022</div><div class="tl-content"><div class="tl-title">All-time high ~$362 on value rotation</div><div class="tl-desc">Rate-hike fears hammered growth stocks; Berkshire, buying Occidental and Alleghany ($11.6B), became a haven trade.</div><div class="tl-impact up">Rally</div></div></div>
+    <div class="tl-item"><div class="tl-date">JUN 2022</div><div class="tl-content"><div class="tl-title">Bear-market drawdown to ~$264</div><div class="tl-desc">Broad de-rating dragged BRK down ~25% from March highs — still outperforming the NASDAQ's ~-33% year.</div><div class="tl-impact down">Drawdown</div></div></div>
+    <div class="tl-item"><div class="tl-date">AUG 2024</div><div class="tl-content"><div class="tl-title">Apple stake halved; cash passes $275B</div><div class="tl-desc">Q2 2024 10-Q revealed ~50% of the Apple position sold. Read as a valuation call (and tax lock-in); the cash-fortress narrative took over.</div><div class="tl-impact neutral">Regime shift</div></div></div>
+    <div class="tl-item"><div class="tl-date">FEB 2025</div><div class="tl-content"><div class="tl-title">Record FY2024: $47.4B operating earnings</div><div class="tl-desc">Insurance-led record year, cash $334B; stock ran to new highs while mega-cap tech corrected — classic defensive bid.</div><div class="tl-impact up">Rally</div></div></div>
+    <div class="tl-item"><div class="tl-date">MAY 3, 2025</div><div class="tl-content"><div class="tl-title">Buffett announces retirement at annual meeting</div><div class="tl-desc">The end of a 60-year era, announced live in Omaha. Shares fell ~5% in days from the ~$540 peak and underperformed for the following year as the succession discount set in.</div><div class="tl-impact down">Sell-off</div></div></div>
+    <div class="tl-item"><div class="tl-date">JAN 2026</div><div class="tl-content"><div class="tl-title">Greg Abel becomes CEO</div><div class="tl-desc">Formal handover Jan 1; Buffett stays Chairman. FY2025 report (Feb 2026) showed operating earnings -6% and zero 2025 buybacks — the "show me" period began.</div><div class="tl-impact neutral">Transition</div></div></div>
+    <div class="tl-item"><div class="tl-date">MAR 2026</div><div class="tl-content"><div class="tl-title">Post-transition low near $463–466</div><div class="tl-desc">52-week low $463.50 as the market questioned whether the cash would ever be deployed; BRK trailed the S&amp;P by double digits.</div><div class="tl-impact down">Drawdown</div></div></div>
+    <div class="tl-item"><div class="tl-date">AUG 2026</div><div class="tl-content"><div class="tl-title">Q2 beat + buybacks: 52-week high $537.74</div><div class="tl-desc">$4.5B repurchased, $19.8B net stock buying, $10B Alphabet stake, Taylor Morrison closed. The Abel discount began to unwind; stock +8% in three weeks.</div><div class="tl-impact up">Rally</div></div></div>
+  </div>
+  <p class="prose" style="margin-top:24px;">
+    <strong>Relative performance:</strong> Over 5 years BRK.B (+94%) beat both the S&amp;P 500 (~+53% price / ~+65% total return) and the S&amp;P 500 Financials sector (~+55%). The last 12 months tell the opposite story: BRK is up only ~13% off depressed Aug 2025 levels and just +3.5% YTD 2026 through Aug 7 vs +14.1% for the S&amp;P 500 — succession-discount underperformance that Q2's capital-deployment pivot has only begun to repair. With a 0.61 beta, expect this pattern to persist: lagging melt-ups, cushioning drawdowns.
+  </p>
+</div>
+
+<!-- SECTION 08: SUMMARY -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>▲ Bull Case</h4>
+      <p>The succession discount is a gift: you're buying the same $177.5B float machine, irreplaceable rail/utility assets, and ~$45B of growing operating earnings at ~1.4x book — the exact level management itself paid for $4.5B of stock in Q2. Abel has now demonstrated he'll deploy capital ($6.8B Taylor Morrison, $10B Alphabet, ~$20B net equity buys, resumed buybacks), and falling short rates convert the $362B cash pile from a melting-yield asset into dry powder with rising relative value. A UP–NS-forced CSX acquisition or one true elephant deal re-rates the stock toward UBS's $604.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>▼ Bear Case</h4>
+      <p>At 23.9x forward operating earnings, you pay a market multiple for a business Buffett himself said can only slightly beat the market — now without Buffett. GEICO's underwriting profits are past peak (Q2 -13.1%) as the auto pricing cycle softens and Progressive out-grows it; insurance investment income falls with every rate cut; and 29% of assets in T-bills mathematically caps ROE near 8–9% normalized. If Abel's deals disappoint or a mega-cat hits reinsurance, the stock reverts toward KBW's ~$463 B-share-equivalent target.</p>
+    </div>
+  </div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Capital-allocation execution post-Buffett.</strong> Berkshire's edge was one person's judgment applied to $360B+ of optionality. A single large misallocated acquisition — or continued paralysis — under the new regime is the highest-magnitude risk to long-term intrinsic value per share.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">Insurance cycle + catastrophe exposure.</strong> Underwriting profits (FY25 combined ratio 84.7% at GEICO) sit near cyclical bests; softening auto/reinsurance pricing plus one $50B+ industry cat event (hurricane, quake, wildfire) could compress the segment that drives both earnings and float growth. PacifiCorp wildfire litigation adds a multi-billion regulatory tail.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Rate sensitivity of the cash pile.</strong> ~$362B in T-bills threw off ~$15B+/yr at 2023–25 rates; every 100bp of Fed cuts removes roughly $3.5B of annual pre-tax income until the cash is redeployed — a direct, mechanical earnings headwind already visible in the -9.1% Q2 investment-income decline.</div></div>
+  </div>
+</div>
+
+<!-- INDUSTRY COMMENTARY -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Matters Right Now</div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div class="biz-name">Succession Execution: Pricing the First Post-Founder Year</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc">Conglomerate history is unkind to founder transitions (GE post-Welch lost ~75% peak-to-trough). The market spent May 2025–June 2026 applying that template: BRK lagged the S&amp;P 500 by ~10 points YTD through early August and traded down to ~1.5x book. But the Q2 2026 print is the strongest available counter-evidence — Abel repurchased $4.5B of stock at 1.4x book (a management-signaled valuation floor), closed an $8.5B-EV acquisition, and reversed 14 quarters of net equity selling with $19.8B of buying, reportedly including a Buffett-negotiated Alphabet block. The "show me" phase isn't over — Abel's February 2027 letter and the FY2026 buyback cadence are the next data points — but the tail risk of permanent strategic drift shrank materially on August 8.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--red);">
+    <div class="biz-header">
+      <div class="biz-name">P&amp;C Pricing Cycle Rolling Over + Falling Short Rates</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc">Both of Berkshire's insurance profit streams are past their cyclical sweet spot simultaneously. Auto insurance pricing surged 2022–24, gifting GEICO an 84.7% FY2025 combined ratio; that margin is now being competed away — Q2 2026 underwriting profit fell 13.1% as claims frequency, severity, and reacquired ad spend all rose, while Progressive (~16% share, telematics-led) keeps growing policies double digits. Meanwhile the float's other engine, short-duration investment income, dropped 9.1% YoY as the Fed cut — with ~$362B effectively in T-bills, each 100bp off the front end costs roughly $3.5B of annual pre-tax income. The offset must come from deployment: every quarter cash sits, the earnings bridge from "rate income" to "acquired earnings" gets harder.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div class="biz-name">The $362B Question: Deployment Optionality Into a Consolidating Economy</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc"><strong style="color:var(--text);">Bull framing:</strong> Berkshire holds the largest discretionary capital pool in corporate history exactly as three once-in-a-generation opportunities converge — rail consolidation (a UP–NS approval effectively invites a BNSF–CSX response only Berkshire can fund in cash), utility/data-center capex (BHE's ~$10B/yr program earns regulated returns on AI-driven load growth), and a housing shortage (Clayton + Taylor Morrison vertical). Deploying even half the pile at 10% pre-tax returns adds ~$18B — roughly +40% — to operating earnings. <strong style="color:var(--text);">Bear framing:</strong> the same pile is a confession that nothing at scale is cheap: equities near record multiples, an $85B rail deal as the price of relevance, and wildfire/cat liability attached to the very infrastructure assets on sale. If Abel deploys into a top, the cash that protected shareholders for a decade becomes the instrument of the first great post-Buffett value destruction. Which framing wins is, more than any metric in this report, the BRK.B investment decision.</p>
+  </div>
+</div>
+
+<!-- DISCLAIMER -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of August 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:800px;margin:0 auto 10px;">Sources: Berkshire Hathaway SEC filings (10-K FY2025, 10-Q Q2 2026, 8-K dated Aug 8, 2026) and shareholder letters; CNBC, Yahoo Finance, Forbes, and StockAnalysis.com earnings coverage; analyst notes from UBS (Brian Meredith), KBW (Meyer Shields), Argus Research, and DBS; Macrotrends price history; AM Best and III industry premium data; S&amp;P Dow Jones Indices for benchmark statistics. Competitor revenues, market shares, TAM estimates, industry averages, and several ratios (PEG, gross margin, ROIC, short interest, current ratio) are estimates or approximations and should be independently verified. Monthly closing prices are approximate month-end values reconstructed from annual OHLC data. Segment revenue mix is approximate, based on FY2025 reporting categories.</p>
+  <p style="max-width:800px;margin:0 auto;">This document is for informational and educational purposes only and does not constitute investment advice, an offer, or a solicitation to buy or sell any security. Past performance does not guarantee future results. All investments involve risk, including possible loss of principal. Consult a qualified financial advisor before making investment decisions. The author may hold positions in securities discussed.</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ============ STATIC DATA — AS OF AUGUST 10, 2026 ============
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [272.9,287.1,276.9,299.0,313.0,320.4,352.9,322.8,315.9,273.0,300.6,280.6,267.0,295.2,318.6,308.9,311.5,305.2,308.8,328.6,321.1,341.0,352.0,360.2,350.3,341.6,360.0,356.7,383.9,409.4,420.5,397.4,414.7,406.9,438.4,475.9,460.2,452.1,476.5,453.3,460.0,493.6,528.7,531.7,502.0,485.5,472.2,466.0,478.0,470.5,488.0,502.7,486.0,470.2,465.9,478.4,492.1,496.3,508.7,529.4];
+
+// Simple moving average on monthly data (windows ≈ 20/50/200-day equivalents: 1, 3, 10 months)
+function sma(data, w) {
+  return data.map((_, i) => {
+    if (i < w - 1) return null;
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += data[j];
+    return +(s / w).toFixed(1);
+  });
+}
+const ma20 = sma(prices, 1);   // ~20-day on monthly = 1-month
+const ma50 = sma(prices, 3);   // ~50-day ≈ 3-month
+const ma200 = sma(prices, 10); // ~200-day ≈ 10-month
+
+// 6-period RSI (Wilder smoothing) on monthly closes
+function computeRSI(data, period) {
+  const rsi = new Array(data.length).fill(null);
+  let gain = 0, loss = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gain += d; else loss -= d;
+  }
+  let avgG = gain / period, avgL = loss / period;
+  rsi[period] = avgL === 0 ? 100 : 100 - 100 / (1 + avgG / avgL);
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    avgG = (avgG * (period - 1) + g) / period;
+    avgL = (avgL * (period - 1) + l) / period;
+    rsi[i] = avgL === 0 ? 100 : +(100 - 100 / (1 + avgG / avgL)).toFixed(1);
+  }
+  return rsi;
+}
+const rsiData = computeRSI(prices, 6);
+
+// Annotated inflection points {index, label, color}
+const events = [
+  { idx: 6,  label: 'Mar 2022: ATH ~$362 on value rotation; Alleghany deal', color: '#f59e0b' },
+  { idx: 9,  label: 'Jun 2022: bear-market low ~$264', color: '#ef4444' },
+  { idx: 35, label: 'Aug 2024: Apple stake halved, cash >$275B', color: '#f59e0b' },
+  { idx: 41, label: 'Feb 2025: record FY24 — $47.4B operating earnings', color: '#22c55e' },
+  { idx: 44, label: 'May 3, 2025: Buffett announces retirement — succession discount begins', color: '#ef4444' },
+  { idx: 52, label: 'Jan 2026: Greg Abel takes over as CEO', color: '#f59e0b' },
+  { idx: 54, label: 'Mar 2026: 52-wk low $463.50 on deployment doubts', color: '#ef4444' },
+  { idx: 59, label: 'Aug 2026: Q2 beat, $4.5B buybacks, Alphabet stake — 52-wk high', color: '#22c55e' }
+];
+const evMap = {};
+events.forEach(e => { evMap[e.idx] = e; });
+
+const ctx = document.getElementById('priceChart').getContext('2d');
+const grad = ctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(164,52,58,0.20)');
+grad.addColorStop(1, 'rgba(164,52,58,0)');
+
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'BRK.B',
+        data: prices,
+        borderColor: '#a4343a',
+        borderWidth: 2.5,
+        backgroundColor: grad,
+        fill: true,
+        tension: 0.3,
+        pointRadius: prices.map((_, i) => evMap[i] ? 6 : 0),
+        pointHoverRadius: prices.map((_, i) => evMap[i] ? 8 : 4),
+        pointBackgroundColor: prices.map((_, i) => evMap[i] ? evMap[i].color : '#a4343a'),
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: prices.map((_, i) => evMap[i] ? 2 : 0)
+      },
+      { label: '20-Day MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '50-Day MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5, 5], pointRadius: 0, fill: false, tension: 0.3 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        callbacks: {
+          afterTitle: (items) => {
+            const e = evMap[items[0].dataIndex];
+            return e ? '⚡ ' + e.label : '';
+          },
+          label: (item) => item.dataset.label + ': $' + (item.parsed.y === null ? '—' : item.parsed.y.toFixed(1))
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(30,41,59,0.5)' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxTicksLimit: 12 } },
+      y: { grid: { color: 'rgba(30,41,59,0.5)' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: (v) => '$' + v } }
+    }
+  }
+});
+
+const rctx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsiData,
+      borderColor: '#a4343a',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+      tension: 0.3
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        callbacks: { label: (item) => 'RSI: ' + (item.parsed.y === null ? '—' : item.parsed.y) }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: {
+          color: (c) => (c.tick.value === 70 || c.tick.value === 30) ? 'rgba(148,163,184,0.35)' : 'rgba(30,41,59,0.5)',
+          lineWidth: (c) => (c.tick.value === 70 || c.tick.value === 30) ? 1.5 : 1
+        },
+        ticks: {
+          stepSize: 10,
+          color: (c) => c.tick.value === 70 ? '#ef4444' : (c.tick.value === 30 ? '#22c55e' : '#64748b'),
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: (v) => v === 70 ? '70 — OVERBOUGHT' : (v === 50 ? '50 — Neutral' : (v === 30 ? '30 — OVERSOLD' : v))
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
