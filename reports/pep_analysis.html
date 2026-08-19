@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PEP — PepsiCo, Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2e7fd6; /* PepsiCo blue, lightened for contrast on navy */
+  --accent-dim: #2e7fd633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<!-- ===================== STATIC DATA BANNER ===================== -->
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 18, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ===================== HEADER ===================== -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <div class="ticker-badge">PEP</div>
+        <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</div>
+        <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Beverages — Non-Alcoholic / Consumer Staples</div>
+        <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $191.26B</div>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #110</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #64</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#45 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">PepsiCo, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$140.13</div>
+      <div class="price-change" style="color:var(--green);">+$1.89 (+1.37%)</div>
+      <div class="price-date">Close · Aug 18, 2026 · 4:00 PM EDT</div>
+      <div class="price-date" style="color:var(--text-muted);">After hours: $140.60 (+0.34%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Purchase, New York, USA</div>
+    <div class="meta-item"><span>Employees:</span>306,000</div>
+    <div class="meta-item"><span>Founded:</span>1898</div>
+    <div class="meta-item"><span>Next Earnings:</span>Oct 8, 2026 (Q3 FY26)</div>
+  </div>
+</div>
+
+<!-- ===================== 01 COMPANY OVERVIEW ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">PepsiCo is a global convenient-foods and beverage company built on two roughly equal engines: a North American snack business (Lay's, Doritos, Cheetos, Tostitos, Quaker) and a beverage business (Pepsi, Gatorade, Mountain Dew, Starbucks ready-to-drink, poppi) that spans owned bottling in North America and franchise concentrate models internationally. Fiscal 2025 net revenue was <strong>$93.93 billion, up 2.3% <span class="tip" title="Year-over-year — this period compared with the same period one year earlier.">YoY</span></strong> on organic growth of just <strong>1.7%</strong>, with company-wide organic volume down 2% and net effective pricing up 4% — the clearest possible statement of the problem: PepsiCo has been buying revenue with price while losing units. On a <span class="tip" title="Trailing twelve months — the most recent four reported quarters combined.">TTM</span> basis revenue is $96.90 billion (+5.62%), boosted by acquisitions and currency rather than volume.</p>
+  <p class="prose" style="margin-top:14px;">At a $191.26 billion market capitalization PepsiCo is the <strong>110th most valuable listed company in the world</strong> and the <strong>64th largest in the United States</strong>, sandwiched between Analog Devices ($190.10B) and McDonald's ($187.90B). That is a demotion: PepsiCo's market cap peaked near $248.89 billion in 2022 and has compounded negatively every year since. Over the trailing twelve months PepsiCo's market cap fell <strong>7.1%</strong> while Coca-Cola's rose <strong>27.0%</strong> — a ~34-point divergence between the two names that most investors still treat as substitutes. That gap is the entire reason Elliott Investment Management is on the register.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 4px;">Notable Executives &amp; Owners</h3>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; CEO</div>
+      <div class="card-value" style="font-size:20px;">Ramon L. Laguarta</div>
+      <div class="card-note">Confirmed still serving as Chairman and Chief Executive Officer as of the August 2026 company profile. CEO since 2018; a PepsiCo lifer who rose through the European beverage business. He has publicly described the dialogue with activist Elliott as "very constructive and collaborative," and remains in the seat through the activist episode — no CEO change has been announced.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">EVP &amp; CFO</div>
+      <div class="card-value" style="font-size:20px;">Stephen T. Schmitt</div>
+      <div class="card-note"><strong style="color:var(--amber);">Correction to prior briefings:</strong> Jamie Caulfield is no longer CFO. Steve Schmitt — a Walmart veteran hired in October 2025 — is EVP &amp; Chief Financial Officer and delivered the Q2 FY26 commentary, conceding that "our North America business was softer than we anticipated in the second quarter."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">80.26% Institutional</div>
+      <div class="card-note">Institutions hold 80.26% of shares outstanding against insider ownership of only 0.12%. The notable active holder is <strong>Elliott Investment Management</strong>, which disclosed a roughly <strong>$4 billion stake on September 3, 2025</strong> — one of the fund's largest ever positions. Individual index-manager position sizes were not verifiable from a live source for this build and are therefore omitted rather than estimated.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 02 CORE BUSINESSES ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose"><strong>Reporting-structure note:</strong> PepsiCo now reports <strong>six</strong> divisions, not the seven many models still carry. Frito-Lay North America and Quaker Foods North America have been consolidated into <strong>PepsiCo Foods North America (PFNA)</strong>, and the old Europe / AMESA / APAC split has been re-cut into International Beverages Franchise, EMEA, Latin America Foods and Asia Pacific Foods. Standalone Frito-Lay and Quaker revenue lines are <em>no longer separately disclosed</em>, so any FLNA/QFNA figure circulating today is either historical or an estimate. Revenue mix below is FY2025 actuals.</p>
+  <div class="seg-bar">
+    <div style="flex:30.0;background:#2e7fd6;">PBNA 30.0%</div>
+    <div style="flex:29.3;background:#f59e0b;">PFNA 29.3%</div>
+    <div style="flex:19.2;background:#a78bfa;">EMEA 19.2%</div>
+    <div style="flex:11.2;background:#22c55e;">LatAm 11.2%</div>
+    <div style="flex:5.3;background:#94a3b8;">IBF 5.3%</div>
+    <div style="flex:4.9;background:#6b7280;">APAC 4.9%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2e7fd6;"></span> PepsiCo Beverages North America — $28,197M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> PepsiCo Foods North America — $27,528M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> EMEA — $18,025M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Latin America Foods — $10,549M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Int'l Beverages Franchise — $4,997M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span> Asia Pacific Foods — $4,629M</div>
+  </div>
+
+  <!-- PFNA -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b; margin-top:28px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">PepsiCo Foods North America (PFNA) — Frito-Lay + Quaker</div>
+        <div style="margin-top:8px;"><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">PROFIT ENGINE — VOLUME IN DECLINE</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$27,528M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−2%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~55% <span style="font-size:10px;color:var(--text-dim);">est.</span></div><div class="biz-stat-label">US Salty Snacks</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US salty snacks est. $30–35B retail; category growth stalled near <strong>0%</strong> with measured price elasticity around <strong>−0.9</strong> (TAM figures are estimates — not vendor-verified in this build)</div>
+    <p class="biz-desc" style="margin-top:14px;">This is the historical profit engine and now the problem child. Frito-Lay's structural advantage is a direct-store-delivery (DSD) route network — PepsiCo's own drivers stock the shelf — which historically produced snack operating margins well above beverages. That machine is now running in reverse: PFNA organic revenue fell <strong>2%</strong> in FY2025 with core constant-currency operating profit down <strong>6%</strong>, and the segment posted <strong>four volume declines in six quarters</strong>. In Q2 FY26 PFNA net revenue was <strong>$6,368M, down 2%</strong>, with segment operating profit of <strong>$1,342M, down 3.5%</strong>. Convenient-foods organic volume was <strong>−2%</strong> against <strong>+2%</strong> price/mix — the same buy-revenue-with-price trade that got the business into trouble. Management responded in February 2026 with price cuts of <strong>up to 15%</strong> on Lay's, Tostitos, Doritos and Cheetos, roughly <strong>20% of US SKUs</strong> cut to simplify the supply chain, three US plant closures, and a health-and-wellness reformulation push (removal of artificial colours and flavours, permissible/portion-controlled formats). Volume ended Q2 flat despite the price cuts — i.e., the elasticity response has not yet paid for the margin given up. First-half PFNA organic sales were <strong>−0.5%</strong>.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Mondelēz (MDLZ)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$79.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">$39.68B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+6.9%</div><div class="comp-bubble-label">Rev YoY</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">NA revenue +3.4% in Q2 26</div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Kraft Heinz (KHC)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$29.43B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">$24.90B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val" style="color:var(--red);">−2.7%</div><div class="comp-bubble-label">NA Organic Q2</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">EM organic +8.5% in Q2 26</div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Private Label</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Record</div><div class="comp-bubble-label">Unit Share H1 26</div></div><div><div class="comp-bubble-val" style="color:var(--red);">Nat'l −</div><div class="comp-bubble-label">Brand Units</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">US store-brand unit share at all-time high</div></div>
+    </div>
+  </div>
+
+  <!-- PBNA -->
+  <div class="biz-card" style="border-left: 3px solid #2e7fd6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">PepsiCo Beverages North America (PBNA)</div>
+        <div style="margin-top:8px;"><span class="biz-badge dominant">#2 IN US LRB — ~25% SHARE (EST.)</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$28,197M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+1%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~25% <span style="font-size:10px;color:var(--text-dim);">est.</span></div><div class="biz-stat-label">US LRB Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US liquid refreshment beverage (LRB) est. $180B+ retail; growth concentrated in energy, sports hydration and functional/prebiotic sodas (TAM is an estimate — not vendor-verified in this build)</div>
+    <p class="biz-desc" style="margin-top:14px;">PBNA is now PepsiCo's largest division by revenue and the one Elliott has explicitly targeted. Unlike Coca-Cola, PepsiCo <em>owns</em> most of its North American bottling and distribution — capital-intensive, lower-margin, and the structural reason PBNA's returns have trailed Coke's asset-light franchise model for years. FY2025 organic revenue grew <strong>1%</strong> with core constant-currency operating profit up <strong>6%</strong>. Q2 FY26 net revenue was <strong>$7,243M, up 7%</strong> (helped by the poppi acquisition) with segment operating profit of <strong>$1,053M</strong> — a figure flagged "not meaningful" versus the prior year because Q2 2025 carried the Rockstar impairment. The underlying picture is weaker than the headline: <strong>North America beverage volume fell 4%</strong> in the quarter, versus Coca-Cola posting <strong>+5% volume and +6% organic revenue</strong> globally in its own Q2 2026. Beverages company-wide ran <strong>+1% volume / +3% price</strong>. Gatorade and Lay's have both been rebranded; poppi gives PepsiCo a genuine foothold in the fastest-growing soda adjacency.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Coca-Cola (KO)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$382.15B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">$50.13B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+6.5%</div><div class="comp-bubble-label">Rev YoY</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">Mkt cap +27.0% YoY · net income $14.32B</div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Keurig Dr Pepper (KDP)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$42.01B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">$20.09B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+27.5%</div><div class="comp-bubble-label">Rev YoY</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">Growth is M&amp;A-driven; EPS −12.3%</div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Monster / Celsius</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$92.8B / $7.6B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">$9.22B / $3.05B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+20.4%</div><div class="comp-bubble-label">MNST Rev YoY</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">Energy is the share donor category</div></div>
+    </div>
+  </div>
+
+  <!-- EMEA -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Europe, Middle East &amp; Africa (EMEA)</div>
+        <div style="margin-top:8px;"><span class="biz-badge growth">GROWTH ENGINE — +6% ORGANIC</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$18,025M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">19.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> combined EMEA snacks + beverages measured in the hundreds of billions; PepsiCo's share is low enough that the runway is distribution-led rather than share-defence (estimate)</div>
+    <p class="biz-desc" style="margin-top:14px;">EMEA merges the former Europe and AMESA (Africa, Middle East, South Asia) divisions and is the single largest international block. FY2025 organic revenue grew <strong>6%</strong> with core constant-currency operating profit up <strong>10%</strong> — the operating leverage North America is failing to deliver. Q2 FY26 net revenue was <strong>$4,983M, up 10%</strong>, and reported segment operating profit was <strong>$751M, up 103%</strong>, though that number is heavily flattered by lapping the prior-year Be &amp; Cheery and Rockstar-related impairment charges. Context matters: Europe was the weakest region for both Mondelēz and Kraft Heinz in Q2 2026, so PepsiCo's EMEA result is genuinely differentiated rather than a rising-tide effect. Currency has swung from a multi-year headwind to roughly a <strong>1-point tailwind</strong> in the FY26 guide.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Mondelēz (EMEA)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--red);">Weakest</div><div class="comp-bubble-label">Region Q2 26</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+7.1%</div><div class="comp-bubble-label">AMEA Organic</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Coca-Cola (EMEA)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--green);">+5%</div><div class="comp-bubble-label">Global Vol Q2</div></div><div><div class="comp-bubble-val" style="color:var(--green);">+6%</div><div class="comp-bubble-label">Global Organic</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- LatAm -->
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Latin America Foods</div>
+        <div style="margin-top:8px;"><span class="biz-badge growth">FASTEST Q2 GROWER — +15% REPORTED</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$10,549M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+4.5%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">Leading <span style="font-size:10px;color:var(--text-dim);">est.</span></div><div class="biz-stat-label">Regional Snacks</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Latin American snacking is the region where PepsiCo's Sabritas/Gamesa position is closest to a true regional monopoly; category expansion is driven by household penetration, not per-capita consumption (estimate)</div>
+    <p class="biz-desc" style="margin-top:14px;">Latin America Foods delivered FY2025 organic revenue growth of <strong>4.5%</strong> with core constant-currency operating profit up <strong>8%</strong>, and accelerated hard in Q2 FY26: net revenue <strong>$2,940M, up 15%</strong>, with segment operating profit of <strong>$616M, up 16%</strong> — margin held while growing mid-teens. This is where the peer read-across is most favourable, since Mondelēz reported Latin America organic growth of <strong>8.4%</strong> in the same quarter, confirming a broadly healthy category rather than one company's share grab. Currency in the region is historically the swing factor and turned helpful in the FY26 guide.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Mondelēz (LatAm)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--green);">+8.4%</div><div class="comp-bubble-label">Organic Q2 26</div></div><div><div class="comp-bubble-val">1M+</div><div class="comp-bubble-label">Brazil Stores</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arca / Femsa bottlers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">Coke sys.</div><div class="comp-bubble-label">Affiliation</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">Beverage-side competition, not snacks</div></div>
+    </div>
+  </div>
+
+  <!-- IBF -->
+  <div class="biz-card" style="border-left: 3px solid #94a3b8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International Beverages Franchise (IBF)</div>
+        <div style="margin-top:8px;"><span class="biz-badge emerging">HIGHEST-MARGIN DIVISION — ASSET-LIGHT</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4,997M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+3%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">41.8%</div><div class="biz-stat-label">Q2 Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">5.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> concentrate/franchise economics mirror Coca-Cola's global model — the structural template Elliott wants applied to North America</div>
+    <p class="biz-desc" style="margin-top:14px;">The smallest revenue line but the most instructive one. IBF sells concentrate to third-party bottlers rather than owning trucks and plants. In Q2 FY26 it generated <strong>$637M of operating profit on $1,523M of revenue</strong> — a <strong>41.8% segment operating margin</strong> — with revenue up <strong>11%</strong> and profit up <strong>19%</strong>. Compare that with PBNA, which needed <strong>$7,243M</strong> of revenue to produce <strong>$1,053M</strong> of profit. The 4.8x revenue requirement for comparable dollars of profit is the arithmetic behind Elliott's refranchising thesis: the same brands earn dramatically better returns when someone else owns the assets.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Coca-Cola system</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$382.15B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">28.6%</div><div class="comp-bubble-label">Net Margin TTM</div></div></div><div style="font-size:11px;color:var(--text-dim);margin-top:8px;font-family:'JetBrains Mono',monospace;">Fully refranchised model; PEP net margin 10.8%</div></div>
+    </div>
+  </div>
+
+  <!-- APAC -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Asia Pacific Foods</div>
+        <div style="margin-top:8px;"><span class="biz-badge growth">EMERGING — FASTEST PROFIT GROWTH</span></div>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4,629M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+1.5%</div><div class="biz-stat-label">FY25 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+20%</div><div class="biz-stat-label">FY25 Core cc OP</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> India and China snacking penetration remains a multi-decade distribution build; Mondelēz added ~100,000 stores in India alone during the period (estimate for PepsiCo's own runway)</div>
+    <p class="biz-desc" style="margin-top:14px;">Small but improving fastest on the bottom line. FY2025 organic revenue grew only <strong>1.5%</strong>, but core constant-currency operating profit grew <strong>20%</strong> — evidence that the prior write-down of Be &amp; Cheery (the China snacks acquisition) has been followed by genuine cost discipline. Q2 FY26 revenue was <strong>$1,124M, up 12%</strong>, with operating profit of <strong>$127M</strong>. Operating margin remains the lowest in the portfolio at roughly <strong>11%</strong>, so this is a mix dilutant near-term and an option on penetration long-term.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Mondelēz (AMEA)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--green);">+7.1%</div><div class="comp-bubble-label">Organic Q2 26</div></div><div><div class="comp-bubble-val">~100k</div><div class="comp-bubble-label">India Stores Added</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 03 MOAT ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <div class="moat-pill">DSD Route Network</div>
+    <div class="moat-pill">23 Billion-Dollar Brands</div>
+    <div class="moat-pill">Retail Shelf Control</div>
+    <div class="moat-pill">Snack + Bev Cross-Sell</div>
+    <div class="moat-pill">54-Yr Dividend Streak</div>
+    <div class="moat-pill">Global Manufacturing Scale</div>
+    <div class="moat-pill">Foodservice Contracts</div>
+  </div>
+  <p class="prose" style="margin-top:24px;">PepsiCo's moat is physical, not digital. Frito-Lay's direct-store-delivery network — company drivers who merchandise the salty-snack aisle themselves, several times a week, in tens of thousands of outlets — is close to unreplicable at scale and is why PepsiCo has historically been able to hold roughly half of a fragmented US category while charging a brand premium. That network also creates a second, subtler advantage: because PepsiCo shows up with both a snack truck and a beverage truck, it can bundle shelf negotiations and foodservice contracts in a way that a pure-play snack or pure-play beverage competitor cannot. The financial signature of the moat is visible in the returns — <span class="tip" title="Return on equity: net income divided by shareholders' equity. How much profit the company generates per dollar of book equity.">ROE</span> of <strong>51.51%</strong> and <span class="tip" title="Return on invested capital: after-tax operating profit divided by total capital employed (debt plus equity). Measures how efficiently the business converts all invested capital into profit.">ROIC</span> of <strong>19.38%</strong> on a business trading at <strong>18.1x</strong> trailing earnings. The vulnerability is that a DSD network is a fixed-cost asset: it is a superb moat when volumes grow and a millstone when they shrink, because the trucks run whether or not the bags move. With convenient-foods volume at −2% and North America beverage volume at −4%, PepsiCo is currently paying for a moat it is not fully using.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Key Vulnerabilities</h3>
+  <div class="prose">
+    <p style="margin-bottom:14px;"><strong>1. Structural volume decline in North American snacking.</strong> Four volume declines in six quarters is not a demand blip; it is a category re-rating. Price cuts of up to 15% on the flagship brands in February 2026 produced <em>flat</em> volume by Q2 — meaning PepsiCo surrendered price without recovering units. With measured salty-snack elasticity around −0.9, the arithmetic says discounting alone does not restore the P&amp;L; the recovery has to come from mix, formats and reformulation.</p>
+    <p style="margin-bottom:14px;"><strong>2. Capital-heavy North American bottling.</strong> PepsiCo owns its US bottling; Coca-Cola largely does not. The internal comparison is damning — International Beverages Franchise earned a 41.8% Q2 operating margin on concentrate economics while PBNA earned roughly 14.5% owning the assets. This is the structural gap Elliott is attacking, and until it is addressed PepsiCo's consolidated <span class="tip" title="Net profit margin: net income as a percentage of revenue.">net profit margin</span> of 10.78% will keep sitting far below Coca-Cola's 28.6%.</p>
+    <p style="margin-bottom:14px;"><strong>3. GLP-1 and the health re-rating of indulgent snacking.</strong> PwC-cited data puts GLP-1 usage at <strong>21% of US households as of May 2026</strong>, up from 9% in January 2025, with roughly 11–12% of US adults using the drugs specifically for weight loss. Approximately <strong>58% of PepsiCo's annual revenue</strong> comes from food brands, giving it the highest direct exposure of any mega-cap staples name. Hershey has flagged the same dynamic. Reformulation and portion control are the defence, but they take years and cost margin.</p>
+    <p><strong>4. Private-label share and consumer trade-down.</strong> US store-brand unit share hit a record high in the first half of 2026 while national-brand units declined. Salty snacks are among the easiest categories for a shopper to trade down in — the product is a commodity input in a branded bag — and the lower-income cohort that drives snack volume is the same cohort most squeezed by the "rising inflationary pressures" Laguarta cited on the Q2 call.</p>
+  </div>
+</div>
+
+<!-- ===================== 04 KEY FINANCIAL METRICS ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>PEP</th><th>Industry / Staples</th><th>NASDAQ-100</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-earnings ratio: share price divided by earnings per share over the last twelve months. How many dollars investors pay for each dollar of current profit.">Trailing P/E</span></td>
+        <td style="color:var(--green);">18.12</td><td>23.05</td><td>33.03</td>
+        <td>Cheaper than both the staples sector (XLP) and the NASDAQ-100 (QQQ). Peer median across KO/MDLZ/KDP/MNST is ≈29x. The discount is the market pricing structurally slower volume.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Forward P/E: share price divided by analysts' consensus estimate of next twelve months' earnings per share.">Forward P/E</span></td>
+        <td style="color:var(--green);">15.86</td><td>—</td><td>—</td>
+        <td>Implies ~14% earnings growth is expected off the trailing base; consensus 2026 <span class="tip" title="Earnings per share: net profit divided by shares outstanding.">EPS</span> is $8.56 and 2027 is $8.98. Sector/index forward multiples were not verifiable from a live source and are omitted rather than estimated.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/earnings-to-growth ratio: the P/E divided by the expected earnings growth rate. Above ~2 usually means you are paying a lot per unit of growth.">PEG Ratio</span></td>
+        <td style="color:var(--red);">3.13</td><td>—</td><td>—</td>
+        <td>High because the denominator is small, not because the multiple is rich. Consensus EPS growth of ~5% against an 18x multiple is the whole bear case in one number.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share: net profit divided by shares outstanding.">EPS</span> (<span class="tip" title="Trailing twelve months — the most recent four reported quarters combined.">TTM</span>)</td>
+        <td>$7.63</td><td>—</td><td>—</td>
+        <td>Up 39.0% — but almost entirely because the period laps FY2025's $1,993M of intangible impairments. FY2025 reported EPS was $6.00; core EPS was $8.14. Use core.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year-over-year — this period compared with the same period one year earlier.">YoY</span>)</td>
+        <td style="color:var(--amber);">+5.62%</td><td>≈+6.7%†</td><td>—</td>
+        <td>Reported TTM growth flatters reality: FY2025 <span class="tip" title="Organic revenue growth strips out acquisitions, divestitures and currency movements to show underlying volume and price performance.">organic</span> growth was only +1.7% and Q2 FY26 organic was +2.4%. †Median of KO (+6.5%) and MDLZ (+6.9%).</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Gross margin: revenue minus cost of goods sold, as a percentage of revenue. What is left to cover overhead, marketing and profit.">Gross Margin</span></td>
+        <td>54.17%</td><td>—</td><td>—</td>
+        <td>Broadly stable — 54.89% in FY2024, 54.46% in FY2025, 54.17% TTM. Commodity relief has offset the February 2026 price cuts so far; watch this line for the true cost of discounting.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td>
+        <td style="color:var(--red);">10.78%</td><td>≈16.0%†</td><td>—</td>
+        <td>Well below the peer median and less than half Coca-Cola's 28.6%. Owning North American bottling is the single largest reason. †Median of KO/MDLZ/KDP/MNST TTM net margins.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price — the cash return on a share bought today.">Dividend Yield</span></td>
+        <td style="color:var(--green);">4.23%</td><td>2.57%</td><td>0.42%</td>
+        <td>$5.92 annualised, <strong>54 consecutive years of increases</strong> (Dividend Aristocrat / King territory). <span class="tip" title="Payout ratio: the share of earnings paid out as dividends.">Payout ratio</span> 77.58% on reported EPS — high, but ~73% on core EPS and covered by $9.28B of free cash flow against ~$7.9B of dividends.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Short interest: the percentage of shares that have been borrowed and sold by investors betting the price will fall.">Short Interest</span> %</td>
+        <td style="color:var(--green);">2.15%</td><td>—</td><td>—</td>
+        <td>29.39M shares short, 2.16% of float. Low — this is not a crowded short. The bears here are underweights, not short sellers.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Debt-to-equity: total debt divided by shareholders' equity. Higher means more leverage and more financial risk.">Debt-to-Equity</span></td>
+        <td style="color:var(--amber);">2.39</td><td>—</td><td>—</td>
+        <td>$53.21B total debt against $10.72B cash — a net debt position of $42.50B (−$31.14/share). Moderate for an investment-grade staple with $13.46B of operating cash flow, but it constrains the size of any Elliott-driven buyback or transformation.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">Current Ratio</span></td>
+        <td style="color:var(--amber);">0.93</td><td>—</td><td>—</td>
+        <td>Below 1.0 (quick ratio 0.69). Normal for a consumer staple with negative working-capital dynamics and daily cash collection, but it leaves no balance-sheet slack for a shock.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free cash flow: operating cash flow minus capital expenditures — the cash actually available to pay dividends, buy back stock or repay debt.">Free Cash Flow</span></td>
+        <td>$9.28B</td><td>—</td><td>—</td>
+        <td>FCF margin 9.58%, $6.80 per share. FY26 guidance targets ≥80% FCF conversion and ~$8.9B of total shareholder returns ($7.9B dividends + $1.0B buybacks).</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity: net income divided by shareholders' equity.">ROE</span></td>
+        <td style="color:var(--green);">51.51%</td><td>—</td><td>—</td>
+        <td>Exceptional on the surface, but inflated by leverage — equity is thin (price-to-book 8.55). <span class="tip" title="Return on assets: net income divided by total assets.">ROA</span> of 8.93% is the un-levered reality check.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital: after-tax operating profit divided by total capital employed. Measures how efficiently all invested capital is converted into profit.">ROIC</span></td>
+        <td style="color:var(--green);">19.38%</td><td>—</td><td>—</td>
+        <td>Comfortably above any plausible cost of capital — the brands still earn excess returns. The question is whether incremental capital deployed into owned bottling earns anything close to this.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means less volatile than the market.">Beta</span> (5Y)</td>
+        <td style="color:var(--green);">0.36</td><td>0.49</td><td>1.23</td>
+        <td>Genuinely defensive — lower volatility than the staples sector itself and less than a third of the NASDAQ-100's. This is the portfolio role PEP plays, and the reason a 4.23% yield attracts income capital.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$133.73 – $171.48</td><td>—</td><td>—</td>
+        <td>Trading at $140.13, roughly 18% below the 52-week high and 4.8% above the low. 52-week price change of −6.83%. 50-day MA $140.05 (price sits right on it); 200-day MA $148.99 (price below it).</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:12px;font-size:13px;color:var(--text-dim);">Column notes — "Industry / Staples" uses the Consumer Staples Select Sector SPDR (XLP) as a live-sourced sector aggregate where available; "NASDAQ-100" uses Invesco QQQ. Cells marked "—" are metrics for which no aggregate could be verified from a live source; they are omitted rather than estimated. † denotes a median derived from the verified peer set (KO, MDLZ, KDP, MNST).</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Notable One-Off Items</h3>
+  <div class="prose">
+    <p style="margin-bottom:14px;"><strong>Impairments dominate the year-over-year optics — do not read the headline growth.</strong> FY2025 carried <strong>$1,993 million of intangible asset impairments</strong>, primarily against the <strong>Rockstar</strong> energy brand (acquired 2020) with additional charges against <strong>Be &amp; Cheery</strong>, the Chinese snacks acquisition. Those write-downs are why FY2025 reported EPS of $6.00 fell 14% while core EPS of $8.14 was flat in constant currency. They are also why every FY2026 comparison looks spectacular: Q2 FY26 reported diluted EPS of $2.18 was <strong>up 137%</strong> and reported operating profit rose <strong>125%</strong>, purely from lapping roughly <strong>$1.86 billion</strong> of prior-year charges. Core EPS of $2.20 was up just <strong>4%</strong>, and core operating margin of 16.8% was <em>down 40 basis points</em>. Reported and core are telling opposite stories; core is the one that matters.</p>
+    <p style="margin-bottom:14px;"><strong>Restructuring and footprint actions.</strong> PepsiCo has announced <strong>three US manufacturing plant closures</strong> and an approximately <strong>20% reduction in US SKUs</strong> beginning early 2026, alongside what management calls a "record year of productivity savings in 2026" from automation, digitalisation and simplification. Restructuring cash outflows fell year-over-year, contributing to operating cash flow of <strong>$2.365 billion</strong> for the 24-week period versus $996 million a year earlier — a 137% improvement that is partly genuine and partly the absence of prior-year cash charges.</p>
+    <p style="margin-bottom:14px;"><strong>Currency and M&amp;A.</strong> FY26 guidance embeds roughly a <strong>1-point foreign-exchange tailwind</strong> and roughly a <strong>1-point M&amp;A contribution</strong> — meaning implied reported revenue growth of 4–6% against organic growth of only 2–4%. Roughly half of the reported top-line growth investors see this year is not operating performance. The poppi acquisition is the visible driver inside PBNA's +7% Q2 revenue against a −4% North America beverage volume result.</p>
+    <p><strong>SodaStream.</strong> The task brief asked specifically about a SodaStream write-down. No SodaStream-specific impairment was identifiable in the FY2025 or Q2 FY26 disclosures reviewed for this build; the named impairments were Rockstar and Be &amp; Cheery. Absence of a figure here should be read as "not verified," not as "confirmed none."</p>
+  </div>
+</div>
+
+<!-- ===================== 05 ANALYST CONSENSUS ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">HOLD</div><div class="card-note">24 analysts tracked. The Street has migrated to the sidelines through 2026 — a broad de-rating rather than an outright bearish call.</div></div>
+    <div class="card"><div class="card-label">Avg Price Target</div><div class="card-value">$155.00</div><div class="card-note"><span style="color:var(--green);">+10.61% upside</span> from $140.13. A second consensus source puts the average at $157.90 (+14.2%); both imply a recovery to roughly the FY2025 trading range, not a re-rating.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$124 – $183</div><div class="card-note">Low target implies −11.5%; high implies +30.6%. A 48% spread between bull and bear on a consumer staple is unusually wide and reflects genuine disagreement about the activist outcome.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">7 / 16 / 1</div><div class="card-note">Buy-equivalent 7 (3 Strong Buy + 4 Buy) · Hold 16 · Sell-equivalent 1 (Strong Sell). Two-thirds of coverage is neutral.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:3;background:var(--green);"></div>
+    <div style="flex:4;background:#4ade80;"></div>
+    <div style="flex:16;background:var(--amber);"></div>
+    <div style="flex:0.01;background:var(--red);"></div>
+    <div style="flex:1;background:#b91c1c;"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy (3)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy (4)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold (16)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell (0)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#b91c1c;"></span> Strong Sell (1)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Key Recent Analyst Calls</div>
+  <div class="prose">
+    <p style="margin-bottom:14px;"><span style="color:var(--red);font-size:18px;">●</span> <strong>Citigroup — Filippo Falorni</strong> · <span style="color:var(--red);">Downgrade: Buy → Neutral</span> · PT <span style="color:var(--red);">$170 → $145</span> · Jul 10, 2026. The most consequential call of the cycle: Citi capitulated on the turnaround thesis the morning after Q2, cutting its target 15%. The downgrade came alongside a broad wave of target cuts and marks the point at which the Street stopped underwriting a 2026 volume inflection.</p>
+    <p style="margin-bottom:14px;"><span style="color:var(--amber);font-size:18px;">●</span> <strong>Morgan Stanley</strong> · <span style="color:var(--amber);">Maintains Equal-Weight</span> · PT <span style="color:var(--amber);">$180 → $160</span> · Jul 10, 2026. The single largest target reduction in the post-Q2 batch — $20 off, an 11% cut — while holding the neutral rating. The message is that even the patient bulls have pushed the recovery out by a year.</p>
+    <p style="margin-bottom:14px;"><span style="color:var(--red);font-size:18px;">●</span> <strong>Wells Fargo — Chris Carey</strong> · <span style="color:var(--red);">Maintains Equal-Weight</span> · PT <span style="color:var(--red);">$150 → $140</span> · Jul 10, 2026. Carey's $140 target is effectively "fairly valued at spot" — the most bearish mainstream mark among the large brokers and only marginally above where the stock trades today.</p>
+    <p style="margin-bottom:14px;"><span style="color:var(--green);font-size:18px;">●</span> <strong>BNP Paribas Exane</strong> · <span style="color:var(--green);">Maintains Outperform</span> · PT <span style="color:var(--green);">$195 → $183</span> · Jul 8, 2026. The Street-high target and the clearest surviving bull case: even after a 6% cut, $183 implies +30.6% and rests on the activist-driven structural argument rather than a near-term volume recovery. <strong>JPMorgan</strong> holds the other Overweight, cutting its target from $178 to $170 on Jul 1, 2026.</p>
+    <p style="font-size:13px;color:var(--text-dim);">Also on the tape: Jefferies Hold $162 → $152; TD Cowen Hold $150 → $145; RBC Capital Sector Perform $163 → $161; Barclays Equal-Weight $138 → $142 (a rare <em>increase</em>, Jul 21); Bank of America Neutral $173 → $164 (Jun 25); Sanford C. Bernstein target $134; Piper Sandler $176; UBS $159; Deutsche Bank $155. Analyst names were not disclosed for calls beyond Citi and Wells Fargo in the sources reviewed.</p>
+  </div>
+</div>
+
+<!-- ===================== 06 CATALYSTS ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026 Earnings — the volume-inflection test</div>
+        <div class="tl-desc">Management guided to reaching "the higher end" of the 2–4% organic range in the back half of 2026. Q3 is the first quarter where that promise is checkable and the first full quarter in which the February price cuts, the ~20% SKU rationalisation and the reformulation push have all been in market simultaneously. The specific number to watch is PFNA organic volume: it was −2% in FY2025 and flat in Q2 FY26, and it needs to turn positive for the guide to hold.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Integrated North America supply-chain / go-to-market decision</div>
+        <div class="tl-desc">At the December 9, 2025 investor day PepsiCo said it was evaluating an integrated North America supply chain and go-to-market model, with an update expected in late 2026. This is the live version of Elliott's structural demand. A decision to combine or refranchise distribution assets would be the largest change to PepsiCo's operating architecture in decades; a decision to leave it alone would likely re-energise the activist.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 9–10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 FY2026 results — revenue beat, EPS miss, target cuts</div>
+        <div class="tl-desc">Revenue of $24.18B beat the $23.95B consensus on 6.4% reported growth, but core EPS of $2.20 missed the $2.21 estimate and core operating margin contracted 40 bps. North America beverage volume fell 4%; convenient-foods volume ended flat. At least nine brokers cut targets within 48 hours and Citigroup downgraded outright.</div>
+        <div class="tl-impact down">Negative reaction — already happened</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Price cuts of up to 15% on flagship snack brands</div>
+        <div class="tl-desc">PepsiCo cut prices by up to 15% on Lay's, Tostitos, Doritos and Cheetos and rebranded Gatorade and Lay's, explicitly targeting the value-seeking consumer and private-label defection. Alongside this it began cutting roughly 20% of US SKUs. Volume response through Q2 was flat, so the margin has been given up ahead of the units.</div>
+        <div class="tl-impact down">Margin cost incurred — payback unproven</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 8–9, 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Investor day: 100 bps margin plan — but no bottling separation</div>
+        <div class="tl-desc">PepsiCo committed to <strong>100 basis points of core operating margin improvement over three fiscal years</strong>, a record year of productivity savings, a ~20% US SKU cut, three plant closures, board refreshment, and 2026 targets of 2–4% organic revenue and 5–7% core EPS growth. Critically, <strong>no bottling separation or refranchising was announced</strong>. Elliott publicly expressed confidence in the plan on December 8. The stock subsequently rallied from $140.77 at the December close to $166.48 by the end of February.</div>
+        <div class="tl-impact up">Positive reaction — since given back</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 3, 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Elliott Investment Management discloses ~$4B stake</div>
+        <div class="tl-desc">Elliott disclosed one of its largest-ever positions and wrote to the board demanding "a comprehensive portfolio and operational review, including a reassessment of bottling operations, greater investment in high-growth brands, and enhanced governance oversight" — in practice, refranchising the North American bottling network and divesting underperforming food assets. Shares rose 2.3% on the news. Laguarta has since called the dialogue "very constructive and collaborative." <strong>Status check:</strong> reporting indicates the two sides moved toward a settlement around the December investor day, and Elliott endorsed the plan; specific settlement terms and board-seat allocations were not verifiable from a live source for this build.</div>
+        <div class="tl-impact up">Live structural catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing FY26</div>
+      <div class="tl-content">
+        <div class="tl-title">International growth, currency tailwind and capital returns</div>
+        <div class="tl-desc">The international divisions are carrying the company: EMEA +10%, LatAm Foods +15%, Asia Pacific Foods +12% and IBF +11% in Q2 FY26 reported revenue. FX has flipped to roughly a 1-point tailwind in the FY26 guide after years of drag. PepsiCo has a new <strong>$10 billion buyback authorisation running to February 2030</strong> and plans ~$8.9B of FY26 shareholder returns, though only $1.0B of that is repurchase — a deliberate choice given $42.5B of net debt.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== 07 5-YEAR PRICE ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">PEP — 60 MONTHLY CLOSES, SEP 2021 → AUG 2026 <span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 18, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">Dividend-adjusted monthly closes (total-return basis) sourced from Digrin. Because dividends are reinvested into the series, historical values sit below the nominal prices printed at the time; the current-month value ($140.47) is effectively spot. Moving averages use 1-, 3- and 10-month windows as monthly proxies for the 20-, 50- and 200-day averages.</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:3px;background:#2e7fd6;display:inline-block;"></span> Price</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #f59e0b;display:inline-block;"></span> 20-Day MA (1-mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #3b82f6;display:inline-block;"></span> 50-Day MA (3-mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #ef4444;display:inline-block;"></span> 200-Day MA (10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY <span style="color:var(--amber);">⚠ AS OF AUG 18, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten down and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> On a dividend-adjusted basis PEP went from <strong>$129.26 in September 2021 to $140.47 in August 2026</strong> — a cumulative total return of roughly <strong>+8.7%</strong>, or about <strong>1.7% annualised</strong> over five years. For a business that raised its dividend every one of those years, virtually all of the return came from the coupon; the price did the opposite of compounding. The shape matters more than the endpoint: PEP rose steadily through the 2022 inflation era, when pricing power was the market's favourite trait, peaking at <strong>$170.73 in April 2023</strong>. It then de-rated for two full years to a trough of <strong>$125.07 in May 2025</strong> — a <strong>−26.7%</strong> drawdown — as GLP-1 adoption, volume declines and the collapse of the pricing narrative all landed at once. The Elliott stake and the December investor day produced a sharp <strong>+33%</strong> rally off that low to <strong>$166.48 in February 2026</strong>, and the entire move has since been surrendered: June 2026 closed at $135.40 and the stock now sits at $140.13, below its 200-day moving average of $148.99 and sitting almost exactly on its 50-day of $140.05.</p>
+
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2022</div><div class="tl-content"><div class="tl-title">Pricing-power peak — $163.78</div><div class="tl-desc">Peak inflation-era enthusiasm. PepsiCo was passing through double-digit price increases with limited elasticity and the market paid a premium for it. FY2022 revenue grew 8.71%.</div><div class="tl-impact up">Multiple expansion</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2023</div><div class="tl-content"><div class="tl-title">Cycle high — $170.73</div><div class="tl-desc">The high-water mark of the adjusted series and the last time PEP traded like a premium compounder. FY2023 revenue grew 5.88%, still price-driven.</div><div class="tl-impact up">Cycle top</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">GLP-1 de-rating begins — $148.09</div><div class="tl-desc">The market began repricing packaged-food demand for weight-loss drugs. PEP fell roughly 13% from the April high over six months even as reported earnings held up — a pure multiple compression driven by terminal-value doubt.</div><div class="tl-impact down">Structural de-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024</div><div class="tl-content"><div class="tl-title">Volume declines bite — $143.41</div><div class="tl-desc">FY2024 revenue grew just 0.42%. The pricing lever was exhausted and the volume problem became undeniable. Market cap fell 10.17% over calendar 2024.</div><div class="tl-impact down">Fundamental deterioration</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr–May 2025</div><div class="tl-content"><div class="tl-title">Five-year low zone — $129.00 / $125.07</div><div class="tl-desc">Capitulation. The stock traded at levels last seen in 2021 on a total-return basis, with the dividend yield stretching toward 4.5% — the valuation floor that ultimately attracted activist capital.</div><div class="tl-impact down">Trough</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2025</div><div class="tl-content"><div class="tl-title">Elliott discloses $4B stake — $136.41</div><div class="tl-desc">Shares rose 2.3% on the disclosure and the narrative changed from "melting ice cube" to "structural value unlock." The rally from here to February was almost entirely activist-driven.</div><div class="tl-impact up">Re-rating catalyst</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">Turnaround optimism peak — $166.48</div><div class="tl-desc">A +33% advance off the May 2025 low, following the December investor day margin plan and Elliott's endorsement. The stock priced in execution before any of it was demonstrated.</div><div class="tl-impact up">Peak expectations</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Jul 2026</div><div class="tl-content"><div class="tl-title">Round-trip — $135.40, then Q2 miss</div><div class="tl-desc">Q1 and Q2 failed to show the volume inflection, the price cuts did not move units, and the entire activist premium unwound. The July 10 downgrade wave followed. The 52-week low of $133.73 sits just below.</div><div class="tl-impact down">Full retracement</div></div></div>
+  </div>
+
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> The comparison that defines the stock is not the index — it is Coca-Cola. Over the trailing twelve months PepsiCo's market cap fell <strong>7.1%</strong> while Coca-Cola's rose <strong>27.0%</strong>, a divergence of roughly <strong>34 percentage points</strong> between two businesses that most allocators historically treated as a pair trade. Against the broad market the gap is similar: PEP's 52-week price change is <strong>−6.83%</strong> while the NASDAQ-100 (QQQ) delivered a <strong>+24.88%</strong> total return over the past year — roughly <strong>32 points</strong> of underperformance. Against its own sector, the staples proxy XLP trades at 23.05x earnings versus PEP at 18.12x, so PepsiCo is now the cheap asset inside an already-defensive sector. That is either a value opportunity or an accurate discount for a business losing units; the Q3 print on October 8 is the first honest referendum on which.</p>
+</div>
+
+<!-- ===================== 08 SUMMARY ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 18.1x trailing and 15.9x forward earnings for a 0.36-beta business with 19.4% ROIC, a 4.23% dividend yield backed by 54 consecutive years of increases, and $9.28B of free cash flow — at a multiple below both the staples sector (23.1x) and the peer median (~29x). The international half of the company already works: EMEA +10%, LatAm +15%, APAC +12% and IBF +11% in Q2 reported revenue, with IBF earning a 41.8% operating margin. Elliott is on the register with $4B and has already extracted a 100-bps margin commitment, a 20% SKU cut, three plant closures and board refreshment; the North America supply-chain decision due late 2026 is a genuine option on structural change. If refranchising ever happens, the gap between PepsiCo's 10.8% net margin and Coca-Cola's 28.6% is the size of the prize.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The core North American business is shrinking in units and the fix is not working. Four volume declines in six quarters, price cuts of up to 15% on the flagship brands that produced <em>flat</em> volume, North America beverage volume −4% while Coca-Cola runs +5%, and core operating margin down 40 bps despite a "record productivity year." GLP-1 usage reached 21% of US households by May 2026 from 9% in January 2025, private-label unit share is at a record high, and 58% of revenue sits in exactly the categories being abandoned. Meanwhile the December investor day explicitly did <em>not</em> announce a bottling separation, so the structural catalyst remains hypothetical — and the stock has already round-tripped the entire activist rally. A 3.13 PEG on ~5% consensus EPS growth says you are not being paid much to wait.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 4px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Volume decline proves structural, not cyclical.</strong> If GLP-1 adoption and deliberate snacking behaviour permanently reset per-capita salty-snack consumption, no amount of price cutting or SKU rationalisation restores the volume base — and PepsiCo is left carrying a fixed-cost DSD network sized for a larger business. The 21%-of-households GLP-1 figure more than doubled in sixteen months; there is no evidence yet of it plateauing.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">The activist catalyst fizzles.</strong> Elliott endorsed the December plan without securing a bottling separation. If the late-2026 supply-chain update is incremental rather than structural, the option value currently embedded in the $155–$183 bull targets deflates, and the stock re-rates toward the $134–$145 cluster where Bernstein, Wells Fargo and Citi already sit. Elliott could also simply exit.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Balance sheet limits the response.</strong> $53.21B of total debt against $10.72B of cash, a 0.93 current ratio, 2.39 debt-to-equity and a 77.58% payout ratio leave little room. FY26 buybacks are budgeted at only $1.0B against $7.9B of dividends. If earnings disappoint further, PepsiCo cannot buy its way out, and the dividend streak — the single largest reason income investors own it — becomes the constraint rather than the attraction.</div></div>
+  </div>
+</div>
+
+<!-- ===================== INDUSTRY COMMENTARY ===================== -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Actually Matters Right Now</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">GLP-1 Drugs and the Snacking Volume Reset</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">PwC-cited data puts GLP-1 usage at <strong>21% of US households as of May 2026</strong>, up from <strong>9% in January 2025</strong> — a doubling-plus in sixteen months. Roughly 11–12% of US adults use the drugs specifically for weight loss, versus ~7% in the UK. Users buy fewer sweet treats and cut back on salty snacks. With approximately <strong>58% of PepsiCo revenue</strong> in food brands, PepsiCo carries the highest direct exposure of any mega-cap staples name; Hershey has independently flagged the same demand reshaping. This is not a pricing problem that discounting solves — one industry observer framed it as consumers moving "from snacking on autopilot to making much more deliberate decisions." The February 2026 price cuts of up to 15% on Lay's, Doritos, Cheetos and Tostitos produced flat volume by Q2, which is the empirical test of that framing and PepsiCo failed it.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Trade-Down to Private Label</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">US store-brand unit share hit a <strong>record high in the first half of 2026</strong> while national-brand units declined. Salty snacks are structurally easy to trade down in, and the lower-income cohort driving snack volume is the one Laguarta identified as constrained by "rising inflationary pressures." Measured salty-snack price elasticity of about <strong>−0.9</strong> means a 15% price cut should theoretically generate ~13.5% more units; PepsiCo got flat. That gap implies the loss is share and occasion, not price. Note the geographic split in the same data: Kraft Heinz North America organic sales fell <strong>2.7%</strong> in Q2 while its emerging markets grew <strong>8.5%</strong>; Mondelēz North America grew 3.4% versus Latin America +8.4% and AMEA +7.1%. The trade-down is a developed-market phenomenon, which is precisely why PepsiCo's international divisions are outgrowing its domestic ones.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Activist Pressure on Food Conglomerates — Bull vs Bear</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">Elliott's $4B PepsiCo position is part of a broader activist thesis that conglomerate food and beverage structures destroy value versus focused, asset-light operators — Kraft Heinz, Campbell's and Smucker have all cut plants amid the same slowdown. <strong>Bull framing:</strong> PepsiCo's own International Beverages Franchise proves the model, earning a 41.8% Q2 operating margin on concentrate economics while PBNA needs 4.8x the revenue to produce comparable profit. Refranchise North American bottling and the 18-point net-margin gap to Coca-Cola becomes addressable; Elliott has already banked a 100-bps three-year margin commitment, a 20% SKU cut and board refreshment. <strong>Bear framing:</strong> the December 9, 2025 investor day announced <em>no</em> bottling separation and <em>no</em> refranchising — only productivity. Elliott endorsed it anyway. The stock priced in the unlock by February at $166.48 and has given all of it back. Investors are now being asked to underwrite a structural change that management has explicitly declined to commit to, with the next update not due until late 2026.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DISCLAIMER ===================== -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of August 18, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: StockAnalysis.com (price, market cap, valuation ratios, margins, returns, dividend, short interest, balance sheet, analyst consensus, company profile, executive roster, QQQ and XLP aggregates); CompaniesMarketCap.com (global rank #110, US rank #64, market-cap history, beverage-sector ranking); PepsiCo Q4/FY2025 earnings release via investors.pepsico.com and the Q2 FY2026 Form 8-K via StockTitan (segment revenue and operating profit, organic growth, volume/price-mix, impairments, guidance); Benzinga and MarketBeat (analyst ratings, price targets, firm and analyst names); Hedgeweek, Yahoo Finance, Food Chain Magazine (Elliott Management campaign and December 2025 investor-day agenda); ESM Magazine, FoodNavigator, Food Business News (GLP-1 household penetration, private-label share, peer segment performance); Digrin (60 dividend-adjusted monthly closes).</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Estimated or unverified figures are labelled as such in-line. Market-share percentages for US salty snacks (~55%) and US liquid refreshment beverages (~25%), and all TAM figures, are <strong>estimates</strong> that could not be verified against a live primary source in this build. Competitor market caps, revenues and growth rates are live-sourced. NASDAQ market-cap rank (~#45) is an approximation. Individual institutional-holder position sizes, Elliott settlement terms and board-seat allocations, and any SodaStream-specific impairment could not be verified and are omitted rather than estimated. Cells marked "—" in the metrics table indicate an unverifiable comparison, not a zero. Note that Frito-Lay North America and Quaker Foods North America are no longer separately disclosed segments; they are consolidated within PepsiCo Foods North America.</p>
+  <p style="max-width:900px;margin:0 auto;">This document is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. Past performance is not indicative of future results. All investments carry risk of loss, including loss of principal. Figures should be independently verified against primary filings before any investment decision. The author may hold positions in securities mentioned.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 dividend-adjusted monthly closes, Sep 2021 – Aug 2026 (Digrin, as of Aug 18 2026) =====
+const labels = [
+  'Sep 21','Oct 21','Nov 21','Dec 21',
+  'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+  'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+  'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+const prices = [
+  129.26,138.88,137.32,150.30,
+  150.13,141.67,145.77,149.54,146.10,146.16,153.43,151.08,144.14,160.31,163.78,160.49,
+  151.93,154.16,163.04,170.73,163.09,166.81,168.83,161.37,153.68,148.09,153.80,155.21,
+  154.02,152.25,161.16,161.99,159.21,153.07,160.26,160.45,159.03,155.31,152.85,143.41,
+  142.12,144.74,142.66,129.00,125.07,127.01,132.67,142.99,136.41,141.90,144.48,140.77,
+  150.68,166.48,153.67,156.84,142.69,135.40,139.56,140.47
+];
+
+function sma(arr, w) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < w - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += arr[j];
+    out.push(+(s / w).toFixed(2));
+  }
+  return out;
+}
+
+function computeRSI(arr, period) {
+  const out = new Array(arr.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = arr[i] - arr[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let ag = gains / period, al = losses / period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (let i = period + 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    ag = (ag * (period - 1) + g) / period;
+    al = (al * (period - 1) + l) / period;
+    out[i] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const events = [
+  { idx: 14, label: 'Nov 22 · Pricing-power peak',        color: '#22c55e' },
+  { idx: 19, label: 'Apr 23 · Cycle high $170.73',        color: '#22c55e' },
+  { idx: 25, label: 'Oct 23 · GLP-1 de-rating begins',    color: '#ef4444' },
+  { idx: 39, label: 'Dec 24 · Volume declines bite',      color: '#ef4444' },
+  { idx: 43, label: 'Apr 25 · 5-yr low zone $129.00',     color: '#ef4444' },
+  { idx: 48, label: 'Sep 25 · Elliott $4B stake',         color: '#f59e0b' },
+  { idx: 53, label: 'Feb 26 · Turnaround rally $166.48',  color: '#22c55e' },
+  { idx: 57, label: 'Jun 26 · Q2 miss, back to $135',     color: '#ef4444' }
+];
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const ptRadius = prices.map((_, i) => eventMap[i] ? 6 : 0);
+const ptColors = prices.map((_, i) => eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)');
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,127,214,0.20)');
+grad.addColorStop(1, 'rgba(46,127,214,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#2e7fd6',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: ptRadius,
+        pointBackgroundColor: ptColors,
+        pointBorderColor: ptColors,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      { label: '20-Day MA (1-mo)',  data: ma1,  borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4,4], fill: false, pointRadius: 0, tension: 0.25, order: 2 },
+      { label: '50-Day MA (3-mo)',  data: ma3,  borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [6,4], fill: false, pointRadius: 0, tension: 0.25, order: 3 },
+      { label: '200-Day MA (10-mo)',data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [8,5], fill: false, pointRadius: 0, tension: 0.25, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: function(c) {
+            if (c.parsed.y === null) return null;
+            return c.dataset.label + ': $' + c.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const i = items[0].dataIndex;
+            return eventMap[i] ? ['', '▸ ' + eventMap[i].label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 14
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rsiCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      borderWidth: 2,
+      fill: false,
+      tension: 0.25,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        callbacks: {
+          label: function(c) {
+            if (c.parsed.y === null) return null;
+            let tag = ' · neutral';
+            if (c.parsed.y >= 70) tag = ' · OVERBOUGHT';
+            else if (c.parsed.y <= 30) tag = ' · OVERSOLD';
+            return 'RSI(6): ' + c.parsed.y.toFixed(1) + tag;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function(c) {
+            if (c.tick.value === 70 || c.tick.value === 30) return 'rgba(148,163,184,0.45)';
+            return 'rgba(30,41,59,0.55)';
+          },
+          lineWidth: function(c) {
+            return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: function(c) {
+            if (c.tick.value === 70) return '#ef4444';
+            if (c.tick.value === 30) return '#22c55e';
+            return '#64748b';
+          },
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
