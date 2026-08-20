@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCX — Freeport-McMoRan Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #c87533; /* Freeport copper */
+  --accent-dim: #c8753333;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 19–20, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">FCX</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Materials — Copper</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $99.21B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #252</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#120</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#65</span>
+        <span style="font-size:11px;color:var(--text-dim);">Global rank per CompaniesMarketCap; US/NYSE ranks are estimates</span>
+      </div>
+      <h1 class="company-name" style="margin-top:14px;">Freeport-McMoRan Inc.</h1>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$69.09</div>
+      <div class="price-change" style="color:var(--green);">+$2.77 (+4.18%)</div>
+      <div class="price-date">Close — Aug 19, 2026, 4:00 PM EDT</div>
+      <div class="price-date">Volume 16,696,401 · 52-wk $35.15 – $72.28</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Phoenix, Arizona</div>
+    <div class="meta-item"><span>Employees:</span>29,000</div>
+    <div class="meta-item"><span>Founded:</span>1987</div>
+    <div class="meta-item"><span>Next Earnings:</span>Q3 2026 — late Oct 2026 (est.)</div>
+    <div class="meta-item"><span>Copper (spot):</span>$6.46/lb</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Freeport-McMoRan is one of the world's largest publicly traded copper producers, operating large-scale, long-lived mines across North America (Morenci, Bagdad, Safford, Sierrita and Miami in Arizona; Chino and Tyrone in New Mexico; Henderson and Climax molybdenum in Colorado), South America (Cerro Verde in Peru, El Abra in Chile) and Indonesia, where its 48.76%-owned subsidiary PT Freeport Indonesia operates the Grasberg minerals district — one of the world's largest copper and gold deposits by recoverable reserves. <strong>FY2025 revenue was $25.92B, up 1.8% <span class="tip" title="Year-over-year: this period compared with the same period one year earlier">YoY</span></strong>, on consolidated sales of <strong>3.574 billion pounds of copper, 1.066 million ounces of gold and 83 million pounds of molybdenum</strong>. The company ranked <strong>third globally in attributable copper production in 2025 (~1.08 million tonnes)</strong> behind BHP and Chile's state-owned Codelco, and is roughly the <strong>252nd most valuable listed company in the world</strong> at a $99.2B market capitalisation.</p>
+  <p class="prose" style="margin-top:14px;">The investment case is dominated by two things right now. First, copper is at record levels — spot copper printed an all-time high of <strong>$6.83/lb in August 2026</strong> and sits at <strong>$6.46/lb</strong>, against FCX's FY2025 realised price of $4.75/lb. Second, a fatal <strong>mud-rush incident at the Grasberg Block Cave on September 8, 2025</strong> forced a force-majeure declaration and gutted Indonesian volumes; the phased restart began in Q2 2026 and management now guides to roughly <strong>65% of capacity in H2 2026, ~80% by mid-2027 and near-full capacity by end-2027</strong>. Full-year 2026 copper sales guidance was cut from 3.4 billion pounds (January) to <strong>~3.1 billion pounds</strong> (July), and gold from 0.8 million ounces to <strong>650 thousand ounces</strong>. The stock has nonetheless risen 65.5% over 52 weeks because the copper price move has more than offset the volume loss.</p>
+
+  <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Notable Executives &amp; Owners</div>
+  <div class="card-grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Kathleen L. Quirk</div>
+      <div class="card-note">President, CEO and Director. A three-decade Freeport veteran who served as Chief Financial Officer and later President before taking the CEO role, succeeding Richard Adkerson. She has led the Grasberg restart response, the leaching-innovation programme and the February 2026 Indonesian operating-rights extension.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Maree E. Robertson</div>
+      <div class="card-note">Executive Vice President and CFO. Oversees a balance sheet carrying $4.08B cash against $9.39B total debt (net debt of ~$2.07B excluding PT-FI downstream smelter financing), a ~$4.3B FY2026 capital programme, and the performance-based dividend framework.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">~80.8% Institutional</div>
+      <div class="card-note">No controlling holder. Largest reported positions include Vanguard Group (~$6.6B), Fisher Asset Management (~$3.2B) and State Street (~$3.2B); Wellington Management holds ~14.9M shares (1.04%) and Barrow Hanley ~10.0M shares (0.69%). Roughly 1,845 institutions have held the stock over the past two years.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Freeport reports six operating segments. The mix below uses <strong>Q1 2026 total segment revenue including intersegment sales</strong> ($8,148M gross, versus $6,234M consolidated after eliminations) — the cleanest available view of where activity sits. Note that intersegment flows are large: most North American mine output is sold internally to the U.S. Rod &amp; Refining business, and Indonesian concentrate increasingly goes to Freeport's own smelters rather than third parties. Indonesia's 13.2% share is <em>abnormally depressed</em> by the Grasberg outage; at full run-rate it is normally the single largest and by far the most profitable segment.</p>
+  <div class="seg-bar">
+    <div style="flex:27.0;background:#c87533;">N. AMERICA 27.0%</div>
+    <div style="flex:25.3;background:#3b82f6;">ROD &amp; REFINING 25.3%</div>
+    <div style="flex:20.1;background:#a78bfa;">S. AMERICA 20.1%</div>
+    <div style="flex:13.2;background:#f59e0b;">INDONESIA 13.2%</div>
+    <div style="flex:11.9;background:#6b7280;color:#fff;">ATLANTIC 11.9%</div>
+    <div style="flex:2.6;background:#475569;color:#fff;">MO 2.6%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#c87533;"></span>U.S. Copper Mines — $2,199M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span>U.S. Rod &amp; Refining — $2,062M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span>South America Mining — $1,634M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span>Indonesia Mining (PT-FI) — $1,072M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span>Atlantic Copper Smelting — $969M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#475569;"></span>Molybdenum Mines — $212M</div>
+  </div>
+
+  <div style="margin-top:28px;"></div>
+
+  <!-- Indonesia -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Indonesia Mining — Grasberg Minerals District (PT-FI)</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">CROWN JEWEL — IN RECOVERY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,072M</div><div class="biz-stat-label">Q1'26 Seg Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">82 Mlbs</div><div class="biz-stat-label">Q1'26 Cu Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">($3.53)/lb</div><div class="biz-stat-label">Unit Net Cash Cost</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Grasberg is the economic heart of Freeport. Gold and silver by-product credits are so large that PT-FI reports <strong>negative unit net cash costs</strong> — in Q1 2026 the segment produced copper at a net cash <em>credit</em> of $3.53 per pound, meaning by-products more than paid for the entire mining operation. That is close to unmatched anywhere in global copper. The district is now underground: the Grasberg Block Cave (GBC), Deep MLZ (DMLZ) and Big Gossan, with the Kucing Liar deposit in development (preliminary recoverable resource of <strong>8 billion pounds of copper and 8 million ounces of gold through 2041</strong>, ramping to ~750 Mlbs copper and ~735 koz gold per year at full capacity).<br><br>On <strong>September 8, 2025</strong> an external mud rush inundated GBC workings, killing workers and triggering a force majeure. DMLZ and Big Gossan restarted in October 2025; the GBC phased restart in Production Blocks 2 and 3 began in Q2 2026. Chute-system modifications for the automated ore trains cap near-term throughput at roughly 60–65% of design until mid-2027. Freeport booked <strong>$625M of idle-facility and recovery costs in 2025</strong> plus $118M of DD&amp;A and $81M of asset impairments, and a further <strong>$284M in Q2 2026</strong>; it has collected <strong>$700M of insurance proceeds</strong> against coverage of up to $1.0B. In February 2026 FCX signed an MOU with the Indonesian government for a <strong>life-of-resource extension of its IUPK operating licence beyond the prior 2041 expiry</strong>, keeping FCX at 48.76% through 2041 and ~37% thereafter, with government reimbursement at book value for pro-rata costs of investments benefiting the post-2041 period.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global copper mine supply ≈ 23 Mt/yr (est.); Grasberg is a top-3 copper-gold asset globally — Indonesian downstreaming rules require domestic smelting</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Codelco (Chile, state-owned)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">1.44 Mt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">#2</div><div class="comp-bubble-label">Global Rank</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Newmont / gold-copper peers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Cu Output</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Est. Rev</div></div><div><div class="comp-bubble-val">Gold credit</div><div class="comp-bubble-label">Cost Model</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- North America -->
+  <div class="biz-card" style="border-left: 3px solid #c87533;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Copper Mines</div>
+        <span class="biz-badge dominant">LARGEST U.S. COPPER PRODUCER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,199M</div><div class="biz-stat-label">Q1'26 Seg Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">327 Mlbs</div><div class="biz-stat-label">Q1'26 Cu Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$2.93/lb</div><div class="biz-stat-label">Unit Net Cash Cost</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">27.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Seven open-pit operations in Arizona and New Mexico, anchored by Morenci — the largest copper mine in North America. These are high-tonnage, low-grade porphyry deposits, so unit costs are the highest in the portfolio ($2.93/lb in Q1 2026 versus a $5.85/lb realised price). The strategic value is different from the cost curve: this is <em>domestic</em> copper in a market where Washington has declared copper a national-security material. Freeport's <span class="tip" title="Leaching: applying acid solution to previously mined waste rock and stockpiles to dissolve residual copper, then recovering it electrolytically">leaching</span> and recovery initiatives are the cheapest growth in the company — incremental production reached <strong>214 million pounds in 2025</strong>, exited the year at a ~240 Mlb annual run rate, contributed <strong>47 Mlbs in Q2 2026 alone</strong>, and are targeted at a <strong>300 Mlb annual run rate by end-2026</strong> with minimal incremental capital and low incremental cost. Longer term, brownfield expansion at Bagdad and a potential Safford/Lone Star expansion are the main U.S. growth options.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> U.S. refined copper consumption ≈ 1.6–1.8 Mt/yr (est.), of which roughly half is imported — the gap Section 232 policy is aimed at</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Rio Tinto (Kennecott, Resolution JV)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">735 kt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">$61.79B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">+15.0%</div><div class="comp-bubble-label">Rev Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">BHP (Escondida, Resolution JV)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">1.47 Mt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">$58.76B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">#1</div><div class="comp-bubble-label">Global Rank</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- South America -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">South America Mining — Cerro Verde (Peru) &amp; El Abra (Chile)</div>
+        <span class="biz-badge emerging">STABLE CASH GENERATOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,634M</div><div class="biz-stat-label">Q1'26 Seg Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">248 Mlbs</div><div class="biz-stat-label">Q1'26 Cu Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$2.38/lb</div><div class="biz-stat-label">Unit Net Cash Cost</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Cerro Verde in Peru is a large concentrator complex with substantial molybdenum by-product; El Abra in Chile is a leaching operation with a long-studied sulphide expansion that would materially extend mine life if sanctioned. Unit costs of $2.38/lb sit between Indonesia and North America. The segment's swing factors are Peruvian and Chilean tax and royalty policy, community relations and water availability — Chile's national copper output has been declining on grade depletion, a structural feature of the region that supports long-run copper prices even as it constrains volumes. A Peruvian tax audit for 2020 at Cerro Verde was resolved in 2025 with a <strong>$54M income-tax benefit</strong>.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Chile + Peru ≈ 38–40% of global mine supply (est.); Chilean output declining on falling ore grades</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Southern Copper (SCCO)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">953 kt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">$15.79B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">+32.8%</div><div class="comp-bubble-label">Rev Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Glencore</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">852 kt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">$304.6B</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">$90.3B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Anglo American</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">695 kt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">#9</div><div class="comp-bubble-label">Global Rank</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Downstream -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Downstream — U.S. Rod &amp; Refining + Atlantic Copper Smelting</div>
+        <span class="biz-badge" style="background:var(--blue-dim);color:var(--blue);">LOW-MARGIN, HIGH-THROUGHPUT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,031M</div><div class="biz-stat-label">Q1'26 Seg Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$2,052M</div><div class="biz-stat-label">Rod — Unaffil. Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$966M</div><div class="biz-stat-label">Atlantic — Unaffil.</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">37.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">U.S. Rod &amp; Refining converts cathode into copper rod for wire and cable customers; Atlantic Copper is Freeport's wholly owned smelter and refinery in Huelva, Spain. Together they represent 37.2% of gross segment revenue but a far smaller share of profit — smelting and rod fabrication earn a processing margin, not a mining margin, so this business inflates revenue and depresses consolidated <span class="tip" title="Gross margin: revenue minus cost of goods sold, divided by revenue">gross margin</span> optics relative to pure-play miners. It matters strategically: it gives Freeport physical presence in the U.S. delivery market, which is exactly where the Section 232 tariff-driven <span class="tip" title="COMEX is the US copper futures exchange; LME is the London Metal Exchange. A tariff on imports pushes the US price above the global price">COMEX–LME</span> premium is captured.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global copper smelting/refining ≈ 27 Mt/yr (est.); treatment and refining charges have been at historically depressed levels amid Chinese smelter overcapacity</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Aurubis (Europe)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Cu Output</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">Smelting</div><div class="comp-bubble-label">Model</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Chinese custom smelters (aggregate)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~50%</div><div class="comp-bubble-label">Global Share (est.)</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Rev</div></div><div><div class="comp-bubble-val">Overcapacity</div><div class="comp-bubble-label">Dynamic</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- Molybdenum -->
+  <div class="biz-card" style="border-left: 3px solid #475569;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Molybdenum Mines — Henderson &amp; Climax (Colorado)</div>
+        <span class="biz-badge growth">SMALL BUT HIGHLY LEVERAGED TO PRICE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$212M</div><div class="biz-stat-label">Q1'26 Seg Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">83 Mlbs</div><div class="biz-stat-label">FY25 Mo Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$28.75/lb</div><div class="biz-stat-label">Q2'26 Realised</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Two primary molybdenum mines plus by-product moly from the copper operations. Total FCX molybdenum sales were <strong>83 million pounds in 2025</strong>, guided to <strong>93 million pounds in 2026</strong>. The realised molybdenum price jumped to <strong>$28.75/lb in Q2 2026 from $21.10/lb a year earlier</strong> (+36%), and 2026 cost guidance was set assuming only $20/lb for H1 and $30/lb for H2 — moly is a small revenue line with an outsized effect on by-product credits and therefore on reported unit net cash costs.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global molybdenum ≈ 600 kt/yr (est.); demand driven by steel alloys, pipelines and energy infrastructure</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Codelco (by-product moly)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Mo Output</div></div><div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">By-product</div><div class="comp-bubble-label">Model</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CMOC Group</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">741 kt</div><div class="comp-bubble-label">2025 Cu Output</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Rev TTM</div></div><div><div class="comp-bubble-val">#7</div><div class="comp-bubble-label">Global Cu Rank</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">GRASBERG ORE BODY</span>
+    <span class="moat-pill">NEGATIVE-COST GOLD CREDITS</span>
+    <span class="moat-pill">LIFE-OF-RESOURCE IUPK</span>
+    <span class="moat-pill">LARGEST U.S. COPPER PRODUCER</span>
+    <span class="moat-pill">DECADES-LONG RESERVE LIFE</span>
+    <span class="moat-pill">LEACHING TECHNOLOGY EDGE</span>
+    <span class="moat-pill">INTEGRATED SMELTING</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">Freeport's moat is geological before it is operational. Tier-one copper deposits cannot be manufactured, permitted quickly, or replicated: a new greenfield copper mine typically takes 15–20 years from discovery to first production, and global average ore grades have been falling for decades. Grasberg is the extreme version of this — a copper-gold system so rich in precious-metal by-products that PT-FI's <span class="tip" title="Unit net cash cost: the cash cost of producing one pound of copper after subtracting revenue from by-products such as gold, silver and molybdenum">unit net cash cost</span> was <em>negative $3.53 per pound</em> in Q1 2026. When by-products pay for the mine, the asset generates cash across essentially the entire copper cycle, which is the definition of a low-cost-curve position. The February 2026 life-of-resource IUPK extension removes the single largest overhang on that asset by pushing operating rights past the prior 2041 expiry, at the price of FCX's stake stepping down from 48.76% to roughly 37% after 2041 (with government reimbursement of pro-rata costs at book value for post-2041 investments). Layered on top: an irreplaceable U.S. footprint at a moment when Washington treats copper as strategic, and a proprietary leaching programme that is adding 200–300 million pounds a year of copper from already-mined material at minimal capital cost — economics no greenfield project can match.</p>
+  <div style="margin-top:28px;">
+    <p class="prose"><strong>Single-asset and single-country concentration.</strong> Grasberg is simultaneously the moat and the vulnerability. The September 2025 mud rush removed a large share of the company's highest-margin volume in one event, cut FY2026 copper guidance from 3.4B to 3.1B pounds and gold from 800koz to 650koz, and produced $824M of 2025 charges plus $284M more in Q2 2026. Indonesia also imposes export duties, domestic-smelting mandates and a divestment schedule; policy there is negotiated, not contractual in the Western sense.</p>
+    <p class="prose" style="margin-top:14px;"><strong>Pure commodity price-taking.</strong> Freeport has no pricing power whatsoever. Realised copper moved from $4.75/lb (FY2025) to $6.17/lb (Q2 2026) and the entire earnings picture changed with it — adjusted EPS went from $0.47 in Q4 2025 to $0.74 in Q2 2026 on <em>lower</em> volumes. The same leverage runs in reverse. Roughly every $0.10/lb change in copper is worth on the order of several hundred million dollars of annualised operating cash flow at ~3.1–3.5B pounds of sales.</p>
+    <p class="prose" style="margin-top:14px;"><strong>Cost inflation and grade decline.</strong> North American unit net cash costs of $2.93/lb are far above the Indonesian and South American operations and above the global cost-curve midpoint. Consolidated unit costs are guided at ~$1.90/lb for 2026 versus $1.65/lb actual in 2025 and $1.75/lb originally guided — the deterioration is driven by lost Grasberg by-product credits and idle-facility costs. If copper mean-reverts while costs stay sticky, margin compression is fast.</p>
+    <p class="prose" style="margin-top:14px;"><strong>Policy and tariff dependence.</strong> The Section 232 regime currently applies a 50% duty to semi-finished and derivative copper products while <em>deferring</em> tariffs on refined cathode, with a Commerce review contemplating 15% by 2027 and 30% by 2028. Traders price only a 14.6% probability of the 15% refined tariff by January 2027 and 37% for a 30% tariff by January 2028. Any change — in either direction — moves the COMEX–LME spread and the U.S. realised price without Freeport doing anything.</p>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose"><strong>Read this table with the cycle in mind.</strong> Freeport is a commodity cyclical: reported earnings are a function of the copper price, not of management execution, and the classic trap is that a miner looks <em>expensive</em> on trailing <span class="tip" title="Price-to-Earnings ratio: share price divided by earnings per share">P/E</span> at the bottom of the cycle (depressed earnings) and <em>cheap</em> at the top (peak earnings). FCX's 33.9x trailing P/E is on <span class="tip" title="Trailing Twelve Months: the most recent four reported quarters">TTM</span> earnings that still carry Grasberg outage charges and only partial benefit from record copper. The 20.5x forward multiple and 0.64 <span class="tip" title="Price/Earnings-to-Growth: P/E divided by the expected earnings growth rate; below 1.0 is conventionally considered cheap">PEG</span> reflect consensus EPS of $3.00 for 2026 and $4.12 for 2027. <strong>Mid-cycle framing:</strong> at ~3.5–4.0 billion pounds of normalised copper sales, a mid-cycle copper price nearer $4.50–$5.00/lb and unit costs around $1.75–$2.00/lb, normalised EPS is plausibly in the $2.00–$2.75 range — implying a mid-cycle multiple in the high-20s at today's price. On <span class="tip" title="Enterprise Value divided by EBITDA: a capital-structure-neutral valuation multiple common in mining">EV/EBITDA</span> the stock trades at 11.0x, well above the 5–7x range typically paid for diversified miners at mid-cycle. In short: today's price already embeds both a copper price near all-time highs and a successful Grasberg recovery.</p>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>FCX</th><th>Copper Mining Avg (est.)</th><th>S&amp;P 500 (est.)</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings ratio: share price divided by trailing twelve-month earnings per share">P/E</span></td><td style="color:var(--red);">33.86</td><td>~23x</td><td>~28x</td><td>Expensive vs both — but TTM earnings are depressed by Grasberg outage charges. Cycle-distorted; do not read literally.</td></tr>
+      <tr><td>Forward <span class="tip" title="Forward P/E: share price divided by estimated forward-year earnings per share">P/E</span></td><td style="color:var(--amber);">20.48</td><td>~18x</td><td>~22x</td><td>Cheaper than the index, richer than mining peers. Assumes consensus 2026 EPS of $3.00 (+69.6%).</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: P/E divided by expected earnings growth; under 1.0 conventionally signals growth is under-priced">PEG</span> Ratio</td><td style="color:var(--green);">0.64</td><td>~0.9</td><td>~2.2</td><td>Flatters FCX — the "growth" is copper-price recovery plus Grasberg restart, not durable compounding.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the trailing twelve months">EPS (TTM)</span></td><td>$2.04</td><td>—</td><td>—</td><td>FY2025 was $1.52 ($1.77 adjusted). Consensus: $3.00 (2026E), $4.12 (2027E).</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year: this period versus the same period a year earlier">YoY</span>)</td><td style="color:var(--red);">+0.19% TTM</td><td>~+15%</td><td>~+7%</td><td>Flat because record prices offset Grasberg volume loss. FY2025 +1.8%; consensus +13.9% for 2026.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue less cost of goods sold, divided by revenue">Gross Margin</span></td><td style="color:var(--green);">38.28%</td><td>~32%</td><td>~35%</td><td>Better than both, but structurally diluted by low-margin rod/refining and Atlantic Copper throughput.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income divided by revenue">Net Profit Margin</span></td><td style="color:var(--red);">11.38%</td><td>~20%</td><td>~13%</td><td>Below both. Drag from outage charges, 31.1% effective tax rate and large non-controlling interests at PT-FI/Cerro Verde.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--red);">0.90%</td><td>~2.5%</td><td>~1.2%</td><td>$0.60/yr ($0.15/qtr), 29.4% payout. Performance-based framework: base plus variable component tied to cash flow.</td></tr>
+      <tr><td><span class="tip" title="Short interest: shares sold short as a percentage of shares outstanding — a gauge of bearish positioning">Short Interest</span></td><td style="color:var(--green);">1.94%</td><td>~2.5%</td><td>~2.0%</td><td>27.79M shares short. Low — bears are not pressing despite the operational disruption.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td><td style="color:var(--green);">0.32</td><td>~0.4</td><td>~1.0</td><td>Conservative for a miner. $9.39B gross debt, ~$2.07B net excluding PT-FI downstream smelter financing.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities — a short-term liquidity measure">Current Ratio</span></td><td style="color:var(--green);">2.07</td><td>~1.8</td><td>~1.2</td><td>Ample liquidity; quick ratio of 0.79 reflects large concentrate and in-process inventories.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditures">Free Cash Flow</span></td><td style="color:var(--amber);">$1.76B</td><td>—</td><td>—</td><td>OCF $5.90B less a heavy ~$4.3B capex programme. FCF is capex-suppressed, not cash-generation-suppressed.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--amber);">14.75%</td><td>~16%</td><td>~19%</td><td>Below both on cycle-depressed earnings; would screen far better on normalised Grasberg volumes.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by total invested capital">ROIC</span></td><td style="color:var(--green);">12.68%</td><td>~11%</td><td>~11%</td><td>Edges both — respectable given ~$4.5B of annual capital being sunk into projects not yet producing.</td></tr>
+      <tr><td><span class="tip" title="Beta: sensitivity of the stock to broad market moves; 1.0 equals the market">Beta</span> (5Y)</td><td style="color:var(--red);">1.38</td><td>~1.2</td><td>1.00</td><td>High-beta by construction. Behaves like a levered call on Chinese/global industrial activity.</td></tr>
+      <tr><td>52-Week Range</td><td>$35.15 – $72.28</td><td>—</td><td>—</td><td>+65.5% over 52 weeks; trading within 4.4% of the 52-week high. The range itself is the volatility story.</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;">Notable One-Off Items</div>
+    <p class="prose" style="margin-top:10px;">FCX's reported results carry unusually large non-recurring distortions right now, and <span class="tip" title="Generally Accepted Accounting Principles: standardised US financial reporting rules">GAAP</span> earnings materially understate underlying economics:</p>
+    <p class="prose" style="margin-top:12px;"><strong>Grasberg incident charges.</strong> FY2025 absorbed <strong>$625M of idle-facility and direct recovery costs</strong> in production expense, plus <strong>$118M of DD&amp;A</strong> and <strong>$81M of asset impairments</strong> — roughly $824M in total, all excluded from adjusted results. Q2 2026 added a further <strong>$284M</strong> of restoration cost. These should fade as the block cave ramps, but at 60–65% capacity through 2026 they will not disappear this year.</p>
+    <p class="prose" style="margin-top:12px;"><strong>Insurance recoveries.</strong> Freeport carries up to <strong>$1.0B of coverage</strong> (a $0.7B underground sub-limit after a $0.5B deductible) and <strong>collected $700M of insurance settlement proceeds in Q2 2026</strong>, recorded as a gain. This is a genuine cash inflow but a one-time item — do not extrapolate it into run-rate cash flow.</p>
+    <p class="prose" style="margin-top:12px;"><strong>Indonesian export duties and tax settlements.</strong> Export duties, which had run at <strong>$0.26/lb</strong> of copper in the prior year, were <strong>nil in Q4 2025</strong> as PT-FI's own smelting capacity came online — a structural cost reduction as long as domestic downstreaming holds. Separately, resolution of the <strong>Cerro Verde 2020 Peruvian tax audit produced a $54M income-tax benefit</strong>, and PT-FI's 2020/2021 Indonesian audits produced net credits (81% attributable to FCX under the shareholder agreement, with $12M of pre-tax credits flowing through Q2 2026).</p>
+    <p class="prose" style="margin-top:12px;"><strong>Smelter start-up costs.</strong> The Manyar smelter in Eastern Java produced its first copper cathode in July 2025 and the associated precious-metals refinery started in December 2024; PT Smelting at Gresik was temporarily suspended in Q4 2025 and restarted in late December 2025. Start-up and reduced-rate running costs have weighed on Indonesian unit economics and will persist until concentrate feed normalises in H2 2026 and beyond.</p>
+    <p class="prose" style="margin-top:12px;"><strong>Legacy liabilities.</strong> FY2025 also carried <strong>$118M of charges</strong> for impairments and abandonment obligations on legacy oil and gas properties — small, but a reminder that Freeport still carries non-mining legacy exposure from its 2013–2016 energy detour.</p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">BUY</div><div class="card-note">Based on 23 covering analysts</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$71.73</div><div class="card-note" style="color:var(--green);">+3.82% vs $69.09 — median target $75.00 (+8.55%)</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$30 – $82</div><div class="card-note">−56.6% to +18.7%. The $30 low is a severe outlier and drags the mean well below the median.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">19 / 3 / 1</div><div class="card-note">Buy-side (13 Strong Buy + 6 Buy) / Hold 3 / Sell-side 1 (Strong Sell)</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:13;background:#16a34a;"></div>
+    <div style="flex:6;background:var(--green);"></div>
+    <div style="flex:3;background:var(--amber);"></div>
+    <div style="flex:0.01;background:var(--red);"></div>
+    <div style="flex:1;background:#b91c1c;"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:8px;">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#16a34a;"></span>Strong Buy (13)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span>Buy (6)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span>Hold (3)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span>Sell (0)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#b91c1c;"></span>Strong Sell (1)</div>
+  </div>
+  <p class="prose" style="margin-top:10px;">The distribution is bullish but the <em>average</em> target implies only 3.8% upside — because a $30 outlier drags the mean down. The median of $75 is the more representative number, and the cluster of post-Q2 targets sits at $70–$82. Note the tension: analysts are overwhelmingly positive on the business while the stock is already within 4.4% of its 52-week high with copper at a record. Consensus modelling assumes 2026 revenue of $29.52B (+13.9%) and EPS of $3.00 (+69.6%), then 2027 revenue of $35.54B (+20.4%) and EPS of $4.12 (+37.4%) — those 2027 numbers require the Grasberg ramp to land on schedule.</p>
+
+  <div style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;">Key Recent Analyst Calls</div>
+  <div style="margin-top:14px;">
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);font-size:18px;line-height:1.2;">•</span><div style="font-size:14px;color:var(--text-muted);"><strong style="color:#fff;">Barclays</strong> — Jul 27, 2026 · Maintains <strong style="color:var(--green);">Overweight</strong>, price target raised to <span style="font-family:'JetBrains Mono',monospace;color:var(--green);font-weight:600;">$82</span> from $80 (its second raise in eleven days, from $80 on Jul 16). The street's high mark. The bull thesis rests on the copper price environment plus a Grasberg ramp that restores Freeport's highest-margin pounds.</div></div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);font-size:18px;line-height:1.2;">•</span><div style="font-size:14px;color:var(--text-muted);"><strong style="color:#fff;">JPMorgan</strong> — Jul 9, 2026 · Maintains <strong style="color:var(--green);">Overweight</strong>, price target <span style="font-family:'JetBrains Mono',monospace;color:var(--green);font-weight:600;">$77</span>. Constructive ahead of Q2 results, consistent with a house view that structurally tight copper supply supports higher-for-longer prices.</div></div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);font-size:18px;line-height:1.2;">•</span><div style="font-size:14px;color:var(--text-muted);"><strong style="color:#fff;">Goldman Sachs</strong> — Jul 9, 2026 · Maintains <strong style="color:var(--green);">Buy</strong>, price target <span style="font-family:'JetBrains Mono',monospace;color:var(--green);font-weight:600;">$74</span>. Modest implied upside from the current price — a "right company, mostly priced" stance.</div></div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);font-size:18px;line-height:1.2;">•</span><div style="font-size:14px;color:var(--text-muted);"><strong style="color:#fff;">RBC Capital Markets</strong> — Jul 24, 2026 · Maintains <strong style="color:var(--amber);">Sector Perform</strong>, price target raised to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);font-weight:600;">$73</span> from $70. The considered neutral: acknowledges the beat but sees limited relative upside with execution risk still live at Grasberg.</div></div>
+    <div style="display:flex;gap:12px;padding:12px 0;"><span style="color:var(--green);font-size:18px;line-height:1.2;">•</span><div style="font-size:14px;color:var(--text-muted);"><strong style="color:#fff;">Wells Fargo</strong> — Jul 24, 2026 · Maintains <strong style="color:var(--green);">Overweight</strong>, price target raised to <span style="font-family:'JetBrains Mono',monospace;color:var(--green);font-weight:600;">$70</span> from $68 — a bullish rating with a target essentially at the market, which is itself a statement about how far the shares have already run.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026<br>(est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings — First Full Quarter of Grasberg Block Cave Restart</div>
+        <div class="tl-desc">The single most important scheduled event. Q3 is the first quarter with meaningful GBC contribution and the first real test of the "~65% of capacity in H2 2026" commitment. Watch three numbers: Indonesian copper sales versus the ~3.1 billion pound full-year plan, consolidated unit net cash costs against the ~$1.90/lb guide, and whether idle-facility charges are shrinking. Any slip in the ramp forces 2027 consensus EPS of $4.12 lower.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Copper Price and Exchange Inventories</div>
+        <div class="tl-desc">Copper set an all-time high of $6.83/lb in August 2026 and trades at $6.46/lb. Freeport's 2026 operating cash flow guide of ~$8.3B assumes $6.00/lb for H2 — so spot is currently running <em>above</em> plan. The counterweight: LME inventories rose 20,000 tonnes in a single day in mid-August, the largest daily build since April, easing the squeeze and triggering profit-taking. Inventory direction is the highest-frequency signal for the stock.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026 – 2028</div>
+      <div class="tl-content">
+        <div class="tl-title">Section 232 Commerce Review of Refined Copper Tariffs</div>
+        <div class="tl-desc">The current regime imposes a 50% duty on semi-finished and derivative copper products but defers tariffs on refined cathode. A Commerce Department review contemplates 15% by 2027 and 30% by 2028; futures markets imply only a 14.6% probability of the 15% tariff by January 2027 and 37% for 30% by January 2028. As the largest U.S. copper producer with domestic rod and refining assets, Freeport is the most direct listed beneficiary of any refined-metal tariff — and copper has "effectively become a policy-driven asset."</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">PT-FI Smelter Feed Restart and Leaching Run-Rate Target</div>
+        <div class="tl-desc">Concentrate shipments to PT-FI's own Manyar smelter are expected to recommence in H2 2026, though at a reduced rate constrained by available concentrate; PT Smelting at Gresik is already at capacity. Separately, Freeport targets a <strong>300 million pound annual run rate</strong> from leaching and recovery innovation by end-2026, versus 214 million pounds achieved in 2025 and 47 million pounds in Q2 2026 alone. This is the company's cheapest incremental copper and requires no new permits.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 Results — Beat on Price, Miss on Volume</div>
+        <div class="tl-desc">Revenue of $7.03B beat the $6.76B consensus; adjusted EPS of $0.74 crushed the $0.59 estimate. But copper sales fell to 710 million pounds from 1.02 billion a year earlier and gold to 123koz, and full-year guidance was cut to ~3.1B lbs copper / 650koz gold with unit costs raised to ~$1.90/lb. Shares fell 2.3% on the day. The market read it correctly: record prices are masking a real volume hole.</div>
+        <div class="tl-impact down">Reaction already happened: −2.3%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 18, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Life-of-Resource Extension of Grasberg Operating Rights</div>
+        <div class="tl-desc">FCX signed an MOU with the Indonesian government to amend PT-FI's IUPK special mining licence for the life of the resource, replacing the prior 2041 expiry. FCX retains 48.76% through 2041, then transfers a 12% interest at no cost, leaving ~37% thereafter, with government reimbursement at book value for pro-rata costs of investments benefiting the post-2041 period. Commitments include expanded community healthcare and increased exploration spending. Still subject to issuance of the amended IUPK.</div>
+        <div class="tl-impact up">Reaction already happened: shares peaked at $67.77 that month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026 – 2030</div>
+      <div class="tl-content">
+        <div class="tl-title">Electrification, Grid Buildout and AI Data-Center Power Demand</div>
+        <div class="tl-desc">The structural demand argument: electric vehicles, charging infrastructure, energy storage, transmission rebuild and — increasingly — data-center electrical infrastructure all consume copper intensively, while global mine supply growth is constrained by grade decline and 15–20 year development lead times. Chile's output is expected to fall again this year. This is the reason copper multiples have re-rated; it is also the reason a cyclical de-rating would be painful if the demand story disappoints.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">FCX Monthly Closes — Sep 2021 to Aug 2026</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Dividend-adjusted monthly closing prices. Moving averages computed on monthly data.</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF AUG 19, 2026</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin:14px 0 18px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:18px;height:3px;background:#c87533;display:inline-block;border-radius:2px;"></span>Price</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:18px;height:0;border-top:2px dashed #f59e0b;display:inline-block;"></span>20-Day MA (1-mo)</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:18px;height:0;border-top:2px dashed #3b82f6;display:inline-block;"></span>50-Day MA (3-mo)</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:18px;height:0;border-top:2px dashed #ef4444;display:inline-block;"></span>200-Day MA (10-mo)</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:9px;height:9px;background:#fff;border-radius:50%;display:inline-block;"></span>Key events</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;max-width:640px;">In plain English: RSI measures how much of the recent price movement has been upward versus downward. Above 70 means the stock has run hard and may be stretched; below 30 means it has been sold off hard and may be washed out. It is a momentum gauge, not a valuation tool.</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ AS OF AUG 19, 2026</div>
+    </div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Five-year trajectory.</strong> On a dividend-adjusted basis FCX closed September 2021 at $30.36 and August 2026 at $69.09 — a <strong>total return of roughly +128%</strong>, or about <strong>+17.9% annualised</strong>. Over the identical window the S&amp;P 500 (SPY, dividend-adjusted) went from $402.36 to $769.98, a total return of about <strong>+91%</strong> (~+13.8% annualised). Freeport therefore beat the index by roughly 37 percentage points cumulatively — but almost the entire margin of outperformance was generated in the last eight months. As recently as April 2025 the stock traded at $35.53, essentially flat against its September 2021 level after three and a half years, while the index had compounded steadily. That is the defining characteristic of a commodity cyclical: long flat stretches punctuated by violent repricing. Year to date in 2026 FCX is <strong>+37.0%</strong> (from a December 2025 close of $50.43) versus <strong>+13.5%</strong> for the S&amp;P 500.</p>
+
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Mar 2022</div><div class="tl-content"><div class="tl-title">Post-Invasion Commodity Spike — $46.68</div><div class="tl-desc">Russia's invasion of Ukraine sent every industrial commodity vertical. FCX peaked at a monthly close of $46.68, up 54% in three months from December 2021.</div><div class="tl-impact up">+54% from Dec '21</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Cycle Low — $25.88</div><div class="tl-desc">Aggressive Federal Reserve tightening, a surging dollar and Chinese property weakness crushed copper. The stock fell 45% from the March high in six months — the five-year trough.</div><div class="tl-impact down">−45% from Mar '22</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2024</div><div class="tl-content"><div class="tl-title">COMEX Squeeze Peak — $51.26</div><div class="tl-desc">A short squeeze on COMEX copper drove futures to then-records and FCX to $51.26. The move faded quickly; by December 2024 the stock was back to $37.24.</div><div class="tl-impact up">+40% off Feb '24 low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2025</div><div class="tl-content"><div class="tl-title">Tariff-Shock Trough — $35.53</div><div class="tl-desc">Broad tariff announcements and global growth fears took FCX to $35.53, near the 52-week low of $35.15. Three and a half years of zero price return from the September 2021 level.</div><div class="tl-impact down">Round-trip to 2021 levels</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2025</div><div class="tl-content"><div class="tl-title">Grasberg Mud Rush and Force Majeure — $38.80</div><div class="tl-desc">The September 8 incident at the Grasberg Block Cave killed workers, triggered force majeure and removed the company's highest-margin volume. The monthly close fell 11.7% from August. Remarkably, this marked the <em>bottom</em>: a mine outage at the world's third-largest copper producer became a bullish catalyst for the copper price itself.</div><div class="tl-impact down">−11.7% month-on-month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025 – Feb 2026</div><div class="tl-content"><div class="tl-title">Re-Rating on Copper Squeeze and IUPK Deal — $50.43 → $67.77</div><div class="tl-desc">Copper tightened sharply on the Grasberg supply loss and tariff-driven U.S. stockpiling, then the February 18 life-of-resource agreement removed the Indonesian licence overhang. The stock gained 34% in two months.</div><div class="tl-impact up">+34% over two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar – Apr 2026</div><div class="tl-content"><div class="tl-title">Consolidation — $58.51 / $57.64</div><div class="tl-desc">A 15% pullback from the February high as the market digested the guidance reset and the pace of the Grasberg restart. Healthy consolidation rather than trend break; the 10-month moving average held.</div><div class="tl-impact neutral">−15% pullback, trend intact</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Record Copper, New Highs — $69.09</div><div class="tl-desc">Copper printed an all-time high of $6.83/lb and FCX reached a 52-week high of $72.28, closing August 19 at $69.09 after a +4.18% session. The stock sits above all three moving averages with monthly RSI in stretched territory.</div><div class="tl-impact up">+65.5% over 52 weeks</div></div></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Against copper-mining peers the picture is mixed rather than dominant. Southern Copper is up far more over the past year (market cap +113.2%, revenue +32.8%), which makes sense — SCCO had no Grasberg outage and captured the full price move on full volumes. Rio Tinto's market cap is up 71.7% and BHP has just posted its highest dividend in four years on strong copper prices and record iron ore. Freeport's 65.5% 52-week gain is therefore roughly in line with the sector, not ahead of it: the company traded the operational disruption against the price windfall and came out approximately where the group did. Against the S&amp;P 500 the five-year outperformance (+128% versus +91%) is real but was earned entirely in 2026; investors who owned FCX for diversification through 2022–2025 endured three years of underperformance with far higher volatility (beta 1.38) to get it.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Freeport owns irreplaceable tier-one copper assets into a structural supply deficit: electrification, grid rebuild and data-center power demand are growing copper consumption while global grades decline and new mines take 15–20 years. Grasberg's negative unit net cash cost of $3.53/lb is close to unique, and the February 2026 life-of-resource IUPK extension removed the biggest single overhang on it. The restart to ~80% by mid-2027 and full capacity by end-2027 restores roughly 900 million pounds of the highest-margin copper in the portfolio just as prices sit at records — consensus sees EPS going from $2.04 TTM to $3.00 (2026E) to $4.12 (2027E). Add 300 million pounds a year of near-zero-capital leaching copper, a 0.32 debt-to-equity ratio, and the strongest domestic position in a market where Washington may yet tariff refined copper imports.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are buying a price-taking cyclical at a 52-week high, 4.4% off the peak, with copper at an all-time record and a 33.9x trailing / 11.0x EV-EBITDA multiple — well above the 5–7x diversified miners typically fetch mid-cycle. The average analyst target of $71.73 implies only 3.8% upside. Volumes are still impaired: FY2026 copper guidance was cut from 3.4B to 3.1B pounds and gold from 800koz to 650koz, unit costs raised from $1.75 to ~$1.90/lb, and the block cave is chute-constrained to ~60–65% until mid-2027. Q2's $700M insurance gain will not repeat. Meanwhile LME inventories are rebuilding, the refined-copper tariff the market is partly hoping for carries only a 14.6% market-implied probability by January 2027, and free cash flow of $1.76B against a $4.3B capex programme leaves little cushion if copper mean-reverts toward $4.50/lb.</p>
+    </div>
+  </div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Copper price reversion.</strong> Every dollar of Freeport's earnings leverage runs through a price it does not control. Copper at $6.46/lb versus an FY2025 realised $4.75/lb is doing all the work; a reversion toward mid-cycle would compress EPS faster than the Grasberg ramp can offset, and the current multiple assumes no such reversion.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Grasberg execution and further disruption.</strong> The block cave restart is chute-constrained, the ramp schedule runs 18 more months, and the same geotechnical conditions that produced the September 2025 mud rush have not gone away. Another incident, or a slip to the 80%-by-mid-2027 milestone, would break the 2027 consensus EPS of $4.12 and re-open the volume hole.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Indonesian and Latin American policy risk.</strong> PT-FI operates on a negotiated licence in a jurisdiction that mandates domestic smelting, levies export duties (previously $0.26/lb) and has a divestment path taking FCX to ~37% post-2041; the amended IUPK is still pending issuance. Peruvian and Chilean tax, royalty, water and community risk compound it. Roughly two-thirds of Freeport's copper sits outside the United States.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Electrification, Grids and AI Power Demand</div>
+        <span class="biz-badge growth">EMERGING TAILWIND</span>
+      </div>
+      <div style="font-size:14px;color:var(--text-muted);line-height:1.7;">Copper reached an all-time high of <strong>$6.83/lb in August 2026</strong> and trades at $6.46/lb — versus Freeport's FY2025 realised price of $4.75/lb, a 36% uplift. The demand narrative has broadened beyond electric vehicles and charging infrastructure to transmission and distribution rebuild and, most recently, the electrical infrastructure required by AI data centers. Copper intensity per unit of new electricity capacity is materially higher than in the fossil era. Freeport is the purest large-cap U.S. listed expression of this: 3.1 billion pounds of guided 2026 sales, with essentially no non-copper diversification to dilute the exposure — unlike BHP (iron ore) or Glencore (energy and trading).</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Mine Supply Constraint and Grade Decline</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div style="font-size:14px;color:var(--text-muted);line-height:1.7;">The supply side is the tighter half of the equation. Chile — the world's largest producer — is expected to see output <em>decline</em> again this year on disruptions and falling ore grades. The top ten producers accounted for roughly 9.4 million tonnes of 2025 attributable output (BHP 1.47Mt, Codelco 1.44Mt, Freeport 1.08Mt, Southern Copper 953kt, Zijin 886kt, Glencore 852kt, CMOC 741kt, Rio Tinto 735kt, Anglo American 695kt, KGHM 592kt) against global mine supply of roughly 23 Mt (est.). Grasberg's own outage removed a meaningful slice of that in 2025–26 and was itself a driver of the price spike. New greenfield copper takes 15–20 years from discovery to production, so supply cannot respond to price on any investable horizon — which is precisely why Freeport's leaching programme (214 Mlbs in 2025, targeting a 300 Mlb run rate by end-2026 from already-mined material) is strategically valuable out of proportion to its size.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Tariffs, Trade Policy and the COMEX–LME Spread</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div style="font-size:14px;color:var(--text-muted);line-height:1.7;">Section 232 currently imposes a <strong>50% duty on semi-finished and derivative copper products while deferring tariffs on refined cathode</strong>; a Commerce review contemplates 15% by 2027 and 30% by 2028. Market-implied probabilities are only <strong>14.6% for a 15% refined tariff by January 2027</strong> and 37% for 30% by January 2028. The consequence is that copper "has effectively become a policy-driven asset": the COMEX–LME spread, historically a ~$33/tonne premium, now swings on tariff expectations and pulls physical metal from London to U.S. warehouses. <strong>Bull implication:</strong> Freeport is the largest U.S. producer with domestic rod and refining assets, so a refined-metal tariff would flow almost directly into its realised price with no cost offset. <strong>Bear implication:</strong> the same policy sensitivity means the U.S. premium can vanish overnight on a headline, and tariff-driven stockpiling has pulled forward demand that will have to be worked off — LME inventories rose 20,000 tonnes in a single mid-August day, the largest build since April, and prices immediately gave ground.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 19–20, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Sources: Freeport-McMoRan fourth-quarter and year-ended 2025 earnings release and first-quarter 2026 earnings release (investors.fcx.com / q4cdn); Freeport second-quarter 2026 results as reported via SEC Form 8-K; Freeport company press releases including the February 18, 2026 Grasberg operating-rights MOU; StockAnalysis.com (quote, statistics, annual and quarterly financials, analyst forecast, company profile — Sector: Materials, Industry: Copper); CompaniesMarketCap (global market-cap rank #252); Benzinga (analyst ratings); MarketBeat (institutional ownership); Digrin (dividend-adjusted monthly closing prices for FCX and SPY); Trading Economics (copper spot price, August 20, 2026); Investing News Network (2025 top copper-producer attributable output); Tradingpedia (Section 232 tariff structure and COMEX–LME spread analytics).</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Figures marked "(est.)" are estimates and are labelled as such: U.S. and NYSE market-cap ranks, the Copper Mining Average and S&amp;P 500 Average columns in Section 04, all Industry Size / TAM figures, global copper mine supply, and the next-earnings date. Copper Mining Average values are approximations derived from the verified peer set (BHP, Rio Tinto, Southern Copper, Glencore) and should not be treated as a published index. Competitor revenue, market cap and production figures are as reported by the sources named above and may be measured on different bases (attributable versus consolidated output; fiscal versus calendar year). Codelco is state-owned and has no market capitalisation. Where a figure could not be verified from a live source it has been omitted or shown as "—".</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This document is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. Commodity producers carry elevated price, operational, geopolitical and environmental risk; past performance is not indicative of future results. Verify all figures against primary filings before making any investment decision. The author may hold positions in securities mentioned.</p>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// STATIC DATA — FCX monthly dividend-adjusted closes
+// Source: Digrin. Sep 2021 – Aug 2026 (60 observations).
+// Final point set to the Aug 19, 2026 close of $69.09.
+// DATA IS STATIC AS OF AUG 19, 2026 — NO LIVE API.
+// ============================================================
+const labels = [
+  'Sep 21','Oct 21','Nov 21','Dec 21',
+  'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+  'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+  'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+const prices = [
+  30.36, 35.28, 34.68, 39.03,
+  34.93, 44.06, 46.68, 38.17, 36.79, 27.54, 29.87, 28.02, 25.88, 30.16, 37.88, 36.16,
+  42.61, 39.12, 39.06, 36.33, 32.91, 38.34, 42.95, 38.39, 35.87, 32.63, 36.04, 41.12,
+  38.47, 36.65, 45.58, 48.55, 51.26, 47.25, 44.28, 43.18, 48.68, 44.03, 43.23, 37.24,
+  35.20, 36.24, 37.17, 35.53, 37.95, 42.75, 39.81, 43.93, 38.80, 41.40, 42.68, 50.43,
+  59.95, 67.77, 58.51, 57.64, 65.55, 62.74, 62.63, 69.09
+];
+
+// Simple moving average helper (window in months)
+function sma(arr, window) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let sum = 0;
+    for (let j = i - window + 1; j <= i; j++) sum += arr[j];
+    out.push(+(sum / window).toFixed(2));
+  }
+  return out;
+}
+
+// 6-period RSI on monthly data
+function computeRSI(arr, period) {
+  const out = new Array(arr.length).fill(null);
+  if (arr.length <= period) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = arr[i] - arr[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  for (let i = period + 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  }
+  return out;
+}
+
+const ma20  = sma(prices, 1);   // ~20-day  ≈ 1 month
+const ma50  = sma(prices, 3);   // ~50-day  ≈ 3 months
+const ma200 = sma(prices, 10);  // ~200-day ≈ 10 months
+const rsi   = computeRSI(prices, 6);
+
+// Annotated inflection points
+const events = [
+  { idx: 6,  label: "Mar '22 — Post-invasion commodity spike, $46.68", color: '#22c55e' },
+  { idx: 12, label: "Sep '22 — 5-year cycle low, $25.88 (Fed tightening)", color: '#ef4444' },
+  { idx: 32, label: "May '24 — COMEX copper squeeze peak, $51.26", color: '#22c55e' },
+  { idx: 43, label: "Apr '25 — Tariff-shock trough, $35.53", color: '#ef4444' },
+  { idx: 48, label: "Sep '25 — Grasberg mud rush / force majeure, $38.80", color: '#ef4444' },
+  { idx: 53, label: "Feb '26 — Life-of-resource IUPK agreement, $67.77", color: '#22c55e' },
+  { idx: 59, label: "Aug '26 — Copper record $6.83/lb; FCX $69.09", color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const pointRadii  = prices.map((_, i) => eventMap[i] ? 6 : 0);
+const pointColors = prices.map((_, i) => eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)');
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(200, 117, 51, 0.20)');
+grad.addColorStop(1, 'rgba(200, 117, 51, 0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'FCX Close',
+        data: prices,
+        borderColor: '#c87533',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 2,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      { label: '20-Day MA',  data: ma20,  borderColor: '#f59e0b', borderWidth: 1.4, borderDash: [4,4], fill: false, pointRadius: 0, tension: 0.25, order: 2 },
+      { label: '50-Day MA',  data: ma50,  borderColor: '#3b82f6', borderWidth: 1.4, borderDash: [6,4], fill: false, pointRadius: 0, tension: 0.25, order: 3 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.4, borderDash: [8,4], fill: false, pointRadius: 0, tension: 0.25, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const i = items[0].dataIndex;
+            return eventMap[i] ? ['', eventMap[i].label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 15
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rsiCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      spanGaps: false
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 10,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            const v = ctx.parsed.y;
+            let tag = 'Neutral';
+            if (v >= 70) tag = 'Overbought';
+            else if (v <= 30) tag = 'Oversold';
+            return 'RSI: ' + v.toFixed(1) + '  (' + tag + ')';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.4)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function(ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.45)';
+            return 'rgba(30,41,59,0.4)';
+          },
+          lineWidth: function(ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: function(ctx) {
+            if (ctx.tick.value === 70) return '#ef4444';
+            if (ctx.tick.value === 30) return '#22c55e';
+            return '#64748b';
+          },
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
