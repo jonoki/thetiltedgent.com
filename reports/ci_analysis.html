@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI — The Cigna Group | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #f48024;
+  --accent-dim: #f4802433;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 19, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">CI</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Exchange:</span>NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Industry:</span>Healthcare · Healthcare Plans</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Mkt Cap:</span>$73.31B</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;">MKT CAP RANKING:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #351</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#175 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#80 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Cigna Group</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$277.45</div>
+      <div class="price-change">−$1.05 (−0.38%)</div>
+      <div class="price-date">Close — Aug 19, 2026, 4:00 PM EDT</div>
+      <div class="price-date">After-hours quote not available from sources used</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Bloomfield, Connecticut</div>
+    <div class="meta-item"><span>Employees:</span>67,700</div>
+    <div class="meta-item"><span>Founded:</span>1792</div>
+    <div class="meta-item"><span>Next Earnings:</span>Q3 2026 — late Oct 2026 (est., unconfirmed)</div>
+    <div class="meta-item"><span>Ex-Dividend:</span>Sep 8, 2026</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <div class="prose">
+    <p>The Cigna Group is a $282 billion-revenue health services company that, unusually for the managed-care sector, earns the large majority of its money outside of insurance risk. It reports two segments: <strong>Evernorth Health Services</strong> — the pharmacy benefit manager Express Scripts, the specialty pharmacy Accredo, and a set of behavioral, home-delivery and care-services businesses — and <strong>Cigna Healthcare</strong>, the U.S. commercial employer and international health insurance operation. Full-year 2025 revenue was <strong>$274.9 billion, up 11%</strong> <span class="tip" title="Year-over-year: this period compared with the same period one year earlier.">YoY</span>, with Evernorth contributing $234.95 billion of adjusted revenue (+16%) against Cigna Healthcare's $47.16 billion (−11%, reflecting the divestiture of the Medicare business).</p>
+    <p style="margin-top:14px;">By market value Cigna is the world's <strong>#351</strong> most valuable public company, but by revenue it is one of the largest companies in the United States — a gap that is the entire valuation story. The stock trades at <span class="tip" title="Price-to-Earnings: share price divided by earnings per share. Lower generally means cheaper, but can also signal perceived risk.">P/E</span> 11.5 trailing and 8.8 forward while the S&P 500 sits near 28x, because the market assigns a structural discount to pharmacy benefit management earnings that face open political and regulatory attack. In July 2026 <strong>Brian Evanko succeeded David Cordani as CEO</strong>, completing a transition announced in March 2026; Cordani, CEO for nearly 17 years, moved to executive chair.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 12px;">NOTABLE EXECUTIVES &amp; OWNERS</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Brian Evanko</div>
+      <div class="card-note">Became CEO effective <strong>July 1, 2026</strong>, succeeding David Cordani. A ~30-year Cigna veteran, Evanko previously served as President &amp; COO, President &amp; CEO of Cigna Healthcare, and CFO of The Cigna Group — meaning the PBM-reform strategy he now owns is one he helped design as finance chief.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Ann Dennison</div>
+      <div class="card-note">EVP &amp; CFO. Joined Cigna in <strong>February 2024</strong> as Deputy CFO after serving as EVP &amp; CFO of Nasdaq, and before that nearly two decades at Goldman Sachs as a Managing Director and Head of Financial Reporting. <em>Note: the task brief listed Brian Evanko as CFO — that is out of date; Evanko is now CEO and Dennison holds the CFO role.</em></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Executive Chair</div>
+      <div class="card-value" style="font-size:20px;">David M. Cordani</div>
+      <div class="card-note">CEO from 2009 until July 1, 2026, now executive chair of the board. Over his tenure Cigna went from a traditional insurer serving 46 million customers on $18 billion of revenue to a health services company with 180+ million customer relationships and ~$275 billion of revenue.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">~87% Institutional</div>
+      <div class="card-note">Largest reported holders by position value: <strong>Vanguard Group ($7.20B)</strong>, <strong>BlackRock ($6.46B)</strong>, <strong>FMR/Fidelity ($3.44B)</strong>, <strong>State Street ($3.40B)</strong>, <strong>Dodge &amp; Cox ($3.07B)</strong> and MFS ($2.90B). Active value managers (Dodge &amp; Cox, GQG at 2.24% of shares) are visible on the register — consistent with a deep-value setup rather than a momentum one.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <div class="prose">Revenue mix below is calculated on <strong>FY2025 adjusted segment revenues</strong> ($234.95B Evernorth + $47.16B Cigna Healthcare = $282.1B), which sum to more than consolidated revenue of $274.9B because intersegment transactions — chiefly Evernorth supplying pharmacy services to Cigna Healthcare's own members — are eliminated at the group level. The distortion is meaningful: Cigna is ~83% a health services and pharmacy company and only ~17% an insurance risk-taker.</div>
+  <div class="seg-bar">
+    <div style="flex:83.3;background:#f48024;">EVERNORTH 83.3%</div>
+    <div style="flex:16.7;background:#3b82f6;">CIGNA HEALTHCARE 16.7%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f48024;"></span> Evernorth Health Services — $234.95B FY25 adj. revenue</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Cigna Healthcare — $47.16B FY25 adj. revenue</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f48024; margin-top:28px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Evernorth Health Services</div>
+        <span class="biz-badge dominant">~31% PBM SHARE — #1 IN U.S.</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$234.95B</div><div class="biz-stat-label">FY25 Adj. Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16.0%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~31%</div><div class="biz-stat-label">Claims Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">83.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Evernorth is built around <strong>Express Scripts</strong>, the largest <span class="tip" title="Pharmacy Benefit Manager: a middleman that negotiates drug prices with manufacturers, builds the list of covered drugs (formulary), runs the pharmacy network, and processes prescription claims on behalf of employers and health plans.">PBM (pharmacy benefit manager)</span> in the United States, which processed <strong>2.22 billion equivalent prescription claims in 2025 (+4.8%)</strong> — ahead of CVS Caremark's 1.90 billion and Optum Rx's 1.659 billion. Cigna reported <strong>123.6 million pharmacy customers</strong> at year-end 2025 (+4%), though that fell to <strong>118.2 million by Q2 2026</strong> on client transitions. Economics are thin-margin and volume-driven: Evernorth generated $7.221 billion of pre-tax adjusted income on $234.95 billion of revenue in FY2025 — roughly a <strong>3.1% pre-tax margin</strong> — with income up only 3% against 16% revenue growth, the clearest evidence that PBM revenue growth is not translating into profit growth.
+      <br><br>
+      The segment splits into two very different engines. <strong>Pharmacy Benefit Services</strong> — traditional claims administration and rebate negotiation — delivered <strong>$609 million of pre-tax adjusted earnings in Q2 2026, down year over year</strong>. <strong>Specialty &amp; Care Services</strong> — Accredo specialty pharmacy, biosimilar and generic substitution, behavioral health and care delivery — delivered <strong>$1.1 billion, up 22%</strong>, helped by generic Revlimid penetration exceeding 80%. The mix shift is the strategic point: the part of Evernorth under political attack is shrinking in profit terms, and the part that dispenses and manages complex drugs is compounding.
+      <br><br>
+      In October 2025 Evernorth announced a <strong>rebate-free "Signature" pharmacy benefit model</strong> that replaces post-purchase manufacturer rebates with upfront negotiated discounts, guaranteeing members the lowest of the negotiated rate, copay, cash price or direct-to-consumer price. Management projects roughly <strong>30% lower monthly brand-drug cost</strong> for high-deductible members and targets approximately <strong>4% margins</strong> on the model. It launches for Cigna Healthcare fully insured plans in <strong>2027</strong> and becomes the standard for all Evernorth clients in <strong>2028</strong> — deliberately ahead of Consolidated Appropriations Act transparency requirements that bite in 2028. On the Q2 2026 call management reported "significant early interest from health plans and employers."
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> ~7.2B equivalent U.S. prescription claims per year (derived: Big Three = 80% of the market at 5.78B combined claims). Claims-based sizing used because a verified dollar TAM was not available from the sources consulted.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin:18px 0 4px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CVS Caremark</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~26%</div><div class="comp-bubble-label">Claims Share</div></div>
+          <div><div class="comp-bubble-val">1.90B</div><div class="comp-bubble-label">2025 Claims</div></div>
+          <div><div class="comp-bubble-val">−0.9%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Optum Rx (UnitedHealth)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~23%</div><div class="comp-bubble-label">Claims Share</div></div>
+          <div><div class="comp-bubble-val">1.66B</div><div class="comp-bubble-label">2025 Claims</div></div>
+          <div><div class="comp-bubble-val">+2.2%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Prime Therapeutics &amp; others</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~20%</div><div class="comp-bubble-label">Non-Big-3</div></div>
+          <div><div class="comp-bubble-val">407M</div><div class="comp-bubble-label">Prime Claims</div></div>
+          <div><div class="comp-bubble-val">~50%</div><div class="comp-bubble-label">Via Express Scripts</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Cigna Healthcare</div>
+        <span class="biz-badge emerging">18.4M MEDICAL CUSTOMERS — COMMERCIAL-ONLY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$47.16B</div><div class="biz-stat-label">FY25 Adj. Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−11.0%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~10% (est.)</div><div class="biz-stat-label">Share of Employer Lives</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Cigna Healthcare is a <strong>U.S. commercial employer and international health insurance</strong> business — and, critically, almost nothing else. On <strong>March 19, 2025</strong> Cigna completed the sale of its Medicare Advantage, standalone Medicare Part D and related businesses to <strong>Health Care Services Corporation (HCSC)</strong>. That divestiture is why segment revenue fell 11% in FY2025 and why total medical customers declined 5% to 18.1 million — and it is also the single best thing that happened to Cigna's risk profile. The 2024–2026 Medicare Advantage cost surge that battered Humana, UnitedHealth and CVS/Aetna simply does not flow through Cigna's income statement. Membership has since resumed growing: <strong>18.4 million medical customers as of Q2 2026</strong>, with U.S. employer membership up year to date and stop-loss tracking well.
+      <br><br>
+      The key insurer metric here is the <span class="tip" title="Medical Care Ratio (also called medical loss ratio): the percentage of premium dollars paid out as medical claims. Lower is better for the insurer — a 1-point move is worth hundreds of millions of dollars on Cigna's premium base. Regulators require most plans to keep it above roughly 80-85%.">MCR (medical care ratio)</span>, the share of premium paid out in claims. FY2025 MCR was <strong>84.4%, up from 83.2% in 2024</strong>, and Q4 2025 spiked to <strong>88.0%</strong>. Q2 2026 came in at <strong>84.5%</strong> — again above the 83.2% of Q2 2025, but management described it as "slightly favorable to expectations," with outpatient surgical spend lower than assumed and cost trend "elevated but stable, high single digits." Segment pre-tax adjusted income was $4.153 billion in FY2025 (−2%), and $1.3 billion in Q2 2026 (<strong>+17% YoY</strong>) — evidence that 2026 pricing caught up to trend.
+      <br><br>
+      Cigna is further narrowing the risk pool: it will <strong>exit the Individual and Family Plans (ACA exchange) business effective January 1, 2027</strong>. Combined with the Medicare exit, this leaves a business concentrated on employer group insurance and administrative-services-only arrangements, where the company bears less claims risk and earns fees. FY2026 guidance calls for Cigna Healthcare pre-tax income of <strong>at least $4.55 billion</strong>, raised from $4.5 billion at the start of the year.
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Cigna serves 18.4M medical customers and 188.4M total customer relationships. A verified dollar TAM for U.S. commercial health insurance was not available from the sources consulted; the ~10% share of employer-sponsored lives above is an <strong>estimate</strong> and should be treated as directional only.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin:18px 0 4px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">UnitedHealth (UNH)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$372.0B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$450.1B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+25.0%</div><div class="comp-bubble-label">YTD Return</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CVS Health / Aetna</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$122.4B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$412.7B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+23.0%</div><div class="comp-bubble-label">YTD Return</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Elevance / CarelonRx</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$86.1B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$201.1B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+14.3%</div><div class="comp-bubble-label">YTD Return</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Humana (HUM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$46.5B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$145.7B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+52.1%</div><div class="comp-bubble-label">YTD Return</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;">SOURCES OF MOAT</div>
+  <div class="moat-list">
+    <span class="moat-pill">#1 PBM SCALE (2.22B CLAIMS)</span>
+    <span class="moat-pill">ACCREDO SPECIALTY PHARMACY</span>
+    <span class="moat-pill">188.4M CUSTOMER RELATIONSHIPS</span>
+    <span class="moat-pill">EMPLOYER SWITCHING COSTS</span>
+    <span class="moat-pill">BIOSIMILAR/GENERIC SOURCING</span>
+    <span class="moat-pill">NO MEDICARE ADVANTAGE EXPOSURE</span>
+    <span class="moat-pill">STOP-LOSS UNDERWRITING DATA</span>
+  </div>
+  <div class="prose" style="margin-top:20px;">
+    <p>Cigna's moat is <strong>purchasing scale converted into negotiating leverage</strong>. With 2.22 billion equivalent prescription claims flowing through Express Scripts — more than any other PBM, and roughly 31% of a market where the top three control 80% — Cigna extracts drug pricing that a standalone employer or regional plan cannot replicate. That scale is self-reinforcing: many smaller PBMs outsource claims adjudication and fulfillment to one of the Big Three, and roughly half of Prime Therapeutics' network spend runs through Express Scripts, so Cigna earns economics even on volume it does not nominally own. Switching a 50,000-life employer's pharmacy benefit is a multi-quarter, disruption-heavy project, which is why PBM contracts are sticky and why management could say on the Q2 2026 call that <strong>new 2027 business wins exceed the prior two years combined</strong>.</p>
+    <p style="margin-top:14px;">The second, less-discussed moat is <strong>Accredo and the specialty/biosimilar franchise</strong>, where Cigna does the physical work of dispensing and managing complex, high-cost therapies. This is where the profit growth actually is: Specialty &amp; Care Services pre-tax earnings rose <strong>22% to $1.1 billion in Q2 2026</strong>, and generic Revlimid penetration above 80% shows Cigna's ability to steer volume to cheaper equivalents — a capability that is <em>more</em> valuable, not less, if rebates disappear. The third element is the negative moat that turned into a positive: by selling Medicare Advantage to HCSC in March 2025, Cigna removed the one line of business where government reimbursement rates, risk-adjustment audits and senior utilization have destroyed peer earnings since 2024. Cigna's <span class="tip" title="Beta measures how much a stock moves relative to the overall market. A beta below 1.0 means the stock is historically less volatile than the index.">Beta</span> of 0.32 is a partial statistical reflection of that de-risked, fee-heavy mix.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 8px;">KEY VULNERABILITIES</div>
+  <div class="prose">
+    <p><strong>1. PBM business-model risk — the central debate.</strong> Roughly 83% of Cigna's revenue and 63% of FY2025 segment pre-tax income comes from a business whose core economic mechanism — retaining a spread on manufacturer rebates — is the explicit target of federal and state legislative activity and of the Consolidated Appropriations Act transparency requirements effective 2028. Cigna's own answer is to pre-empt it: the Signature rebate-free model targets roughly <strong>4% margins</strong> on a transparent fee basis. But that is a deliberate admission that the old economics are ending, and 4% on a fee stream is a different, smaller, and as-yet-unproven business than the one that generated $7.2 billion of Evernorth pre-tax income. Pharmacy Benefit Services pre-tax earnings <em>already declined</em> to $609 million in Q2 2026.</p>
+    <p style="margin-top:14px;"><strong>2. Medical cost trend inflation in the remaining risk book.</strong> The MCR moved from 83.2% (FY2024) to 84.4% (FY2025) to 84.5% (Q2 2026), with Q4 2025 at 88.0%. Management calls trend "elevated but stable, high single digits." Cigna Healthcare earns roughly $4.5 billion of pre-tax income on ~$47 billion of revenue; every additional point of MCR is worth hundreds of millions. Because Cigna is now a <em>commercial-only</em> insurer, it cannot offset a bad employer year with Medicare — the concentration cuts both ways.</p>
+    <p style="margin-top:14px;"><strong>3. GLP-1 drug costs flow through both segments — with opposite signs.</strong> On the Evernorth side, GLP-1 volume is revenue and, through Accredo, profit. On the Cigna Healthcare side, GLP-1 coverage is claims cost inside the MCR. Q2 2026 commentary was that "GLP-1 prescription growth moderated" and utilization growth "slowed from elevated levels," with weight-loss coverage declining slightly — a "modest headwind offset by specialty strength." That is a benign outcome this quarter, but the two-sided exposure means Cigna has limited ability to hedge a step-change in GLP-1 pricing or utilization.</p>
+    <p style="margin-top:14px;"><strong>4. Earnings quality and one-off noise.</strong> FY2025 GAAP <span class="tip" title="Earnings Per Share: net income divided by shares outstanding.">EPS</span> was $22.18 against adjusted EPS of $29.84 — a $7.66 gap. An enterprise-wide "strategic optimization program" running through 2028 had already absorbed $450 million of pre-tax cost by June 30, 2026. In 2024, a non-cash after-tax investment loss of $2.7 billion ($9.53 per share) plus a $182 million dividend-receivable impairment cut GAAP earnings roughly in half. Persistent adjustments of this size make the headline <span class="tip" title="Generally Accepted Accounting Principles: the standardized U.S. accounting rules that govern reported (unadjusted) financial statements.">GAAP</span> P/E less informative and require investors to trust management's definition of "core."</p>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <div class="prose">Industry column = <strong>median of UnitedHealth, CVS Health and Elevance Health</strong> as reported by StockAnalysis on the same date (a computed peer median, not a published index average). S&amp;P 500 column uses the SPDR S&amp;P 500 ETF (SPY) where a verified index-level figure exists; cells marked <em>n/a</em> could not be verified from the sources used and are deliberately left blank rather than estimated. Several ratios are structurally not meaningful for a managed-care company and are flagged as such.</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>CI</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-Earnings ratio on the last twelve months of reported earnings. Lower is cheaper.">Trailing P/E</span></td>
+        <td style="color:var(--green);">11.47</td><td>24.54</td><td>28.00</td>
+        <td>Cheapest of the large managed-care names by a wide margin. Note this is on <strong>GAAP EPS of $24.18</strong>; on FY2025 adjusted EPS of $29.84 the multiple is ~9.3x. The discount is the market pricing PBM regulatory risk, not distress.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Share price divided by expected earnings per share over the next twelve months.">Forward P/E</span></td>
+        <td style="color:var(--green);">8.75</td><td>14.71</td><td>n/a</td>
+        <td>Against FY2026 guidance of at least $30.45 adjusted EPS, CI trades near 9.1x. Consensus FY2027 EPS of $33.47 implies ~8.3x two years out.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is often read as growth being under-priced.">PEG Ratio</span></td>
+        <td style="color:var(--green);">0.82</td><td>1.43</td><td>n/a</td>
+        <td>Sub-1.0 PEG on a 7.5% three-year EPS growth forecast. Cheaper than UNH (1.43), CVS (1.09) and far cheaper than ELV (4.04).</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings Per Share over the trailing twelve months.">EPS</span> (<span class="tip" title="Trailing Twelve Months: the most recent four reported quarters.">TTM</span>)</td>
+        <td style="color:var(--green);">$24.18</td><td>—</td><td>—</td>
+        <td>GAAP. Up 32.6% TTM. FY2025 GAAP EPS was $22.18 vs adjusted $29.84; H1 2026 GAAP diluted EPS $12.55 vs $10.55 in H1 2025.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year-over-year: this period versus the same period one year earlier.">YoY</span>)</td>
+        <td style="color:var(--amber);">+7.8%</td><td>n/a</td><td>n/a</td>
+        <td>TTM. FY2025 was +11.2%; FY2024 +26.6% on the Centene PBM onboarding. Q2 2026 revenue of $71.7B was +6.6%. Growth is decelerating toward the ~4.3% consensus for FY2026.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Revenue minus cost of goods sold, divided by revenue. For a PBM/insurer this is dominated by drug acquisition cost and medical claims, so it is not comparable to a software or industrial company.">Gross Margin</span></td>
+        <td style="color:var(--red);">9.14%</td><td>19.72%</td><td>n/a</td>
+        <td><strong>Not meaningful cross-industry.</strong> Cigna's gross margin is structurally low because pass-through drug spend inflates the revenue denominator. Peers with more insurance-premium revenue mix (ELV 25.99%) screen higher without being more profitable.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net income divided by revenue — the share of every sales dollar that becomes profit.">Net Profit Margin</span></td>
+        <td style="color:var(--amber);">2.27%</td><td>2.47%</td><td>n/a</td>
+        <td><strong>Not meaningful as a quality signal here.</strong> Thin margins are a feature of pass-through pharmacy revenue. Net income of $6.42B on $282.4B of revenue; ROE of 16.8% is the better profitability read.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td>
+        <td style="color:var(--amber);">2.25%</td><td>2.39%</td><td>0.98%</td>
+        <td>$6.24 annualized, raised to $1.56/quarter with FY2025 results. Payout ratio only 25.8% with 5 consecutive years of growth. Ex-dividend Sep 8, 2026. Well above the index, roughly in line with peers.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="The percentage of a company's shares that have been sold short by investors betting the price will fall.">Short Interest</span> %</td>
+        <td style="color:var(--green);">1.80%</td><td>1.68%</td><td>n/a</td>
+        <td>4.77M shares short, 1.81% of float. Low in absolute terms — despite the PBM overhang, this is not a crowded short. Bears are expressing the view through valuation, not positioning.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Total debt divided by shareholders' equity — a measure of financial leverage.">Debt-to-Equity</span></td>
+        <td style="color:var(--amber);">0.74</td><td>0.69</td><td>n/a</td>
+        <td>$31.88B total debt against $42.6B of shareholders' equity (Q2 2026). Management reported a debt-to-capitalization ratio of <strong>42.8%</strong> at June 30, 2026 — elevated versus historical targets and one reason buybacks slowed sharply.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure. Below 1.0 is normal for insurers, whose claims reserves sit in current liabilities.">Current Ratio</span></td>
+        <td style="color:var(--amber);">0.85</td><td>0.87</td><td>n/a</td>
+        <td><strong>Not meaningful for a managed-care company.</strong> Insurers structurally run below 1.0 because medical claims payable is a current liability funded by long-duration investments. UNH 0.78, CVS 0.87, ELV 1.52 — the spread reflects accounting mix, not solvency.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditure — the cash actually available for dividends, buybacks and debt reduction.">Free Cash Flow</span></td>
+        <td style="color:var(--green);">$9.11B</td><td>—</td><td>—</td>
+        <td>Operating cash flow $10.28B; FY2026 guidance ~$9.0B, back-half weighted. FCF is 12.4% of market cap — the single most striking number in the table and the anchor of the bull case.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how efficiently the company turns owner capital into profit.">ROE</span></td>
+        <td style="color:var(--green);">16.76%</td><td>11.13%</td><td>n/a</td>
+        <td>Best of the peer set (UNH 14.15%, ELV 11.13%, CVS 6.21%). Confirms that low net margin is a revenue-recognition artifact, not weak returns on capital.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity employed in the business.">ROIC</span></td>
+        <td style="color:var(--green);">13.39%</td><td>8.46%</td><td>n/a</td>
+        <td>Comfortably above any plausible cost of capital and well ahead of UNH (11.37%), CVS (7.17%) and ELV (8.46%). Evernorth is capital-light relative to its revenue.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="A measure of a stock's volatility relative to the overall market. 1.0 moves with the market; below 1.0 is less volatile.">Beta</span></td>
+        <td style="color:var(--green);">0.32</td><td>0.63</td><td>1.01</td>
+        <td>Extremely low — roughly a third of market volatility, and half the peer median. Reflects non-cyclical healthcare demand plus the fee-based Evernorth mix. Note that low beta has <em>not</em> meant low drawdowns: the stock fell from $363 (Mar 2024) to $244 (Oct 2025).</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$239.51 – $315.47</td><td>—</td><td>—</td>
+        <td>At $277.45 the stock sits 15.9% above the low and 12.1% below the high — mid-range, with a 1-year total return of roughly +3.6% versus SPY's +20.9%.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top:20px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:8px;">ADDITIONAL CONTEXT METRICS (NOT IN STANDARD TABLE)</div>
+    <div class="prose" style="max-width:none;font-size:14px;">
+      <strong>Medical Care Ratio (MCR):</strong> FY2025 <strong>84.4%</strong> (vs 83.2% FY2024); Q4 2025 <strong>88.0%</strong>; Q2 2026 <strong>84.5%</strong> (vs 83.2% Q2 2025). &nbsp;·&nbsp;
+      <strong>SG&amp;A Expense Ratio:</strong> FY2025 <strong>5.3% GAAP / 5.0% adjusted</strong> — among the leanest cost structures in managed care, a direct consequence of the fee-based Evernorth revenue base. &nbsp;·&nbsp;
+      <strong>Adjusted EPS:</strong> FY2025 <strong>$29.84</strong>; Q2 2026 <strong>$7.78</strong>; FY2026 guidance raised to <strong>at least $30.45</strong>. &nbsp;·&nbsp;
+      <strong>Buyback:</strong> FY2025 repurchases of <strong>11.9M shares for $3.6 billion</strong>; TTM buyback yield <strong>3.55%</strong>. But H1 2026 repurchases were only <strong>$250 million (~900k shares)</strong>, all in Q2 — a dramatic deceleration alongside the 42.8% debt-to-cap ratio. Combined shareholder yield of ~5.8% on a TTM basis will not repeat at H1 2026's run-rate.
+      &nbsp;·&nbsp; <strong>Other:</strong> EV $97.93B · EV/EBITDA 7.68 · P/S 0.26 · P/B 1.72 · Shares out 264.24M · Cash $7.26B.
+    </div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 8px;">NOTABLE ONE-OFF ITEMS</div>
+  <div class="prose">
+    <p>One-off items at Cigna are <strong>large, recurring and material to how the headline P/E should be read</strong>. FY2025 after-tax special items were: a <strong>strategic optimization program charge of $565 million</strong>, <strong>integration and transaction-related costs of $247 million</strong>, a <strong>net loss on sale of businesses of $404 million</strong> (principally the HCSC Medicare transaction), partly offset by a <strong>$13 million benefit from litigation</strong>. Together these are the bulk of the $7.66 per-share gap between FY2025 GAAP EPS of $22.18 and adjusted EPS of $29.84.</p>
+    <p style="margin-top:14px;">FY2024 was distorted far more severely by a <strong>non-cash after-tax investment loss of $2.7 billion ($9.53 per share)</strong> — the write-down of Cigna's equity stake in a value-based primary care investment — plus a <strong>$182 million ($0.49 per share) impairment of a dividend receivable</strong>. Those two items are why FY2024 GAAP EPS collapsed to $12.12 and why FY2025's 83% GAAP EPS "growth" is an artifact of the prior-year base rather than genuine operating improvement. Investors should compare adjusted EPS ($29.84 FY2025) year over year, not GAAP.</p>
+    <p style="margin-top:14px;">The <strong>strategic optimization program is ongoing and expected to continue through 2028</strong>, with <strong>$450 million of pre-tax cost recorded through June 30, 2026</strong>. Charges this persistent sit uncomfortably in the "non-recurring" bucket — a restructuring running four calendar years is closer to a cost of doing business. Assume further quarterly adjustments and treat the GAAP-to-adjusted bridge as a permanent feature of the reporting.</p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">24 covering analysts. No sell ratings. MarketBeat's separate 22-analyst panel shows "Moderate Buy" — the two datasets agree in substance.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$341.42</div>
+      <div class="card-note" style="color:var(--green);">+23.1% upside from $277.45</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$290 – $400</div>
+      <div class="card-note">Even the lowest target on the street is <strong>4.5% above</strong> the current price — an unusually narrow, uniformly positive dispersion for a stock with this much regulatory overhang.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">19 Buy / 5 Hold / 0 Sell</div>
+      <div class="card-note">Strong Buy 13 · Buy 6 · Hold 5 · Sell 0 · Strong Sell 0</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:54.2;background:var(--green);"></div>
+    <div style="flex:25.0;background:#4ade80;"></div>
+    <div style="flex:20.8;background:var(--amber);"></div>
+    <div style="flex:0.1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy 13 (54.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 6 (25.0%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold 5 (20.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell 0 (0%)</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 12px;">KEY RECENT ANALYST CALLS</div>
+  <div class="prose">
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--amber);font-size:20px;line-height:1;">•</span>
+      <div><strong>Jefferies</strong> — <em>Aug 4, 2026</em> — <span style="color:var(--amber);">Downgrade: Buy → Hold</span>, price target cut to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$307</span> from $336. The most recent and most negative datapoint on the tape, arriving five days after a Q2 beat — consistent with a view that the guidance raise is already priced and that the PBM model transition caps the multiple.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--amber);font-size:20px;line-height:1;">•</span>
+      <div><strong>Raymond James</strong> — <em>Aug 3, 2026</em> — <span style="color:var(--amber);">Downgrade: Strong Buy → Outperform</span>, price target cut to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$320</span> from $350. A partial step down rather than a rejection; the firm remains above the current price by ~15%.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--green);font-size:20px;line-height:1;">•</span>
+      <div><strong>Guggenheim</strong> — <em>Jul 31, 2026</em> — <span style="color:var(--green);">Target raised</span> to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$361</span> from $338 immediately after the Q2 print. <strong>Robert W. Baird</strong> set <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$362</span> the same day; <strong>Wells Fargo</strong> nudged to $307 from $305 and <strong>Barclays</strong> to $310 from $304 — a clear split between the high-conviction bulls (~$360) and the risk-adjusted camp (~$310).</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;">
+      <span style="color:var(--green);font-size:20px;line-height:1;">•</span>
+      <div><strong>Sanford C. Bernstein</strong> — <em>Jul 9, 2026</em> — <span style="color:var(--green);">Target raised</span> to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$381</span> from $371, near the top of the street range and roughly 37% above the current price. The bull case in its purest form: a sub-9x forward multiple on a business generating $9 billion of free cash flow.</div>
+    </div>
+    <p style="margin-top:18px;font-size:14px;color:var(--text-dim);">The pattern is telling: <strong>targets went up on the print and ratings came down a few days later</strong>. Analysts believe the numbers and doubt the multiple. That is precisely the shape of a valuation-versus-business-model standoff.</p>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 beat — and the stock fell</div>
+        <div class="tl-desc">Revenue of $71.7B (+6.6%), adjusted EPS of $7.78, and FY2026 guidance raised to at least $30.45 from $30.35. Cigna Healthcare pre-tax adjusted earnings rose 17% to $1.3B with an MCR of 84.5% described as "slightly favorable to expectations." Shares nevertheless declined, with Pharmacy Benefit Services pre-tax earnings of $609 million — down year over year — the likely culprit.</div>
+        <div class="tl-impact down">Beat, but shares fell — PBM profit decline in focus</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date — $1.56 quarterly</div>
+        <div class="tl-desc">The quarterly dividend was raised to $1.56 per share alongside FY2025 results, taking the annualized rate to $6.24 (2.25% yield) on a payout ratio of just 25.8%. Five consecutive years of increases. Low-risk but a real component of total return given the stock's flat price action.</div>
+        <div class="tl-impact neutral">Income event — modest</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results — the 2027 pricing tell</div>
+        <div class="tl-desc"><strong>Date not confirmed in the sources used; estimated from prior-year timing.</strong> The two numbers that matter: the Q3 MCR against the ~84.5% run-rate, and any early framing of 2027 commercial pricing. Management explicitly declined to guide 2027 on the Q2 call, calling it "too early," so this is the first structured look at whether high-single-digit cost trend has been priced into January 2027 renewals.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 1, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Individual &amp; Family Plans exit + Signature model launch</div>
+        <div class="tl-desc">Two structural changes land together. Cigna exits the ACA individual exchange business, further concentrating Cigna Healthcare on employer group risk and removing a volatile, subsidy-dependent membership pool. Simultaneously the rebate-free Signature model goes live for Cigna Healthcare fully insured plans — the first real-world margin test of a ~4%-target transparent PBM economics before the 2028 broad rollout.</div>
+        <div class="tl-impact up">Potential upside catalyst — de-risking plus model proof-point</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027 selling season</div>
+      <div class="tl-content">
+        <div class="tl-title">New business wins already exceed the prior two years combined</div>
+        <div class="tl-desc">Management disclosed on the Q2 2026 call that new 2027 business wins exceed the prior two years combined, and that U.S. employer medical membership grew year to date with stop-loss "tracking well." Medical membership was 18.4 million at Q2 2026, up from 18.1 million at year-end 2025. If these wins convert at target margins, they underwrite the FY2027 consensus EPS of $33.47.</div>
+        <div class="tl-impact up">Potential upside catalyst — visible revenue backlog</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2028</div>
+      <div class="tl-content">
+        <div class="tl-title">CAA transparency requirements + Signature becomes the standard model</div>
+        <div class="tl-desc">Consolidated Appropriations Act pharmacy-benefit transparency requirements take effect, and Signature becomes the default model for all Evernorth pharmacy benefit clients. Evernorth designed the model to exceed the statutory requirement "by multiple steps." This is the terminal date for the rebate-spread business model as currently constituted — and the point at which the market will be able to price Evernorth's earnings power with far less uncertainty, in either direction. The strategic optimization program also runs through 2028.</div>
+        <div class="tl-impact neutral">Regulatory deadline — the central unknown resolves</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:6px;">CI MONTHLY CLOSES — SEP 2021 TO AUG 2026 &nbsp; <span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 19, 2026</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin:12px 0 18px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">
+      <span><span style="display:inline-block;width:22px;height:3px;background:#f48024;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:22px;height:0;border-top:3px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (1-mo)</span>
+      <span><span style="display:inline-block;width:22px;height:0;border-top:3px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (3-mo)</span>
+      <span><span style="display:inline-block;width:22px;height:0;border-top:3px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY &nbsp; <span style="color:var(--amber);">⚠ STATIC DATA AS OF AUG 19, 2026</span></div>
+    <div style="font-size:13px;color:var(--text-muted);margin:8px 0 16px;">RSI measures how much of recent price movement has been up versus down, on a 0–100 scale. Above 70 suggests the stock has run hot and may be due for a pause; below 30 suggests it has been beaten down and may be due for a bounce. Neither is a signal on its own.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <div class="prose" style="margin-top:32px;">
+    <p><strong>Five-year trajectory.</strong> From a September 2021 close of $200.16 to $277.45 on August 19, 2026, CI returned <strong>+38.6% on price alone</strong> — roughly a <strong>6.8% compound annual price return</strong> before dividends. That headline masks a violent round trip. The stock nearly doubled from the September 2021 low to a March 2024 peak of <strong>$363.19</strong>, then gave back a third of its value to an October 2025 trough of <strong>$244.41</strong>, and has spent the ten months since chopping in a $265–$295 band. An investor who bought at the 2024 high is down 24% two and a half years later; an investor who bought the October 2025 low is up 14%. The path, not the endpoint, is the story.</p>
+    <p style="margin-top:14px;"><strong>The technical picture is neutral-to-heavy.</strong> At $277.45 the stock sits below its 10-month (200-day equivalent) moving average and essentially on top of its 3-month average — a market with no trend. Six-period monthly RSI has oscillated in a compressed 35–65 range through 2026 without reaching either threshold, the signature of a stock that is being accumulated by value buyers and distributed by growth holders in roughly equal measure. There is no oversold washout to buy and no overbought extension to fade.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Dec 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">$331.34 — the defensive-rotation peak</div>
+        <div class="tl-desc">CI closed 2022 up 44% from its September 2021 level while the broad market fell, as capital rotated into low-beta, cash-generative healthcare. Cigna's 0.32 beta did exactly what it is supposed to do in a drawdown year.</div>
+        <div class="tl-impact up">+65% from Sep 2021 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">$255.53 — PBM scrutiny and the give-back</div>
+        <div class="tl-desc">A 23% drawdown from the December 2022 close as the defensive trade unwound and pharmacy-benefit business-model scrutiny moved to the front page. The first clear instance of the market applying a discount specifically to PBM earnings.</div>
+        <div class="tl-impact down">−22.9% from Dec 2022</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">$363.19 — five-year high</div>
+        <div class="tl-desc">The peak of the cycle, reached as Express Scripts absorbed the Centene book (which drove FY2024 revenue growth of 26.6%) and before the FY2024 investment write-down landed. Nothing in the subsequent 29 months has come close.</div>
+        <div class="tl-impact up">+42.1% from Mar 2023</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">$276.14 — sector-wide managed-care de-rating</div>
+        <div class="tl-desc">A 24% fall from the March 2024 high in nine months, coinciding with the $2.7 billion non-cash investment loss ($9.53/share) that halved FY2024 GAAP EPS to $12.12, and with a broad re-rating of managed care on intensified political attention to pharmacy benefit managers.</div>
+        <div class="tl-impact down">−24.0% from Mar 2024 high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 19, 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$329.00 — HCSC Medicare divestiture closes</div>
+        <div class="tl-desc">Cigna completed the sale of Medicare Advantage, standalone Part D and related businesses to Health Care Services Corporation. The stock rallied 19% off the December 2024 close into this event. In hindsight this transaction is why Cigna avoided the MA cost surge that subsequently crushed peer earnings — but it also cost 5% of medical membership and 11% of Cigna Healthcare revenue.</div>
+        <div class="tl-impact up">+19.1% from Dec 2024</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$244.41 — five-year low zone</div>
+        <div class="tl-desc">The lowest monthly close in the five-year window, 33% below the March 2024 high. Sentiment on PBM regulation was at its most negative; three weeks later Evernorth announced the rebate-free Signature model (Oct 27, 2025), which marked the bottom.</div>
+        <div class="tl-impact down">−33% from cycle high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 5, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$289.82 — FY2025 results and dividend increase</div>
+        <div class="tl-desc">FY2025 revenue of $274.9B (+11%), adjusted EPS of $29.84, a dividend raise to $1.56/quarter, and initial FY2026 guidance of at least $30.25 adjusted EPS. Solid numbers; a 5% monthly gain that did not break the range.</div>
+        <div class="tl-impact up">Range-bound response to a clean print</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$293.46 → $277.45 — post-Q2 fade</div>
+        <div class="tl-desc">July closed at $293.46 after the July 30 beat and guidance raise, then Jefferies and Raymond James downgraded in the first four days of August and the stock retraced to $277.45. A textbook illustration of the standoff: the earnings are fine, the multiple is contested.</div>
+        <div class="tl-impact down">−5.5% from Jul close on downgrades</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose" style="margin-top:24px;">
+    <p><strong>Relative performance.</strong> This is where the analysis gets uncomfortable for bulls. Year to date CI has returned <strong>+2.4%</strong> and over one year <strong>+3.6%</strong>. Over the same one-year window the SPDR S&amp;P 500 ETF returned <strong>+20.9%</strong> — CI underperformed the index by roughly 17 percentage points. Against its own sector the gap is worse: year to date <strong>Humana +52.1%, UnitedHealth +25.0%, CVS Health +23.0%, Elevance +14.3%</strong>, versus CI at +2.4%. Cigna is <em>last</em> among the five large managed-care names.</p>
+    <p style="margin-top:14px;">The irony is precise: Cigna sold the Medicare Advantage business that damaged its peers, and its peers have massively outperformed it while recovering from that damage. The market spent 2026 paying up for MA recovery stories and refusing to pay for the company that avoided the problem — because Cigna's remaining earnings base is the one under regulatory attack. Investors buying CI here are explicitly betting that the PBM discount is too large, not that the operations are better. <em>Note: a verified 5-year S&amp;P 500 total return was not retrievable from the sources used; the 1-year comparison above is the verified benchmark point.</em></p>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>CI generates <strong>$9.1 billion of free cash flow</strong> — 12.4% of its $73.3 billion market cap — at a <strong>13.4% ROIC</strong> and <strong>16.8% ROE</strong>, yet trades at <strong>8.75x forward earnings</strong> against 14.7x for peers and 28x for the S&amp;P 500. FY2026 guidance was raised to at least $30.45 adjusted EPS, 2027 new business wins exceed the prior two years combined, and Specialty &amp; Care Services earnings grew 22% in Q2 2026. Management is not waiting to be regulated: the Signature rebate-free model launches in 2027, two years ahead of the 2028 statutory deadline, and every analyst target on the street — including the lowest at $290 — sits above the current price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The multiple is low because the earnings may not be durable. <strong>Pharmacy Benefit Services pre-tax earnings already declined to $609 million in Q2 2026</strong>, and Evernorth's FY2025 pre-tax income grew just 3% on 16% revenue growth. The Signature model explicitly targets ~4% margins on a transparent fee — an admission that rebate-spread economics are ending, with no proof yet that the replacement earns as much. Meanwhile MCR has risen every comparable period (83.2% → 84.4% → 84.5%), the commercial-only book has no diversification left after exiting Medicare and, from January 2027, the exchanges, and H1 2026 buybacks collapsed to $250 million from $3.6 billion in FY2025 against a 42.8% debt-to-capitalization ratio. Two analysts downgraded within five days of a beat.</p>
+    </div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 4px;">TOP 3 RISKS</div>
+  <div class="risk-list">
+    <div class="risk-item">
+      <span class="risk-num">01</span>
+      <div><strong>PBM regulatory and legislative action.</strong> Federal and state pressure on rebate retention, spread pricing and PBM-payer vertical integration targets the mechanism behind ~83% of Cigna's revenue and the majority of its profit. Consolidated Appropriations Act transparency requirements take effect in 2028. If legislation goes further than transparency — to mandatory rebate pass-through, delinking of PBM compensation from list price, or forced divestiture of PBM from insurer — Cigna's earnings base could be permanently reset, and it has less non-PBM diversification than CVS or UnitedHealth to absorb the hit.</div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">02</span>
+      <div><strong>Commercial medical cost trend outrunning pricing.</strong> MCR at 84.5% in Q2 2026 is 1.3 points above the year-ago 83.2%, and Q4 2025 printed 88.0%. Management describes trend as "elevated but stable, high single digits" and has declined to guide 2027. Because Cigna is now a commercial-only insurer with no Medicare or exchange offset, a single mispriced January renewal cycle would hit the full ~$47 billion premium base with no cushion.</div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">03</span>
+      <div><strong>Transition execution on the Signature model — and the capital-return slowdown.</strong> Replacing rebate economics with a ~4% fee margin across a 118-million-member pharmacy book, in 2027 for fully insured and 2028 for everyone, is a business-model transplant with no precedent at this scale. If clients accept the transparency but not the fee, or if competitors undercut on price to take share during the changeover, Evernorth margins compress permanently. The 42.8% debt-to-capitalization ratio and the drop in H1 2026 buybacks to $250 million from a $3.6 billion FY2025 pace reduce management's ability to support the share price through the transition.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">PBM Regulatory &amp; Political Risk</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        The dominant overhang, and the reason a company earning 13.4% ROIC with $9.1B of free cash flow trades at 8.75x forward earnings. Three PBMs — Express Scripts (~31% of claims), CVS Caremark (~26%) and Optum Rx (~23%) — control <strong>80% of U.S. equivalent prescription claims</strong>, and all three are owned by, or own, a major insurer. That concentration is the target. Consolidated Appropriations Act transparency requirements land in <strong>2028</strong>. Cigna's response — the rebate-free Signature model announced October 2025, launching for fully insured members in 2027 and universally in 2028 at a ~4% target margin — is a pre-emptive capitulation on the old economics. The market has not yet decided whether that is leadership or the first markdown of a larger repricing. Evidence for the bear reading is already visible: Pharmacy Benefit Services pre-tax earnings fell to $609 million in Q2 2026.
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Medical Cost Trend Inflation</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        Utilization has run above pre-2023 baselines across the industry, and Cigna's MCR tracks it: <strong>83.2% (FY2024) → 84.4% (FY2025) → 84.5% (Q2 2026)</strong>, with a 88.0% Q4 2025 spike. Management's language — "elevated but stable, high single digits" — signals a trend that has plateaued at a higher level rather than reverting. Cigna's specific position is unusual: by selling Medicare Advantage to HCSC in March 2025 it removed the segment where cost trend did the most damage to Humana, UnitedHealth and CVS/Aetna, and its Q2 2026 Cigna Healthcare pre-tax earnings grew 17% while peers were repairing MA margins. The trade-off is concentration — from January 2027, with the exchange exit complete, Cigna's entire underwriting risk sits in one employer-group book.
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">GLP-1 Spending &amp; Specialty Drug Economics</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        <strong>Bull framing:</strong> GLP-1 and specialty drugs flow through Evernorth as revenue and, via Accredo, as high-value dispensing and management fees — and they are exactly the therapies where a PBM's clinical management is hardest to disintermediate. Specialty &amp; Care Services pre-tax earnings grew <strong>22% to $1.1 billion in Q2 2026</strong>, with generic Revlimid penetration above 80% demonstrating Cigna's ability to convert branded spend into cheaper equivalents while keeping the margin. Management reported GLP-1 prescription growth "moderated" and utilization growth "slowed from elevated levels" — the benign outcome.
+        <br><br>
+        <strong>Bear framing:</strong> the same drugs are claims cost inside Cigna Healthcare's MCR, and weight-loss coverage is already being trimmed. The specialty growth that offsets PBM decline is itself a function of drug-price inflation the political system is trying to end. If net drug prices fall materially, Evernorth's pass-through revenue base shrinks alongside the rebate pool — the two halves of the bull case are less independent than they appear. The resolution point for both debates is the same: <strong>2028</strong>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 19, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">
+    Sources: price, valuation, statistics, dividend, forecast and peer comparison data from <strong>StockAnalysis.com</strong> (CI, UNH, CVS, ELV, HUM, SPY pages, retrieved Aug 20, 2026 reflecting the Aug 19, 2026 close). Market cap global ranking from <strong>CompaniesMarketCap.com</strong>. FY2025 and Q4 2025 segment revenue, pre-tax adjusted income, medical care ratio, SG&amp;A ratio, membership, special items, buybacks and 2026 outlook from <strong>The Cigna Group newsroom press release dated February 5, 2026</strong>. Q2 2026 figures from the company's <strong>Form 10-Q</strong> (via StockTitan), the <strong>Q2 2026 earnings call</strong> coverage, and <strong>Fierce Healthcare</strong>. Rebate-free Signature model details from <strong>Becker's Payer Issues</strong> and Fierce Healthcare. PBM market share and claim volumes from <strong>Drug Channels' "Top Pharmacy Benefit Managers of 2025"</strong>. Leadership changes from <strong>The Cigna Group newsroom (March 3, 2026)</strong> and thecignagroup.com leadership pages. Named analyst actions and institutional ownership from <strong>MarketBeat</strong>.
+  </p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">
+    <strong>Estimated and derived figures are labelled as such in-line.</strong> Specifically: US and NYSE market-cap ranks are estimates (only the global rank of #351 is sourced); PBM percentage shares are derived from Drug Channels' claim counts and its 80% Big-Three figure; the ~10% share of employer-sponsored medical lives is an estimate; the "Industry Avg" column is a computed median of UNH, CVS and ELV rather than a published industry average; the Q3 2026 earnings date is estimated from prior-year timing and is not confirmed. Cells marked "n/a" indicate figures that could not be verified from the sources consulted and were deliberately not estimated. Chart data is hardcoded from StockAnalysis monthly closing prices through July 2026 plus the August 19, 2026 close; verify all figures against primary SEC filings before acting.
+  </p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">
+    This document is for informational and educational purposes only and is not investment advice, a recommendation, or an offer or solicitation to buy or sell any security. The author may hold positions in securities mentioned. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making investment decisions.
+  </p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA AS OF AUGUST 19, 2026 — monthly closes, Sep 2021 – Aug 2026 =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [200.16,213.61,191.90,229.63,230.46,237.78,239.61,246.78,268.29,263.52,275.36,283.45,277.47,323.06,328.89,331.34,316.67,292.10,255.53,253.29,247.41,280.60,295.10,276.26,286.07,309.20,262.88,299.45,300.95,336.14,363.19,357.04,344.62,330.57,348.67,361.81,346.44,314.81,337.80,276.14,294.21,308.85,329.00,340.04,316.64,330.58,267.38,300.87,288.25,244.41,277.28,275.23,274.11,289.82,266.75,290.58,277.40,275.68,293.46,277.45];
+
+function sma(data, w) {
+  const out = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < w - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += data[j];
+    out.push(+(s / w).toFixed(2));
+  }
+  return out;
+}
+
+function computeRSI(data, period) {
+  const out = new Array(data.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let ag = gains / period, al = losses / period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    ag = (ag * (period - 1) + g) / period;
+    al = (al * (period - 1) + l) / period;
+    out[i] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const ma20 = sma(prices, 1);
+const ma50 = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi = computeRSI(prices, 6);
+
+const events = [
+  { idx: 15, label: 'Dec 2022 — defensive-rotation peak $331.34', color: '#22c55e' },
+  { idx: 18, label: 'Mar 2023 — PBM scrutiny drawdown $255.53', color: '#ef4444' },
+  { idx: 30, label: 'Mar 2024 — 5-year high $363.19', color: '#22c55e' },
+  { idx: 39, label: 'Dec 2024 — managed-care de-rating $276.14', color: '#ef4444' },
+  { idx: 42, label: 'Mar 2025 — HCSC Medicare sale closes $329.00', color: '#22c55e' },
+  { idx: 49, label: 'Oct 2025 — 5-year low zone $244.41', color: '#ef4444' },
+  { idx: 53, label: 'Feb 2026 — FY25 results, dividend raise $289.82', color: '#22c55e' },
+  { idx: 58, label: 'Jul 2026 — Q2 beat, guidance raised $293.46', color: '#f59e0b' }
+];
+
+const eventPointRadius = prices.map((_, i) => events.some(e => e.idx === i) ? 6 : 0);
+const eventPointColor = prices.map((_, i) => {
+  const e = events.find(ev => ev.idx === i);
+  return e ? e.color : 'rgba(0,0,0,0)';
+});
+
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(244,128,36,0.20)');
+grad.addColorStop(1, 'rgba(244,128,36,0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#f48024',
+        backgroundColor: grad,
+        borderWidth: 2,
+        fill: true,
+        tension: 0.25,
+        pointRadius: eventPointRadius,
+        pointBackgroundColor: eventPointColor,
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 2,
+        pointHoverRadius: 8
+      },
+      { label: '20-Day MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.4, borderDash: [4, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '50-Day MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.4, borderDash: [6, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.4, borderDash: [8, 5], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        callbacks: {
+          label: function (c) {
+            if (c.parsed.y === null) return null;
+            return c.dataset.label + ': $' + c.parsed.y.toFixed(2);
+          },
+          afterBody: function (items) {
+            const e = events.find(ev => ev.idx === items[0].dataIndex);
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function (v) { return '$' + v; } }
+      }
+    }
+  }
+});
+
+const rctx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: true },
+      { label: 'Overbought 70', data: labels.map(() => 70), borderColor: 'rgba(239,68,68,0.45)', borderWidth: 1, borderDash: [5, 5], pointRadius: 0, fill: false },
+      { label: 'Oversold 30', data: labels.map(() => 30), borderColor: 'rgba(34,197,94,0.45)', borderWidth: 1, borderDash: [5, 5], pointRadius: 0, fill: false }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 10,
+        filter: function (item) { return item.datasetIndex === 0; },
+        callbacks: {
+          label: function (c) { return 'RSI: ' + (c.parsed.y === null ? 'n/a' : c.parsed.y.toFixed(1)); }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.4)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function (ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.35)';
+            return 'rgba(30,41,59,0.4)';
+          },
+          lineWidth: function (ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.5 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function (v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
