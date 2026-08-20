@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UPS — United Parcel Service, Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #ffb500; /* UPS gold — brand brown #644117 is unreadable on navy */
+  --accent-dim: #ffb50033;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+/* metric favorability colouring */
+.fin-table td.g { color: var(--green) !important; }
+.fin-table td.r { color: var(--red) !important; }
+.fin-table td.a { color: var(--amber) !important; }
+.fin-table td.n { color: var(--text) !important; }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 19, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">UPS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials · Integrated Freight &amp; Logistics</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $87.51B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;">MKT CAP RANKING:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #281</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #188</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#105 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">United Parcel Service, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$102.86</div>
+      <div class="price-change" style="color:var(--green);">+$0.93 &nbsp;(+0.91%)</div>
+      <div class="price-date">Close — Aug 19, 2026, 4:00 PM EDT</div>
+      <div class="price-date">After hours: $103.06 (+0.19%) @ 7:59 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Atlanta, Georgia</div>
+    <div class="meta-item"><span>Employees:</span>~460,000</div>
+    <div class="meta-item"><span>Founded:</span>1907 · NYSE IPO Nov 10, 1999</div>
+    <div class="meta-item"><span>Next Earnings:</span>Q3 2026 — late Oct 2026 (est., unconfirmed)</div>
+    <div class="meta-item"><span>Dividend:</span>$6.56/yr · 6.38% yield</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <div class="prose">
+    <p>United Parcel Service is the largest package delivery company in the world by revenue, moving parcels, freight and healthcare shipments through an integrated air-and-ground network across more than 200 countries and territories. Full-year 2025 revenue was <strong>$88.7 billion</strong>, down <strong>2.65%</strong> from $91.07 billion in 2024 and down roughly 12% from the 2022 pandemic peak of $100.3 billion — the third consecutive year of flat-to-negative top line. UPS ranks approximately <strong>#281 globally</strong> and <strong>#188 among US-listed companies</strong> by market capitalisation, and captured roughly <strong>34% of US parcel industry revenue</strong> ($69.8B in 2024) on only ~21% of volume, a spread that is the entire point of the current strategy.</p>
+    <p style="margin-top:14px;">The company is in the middle of the largest network restructuring in its history. Since the start of 2025 it has removed roughly <strong>78,000 positions</strong>, closed about <strong>150 buildings</strong>, taken out ~<strong>50 million operational hours</strong> and eliminated approximately <strong>$4.5 billion of expense</strong> — all while deliberately shedding around <strong>2 million Amazon packages per day</strong>. Management declared that "glide-down" complete on the 2Q 2026 call (July 28, 2026) and raised full-year guidance to ~$91.2B revenue, ~$8.65B adjusted operating profit and ~$7.22 adjusted <span class="tip" title="Earnings per share: net profit divided by diluted shares outstanding">EPS</span>.</p>
+  </div>
+
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Carol Tomé</div>
+      <div class="card-note">CEO since June 2020; former CFO of Home Depot for 18 years and a long-serving UPS director. She authored the "better not bigger" doctrine that drove the decision to halve Amazon's US volume, and stated on the 2Q 2026 call that UPS "successfully completed our Amazon glide down and related network reconfiguration initiatives."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Brian Dykes</div>
+      <div class="card-note">CFO since 2024, a multi-decade UPS finance veteran. He owns the $3B-per-year cost-out program and the capital-allocation debate: ~$3.0B capex, ~$5.4B of dividends and ~$5.5B of guided <span class="tip" title="Free cash flow: operating cash flow less capital expenditure — the cash actually available for dividends, buybacks and debt paydown">free cash flow</span> in 2026. He flagged the September de minimis anniversary as "a significant year-over-year tailwind."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">60.26% Inst.</div>
+      <div class="card-note">Vanguard Group ($6.79B), State Street ($3.18B), Charles Schwab Investment Management ($2.69B), Geode Capital ($1.70B) and FMR/Fidelity ($1.37B) are the largest reported holders. Ownership is dominated by index and income mandates — which is precisely why the dividend decision carries outsized share-price consequence.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <div class="prose">Revenue mix, full-year 2025 (total $88.7B). UPS reports three segments; U.S. Domestic Package is two-thirds of revenue but under half of segment operating profit, which frames the whole restructuring.</div>
+
+  <div class="seg-bar">
+    <div style="flex:67.1;background:#ffb500;">U.S. DOMESTIC 67.1%</div>
+    <div style="flex:21.0;background:#3b82f6;color:#fff;">INTERNATIONAL 21.0%</div>
+    <div style="flex:11.9;background:#a78bfa;">SCS 11.9%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ffb500;"></span> U.S. Domestic Package — $59.5B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> International Package — $18.6B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Supply Chain Solutions — $10.6B</div>
+  </div>
+
+  <!-- SEGMENT 1 -->
+  <div class="biz-card" style="border-left: 3px solid #ffb500; margin-top:28px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">U.S. Domestic Package</div>
+        <span class="biz-badge dominant">~21% OF US PARCEL VOLUME · ~34% OF US PARCEL REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$59.5B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.0%</div><div class="biz-stat-label">Q2'26 Rev <span class="tip" title="Year-over-year: this period versus the same period one year earlier">YoY</span></div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7.7%</div><div class="biz-stat-label">FY25 Adj Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">67.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Ground, air and <span class="tip" title="Small package delivery for consumers and small businesses, as opposed to business-to-business freight">small-package</span> delivery inside the United States — the network that carries the fixed cost. The segment is the live test of the revenue-per-piece-versus-volume trade-off: in 2Q 2026 average daily volume fell to <strong>16,002 thousand pieces</strong> from 16,553 thousand (roughly <strong>−3.3%</strong>), yet revenue rose 6.0% to <strong>$14.93B</strong> because <strong>revenue per piece climbed 9.3%</strong> against cost per piece up only 4.9%. Adjusted operating profit rose 21% to <strong>$1,188M</strong> and adjusted margin expanded ~100 basis points to <strong>8.0%</strong>. On a <span class="tip" title="Generally Accepted Accounting Principles — reported results before management's non-recurring adjustments">GAAP</span> basis the same quarter earned just $16M (0.1% margin) because of a $1,172M pre-tax separation charge. For full-year 2025 the segment earned $3.926B GAAP (6.6%) / $4.604B adjusted (7.7%) on $59.5B; 4Q 2025 revenue was $16.756B on 19,970 thousand pieces per day with revenue per piece up 8.3%. The mix shift is deliberate: Amazon fell from over 13% of UPS volume to roughly <strong>8.8–9%</strong>, taking about <strong>$5 billion of revenue</strong> out with it.
+    </div>
+    <div class="biz-tam"><strong>Industry size:</strong> 22.4B US parcel shipments / $203.2B revenue (2024, Pitney Bowes Parcel Shipping Index) → projected 30.5B shipments by 2030, ~+36% / ~5% CAGR</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Amazon Logistics</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~28%</div><div class="comp-bubble-label">Vol Share '24</div></div>
+          <div><div class="comp-bubble-val">6.7B</div><div class="comp-bubble-label">Parcels '25</div></div>
+          <div><div class="comp-bubble-val">+9.8%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">USPS</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~31%</div><div class="comp-bubble-label">Vol Share '24</div></div>
+          <div><div class="comp-bubble-val">6.6B</div><div class="comp-bubble-label">Parcels '25</div></div>
+          <div><div class="comp-bubble-val">−8.3%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">FedEx (FDX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~17%</div><div class="comp-bubble-label">Vol Share '24</div></div>
+          <div><div class="comp-bubble-val">$63.2B</div><div class="comp-bubble-label">US Parcel Rev '24</div></div>
+          <div><div class="comp-bubble-val">+5.9%</div><div class="comp-bubble-label">Vol YoY '25</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEGMENT 2 -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International Package</div>
+        <span class="biz-badge emerging">MARGIN LEADER — GLOBAL TOP-3 EXPRESS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$18.6B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+12.5%</div><div class="biz-stat-label">Q2'26 Rev YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.8%</div><div class="biz-stat-label">FY25 Adj Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Export, import and intra-region parcel movement outside the US, run through UPS's own air fleet and international hubs. This is the highest-margin segment by a wide margin — <strong>15.5% GAAP / 15.8% adjusted operating margin in FY2025</strong> on $18.6B of revenue ($2.873B / $2.935B of operating profit), versus 7.7% adjusted in U.S. Domestic. In 2Q 2026 revenue rose <strong>12.5% to $5,044M</strong> with <strong>revenue per piece up 18.9%</strong>, though operating profit slipped to $623M from $672M (12.4% margin) as mix and trade-lane disruption bit. The removal of the <em>de minimis</em> exemption (the duty-free threshold that let low-value e-commerce parcels enter the US untaxed) crushed China-to-US small-parcel flows; CFO Brian Dykes told investors that the "de minimis elimination wrap-around in September is expected to provide a significant year-over-year tailwind." China-US lanes returned to growth in May 2026 and Asia-to-Asia volume grew <strong>13.6%</strong>.
+    </div>
+    <div class="biz-tam"><strong>Industry size:</strong> global cross-border CEP (courier/express/parcel) TAM not independently verified in this build — treat any global figure with caution. Verified proxy: UPS international revenue per piece <strong>+18.9% YoY</strong> in 2Q'26, +7.1% in 4Q'25</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">DHL Express (Deutsche Post)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Share (n/v)</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue (n/v)</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Metrics not verified from a live source in this build.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">FedEx Express</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">7.89%</div><div class="comp-bubble-label">FDX Op Margin</div></div>
+          <div><div class="comp-bubble-val">$77.7B</div><div class="comp-bubble-label">FDX Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">+44.2%</div><div class="comp-bubble-label">FDX 52wk</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEGMENT 3 -->
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Supply Chain Solutions</div>
+        <span class="biz-badge growth">FRAGMENTED MARKET — HEALTHCARE-LED GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$10.6B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7.8%</div><div class="biz-stat-label">Q2'26 Rev YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.6%</div><div class="biz-stat-label">FY25 Adj Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Forwarding, logistics, distribution and — increasingly — healthcare. FY2025 revenue of $10.6B produced $1.068B GAAP / $1.122B adjusted operating profit (10.1% / 10.6% margin); 4Q 2025 revenue fell 12.7% to $2.678B on portfolio pruning, but 2Q 2026 revenue rebounded <strong>7.8% to $2,860M</strong> with operating profit up to <strong>$291M (10.2% margin)</strong>. Healthcare is the strategic centrepiece: UPS Healthcare delivered <strong>$3.0 billion of revenue for a second consecutive quarter</strong> in 2Q 2026 (~$12B annualised) and operates <strong>17 million square feet</strong> of cGMP/GDP-compliant distribution space. On <strong>November 3, 2025</strong> UPS closed the acquisition of Canada's <strong>Andlauer Healthcare Group for CAD $55.00/share, ~CAD $2.2B (≈US$1.6B)</strong>, adding specialised cold-chain and 3PL pharma capability; founder Michael Andlauer now leads UPS Canada Healthcare. The Digital Access Program (small-business digital channel) added $1.4B of global revenue in the quarter.
+    </div>
+    <div class="biz-tam"><strong>Industry size:</strong> healthcare-logistics TAM not verified in this build. Verified scale markers: UPS Healthcare ~<strong>$3.0B/quarter</strong> revenue, <strong>17M sq ft</strong> cGMP/GDP space, Andlauer purchased for ≈<strong>US$1.6B</strong></div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">DHL Supply Chain</div>
+        <div class="comp-bubble-stats"><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Metrics (n/v)</div></div></div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Not verified in this build.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">FedEx Logistics / Supply Chain</div>
+        <div class="comp-bubble-stats"><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Metrics (n/v)</div></div></div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Not verified in this build.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Alternative / regional carriers</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">2.6B</div><div class="comp-bubble-label">US Parcels '25</div></div>
+          <div><div class="comp-bubble-val">+13%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="prose">Sources of moat:</div>
+  <div class="moat-list">
+    <span class="moat-pill">INTEGRATED AIR + GROUND NETWORK</span>
+    <span class="moat-pill">US RESIDENTIAL DENSITY</span>
+    <span class="moat-pill">~460,000 EMPLOYEES</span>
+    <span class="moat-pill">~$3B/YR CAPEX &amp; AUTOMATION</span>
+    <span class="moat-pill">HEALTHCARE COLD CHAIN — 17M SQ FT</span>
+    <span class="moat-pill">B2B CONTRACT BOOK &amp; SLAs</span>
+    <span class="moat-pill">CUSTOMS / BROKERAGE SCALE</span>
+  </div>
+  <div class="prose" style="margin-top:20px;">
+    <p>UPS's advantage is a single integrated network that carries residential, commercial, freight and healthcare volume over the same assets — the reason it can convert ~21% of US parcel <em>volume</em> into ~34% of US parcel <em>revenue</em>. Density is the mechanism: each additional stop on an existing route is close to pure contribution margin, which is why the company can afford to give away 2 million low-yield Amazon packages a day and still expand U.S. Domestic adjusted margin by 100 basis points. The moat is reinforced by capital intensity (~$3.0B of capex per year), by regulatory and customs infrastructure that a new entrant cannot replicate quickly, and by the healthcare franchise, where cGMP/GDP-certified space, validated cold-chain lanes and pharma qualification cycles create genuine switching costs. That last piece is where UPS is deliberately reallocating capital — Andlauer at ≈$1.6B was the largest expression of it.</p>
+    <p style="margin-top:14px;"><strong>Key vulnerabilities:</strong></p>
+    <p style="margin-top:10px;"><strong>1. Customer concentration inverting into competition.</strong> Amazon was over 13% of UPS volume at the pandemic peak and is now roughly 9%. But Amazon Logistics delivered <strong>6.7 billion US parcels in 2025 (+9.8%)</strong>, overtaking USPS to become the largest US parcel carrier — and it is increasingly selling third-party shipping. The Big Three (USPS, UPS, FedEx) now handle about <strong>61% of ~23.9 billion annual US parcels, down from ~85% pre-pandemic</strong>. UPS chose to exit low-margin Amazon work; Amazon did not stop growing.</p>
+    <p style="margin-top:10px;"><strong>2. A unionised cost base its largest competitors do not carry.</strong> The Teamsters national agreement runs through <strong>July 31, 2028</strong> and delivers <strong>$7.50/hour</strong> of increases to seniority employees over 2023–2028, plus cost-of-living escalators — Teamsters who completed progression received a <strong>$1.22/hour raise on August 1, 2026</strong>, including a $0.22 COLA tied to 4.4% May-to-May inflation. Part-time starting pay is $21/hour rising to $23/hour after August 1, 2027, and UPS committed to at least 22,500 permanent full-time openings and 28,000 replacement vehicles. Amazon Logistics' delivery-service-partner model and USPS carry structurally different labour economics.</p>
+    <p style="margin-top:10px;"><strong>3. Dividend coverage.</strong> The declared annual dividend of <strong>$6.56</strong> exceeds <span class="tip" title="Trailing twelve months — the most recent four reported quarters">TTM</span> GAAP EPS of <strong>$5.38</strong>, a <span class="tip" title="Payout ratio: dividends as a percentage of earnings. Above 100% means the company is paying out more than it earns">payout ratio</span> of <strong>121.95%</strong>, and roughly equals TTM free cash flow per share of <strong>$6.41</strong>. Guided 2026 dividends of ~$5.4B against ~$5.5B of guided free cash flow leaves essentially no cushion after ~$3.0B of capex. This is the core of the value-versus-value-trap argument.</p>
+    <p style="margin-top:10px;"><strong>4. Regulatory and trade-policy exposure.</strong> The elimination of the <em>de minimis</em> duty exemption re-routed a large slice of Asia-origin e-commerce; tariffs continue to reshape lane mix. UPS is currently positioning this as a September tailwind, but the same mechanism can reverse. UPS reportedly also carries a US Postal Service air-cargo agreement won from FedEx — <em>this specific contract could not be verified against a live source in this build and should be confirmed before it is relied on.</em></p>
+  </div>
+</div>
+
+<!-- ============ 04 FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>UPS</th><th>Industry Ref*</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings: share price divided by earnings per share over the last twelve months">Trailing P/E</span></td><td class="a">19.12</td><td>17.70</td><td>28.00</td><td>Cheap against the index, slightly richer than FedEx — but the denominator is depressed by ~$1.2B of restructuring charges.</td></tr>
+      <tr><td><span class="tip" title="Share price divided by consensus earnings per share for the next twelve months">Forward P/E</span></td><td class="g">13.22</td><td>18.55</td><td>≈22.5 (est.)</td><td>The valuation case in one number: forward multiple 5.3 turns below FedEx on ~$7.22 guided adjusted EPS.</td></tr>
+      <tr><td><span class="tip" title="P/E divided by expected earnings growth rate — a valuation measure that adjusts for growth">PEG Ratio</span></td><td class="a">1.72</td><td>1.68</td><td>≈2.3 (est.)</td><td>Roughly level with FedEx. Growth is the weak link, not the multiple.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td><td class="n">$5.38</td><td>—</td><td>—</td><td>GAAP. Adjusted FY2025 EPS was $7.16 and 2026 guidance is ~$7.22 — a $1.80+ gap driven by transformation charges.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year change in total revenue">Revenue Growth (YoY)</span></td><td class="r">−0.42% <span style="color:var(--text-dim);font-size:11px;">TTM</span></td><td>≈+0.7%</td><td>≈+6% (est.)</td><td>FY2025 was −2.65%. Volume is being given away on purpose; 2026 guidance of ~$91.2B implies a return to ~+2.9%.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue">Gross Margin</span></td><td class="r">22.41%</td><td>27.32%</td><td>≈33% (est.)</td><td>Asset-heavy delivery economics. The relevant number is adjusted operating margin: 9.8% FY25, guided ~9.5% for 2026.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue — what is left after every cost, interest and tax">Net Profit Margin</span></td><td class="a">5.08%</td><td>4.68%</td><td>≈12.5% (est.)</td><td>Ahead of FedEx but less than half the 13.25% UPS earned in 2021. The compression is the whole bear story.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td class="g">6.38%</td><td>1.70%</td><td>0.98%</td><td>$6.56/share. Roughly 6.5x the index yield — the market is pricing meaningful probability of a cut.</td></tr>
+      <tr><td><span class="tip" title="Dividends paid as a percentage of earnings. Over 100% means the dividend exceeds reported profit">Payout Ratio</span></td><td class="r">121.95%</td><td>30.03%</td><td>27.38%</td><td><strong>Flagged.</strong> Dividend exceeds GAAP earnings and consumes ~99% of guided free cash flow ($5.4B of ~$5.5B). Not sustainable indefinitely without earnings recovery.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares outstanding sold short by investors betting the price will fall">Short Interest %</span></td><td class="r">2.80%</td><td>2.15%</td><td>≈2.0% (est.)</td><td>23.81M shares short. Above peer and index but low in absolute terms — this is not a crowded short.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a measure of balance-sheet leverage">Debt-to-Equity</span></td><td class="r">1.90</td><td>1.36</td><td>≈1.0 (est.)</td><td>$28.67B total debt vs $4.65B cash; enterprise value $111.53B. Leverage limits flexibility if the dividend is defended through a downturn.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td class="a">1.18</td><td>1.48</td><td>≈1.2 (est.)</td><td>Quick ratio 1.05. Adequate for a business with fast cash conversion, but thinner than FedEx.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow: operating cash flow less capital expenditure">Free Cash Flow</span></td><td class="n">$5.46B</td><td>—</td><td>—</td><td>$8.87B operating cash flow less ~$3.4B capex. FCF/share $6.41 versus a $6.56 dividend — a 98% coverage shortfall.</td></tr>
+      <tr><td><span class="tip" title="Return on equity: net income divided by shareholders' equity">ROE</span></td><td class="g">29.60%</td><td>14.85%</td><td>≈19% (est.)</td><td>Flattered by a small equity base ($17.71 book value per share) and leverage, but still double FedEx.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital: after-tax operating profit divided by debt plus equity — how efficiently the whole capital base earns">ROIC</span></td><td class="g">16.48%</td><td>9.18%</td><td>≈11% (est.)</td><td>Comfortably above any plausible cost of capital. The network still earns its keep even at trough margins.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to overall market moves; 1.0 means it moves in line with the market">Beta</span></td><td class="a">1.04</td><td>1.36</td><td>1.01</td><td>Market-like volatility, well below FedEx — consistent with the income-oriented holder base.</td></tr>
+      <tr><td>52-Week Range</td><td class="n">$82.00 – $122.41</td><td>—</td><td>—</td><td>Currently $102.86, about 25% above the low and 16% below the high. 52-week price change +18.90%.</td></tr>
+    </tbody>
+  </table>
+  <div class="prose" style="margin-top:14px;font-size:13px;">
+    <p>* <strong>Industry Ref</strong> uses FedEx (FDX) reported statistics as the closest large-cap Integrated Freight &amp; Logistics comparable, not a cap-weighted industry average — treat it as indicative. S&amp;P 500 P/E (28.00), dividend yield (0.98%), payout ratio (27.38%) and beta (1.01) are the verified SPY ETF figures; <strong>every S&amp;P 500 value marked "(est.)" is an approximation and was not verified against a live source in this build.</strong></p>
+  </div>
+
+  <div class="prose" style="margin-top:28px;">
+    <p><strong>Notable One-Off Items</strong> — the gap between GAAP and adjusted results is unusually wide right now, and reported earnings should not be taken at face value.</p>
+    <p style="margin-top:12px;"><strong>2Q 2026 transformation charge.</strong> UPS booked <strong>$1,172 million pre-tax / $891 million after-tax ($1.05 per diluted share)</strong> under "Network Reconfiguration &amp; Efficiency Reimagined," principally employee separation costs from the completed Driver Choice Program (a voluntary driver buyout capped at 7,500 participants after union negotiation). This drove U.S. Domestic GAAP operating profit to $16M against $1,188M adjusted, and consolidated GAAP EPS to $0.71 against $1.76 adjusted.</p>
+    <p style="margin-top:12px;"><strong>Full-year 2026 charge guidance.</strong> Management expects <strong>$1.3–$1.5 billion</strong> of transformation costs for 2026, of which roughly <strong>$1.1 billion</strong> relates to the Driver Choice Program. Cumulative program cost through June 2026 was $1.8 billion ($1.2 billion incurred in 2026).</p>
+    <p style="margin-top:12px;"><strong>FY2025 items.</strong> A <strong>$182 million pre-tax ($137 million after-tax, $0.16/share) impairment</strong> on retirement of the MD-11 aircraft fleet; total transformation costs of <strong>$593 million</strong> ($0.53/share after tax — Transformation 2.0 $37M, Fit to Serve $47M, Network Reconfiguration $509M); and a <strong>+$109 million ($0.13/share) benefit</strong> from reversal of an income-tax valuation allowance.</p>
+    <p style="margin-top:12px;"><strong>M&amp;A and divestitures.</strong> The <strong>Andlauer Healthcare Group</strong> acquisition closed November 3, 2025 for approximately US$1.6 billion, adding inorganic revenue to Supply Chain Solutions and healthcare from 4Q 2025 onward — 2026 segment growth rates are therefore not fully organic. UPS's earlier divestiture of the <strong>Coyote Logistics</strong> truckload brokerage is frequently cited as a driver of the Supply Chain Solutions revenue decline (4Q 2025 revenue −12.7%); <em>the transaction value and closing date were not verified against a live source in this build.</em> No goodwill impairment or pension mark-to-market charge was identified in the 2025 or 2026 releases reviewed here — pension remeasurement has historically been a recurring 4Q distortion for UPS, so the upcoming 4Q 2026 report warrants attention.</p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">BUY</div>
+      <div class="card-note">29 analysts (StockAnalysis / S&amp;P Global Market Intelligence &amp; TipRanks, as of Aug 14, 2026). MarketBeat's narrower 21-analyst panel scores it a <strong>Hold</strong> — the split itself is informative.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$116.15</div>
+      <div class="card-note"><span style="color:var(--green);">+12.92% upside</span> from $102.86. MarketBeat's panel averages $117.41.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$76 – $135</div>
+      <div class="card-note">Low implies −26.11%, high implies +31.25%. A 78% spread between bull and bear targets is unusually wide for a mega-cap industrial — the dividend question is unresolved.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">14 / 0 / 12 / 3</div>
+      <div class="card-note">Strong Buy 14 · Buy 0 · Hold 12 · Sell 2 · Strong Sell 1. Barbelled, with almost nothing in the middle.</div>
+    </div>
+  </div>
+
+  <div class="analyst-bar">
+    <div style="flex:14;background:#22c55e;"></div>
+    <div style="flex:0.01;background:#4ade80;"></div>
+    <div style="flex:12;background:#f59e0b;"></div>
+    <div style="flex:2;background:#f87171;"></div>
+    <div style="flex:1;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Strong Buy 14</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 0</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold 12</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f87171;"></span> Sell 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Strong Sell 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;">KEY RECENT ANALYST CALLS</div>
+  <div class="prose" style="margin-top:14px;">
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>Sanford C. Bernstein — David Vernon</strong> · Outperform · PT raised $130 → <span style="color:var(--green);">$133</span> (Jul 21, 2026). Highest active target on the Street; the bull framing is that the Amazon glide-down removes a structural margin drag and U.S. Domestic yield gains are durable.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>Citigroup — Ariel Rosa</strong> · Buy · PT raised $127 → <span style="color:var(--green);">$132</span> (Jul 9, 2026). Raised ahead of the print, anticipating that cost-out was running ahead of the $3B target.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>Stephens — Jack Atkins</strong> · Overweight · PT cut $135 → <span style="color:var(--amber);">$130</span> (Jul 29, 2026). Constructive rating but a trimmed target the day after Q2 — the cut signals concern about how much yield expansion survives once the Amazon base effect laps.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>BMO Capital Markets — Fadi Chamoun</strong> · Market Perform · PT raised $110 → <span style="color:var(--amber);">$115</span> (Jul 29, 2026). Acknowledges execution, withholds the rating — essentially the median view: better company, unresolved capital-return question.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>UBS — Thomas Wadewitz</strong> · Buy · PT raised $123 → <span style="color:var(--green);">$124</span> (Jul 29, 2026). Also on Jul 29: Susquehanna (Bascome Majors, Neutral, $118 → $120) and Oppenheimer (Scott Schneeberger, Outperform, $115 → $117). Weiss Ratings upgraded Sell → Hold on Aug 17, 2026.</p>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2Q 2026 earnings — Amazon glide-down declared complete, guidance raised</div>
+        <div class="tl-desc">Adjusted EPS $1.76 vs $1.55; adjusted operating profit $2,102M (9.2% margin) on $22.8B revenue. Full-year guidance lifted from ~$89.7B to <strong>~$91.2B</strong> revenue, ~$8.65B adjusted operating profit and ~$7.22 adjusted EPS. GAAP EPS was only $0.71 after the $891M after-tax separation charge.</div>
+        <div class="tl-impact up">Reaction: positive — beat consensus $7.11 adj. EPS guide</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">De minimis anniversary wrap-around</div>
+        <div class="tl-desc">CFO Brian Dykes guided that lapping the elimination of the <em>de minimis</em> duty exemption from September will be "a significant year-over-year tailwind" for International Package. China-to-US lanes returned to growth in May 2026 and Asia-to-Asia volume rose 13.6% in 2Q — the comparison base gets materially easier.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">3Q 2026 earnings — first clean post-glide-down quarter</div>
+        <div class="tl-desc">Date not yet confirmed by the company; verify before relying on it. This is the first quarter in which U.S. Domestic volume and revenue-per-piece comparisons are no longer distorted by the Amazon step-down, so it is the cleanest read on whether the yield gains are structural or a mix artefact.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Peak season pricing and the 24% sequential volume assumption</div>
+        <div class="tl-desc">Management's guidance embeds an assumed <strong>24% sequential volume lift from Q3 to Q4</strong> with "rational" pricing and supportive holiday surcharges. With ~150 buildings closed and 50 million hours removed, the network has far less slack than in prior peaks — good for margin if volume lands as planned, painful if it overshoots or undershoots.</div>
+        <div class="tl-impact neutral">Key near-term event — highest-variance quarter</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026 / Jan 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Network savings realisation: $1.2B achieved vs ~$3B targeted</div>
+        <div class="tl-desc">First-half 2026 program benefits were approximately <strong>$1.2 billion</strong> against a full-year target of <strong>~$3 billion</strong>, implying $1.8B must land in the back half. For reference, 2025 delivered ~$3.5 billion of year-over-year savings against 93 building closures and ~48,000 position reductions. Under-delivery would put the 9.5%-ish adjusted margin at risk.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q1 2027 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend policy decision</div>
+        <div class="tl-desc">UPS has historically reset the dividend with the February board declaration. With a <strong>121.95% payout ratio</strong> on GAAP earnings, $6.56 of dividend against $6.41 of free cash flow per share, and ~$5.4B of dividends versus ~$5.5B of guided FCF, the board faces a genuine choice: hold flat and rely on 2027 EPS recovery to ~$8.08 consensus, or rebase. This single decision explains most of the $76–$135 target spread.</div>
+        <div class="tl-impact down">Binary risk event — the core of the value-trap debate</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Through Jul 2028</div>
+      <div class="tl-content">
+        <div class="tl-title">Teamsters contract escalators and tariff policy</div>
+        <div class="tl-desc">The national agreement runs to July 31, 2028 with $7.50/hour of increases over 2023–2028 plus COLA — a $1.22/hour raise landed August 1, 2026. Separately, tariff levels and any further change to cross-border e-commerce treatment directly reset International Package mix and yield in both directions.</div>
+        <div class="tl-impact neutral">Ongoing structural factor</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">UPS — Monthly Closes, Sep 2021 → Aug 2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ STATIC DATA AS OF AUG 19, 2026 — hardcoded month-end closes, not live</div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:18px;height:3px;background:#ffb500;vertical-align:middle;margin-right:6px;"></span>Price</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (1-mo)</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (3-mo)</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (10-mo)</span>
+      </div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ STATIC DATA AS OF AUG 19, 2026</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-top:6px;max-width:760px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 means the stock has run hard and may be stretched; below 30 means it has been sold hard and may be washed out. It is a momentum gauge, not a forecast.</div>
+    <div style="position:relative;width:100%;height:150px;margin-top:12px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <div class="prose" style="margin-top:28px;">
+    <p><strong>Five-year trajectory.</strong> UPS closed August 2021 at <strong>$195.63</strong> and September 2021 at $182.10. It closed August 19, 2026 at <strong>$102.86</strong> — a <strong>−43.5%</strong> price return over the five-year window from September 2021, or roughly <strong>−29.6%</strong> on a dividend-adjusted total-return basis (the ~14-point wedge is the 6%-ish yield doing its work). The monthly-close peak was <strong>$214.46 in March 2022</strong>; from there to the September 2025 monthly-close low of <strong>$83.53</strong> the stock lost <strong>61%</strong>. That is not a growth de-rating — it is a full cycle unwind of pandemic parcel economics, layered on top of a self-inflicted revenue reduction.</p>
+    <p style="margin-top:14px;">The last twelve months have been a genuine recovery: <strong>+18.90%</strong> over 52 weeks, and <strong>+23.1%</strong> off the September 2025 low. But the stock still sits <strong>16% below its 52-week high of $122.41</strong> and roughly half its 2022 peak. The market has re-rated the operational turnaround while refusing to re-rate the dividend.</p>
+    <p style="margin-top:14px;"><strong>Relative performance.</strong> Over the trailing year UPS's +18.90% price change lagged SPY's <strong>+20.87% total return</strong> — close, but behind. It badly lagged its closest peer: FedEx returned <strong>+44.20%</strong> over the same 52 weeks, more than double UPS. Over five years the gap is far larger; the S&amp;P 500's five-year cumulative return was not verified against a live source in this build, but UPS's −43.5% price return against an index that compounded strongly through 2023–2026 represents severe and persistent underperformance. UPS is a re-rating story that has only just begun to work, not a compounder that stumbled.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Mar 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle peak — $214.46 monthly close</div>
+        <div class="tl-desc">Pandemic parcel demand, constrained capacity and record pricing produced FY2022 revenue of $100.3B, 14.27% operating margin and $13.20 GAAP EPS. Everything since has been mean reversion.</div>
+        <div class="tl-impact up">All-time area high (monthly close basis)</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">First break — $161.54, −24.7% from the March peak</div>
+        <div class="tl-desc">E-commerce normalisation began to bite as consumers rotated back to services. FY2023 revenue fell 9.35% to $91.0B and operating margin collapsed from 14.27% to 10.49%.</div>
+        <div class="tl-impact down">Volume normalisation begins</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul–Aug 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Teamsters agreement averts a strike — $187.13 → $169.40</div>
+        <div class="tl-desc">The national contract running to July 31, 2028 removed strike risk but locked in $7.50/hour of wage increases plus COLA, a $21/hour part-time floor, 22,500 committed full-time openings and 28,000 replacement vehicles. Volume diverted during the negotiation did not fully return.</div>
+        <div class="tl-impact down">Cost base permanently reset higher</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">$141.25 — margin trough recognised</div>
+        <div class="tl-desc">FY2023 landed at $6,708M net income and $7.80 EPS, down from $11,548M and $13.20 a year earlier. The market began treating UPS as a cyclical industrial rather than a secular e-commerce beneficiary.</div>
+        <div class="tl-impact down">Multiple compression</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Amazon glide-down announced — $114.23, first close under $120 since 2020</div>
+        <div class="tl-desc">UPS disclosed the agreement to cut Amazon's US volume roughly in half over 18 months because the business was structurally low margin. The market read it as ~$5B of revenue walking out the door with uncertain cost offset.</div>
+        <div class="tl-impact down">Strategic pivot, hostile reception</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun → Jul 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$100.94 → $86.16 — a −14.6% month</div>
+        <div class="tl-desc">The steepest monthly decline of the five-year window, as the cost of the transition became visible before any of the benefit. FY2025 ultimately delivered ~$3.5B of year-over-year savings on 93 building closures and ~48,000 fewer positions — but that was not yet apparent.</div>
+        <div class="tl-impact down">Peak pessimism approach</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle low — $83.53 monthly close</div>
+        <div class="tl-desc">−61% from the March 2022 peak. At this level the dividend yield exceeded 7.8%, an explicit market signal that a cut was expected.</div>
+        <div class="tl-impact down">Five-year low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Recovery high — $115.96, +38.8% off the low</div>
+        <div class="tl-desc">The 4Q 2025 report (Jan 27, 2026) delivered FY2025 adjusted EPS of $7.16, ~$5.5B of adjusted free cash flow and a 2026 plan of ~$89.7B revenue at ~9.6% adjusted margin. The turnaround was suddenly credible.</div>
+        <div class="tl-impact up">Re-rating begins</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$98.38 — a −15.2% single-month give-back</div>
+        <div class="tl-desc">Tariff escalation and cross-border uncertainty hit International Package sentiment hard, demonstrating how much of the equity story now runs through trade policy rather than parcel volume.</div>
+        <div class="tl-impact down">Trade-policy shock</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul–Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Glide-down complete — consolidating at $102–$108</div>
+        <div class="tl-desc">2Q 2026 beat and guidance raise on July 28 confirmed the strategy is working operationally (U.S. Domestic adjusted margin 8.0%, +100bp; revenue per piece +9.3%). The stock has gone sideways since, because the operational question is answered and the capital-return question is not.</div>
+        <div class="tl-impact neutral">Awaiting the dividend decision</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY & RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The hard part is done. UPS removed ~2 million low-margin Amazon packages a day, ~78,000 positions, ~150 buildings, ~50 million hours and ~$4.5 billion of cost — and came out with U.S. Domestic adjusted margin <em>up</em> 100bp to 8.0% on revenue per piece +9.3% against cost per piece +4.9%. Guidance was raised to ~$91.2B / ~$8.65B / ~$7.22, International is compounding at 12.5% with an 18.9% yield gain and a September de minimis tailwind ahead, and healthcare is a $12B-run-rate franchise reinforced by the $1.6B Andlauer deal. At a 13.22 forward P/E — 5.3 turns below FedEx and less than half the index — you are paid a 6.38% yield to wait for 2027 consensus EPS of $8.08.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The dividend costs more than the company earns. $6.56 per share against $5.38 TTM GAAP EPS is a 121.95% payout; $5.4B of dividends against ~$5.5B of guided free cash flow leaves nothing after $3.0B of capex, on a balance sheet already at 1.90 debt-to-equity. Meanwhile net margin has fallen from 13.25% (2021) to 5.08%, revenue is still negative on a TTM basis, volume is shrinking, and the customer UPS fired — Amazon Logistics — just became the largest US parcel carrier at 6.7 billion parcels and is taking third-party freight. The Big Three's share of US parcels has fallen from ~85% to 61%. Teamsters escalators run to 2028 regardless. A yield near 6.4% on a 122% payout is not a value signal; it is the market pricing a cut.</p>
+    </div>
+  </div>
+
+  <div class="prose" style="margin-top:32px;"><strong>Top 3 Risks</strong></div>
+  <div class="risk-list">
+    <div class="risk-item">
+      <span class="risk-num">01</span>
+      <div><strong>Dividend rebasing.</strong> With a 121.95% payout ratio, FCF per share of $6.41 against a $6.56 dividend, and an income-dominated shareholder base (60.26% institutional, heavily indexed and yield-mandated), a cut would trigger forced selling well beyond the arithmetic of the reduced payout. The board's next declaration is the single highest-variance event in the story.</div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">02</span>
+      <div><strong>The yield gains prove to be a mix artefact.</strong> Revenue per piece rose 9.3% in 2Q 2026 largely because two million of the cheapest packages left the network. Once the Amazon base laps, the comparison resets and the underlying question — can UPS raise price on the volume it kept, against a 24%-share Amazon Logistics and a growing pool of alternative carriers up 13% — has not yet been answered. Volume is still declining ~3.3%.</div>
+    </div>
+    <div class="risk-item">
+      <span class="risk-num">03</span>
+      <div><strong>Operating leverage cuts both ways in a stripped-down network.</strong> After ~150 building closures and 50 million hours removed, UPS has far less capacity slack. Management's Q4 plan assumes a 24% sequential volume lift with rational pricing; a soft peak, a tariff shock, or an unexpected volume surge into a thinned network would all damage margin, and $1.3–$1.5B of 2026 transformation charges are still flowing through GAAP results while savings arrive on a lag ($1.2B realised in H1 versus ~$3B targeted for the year).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Parcel volume and pricing after the e-commerce normalisation</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        The US parcel market grew to <strong>22.4 billion shipments and $203.2 billion of revenue in 2024</strong> — volume up just 3.4% and revenue up 2.7%, with <strong>revenue per parcel falling to $9.09 from $9.10</strong>. Pitney Bowes projects ~5% annual volume growth to 30.5 billion shipments by 2030 (+36%), which is healthy but nothing like the pandemic step-function. The structural problem is share: the Big Three now handle roughly <strong>61% of ~23.9 billion annual US parcels, down from ~85% pre-pandemic</strong>, while alternative and regional carriers grew 13% in 2025 to 2.6 billion parcels. A market growing at 5% with price flat and share leaking to lower-cost entrants is a market where incumbents must earn margin from cost, not from volume — which is exactly the bet UPS has made.
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Tariffs and cross-border e-commerce flows</div>
+        <span class="biz-badge growth">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        The elimination of the <em>de minimis</em> exemption removed the duty-free treatment that made ultra-low-value Asia-to-US parcels economic, gutting a high-volume, low-yield lane. UPS is now on the other side of that shock: China-to-US lanes <strong>returned to growth in May 2026</strong>, Asia-to-Asia volume grew <strong>13.6%</strong>, International revenue rose <strong>12.5% to $5.04B</strong> with <strong>revenue per piece up 18.9%</strong>, and CFO Brian Dykes has guided that the <strong>September wrap-around will be "a significant year-over-year tailwind."</strong> The catch is that this is policy-derived, not demand-derived — March 2026's −15.2% month showed how fast trade headlines re-price the stock. International is 21% of revenue but earned a 15.8% adjusted margin in FY2025, roughly double U.S. Domestic, so the lane mix matters far more to profit than to revenue.
+      </div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Labour cost structure versus non-union competitors</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;">
+        UPS employs roughly <strong>460,000 people</strong> under a Teamsters national agreement running to <strong>July 31, 2028</strong>: <strong>$7.50/hour</strong> of increases across 2023–2028, a <strong>$1.22/hour raise on August 1, 2026</strong> including a $0.22 COLA, part-time entry at $21/hour rising to $23/hour after August 2027, plus commitments to 22,500 permanent full-time openings and 28,000 replacement vehicles. Amazon Logistics' delivery-service-partner network and the alternative carriers taking share operate on materially different labour economics. Even the buyout mechanism was constrained — the Driver Choice Program had to be <strong>capped at 7,500 participants</strong> after union negotiation, and still cost ~$1.1B of the $1.3–$1.5B of 2026 transformation charges.
+        <br><br><strong style="color:var(--text);">Bull vs bear framing:</strong> the bull argues UPS has already absorbed the worst of it — $4.5B of cost removed, 78,000 positions gone, U.S. Domestic adjusted margin up 100bp to 8.0% <em>despite</em> the escalators, and a 13.22 forward P/E that assumes none of it sticks. The bear argues that a fixed, contractually rising cost base against declining volume is precisely the definition of negative operating leverage, that the 121.95% payout ratio removes the balance-sheet cushion needed to absorb it, and that every dollar of savings from here is harder than the last because the easy 150 buildings are already closed.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER ============ -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 19, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:14px;max-width:900px;margin-left:auto;margin-right:auto;">
+    <strong>Sources.</strong> Price, market capitalisation, valuation, balance-sheet, returns and ownership statistics: StockAnalysis.com (UPS quote, statistics, financials and forecast pages; sourced from S&amp;P Global Market Intelligence and TipRanks, analyst data as of Aug 14, 2026). Global market-cap rank: CompaniesMarketCap.com. Monthly closing prices: Digrin.com ("Real price" column), cross-checked against StockAnalysis daily closes for Apr–Aug 2026. Segment revenue, operating profit, margin, average daily volume, revenue per piece, guidance, transformation charges and the Andlauer acquisition: UPS Investor Relations press releases (2Q 2026 earnings, July 28, 2026; 4Q 2025 earnings and 2026 guidance, January 27, 2026; Andlauer acquisition completion, November 3, 2025) and UPS 2Q 2026 earnings-call coverage. Restructuring detail (building closures, headcount, savings): FreightWaves and Yahoo Finance reporting of the Q1 2026 and Q4 2025 earnings calls. US parcel market size, carrier volumes and share: Pitney Bowes Parcel Shipping Index (2024) via Yahoo Finance, ShipMatrix data via FreightWaves/Red Stag Fulfillment, and 2025 carrier volume rankings via GetTransport. Named analyst calls, targets and ratings: MarketBeat. Teamsters contract terms: Supply Chain Dive and Teamsters for a Democratic Union. Peer comparisons: FedEx (FDX) StockAnalysis statistics. Index comparisons: SPDR S&amp;P 500 ETF (SPY) via StockAnalysis.
+  </p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">
+    <strong>Estimated and unverified items are flagged inline.</strong> The NYSE market-cap rank, the next-earnings date, and all S&amp;P 500 column values marked "(est.)" are approximations that were not verified against a live source. Competitor metrics for DHL, DHL Supply Chain and FedEx Logistics could not be verified and are shown as "—". The US Postal Service air-cargo agreement and the Coyote Logistics divestiture terms are referenced but were not verified in this build. Segment market-share figures are third-party estimates (ShipMatrix / Pitney Bowes) and differ between sources; ranges are shown where sources disagree. Verify all figures against UPS's SEC filings (10-K, 10-Q) before acting on them.
+  </p>
+  <p style="margin-top:14px;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making investment decisions.</p>
+  <p style="margin-top:10px;color:var(--accent);font-family:'JetBrains Mono',monospace;">The Tilted Gent — finance and risk education</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ============================================================
+// STATIC DATA — hardcoded month-end closes, Sep 2021 → Aug 2026
+// Source: Digrin.com "Real price" column (unadjusted month-end
+// closes), cross-checked vs StockAnalysis.com daily closes for
+// Apr 30 / May 29 / Jun 30 2026 and the Aug 19 2026 close.
+// DATA AS OF: 2026-08-19. Does not update.
+// ============================================================
+const labels = [
+  'Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22',
+  'Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23',
+  'Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24',
+  'Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25',
+  'Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+const prices = [
+  182.10, 213.47, 198.37, 214.34, 202.21, 210.42, 214.46, 179.98, 182.25, 182.54, 194.89, 194.51,
+  161.54, 167.77, 189.73, 173.84, 185.23, 182.49, 193.99, 179.81, 167.00, 179.25, 187.13, 169.40,
+  155.87, 141.25, 151.61, 157.23, 141.90, 148.26, 148.63, 147.48, 138.93, 136.85, 130.37, 128.55,
+  136.34, 134.06, 135.72, 126.10, 114.23, 119.03, 109.99,  95.30,  97.54, 100.94,  86.16,  87.44,
+   83.53,  96.42,  95.79,  99.19, 106.22, 115.96,  98.38, 108.80, 106.69, 107.50, 104.23, 102.86
+];
+
+// simple moving average helper (window in months)
+function sma(arr, w) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < w - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - w + 1; j <= i; j++) s += arr[j];
+    out.push(+(s / w).toFixed(2));
+  }
+  return out;
+}
+
+// 6-period RSI on monthly data
+function computeRSI(arr, period) {
+  const rsi = new Array(arr.length).fill(null);
+  if (arr.length <= period) return rsi;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = arr[i] - arr[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let ag = gains / period, al = losses / period;
+  rsi[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (let i = period + 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    ag = (ag * (period - 1) + g) / period;
+    al = (al * (period - 1) + l) / period;
+    rsi[i] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return rsi;
+}
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsiVals = computeRSI(prices, 6);
+
+// annotated inflection points
+const events = [
+  { idx: 6,  label: 'Mar 2022 — cycle peak $214.46',                 color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — e-commerce normalisation, −24.7%',   color: '#ef4444' },
+  { idx: 22, label: 'Jul 2023 — Teamsters deal, cost base resets',   color: '#f59e0b' },
+  { idx: 40, label: 'Jan 2025 — Amazon glide-down announced',        color: '#ef4444' },
+  { idx: 46, label: 'Jul 2025 — −14.6% month, worst of the window',  color: '#ef4444' },
+  { idx: 48, label: 'Sep 2025 — cycle low $83.53 (−61% from peak)',  color: '#ef4444' },
+  { idx: 53, label: 'Feb 2026 — recovery high $115.96, +38.8%',      color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — $102.86, glide-down complete',       color: '#ffb500' }
+];
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const ptRadius = prices.map((p, i) => eventMap[i] ? 6 : 0);
+const ptColor  = prices.map((p, i) => eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)');
+
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255,181,0,0.20)');
+grad.addColorStop(1, 'rgba(255,181,0,0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#ffb500',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: ptRadius,
+        pointBackgroundColor: ptColor,
+        pointBorderColor: ptColor,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      { label: '20-Day MA (1-mo)',  data: ma1,  borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4,4], pointRadius: 0, fill: false, tension: 0.25, order: 2 },
+      { label: '50-Day MA (3-mo)',  data: ma3,  borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [6,4], pointRadius: 0, fill: false, tension: 0.25, order: 3 },
+      { label: '200-Day MA (10-mo)',data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [8,5], pointRadius: 0, fill: false, tension: 0.25, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#ffb500',
+        bodyColor: '#e2e8f0',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const i = items[0].dataIndex;
+            return eventMap[i] ? ['', '▸ ' + eventMap[i].label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+// ---------------- RSI ----------------
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsiVals,
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      fill: true,
+      tension: 0.25,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#ffb500',
+        bodyColor: '#e2e8f0',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 12 },
+        padding: 10,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            const v = ctx.parsed.y;
+            let tag = 'Neutral';
+            if (v >= 70) tag = 'Overbought';
+            else if (v <= 30) tag = 'Oversold';
+            return 'RSI(6): ' + v.toFixed(1) + '  — ' + tag;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function(ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.45)';
+            return 'rgba(30,41,59,0.5)';
+          },
+          lineWidth: function(ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: function(ctx) {
+            if (ctx.tick && ctx.tick.value === 70) return '#ef4444';
+            if (ctx.tick && ctx.tick.value === 30) return '#22c55e';
+            return '#64748b';
+          },
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
