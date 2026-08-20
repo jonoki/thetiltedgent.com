@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MRSH — Marsh &amp; McLennan Companies, Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4d90c8;
+  --accent-dim: #4d90c833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 19, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">MRSH</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials — Insurance Brokers</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $90.29B</span>
+      </div>
+      <div style="margin-top:10px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--amber);background:var(--amber-dim);display:inline-block;padding:3px 10px;border-radius:4px;">⚠ TICKER CHANGED — NOW TRADES AS <strong>MRSH</strong> ON NYSE (EFFECTIVE JANUARY 2026)</div>
+      <div style="margin-top:12px;">
+        <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--accent);letter-spacing:1px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;margin-left:6px;">Global: #272</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;margin-left:6px;">US: #196</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;margin-left:6px;">NYSE: ~#105 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Marsh &amp; McLennan Companies, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$189.20</div>
+      <div class="price-change" style="color:var(--green);">+$2.83 (+1.52%)</div>
+      <div class="price-date">Close — Aug 19, 2026, 4:00 PM EDT</div>
+      <div class="price-date">After-hours quote not available from sources</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1166 Avenue of the Americas, New York, NY</div>
+    <div class="meta-item"><span>Employees:</span> ~95,000</div>
+    <div class="meta-item"><span>Founded:</span> 1871 (Marsh business); MMC formed 1905</div>
+    <div class="meta-item"><span>Next Earnings:</span> Oct 22, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <div class="prose">
+    <p>Marsh &amp; McLennan is the world's largest insurance and reinsurance broker and one of its largest professional-services firms, operating in 130 countries through two reported segments: <strong>Risk and Insurance Services</strong> (Marsh Risk in insurance broking, Guy Carpenter in reinsurance broking) and <strong>Consulting</strong> (Mercer in health, wealth and career; Oliver Wyman in management consulting). Fiscal 2025 revenue was <strong>$26.98 billion</strong>, up <strong>10.3%</strong> <span class="tip" title="Year-over-year — change versus the same period one year earlier.">YoY</span> on a reported basis but only <strong>+4% on an underlying (organic, constant-currency, acquisition-adjusted) basis</strong> — the gap is almost entirely the McGriff acquisition. Adjusted operating margin expanded to <strong>27.1%</strong> from 26.8%, and adjusted <span class="tip" title="Earnings per share — net income divided by diluted shares outstanding.">EPS</span> rose 9% to <strong>$9.75</strong>.</p>
+    <p style="margin-top:14px;">The business model is asset-light and fee-based: brokers earn <strong>commissions calculated as a percentage of the insurance premium placed</strong>, plus fees. That makes revenue recurring and capital-light — but it also means <strong>the direction of property-and-casualty (P&amp;C) insurance pricing feeds straight through to organic growth</strong>. With commercial rates down 6% in Q2 2026 and global property down 12%, this is the central debate on the stock. At $90.3 billion of market capitalisation MMC ranks roughly <strong>#272 globally</strong> and <strong>#196 in the United States</strong> by market value, and it is by a wide margin the largest company in the listed Insurance Brokers industry (~30% of the group's $89.4 billion of combined revenue).</p>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 12px;">NOTABLE EXECUTIVES &amp; OWNERS</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">John Q. Doyle</div>
+      <div class="card-note">President and CEO since January 2023, a career Marsh executive who previously ran Marsh (the insurance broking unit) and served as Group President/COO. He led the $7.75bn McGriff purchase and the 2025 decision to consolidate all four operating businesses under a single "Marsh" brand. On the Q2 2026 call he framed demand as "strong across risk, people, strategy and investments."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Mark C. McGivney</div>
+      <div class="card-note">Chief Operating Officer <em>and</em> Chief Financial Officer — a combined role confirmed on the Q2 2026 earnings call. He is the primary voice on margin expansion, the fiduciary-interest-income runoff as rates fall ($88m in Q2 2026, guided to ~$95m in Q3), and the raised $5.5bn 2026 capital-deployment target.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Institutional Ownership</div>
+      <div class="card-value" style="font-size:20px;">88.0%</div>
+      <div class="card-note">Institutions hold ~87.99% of shares outstanding. Among the largest disclosed 13F positions: <strong>Bank of America</strong> (4.94m shares, 1.03%), <strong>Arrowstreet Capital</strong> (3.45m, 0.72%), <strong>Royal Bank of Canada</strong> (3.32m, 0.69%), <strong>Amundi</strong> (2.30m, 0.48%). 1,239 institutions added versus 740 that reduced over the trailing twelve months. Index-fund holdings were not individually verified from a live source.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <div class="prose">Revenue mix below reflects the fiscal 2025 segment/unit split disclosed in the FY2025 Form 10-K, applied to reported revenue of $26.98 billion. Risk and Insurance Services accounts for ~64% of revenue; Consulting ~36%.</div>
+  <div class="seg-bar">
+    <div style="flex:54;background:#4d90c8;">MARSH RISK 54%</div>
+    <div style="flex:23;background:#a78bfa;">MERCER 23%</div>
+    <div style="flex:13;background:#f59e0b;">OLIVER WYMAN 13%</div>
+    <div style="flex:10;background:#3b82f6;color:#fff;">GUY CARPENTER 10%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4d90c8;"></span> Marsh Risk — insurance broking (~$14.4B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Guy Carpenter — reinsurance broking (~$2.5B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Mercer — health, wealth &amp; career (~$6.2B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Oliver Wyman — management consulting (~$3.6B)</div>
+  </div>
+
+  <!-- Marsh Risk -->
+  <div class="biz-card" style="border-left: 3px solid #4d90c8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Marsh Risk <span style="font-size:13px;color:var(--text-dim);font-weight:400;">— insurance broking &amp; risk advisory (Risk &amp; Insurance Services segment)</span></div>
+        <span class="biz-badge dominant" style="margin-top:8px;">#1 GLOBAL INSURANCE BROKER — ~19% OF BIG-5 BROKER REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$14.4B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4%</div><div class="biz-stat-label">FY25 Underlying</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~18.8%</div><div class="biz-stat-label">Big-5 Rev. Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">54%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Marsh Risk places commercial property, casualty, financial and specialty insurance for corporate, institutional and — increasingly — middle-market and personal-lines clients, earning <strong>commissions set as a percentage of premium</strong> plus negotiated fees. FY2025 revenue grew <strong>15% reported but only 4% underlying</strong>: the 11-point wedge is the McGriff acquisition, which closed in November 2024 for <strong>$7.75 billion in cash</strong> (plus ~$500m of assumed deferred tax assets) and added roughly <strong>$1.3 billion of annual revenue and 3,500 colleagues</strong> in US middle-market commercial P&amp;C, surety, employee benefits and personal lines through Marsh McLennan Agency. FY2025 underlying growth by region: EMEA +6%, Asia Pacific +4%, US/Canada +3%, Latin America +2%. In Q2 2026 revenue reached <strong>$4.1 billion, +6% reported / +4% underlying</strong>, with US/Canada +4%, EMEA +5%, Asia Pacific +5% and Latin America +8%. The unit's economics are the reason Risk &amp; Insurance Services carries a <strong>32.0% FY2025 adjusted operating margin</strong> (35.3% in Q2 2026) — there is essentially no underwriting risk on the balance sheet, only distribution.</div>
+    <div class="biz-tam"><strong>Peer revenue pool:</strong> $89.4B across 22 listed insurance brokers (TTM); the five largest brokers alone generate $76.4B. Global brokerage <span class="tip" title="Total addressable market — the full revenue opportunity available to a product or service.">TAM</span> beyond the listed universe was not verified from a live source and is deliberately omitted.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:16px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Aon plc (AON)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$17.58B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+4.9%</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">23%</div><div class="comp-bubble-label">Big-5 Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Arthur J. Gallagher (AJG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$15.11B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+30.8%</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">20%</div><div class="comp-bubble-label">Big-5 Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Brown &amp; Brown (BRO)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$6.66B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+34.6%</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">9%</div><div class="comp-bubble-label">Big-5 Share</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guy Carpenter -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Guy Carpenter / Marsh Re <span style="font-size:13px;color:var(--text-dim);font-weight:400;">— reinsurance broking &amp; capital advisory</span></div>
+        <span class="biz-badge emerging" style="margin-top:8px;">TOP-2 GLOBAL REINSURANCE BROKER (SHARE NOT DISCLOSED)</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2.5B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5%</div><div class="biz-stat-label">FY25 Underlying</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~3.3%</div><div class="biz-stat-label">Big-5 Rev. Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Guy Carpenter intermediates between primary insurers (cedents) and reinsurers, and advises on catastrophe-bond and insurance-linked-securities placements. It is the clearest expression of the pricing-cycle risk in the MMC story. FY2025 was solid — $2.5 billion, +6% reported / +5% underlying, with Q4 up 5% underlying — but <strong>Q2 2026 revenue fell to $664 million, down 2% both reported and underlying</strong>. Management attributed the decline to a soft catastrophe-reinsurance market and cedent consolidation. Guy Carpenter's own <strong>global property catastrophe rate-on-line index fell 16% at the July 1, 2026 renewal — described on the call as the steepest year-over-year decline in 25 years</strong> — and because reinsurance brokerage is largely a percentage of ceded premium, a 16% rate decline compresses commission dollars directly. Six-month 2026 underlying growth was flat. This ~10% of revenue is currently a drag on a company that otherwise compounded 5% organically in the quarter.</div>
+    <div class="biz-tam"><strong>Structural note:</strong> reinsurance broking is a concentrated oligopoly (Guy Carpenter, Aon Reinsurance Solutions, Gallagher Re). Precise market shares are not publicly disclosed by any of the three and are therefore not stated here.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:16px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Aon Reinsurance Solutions</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$17.58B</div><div class="comp-bubble-label">Aon Total Rev.</div></div>
+          <div><div class="comp-bubble-val">+4.9%</div><div class="comp-bubble-label">Aon Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Unit Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Gallagher Re (AJG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$15.11B</div><div class="comp-bubble-label">AJG Total Rev.</div></div>
+          <div><div class="comp-bubble-val">+30.8%</div><div class="comp-bubble-label">AJG Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Unit Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">WTW / Willis Re legacy</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$10.10B</div><div class="comp-bubble-label">WTW Total Rev.</div></div>
+          <div><div class="comp-bubble-val">+3.0%</div><div class="comp-bubble-label">WTW Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Unit Share</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mercer -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Mercer <span style="font-size:13px;color:var(--text-dim);font-weight:400;">— health, wealth, career &amp; investments (Consulting segment)</span></div>
+        <span class="biz-badge growth" style="margin-top:8px;">~$692B OF ASSETS UNDER MANAGEMENT/ADVICE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6.2B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4%</div><div class="biz-stat-label">FY25 Underlying</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/m</div><div class="biz-stat-label">Broker Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Mercer advises on employee health and benefits, retirement and defined-contribution plans, executive compensation and workforce design, and runs a large outsourced-CIO investment business — <strong>approximately $692 billion of assets managed worldwide as of December 31, 2025</strong> per the FY2025 10-K. FY2025 revenue of $6.2 billion grew 8% reported / 4% underlying, with health +6%, wealth +4% and career −2%. The mix flipped in Q2 2026: revenue of <strong>$1.6 billion, +7% reported / +5% underlying</strong>, with <strong>wealth +8%, health +3% and career +2%</strong> — investment/wealth mandates are now carrying the unit while health decelerates. Mercer's revenue is fee-based and largely uncorrelated with P&amp;C insurance pricing, which is precisely why it matters to the bull case: it is the ballast against a softening broking cycle. Margins are structurally lower than broking — the Consulting segment ran a <strong>21.1% adjusted operating margin in FY2025</strong> versus 32.0% for Risk &amp; Insurance Services.</div>
+    <div class="biz-tam"><strong>Market context:</strong> Mercer competes with Aon Human Capital, WTW Health &amp; Benefits and Accenture in benefits administration and workforce consulting. Segment-level TAM figures were not verified from a live source and are omitted.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:16px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">WTW (Health, Wealth &amp; Career)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$10.10B</div><div class="comp-bubble-label">Revenue TTM</div></div>
+          <div><div class="comp-bubble-val">+3.0%</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">$31.15B</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Aon Human Capital</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$17.58B</div><div class="comp-bubble-label">Aon Total Rev.</div></div>
+          <div><div class="comp-bubble-val">+4.9%</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">$73.91B</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Accenture (benefits/HR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Unit Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Oliver Wyman -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Oliver Wyman Group <span style="font-size:13px;color:var(--text-dim);font-weight:400;">— management consulting (incl. Lippincott, NERA)</span></div>
+        <span class="biz-badge growth" style="margin-top:8px;">FASTEST-GROWING UNIT — +13% UNDERLYING IN Q2 2026</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3.6B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+6%</div><div class="biz-stat-label">FY25 Underlying</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/m</div><div class="biz-stat-label">Broker Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Now reported as Marsh Management Consulting, Oliver Wyman Group is a top-tier strategy consultancy with deep verticals in financial services, energy, transport and healthcare, plus brand consultancy Lippincott and economic-litigation firm NERA. FY2025 revenue was $3.6 billion, +6% underlying, with Q4 up 8%. <strong>Q2 2026 was the standout of the entire company: $1.0 billion of revenue, +15% reported / +13% underlying — the fastest quarter of growth in more than two years.</strong> Managing Partner Ted Moynihan cited strength in Europe and Asia and across energy, insurance and telecom, with the firm's AI strategic-advisory practice, Quotient, growing fastest. Consulting-segment adjusted operating margin was 20.5% in Q2 with adjusted operating income up 11%. Project-based consulting revenue is more cyclical and less recurring than broking commissions, which is why the market applies a lower multiple to it — but it is the part of MMC that is <em>accelerating</em> while broking decelerates.</div>
+    <div class="biz-tam"><strong>Market context:</strong> competes with McKinsey, Bain, BCG and Accenture Strategy — all private or reporting on non-comparable bases. Consulting TAM figures were not verified from a live source and are omitted rather than estimated.</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;margin-top:16px;">TOP COMPETITORS</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">McKinsey &amp; Company</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">private</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Accenture Strategy</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Unit Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Bain / BCG</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">private</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Rev. Growth</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Market Cap</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="prose" style="margin-top:8px;font-size:13px;color:var(--text-dim);">"Big-5 Rev. Share" = unit or company revenue divided by the combined TTM revenue of Marsh &amp; McLennan, Aon, Arthur J. Gallagher, Willis Towers Watson and Brown &amp; Brown ($76.4B). "n/m" = not meaningful (consulting units do not compete in the broker revenue pool). "n/d" = not disclosed by the company. "n/v" = not verified from a live source.</div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;">SOURCES OF MOAT</div>
+  <div class="moat-list">
+    <span class="moat-pill">GLOBAL SCALE — 130 COUNTRIES</span>
+    <span class="moat-pill">PROPRIETARY PLACEMENT DATA</span>
+    <span class="moat-pill">STICKY RENEWAL BOOK</span>
+    <span class="moat-pill">REGULATORY &amp; LICENSING COMPLEXITY</span>
+    <span class="moat-pill">CROSS-SELL ACROSS 4 BUSINESSES</span>
+    <span class="moat-pill">SERIAL M&amp;A ROLL-UP MACHINE</span>
+    <span class="moat-pill">ASSET-LIGHT, NO UNDERWRITING RISK</span>
+  </div>
+  <div class="prose" style="margin-top:20px;">
+    <p>MMC's moat is distribution scale layered on top of information asymmetry. A broker that places tens of billions of dollars of premium across 130 countries sees pricing, terms and claims outcomes no single insurer or client can see, and that data advantage is what lets Marsh Risk defend commission rates when carriers push back. Renewal retention in commercial broking is structurally high — the switching cost of moving a complex global insurance programme mid-cycle is real, and the incumbent broker controls the placement history. The <strong>roll-up strategy is itself part of the moat</strong>: MMC has spent $7.75bn on McGriff (2024) and £4.3bn on Jardine Lloyd Thompson (2019), plus a continuous stream of tuck-ins — Astera in Spain closed July 1, 2026, with Altmark M and an alternatives-manager deal pending — each acquired at a smaller multiple than MMC's own and immediately plugged into a larger carrier-negotiation footprint. Because the model requires no underwriting capital, incremental revenue converts at high margin: <span class="tip" title="Return on equity — net income divided by shareholders' equity.">ROE</span> of <strong>25.9%</strong> and <span class="tip" title="Return on invested capital — after-tax operating profit divided by total debt plus equity.">ROIC</span> of <strong>14.5%</strong> on a business generating <strong>$4.77 billion of <span class="tip" title="Free cash flow — operating cash flow less capital expenditure; cash available to shareholders and creditors.">free cash flow</span></strong>. That recurring, capital-light cash stream is why brokers have historically traded at a premium multiple to the broader financials sector — and why the current 23.2x trailing / 17.2x forward <span class="tip" title="Price-to-earnings ratio — share price divided by earnings per share.">P/E</span>, below the 29.0x industry weighted average, reads as a cycle derating rather than a moat impairment.</p>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:28px 0 8px;">KEY VULNERABILITIES</div>
+  <div class="prose">
+    <p><strong>1. Commission revenue is levered to P&amp;C premium rates.</strong> Brokers get paid a percentage of premium. Commercial insurance rates fell 5% in Q1 2026 — the seventh consecutive quarterly decline — and 6% in Q2 2026, with global property down 12%. Guy Carpenter's property-cat rate-on-line index fell 16% at the July 2026 renewal. Rate declines do not automatically shrink revenue (exposure growth and new business offset), but they remove the tailwind that drove 7–8% organic growth in 2023–24 down to ~4% now. This is the single most important variable in the model.</p>
+    <p style="margin-top:12px;"><strong>2. Leverage taken on for McGriff.</strong> Total debt stands at <strong>$22.38 billion</strong> against $1.70 billion of cash, a <span class="tip" title="Debt-to-equity ratio — total debt divided by shareholders' equity; a measure of financial leverage.">debt-to-equity</span> ratio of <strong>1.45</strong> and enterprise value of $110.97 billion versus $90.29 billion of market cap. The company also carries a <span class="tip" title="Current ratio — current assets divided by current liabilities; short-term liquidity.">current ratio</span> of only 1.14 and a quick ratio of 0.53. Deleveraging competes directly with the $5.5 billion 2026 capital-deployment target and with further M&amp;A.</p>
+    <p style="margin-top:12px;"><strong>3. Fiduciary investment income declines with rates.</strong> Brokers hold client premium in fiduciary accounts and keep the interest. That income was $403 million in FY2025 and $88 million in Q2 2026 — <strong>down $11 million year-over-year</strong> — with management guiding to roughly $95 million in Q3. Every Fed cut erodes a high-margin, zero-cost revenue line that flattered 2023–25 earnings.</p>
+    <p style="margin-top:12px;"><strong>4. Integration, restructuring and legal drag.</strong> FY2025 carried $215 million of McGriff integration costs and $222 million of "Thrive" restructuring charges; Q2 2026 added $58 million of Thrive charges ($103 million year-to-date). Separately, a <strong>$425 million Greensill-related charge was recorded in Q1 2026</strong>. The 2027 consolidation of all four businesses under the single Marsh brand adds execution and brand-equity risk to businesses (Oliver Wyman, Mercer) whose names carry independent value.</p>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>MMC</th><th>Insurance Brokers Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings ratio on the last twelve months of reported earnings.">Trailing P/E</span></td><td style="color:var(--green);">23.16</td><td>28.98</td><td>29.65</td><td>Cheaper than both the broker group and the index — a rare configuration for MMC, and the core of the value argument.</td></tr>
+      <tr><td><span class="tip" title="Share price divided by expected earnings per share for the next fiscal year.">Forward P/E</span></td><td style="color:var(--amber);">17.24</td><td>16.63</td><td>—</td><td>Peer median forward multiple (AON 17.3, AJG 18.3, WTW 16.0, BRO 15.5) computed from live quotes; MMC now sits mid-pack, not at a premium.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth — P/E divided by the expected earnings growth rate. Below 1 is often considered cheap.">PEG Ratio</span></td><td style="color:var(--red);">2.58</td><td>—</td><td>—</td><td>High: 23x earnings against high-single-digit EPS growth. The multiple is only cheap if organic growth reaccelerates.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months, on a GAAP basis.">EPS (TTM)</span></td><td>$8.17</td><td>—</td><td>—</td><td>GAAP; adjusted FY2025 EPS was $9.75 and 2026 consensus is $10.45. The Greensill charge is a large part of the GAAP/adjusted gap.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year percentage change in revenue.">Revenue Growth (YoY)</span></td><td style="color:var(--amber);">+8.3%</td><td>+17.9%</td><td>—</td><td>Reported TTM. Peer median is inflated by AJG (+30.8%) and BRO (+34.6%) acquisition activity; MMC's <em>underlying</em> growth is ~4–5%.</td></tr>
+      <tr><td><span class="tip" title="Revenue less cost of revenue, expressed as a percentage of revenue.">Gross Margin</span></td><td style="color:var(--green);">43.99%</td><td>—</td><td>—</td><td>Asset-light services model — cost of revenue is almost entirely compensation, not capital.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue.">Net Profit Margin</span></td><td style="color:var(--green);">14.24%</td><td>12.28%</td><td>~12.3%</td><td>Above both. Index figure derived from S&amp;P 500 aggregate market cap $70.22T ÷ revenue $19.26T ÷ index P/E of 29.65.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price.">Dividend Yield</span></td><td style="color:var(--green);">2.09%</td><td>1.20%</td><td>1.04%</td><td>$3.96 annualised, 48.5% payout, +10.3% growth — the 17th consecutive annual increase, raised again in Q2 2026.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares outstanding sold short by investors betting the price will fall.">Short Interest</span></td><td style="color:var(--green);">1.57%</td><td>—</td><td>—</td><td>Negligible. Despite a −8.9% twelve-month return, this is not a crowded short.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity.">Debt-to-Equity</span></td><td style="color:var(--red);">1.45</td><td>—</td><td>—</td><td>$22.38B of debt vs $1.70B cash — elevated for a services firm, and a direct consequence of funding McGriff in cash.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure.">Current Ratio</span></td><td style="color:var(--amber);">1.14</td><td>—</td><td>—</td><td>Thin, but fiduciary balances distort broker balance sheets; quick ratio is 0.53. Cash generation, not the balance sheet, funds the dividend.</td></tr>
+      <tr><td><span class="tip" title="Operating cash flow less capital expenditure.">Free Cash Flow</span></td><td>$4.77B</td><td>—</td><td>—</td><td>On $5.08B of operating cash flow — 94% conversion and 17.1% of revenue. This is the number that supports the premium recurring-revenue multiple.</td></tr>
+      <tr><td><span class="tip" title="Return on equity — net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--green);">25.90%</td><td>—</td><td>—</td><td>Very high; partly flattered by leverage (ROA is 7.24%).</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital — after-tax operating profit divided by debt plus equity.">ROIC</span></td><td style="color:var(--green);">14.52%</td><td>—</td><td>—</td><td>Comfortably above any plausible cost of capital for a 0.58-beta business. Goodwill from McGriff/JLT depresses the reported figure.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to the overall market; 1.00 equals market volatility.">Beta</span></td><td style="color:var(--green);">0.58</td><td>0.54</td><td>1.00</td><td>Defensive by construction. Peer median from AON 0.68, AJG 0.50, WTW 0.42, BRO 0.58.</td></tr>
+      <tr><td>52-Week Range</td><td>$156.60 – $213.80</td><td>—</td><td>—</td><td>Currently $189.20 — 11.5% below the high, 20.8% above the low. Twelve-month return −8.89%.</td></tr>
+    </tbody>
+  </table>
+  <div class="prose" style="margin-top:12px;font-size:12px;color:var(--text-dim);">"—" indicates a figure that could not be verified from a live source on the as-of date and has been omitted rather than estimated. Industry column blends stockanalysis.com's Insurance Brokers aggregate statistics (22 listed companies; weighted P/E 28.98, profit margin 12.28%, dividend yield 1.20%) with medians computed from live AON / AJG / WTW / BRO quotes.</div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 8px;">NOTABLE ONE-OFF ITEMS</div>
+  <div class="prose">
+    <p>The gap between MMC's GAAP <span class="tip" title="Generally Accepted Accounting Principles — the standard US financial reporting framework.">GAAP</span> results and its adjusted results is unusually wide right now, and every component is identifiable:</p>
+    <p style="margin-top:10px;"><strong>Greensill charge — $425 million, Q1 2026.</strong> A legal/settlement charge tied to the long-running Greensill Capital matter, recorded in the first quarter. This is the single largest driver of the GAAP TTM EPS of $8.17 sitting <em>below</em> the FY2025 GAAP EPS of $8.43 despite revenue growth, and it explains the depressed Q1 2026 GAAP operating margin of 24.34%.</p>
+    <p style="margin-top:10px;"><strong>McGriff integration costs — $215 million in FY2025.</strong> Non-recurring integration spend associated with folding a 3,500-person, $1.3bn-revenue broker into Marsh McLennan Agency. Management has not published a formal synergy target on the calls reviewed.</p>
+    <p style="margin-top:10px;"><strong>"Thrive" restructuring — $222 million in FY2025, $58 million in Q2 2026 ($103 million year-to-date).</strong> A three-year programme targeting savings through automation and operating-model change. It is the explicit engine behind the guided margin expansion; treat the charges as recurring-while-the-programme-runs rather than truly one-off.</p>
+    <p style="margin-top:10px;"><strong>Currency and acquisition effects.</strong> The 10-point spread between FY2025 reported revenue growth (+10.3%) and underlying growth (+4%) is almost entirely acquisition-driven. Any assessment of the business should anchor on underlying growth; reported growth will decelerate sharply as McGriff annualises out of the comparison — visible already in Q2 2026, where reported (+6%) and underlying (+5%) had nearly converged.</p>
+    <p style="margin-top:10px;"><strong>Fiduciary interest income — $403 million FY2025.</strong> Not a one-off, but worth flagging as a quality-of-earnings item: it is pure interest on client money, it carries no cost, and it is now shrinking ($88m in Q2 2026, −$11m YoY).</p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">HOLD</div>
+      <div class="card-note">23 analysts covering (stockanalysis.com). MarketBeat's 18-analyst panel also reads Hold.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$206.48</div>
+      <div class="card-note" style="color:var(--green);">+9.1% upside from $189.20</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$182 – $238</div>
+      <div class="card-note">Low implies −3.8%; high implies +25.8%. A narrow dispersion — nobody is modelling a collapse or a melt-up.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">7 / 15 / 1</div>
+      <div class="card-note">Buy (incl. Strong Buy) 7 · Hold 15 · Sell 1. Holds are 65% of the panel.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:5;background:var(--green);"></div>
+    <div style="flex:2;background:#86efac;"></div>
+    <div style="flex:15;background:var(--amber);"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy (5)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#86efac;"></span> Buy (2)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold (15)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell (1)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:28px 0 12px;">KEY RECENT ANALYST CALLS</div>
+  <div class="prose">
+    <div style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--amber);font-size:20px;line-height:1;">•</span><div><strong>Morgan Stanley</strong> — Bob Huang, <em>Equal Weight</em>, price target raised $180 → <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$200</span> (Aug 19, 2026). The most recent action on the tape, and notably a 11% target increase without a ratings change — the sell side marking to a recovering multiple rather than to upgraded fundamentals.</div></div>
+    <div style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--green);font-size:20px;line-height:1;">•</span><div><strong>UBS Group</strong> — Brian Meredith, <em>Buy</em>, price target raised $212 → <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$216</span> (Jul 27, 2026). The most constructive of the major houses post-Q2, and the only large-bank Buy in the recent cluster; consistent with Oliver Wyman's +13% underlying quarter carrying the story.</div></div>
+    <div style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--red);font-size:20px;line-height:1;">•</span><div><strong>Citigroup</strong> — Matthew Heimermann, <em>downgrade Buy → Neutral</em>, price target <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$200</span> (Jul 22, 2026). The day after Q2 results — the clearest expression of the bear thesis: with reinsurance broking shrinking and primary rates down seven straight quarters, the organic-growth path no longer justifies a Buy.</div></div>
+    <div style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--amber);font-size:20px;line-height:1;">•</span><div><strong>Wells Fargo</strong> — Elyse Greenspan, <em>Equal Weight</em>, price target raised $186 → <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$188</span> (Jul 22, 2026). Essentially a mark-to-market: her target sits fractionally below the current price, the lowest of the recent named calls.</div></div>
+    <div style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--amber);font-size:20px;line-height:1;">•</span><div><strong>Mizuho</strong> — Yaron Kinar, <em>Neutral</em>, price target raised $197 → <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$201</span> (Jul 22, 2026). Earlier context: <strong>Goldman Sachs</strong> upgraded MMC from Sell to Neutral (PT $195) on Oct 20, 2025, citing the Thrive programme, McGriff's US/Canada organic tailwind, and the view that "estimates and the stock's valuation are likely close to bottoming."</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The single most important near-term event. Watch three lines: Guy Carpenter's underlying growth (−2% in Q2 — does the July renewal damage deepen?), consolidated underlying growth against the "similar to 2025" (~4%) guide, and fiduciary interest income, which management pre-guided to approximately $95 million. Management also flagged that margin expansion should be greater in Q4 than in Q3, which sets a low bar for the Q3 margin print.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat on Consulting, miss on reinsurance</div>
+        <div class="tl-desc">Revenue of $7.40bn (+6% reported, +5% underlying) and adjusted EPS of $2.96 (+9%) matched consensus; consolidated adjusted operating margin reached 29.3%. Oliver Wyman's +13% underlying was the fastest in over two years while Guy Carpenter fell 2%. Shares were roughly flat on the day but the stock has since recovered toward $189 from the May low of ~$160.</div>
+        <div class="tl-impact up">Reaction already happened — stock +18% off May low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3–Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Organic growth versus a softening P&amp;C market</div>
+        <div class="tl-desc">Primary commercial rates fell 6% in Q2 2026 after −5% in Q1 (the seventh straight decline), with global property −12% and casualty +2%. The bull test is whether exposure growth, new business wins and the McGriff middle-market book can hold underlying growth near 4–5% while the rate tailwind runs negative. If underlying growth slips below 3%, the multiple case breaks.</div>
+        <div class="tl-impact down">Ongoing headwind to commission revenue</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">McGriff integration and the Thrive savings programme</div>
+        <div class="tl-desc">FY2025 carried $215m of McGriff integration costs and $222m of Thrive restructuring; Q2 2026 added $58m of Thrive charges. Management has committed to continued margin expansion in 2026 on top of FY2025's 27.1% adjusted margin (up from 26.8%). Q2 2026's Risk &amp; Insurance Services margin of 35.3% and Consulting margin of 20.5% show the programme working, but no formal McGriff synergy number has been published.</div>
+        <div class="tl-impact up">Potential upside catalyst if margin guide is beaten</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026 – 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiduciary investment income as rates fall</div>
+        <div class="tl-desc">Fiduciary interest income was $403m in FY2025 and $88m in Q2 2026, down $11m year-over-year on lower rates, with ~$95m guided for Q3. This is zero-cost, ~100%-margin revenue; each further cut in policy rates removes earnings that flattered 2023–2025 comparisons. It is the most mechanical, most predictable headwind in the model.</div>
+        <div class="tl-impact down">Ongoing headwind — high-margin revenue in runoff</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026 – 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">M&amp;A pace, capital return, and the single-brand transition</div>
+        <div class="tl-desc">Management raised the 2026 capital-deployment target to $5.5bn from $5bn, repurchased $750m of stock in Q2 and lifted the dividend 10% (17th consecutive annual increase). M&amp;A slowed in H1 2026 on valuation gaps between strategic and financial-sponsor bidders; Astera (Spain) closed July 1 with Altmark M and an alternatives-manager deal pending. Separately, all four businesses fully adopt the Marsh brand beginning in 2027 — the ticker already moved from MMC to MRSH in January 2026.</div>
+        <div class="tl-impact neutral">Key near-term event — buyback pace vs deleveraging</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 1, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">January 1 reinsurance renewal season</div>
+        <div class="tl-desc">The largest reinsurance renewal date of the year and the direct read-through to Guy Carpenter's 2027 revenue. After a 16% decline in the property-cat rate-on-line index at July 1, 2026 — the steepest in 25 years per management — a second consecutive soft renewal would extend the reinsurance-broking drag through 2027. A loss-driven firming would be the cleanest single positive surprise available to this stock.</div>
+        <div class="tl-impact neutral">Key near-term event — binary for the reinsurance unit</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR STOCK PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">MMC / MRSH — 60 Monthly Closes, Sep 2021 – Aug 2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ STATIC DATA AS OF AUG 19, 2026</div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:18px;height:3px;background:#4d90c8;vertical-align:middle;margin-right:6px;"></span>Price</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA</span>
+        <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA</span>
+      </div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:12px;font-family:'JetBrains Mono',monospace;">Monthly series sourced from stockanalysis.com historical data. Moving averages are computed on the monthly series using 1-, 3- and 10-period windows as proxies for the 20-, 50- and 200-day averages. Final point is the Aug 19, 2026 close of $189.20.</div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:#fff;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ STATIC DATA AS OF AUG 19, 2026</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:8px;max-width:760px;">In plain English: RSI measures how much of the recent price movement has been upward versus downward, on a 0–100 scale. Readings above 70 suggest the stock has run hot and may be due for a pause; readings below 30 suggest it has been beaten down and may be due for a bounce. It says nothing about whether the business is good — only about the recent balance of buying and selling pressure.</div>
+    <div style="position:relative;width:100%;height:150px;margin-top:14px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <div class="prose" style="margin-top:32px;">
+    <p><strong>Five-year trajectory.</strong> From a September 2021 close of $151.43 to $189.20 on August 19, 2026, MMC returned <strong>+24.9% on price alone</strong> over five years — roughly 4.6% annualised before dividends, with the current yield at 2.09%. That headline number badly understates the round trip inside it. The stock compounded steadily from 2022 through 2024, more than doubling off the September 2022 low of $149.29 to an all-time-area high of <strong>$244.03 in March 2025</strong>, as the hard P&amp;C market delivered 7–8% organic growth and rising rates inflated fiduciary income. It then fell <strong>34.4% peak-to-trough</strong> to $159.97 in May 2026 as the pricing cycle turned, reinsurance rates collapsed, fiduciary income began rolling off and the market repriced a 4%-organic-growth broker. The last three months have retraced roughly 18% of that decline. Net of everything: the entire five-year gain was earned in 2023–24 and half of it has been given back.</p>
+    <p style="margin-top:14px;"><strong>Relative performance.</strong> Over the trailing twelve months MMC's market capitalisation fell <strong>11.4%</strong> and the share price fell 8.89%. Within the listed broker group that is middle-of-the-pack: Willis Towers Watson −3.4%, Aon −6.6%, MMC −11.4%, Arthur J. Gallagher −12.6%, Brown &amp; Brown −23.9% (all market-cap changes over twelve months). <em>The whole industry derated together</em>, which is the strongest evidence that this is a cycle event, not a company-specific problem. Comparable five-year total-return figures for the S&amp;P 500 could not be verified from a live source on the as-of date and are deliberately not stated; the reader should verify index performance independently before drawing a relative-return conclusion.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 8px;">KEY INFLECTION POINTS</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle low — $149.29</div>
+        <div class="tl-desc">The 2022 bear market compressed multiples across quality compounders even as the hard insurance market was delivering MMC's best organic growth in a decade. The stock bottomed at a level it has not revisited since.</div>
+        <div class="tl-impact up">Trough — start of a 63% two-and-a-half-year advance</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">McGriff closes — $233.23</div>
+        <div class="tl-desc">The $7.75bn all-cash purchase of McGriff Insurance Services added ~$1.3bn of revenue and 3,500 colleagues in US middle-market broking — the largest deal since Jardine Lloyd Thompson in 2019. It was financed with cash and debt, taking total debt toward $22bn.</div>
+        <div class="tl-impact up">Largest acquisition since JLT; near cycle highs</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">All-time-area high — $244.03</div>
+        <div class="tl-desc">Peak optimism: FY2024 had just delivered 7% underlying growth, adjusted EPS of $8.80 (+10%), and McGriff was expected to add a US organic tailwind. Year-end 2024 market cap of $104.3bn was the company's high-water mark.</div>
+        <div class="tl-impact neutral">Peak — start of the derating</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Sharp derating — $178.15</div>
+        <div class="tl-desc">A step-change lower. Q3 2025 GAAP operating margin printed at 19.24% — the weakest quarter of the five-year window — as restructuring and integration charges landed, and the softening rate environment became consensus. Goldman Sachs upgraded from Sell to Neutral that month, arguing valuation was "close to bottoming"; it was early by seven months.</div>
+        <div class="tl-impact down">−27% from the March 2025 high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ticker changes MMC → MRSH</div>
+        <div class="tl-desc">As part of consolidating all four operating businesses under the single Marsh brand, the NYSE ticker changed from MMC to MRSH. Guy Carpenter becomes Marsh Re, Marsh becomes Marsh Risk, and Oliver Wyman Group reports as Marsh Management Consulting. Full brand adoption follows in 2027.</div>
+        <div class="tl-impact neutral">Cosmetic for fundamentals; material for screening and data continuity</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle trough — $159.97</div>
+        <div class="tl-desc">The low of the derating, 34.4% below the March 2025 peak. By this point commercial P&amp;C rates had fallen for seven consecutive quarters, the Q1 Greensill charge of $425m had hit GAAP earnings, and fiduciary income was in visible decline.</div>
+        <div class="tl-impact down">−34.4% peak-to-trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul–Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Recovery to $189.20</div>
+        <div class="tl-desc">Q2 results on July 21 showed 5% underlying growth, 29.3% adjusted operating margin and Oliver Wyman's fastest quarter in over two years. Morgan Stanley lifted its target to $200 on August 19. The stock has recovered ~18% off the May low but remains 11.5% below its 52-week high of $213.80.</div>
+        <div class="tl-impact up">+18% off the trough</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying the world's largest insurance broker — an asset-light, no-underwriting-risk toll booth on global commercial premium — at <strong>23.2x trailing and 17.2x forward earnings</strong>, below both the 29.0x broker-industry weighted average and the 29.7x S&amp;P 500. The model still throws off <strong>$4.77bn of free cash flow at 94% conversion</strong>, earns 25.9% ROE and 14.5% ROIC, and pays a 2.09% yield growing 10% a year for the 17th consecutive year. Margin expansion is real and structural, not cyclical: FY2025 adjusted margin of 27.1% (up from 26.8%) rose again to 29.3% in Q2 2026 on the back of the Thrive programme, and management guides to more. Meanwhile Consulting — 36% of revenue and uncorrelated to P&amp;C pricing — is <em>accelerating</em>, with Oliver Wyman up 13% underlying in Q2, its fastest in over two years. Every listed broker derated together, which argues this is a cycle trough being priced, not a franchise in decline.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Broker revenue is a percentage of premium, and premium is falling. Commercial rates have now declined for <strong>seven-plus consecutive quarters</strong> (−5% in Q1 2026, −6% in Q2, global property −12%), and Guy Carpenter's property-cat index fell <strong>16% at the July 2026 renewal — the steepest in 25 years</strong>. Reinsurance broking is already shrinking (−2% underlying in Q2). Underlying growth has halved from 7–8% to ~4%, yet the <span class="tip" title="P/E divided by expected growth.">PEG</span> ratio is 2.58. The reported growth optics flatter the business: FY2025's +10.3% was almost entirely McGriff, and that roll-up was funded with cash and debt, leaving <strong>$22.4bn of debt, 1.45x debt-to-equity and a 1.14 current ratio</strong>. Fiduciary income — pure-margin interest on client money — is in mechanical runoff as rates fall. Add a $425m Greensill charge, $222m of restructuring, $215m of integration costs and a full rebrand of four storied franchises in 2027, and the sell side's 65% Hold weighting looks like the right call.</p>
+    </div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin:32px 0 8px;">TOP 3 RISKS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>A prolonged soft P&amp;C market.</strong> Commissions scale with premium. If rates keep falling at 5–6% a year through 2027, exposure growth and new business will not fully offset, and underlying growth could break below 3% — at which point a 17x forward multiple on a low-single-digit grower is no longer cheap. Watch the January 1, 2027 reinsurance renewal as the first read.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Leverage constrains the roll-up.</strong> $22.38bn of debt against $1.70bn of cash and an enterprise value $20.7bn above market cap means deleveraging, the $5.5bn capital-return target and continued M&amp;A are competing for the same cash. Management has already flagged that H1 2026 deal activity slowed on valuation gaps — the acquisition engine that has papered over slowing organic growth may not be available at the same pace.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Earnings quality erosion.</strong> The GAAP-to-adjusted gap is wide and widening: $425m Greensill, $222m Thrive (FY2025), $215m McGriff integration, plus fiduciary income declining $11m year-over-year in a single quarter. TTM GAAP EPS of $8.17 sits <em>below</em> FY2025's $8.43 despite 8.3% revenue growth. If the market stops crediting adjusted numbers, the effective multiple is materially higher than 23x.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary — What Actually Matters Right Now</div>
+  <div class="card-grid" style="grid-template-columns:1fr;">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">The P&amp;C Pricing Cycle Has Turned — and Brokers Get Paid on Premium</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;margin-top:12px;">This is the whole debate, and it deserves to be stated plainly: <strong>an insurance broker's commission is a percentage of the premium it places, so when premium rates fall, broker revenue per unit of risk falls with them.</strong> The 2019–2023 hard market — driven by catastrophe losses, social inflation and constrained capacity — handed MMC a multi-year tailwind that produced 7–8% underlying growth. That has reversed. Marsh's own global rate index showed commercial rates down <strong>5% in Q1 2026 (the seventh consecutive quarterly decline) and 6% in Q2 2026</strong>, with global property down <strong>12%</strong> and only casualty still rising (+2%). Reinsurance is worse: Guy Carpenter's global property-catastrophe rate-on-line index fell <strong>16% at the July 1, 2026 renewal</strong>, which management called the steepest year-over-year decline observed in 25 years, and Guy Carpenter revenue duly fell 2% underlying in Q2. Brokers are not defenceless — exposure growth, rising insured values, new client wins and higher-value advisory work all offset — which is why MMC still printed 5% underlying growth in Q2 rather than a decline. But the mechanism is real, it is currently running against the company, and it is why underlying growth has halved and why 15 of 23 analysts sit on Hold.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Consolidation: the Roll-Up Is the Growth Strategy</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;margin-top:12px;">Insurance broking is consolidating hard, and the numbers show why: the five largest listed brokers generate <strong>$76.4bn of the $89.4bn earned by all 22 listed brokers</strong> — 85% of the public universe. MMC alone is 30% of it. Consolidation is genuinely accretive here: scale improves carrier negotiating leverage, spreads compliance costs, and lets acquirers buy sub-scale agencies at lower multiples than their own. MMC paid <strong>$7.75bn for McGriff</strong> in late 2024 for ~$1.3bn of revenue and 3,500 people; Arthur J. Gallagher (+30.8% TTM revenue growth) and Brown &amp; Brown (+34.6%) are running the same playbook even harder. The headwind is what it costs and what it hides. Reported growth flattered by acquisitions masks decelerating organic growth; MMC's FY2025 +10.3% reported versus +4% underlying is exactly that. And the debt is permanent while the revenue is not guaranteed: $22.4bn of borrowings, 1.45x debt-to-equity, $215m of integration costs in FY2025 alone. Management's own commentary — H1 2026 M&amp;A slowed on "gaps" between strategic and financial-sponsor valuations — suggests private-equity competition is now setting the clearing price for the very assets MMC needs to keep buying.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Rate Cuts Cut Both Ways — Fiduciary Income vs. the Multiple</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.7;margin-top:12px;">Brokers hold client premium in fiduciary accounts between collection and remittance and keep the interest earned. In a 5% policy-rate world that was a windfall — <strong>$403m in FY2025</strong>, effectively 100%-margin. As rates fall it reverses: Q2 2026 fiduciary interest income was <strong>$88m, down $11m year-over-year</strong>, with roughly $95m guided for Q3. Every 100bp of cuts removes a meaningful, high-quality slice of pre-tax income with no offsetting cost. <strong>Bull framing:</strong> falling rates also lift the present value of a long-duration, recurring, 0.58-beta cash stream, and MMC currently trades at 17.2x forward earnings against a 29.7x index — a defensive compounder derating into a rate-cutting cycle is historically an attractive setup, and the $4.77bn of free cash flow plus a 10%-growing dividend gets paid while you wait. <strong>Bear framing:</strong> fiduciary income runoff, a soft P&amp;C cycle and a shrinking reinsurance unit are three independent headwinds hitting the same P&amp;L simultaneously, while $22.4bn of debt limits the buyback that would otherwise cushion EPS. The resolution depends almost entirely on one number — whether underlying revenue growth holds at 4–5% or slips toward 3%.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 19, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:14px;max-width:900px;margin-left:auto;margin-right:auto;">Sources: stockanalysis.com (quote, statistics, annual and quarterly financials, forecast, market-cap history, monthly price history, Insurance Brokers industry aggregates, and the Sector = "Financials" / Industry = "Insurance Brokers" classifications); Marsh McLennan FY2025 Form 10-K and the January 28, 2026 fourth-quarter and full-year 2025 news release (Businesswire); the July 21, 2026 second-quarter 2026 earnings release and earnings-call transcript; Insurance Journal and Insurance Business Magazine coverage of Q2 2026 and FY2024 results; Marsh McLennan's McGriff acquisition announcement; Oliver Wyman's October 2025 rebranding announcement; companiesmarketcap.com (global market-cap rank); MarketBeat (analyst actions, institutional ownership); TipRanks/TheFly (Goldman Sachs action); multpl.com (S&amp;P 500 P/E and dividend yield).</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Estimated or derived figures are labelled in-line. Specifically: the NYSE market-cap rank of ~#105 is an <strong>estimate</strong> derived from the verified US rank of #196 and was not independently confirmed; "Big-5 revenue share" percentages are <strong>computed</strong> by this analysis from live peer revenue figures and are not company-reported market shares; the S&amp;P 500 net profit margin of ~12.3% is <strong>derived</strong> from index aggregate market cap, aggregate revenue and index P/E; industry forward P/E, revenue growth and beta are <strong>medians computed</strong> from four listed peers, not published industry statistics. Any cell shown as "—" could not be verified from a live source and has been omitted rather than estimated. Competitor unit-level revenue and market shares for reinsurance broking and management consulting are not publicly disclosed and are marked "n/d" or "n/v". <strong>Note that the NYSE ticker changed from MMC to MRSH in January 2026</strong>; historical data prior to that date is filed under MMC.</p>
+  <p style="margin-top:12px;">This document is for informational and educational purposes only and is not investment advice, a recommendation, or an offer to buy or sell any security. It was assembled from third-party sources that may contain errors. Verify all figures against primary SEC filings before acting. Past performance does not predict future results. Consult a licensed financial adviser regarding your particular circumstances.</p>
+  <p style="margin-top:14px;color:var(--accent);font-family:'JetBrains Mono',monospace;">THE TILTED GENT — RISK, EDUCATED.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Sep 2021 through Aug 19, 2026 =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [151.43,166.80,164.02,173.82,153.64,155.41,170.42,161.70,159.95,155.25,163.96,161.37,149.29,161.49,173.18,165.48,174.91,162.14,166.55,180.19,173.18,188.08,188.42,194.99,190.30,189.65,199.42,189.47,193.84,202.27,205.98,199.43,207.58,210.72,222.57,227.51,223.09,218.24,233.23,212.41,216.88,237.84,244.03,225.47,233.66,218.64,199.20,205.81,201.53,178.15,183.45,185.52,188.19,186.74,173.45,167.71,159.97,166.67,189.69,189.20];
+
+function sma(data, window) {
+  const out = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - window + 1; j <= i; j++) s += data[j];
+    out.push(s / window);
+  }
+  return out;
+}
+
+function computeRSI(data, period) {
+  const out = new Array(data.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — bear-market low $149.29', color: '#22c55e' },
+  { idx: 38, label: 'Nov 2024 — McGriff closes ($7.75B)', color: '#4d90c8' },
+  { idx: 42, label: 'Mar 2025 — cycle high $244.03', color: '#f59e0b' },
+  { idx: 49, label: 'Oct 2025 — derating; Q3 margin 19.2%', color: '#ef4444' },
+  { idx: 52, label: 'Jan 2026 — ticker MMC → MRSH', color: '#a78bfa' },
+  { idx: 56, label: 'May 2026 — trough $159.97 (-34% from peak)', color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 beat; Oliver Wyman +13%', color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const ma20 = sma(prices, 1);
+const ma50 = sma(prices, 3);
+const ma200 = sma(prices, 10);
+
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(77,144,200,0.20)');
+grad.addColorStop(1, 'rgba(77,144,200,0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#4d90c8',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: labels.map((_, i) => eventMap[i] ? 6 : 0),
+        pointBackgroundColor: labels.map((_, i) => eventMap[i] ? eventMap[i].color : 'transparent'),
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 2,
+        pointHoverRadius: 7
+      },
+      { label: '20-Day MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '50-Day MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5, 4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function (items) {
+            const e = eventMap[items[0].dataIndex];
+            return e ? ['', '● ' + e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: v => '$' + v }
+      }
+    }
+  }
+});
+
+const rsi = computeRSI(prices, 6);
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: true },
+      { label: 'Overbought 70', data: labels.map(() => 70), borderColor: 'rgba(239,68,68,0.45)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false },
+      { label: 'Oversold 30', data: labels.map(() => 30), borderColor: 'rgba(34,197,94,0.45)', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        padding: 10,
+        filter: item => item.datasetIndex === 0,
+        callbacks: {
+          label: function (ctx) {
+            const v = ctx.parsed.y;
+            if (v === null) return null;
+            let tag = 'Neutral';
+            if (v >= 70) tag = 'Overbought';
+            else if (v <= 30) tag = 'Oversold';
+            return 'RSI: ' + v.toFixed(1) + '  (' + tag + ')';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.5)' },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function (c) {
+            if (c.tick.value === 70 || c.tick.value === 30) return 'rgba(148,163,184,0.35)';
+            return 'rgba(30,41,59,0.5)';
+          },
+          lineWidth: function (c) {
+            return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function (v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
