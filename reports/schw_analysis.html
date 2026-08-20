@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCHW — The Charles Schwab Corporation | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #00a0df; /* Charles Schwab brand blue */
+  --accent-dim: #00a0df33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 19, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">SCHW</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Exchange:</span>NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Industry:</span>Capital Markets (Financials)</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Mkt Cap:</span>$191.75B</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #104</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #62</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#38 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Charles Schwab Corporation</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$110.88</div>
+      <div class="price-change">−$0.80 (−0.72%)</div>
+      <div class="price-date">Close — Aug 19, 2026, 4:00 PM EDT</div>
+      <div class="price-date" style="color:var(--green);font-family:'JetBrains Mono',monospace;">After hours: $111.08 (+0.18%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Westlake, Texas</div>
+    <div class="meta-item"><span>Employees:</span>~33,000</div>
+    <div class="meta-item"><span>Founded:</span>1971</div>
+    <div class="meta-item"><span>Next Earnings:</span>~Oct 15, 2026 (3Q26, est.)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <div class="prose">
+    <p>Charles Schwab is a savings-and-loan holding company that runs the largest publicly traded retail brokerage and the largest custodian for independent registered investment advisors (<span class="tip" title="Registered Investment Advisor — an independent advisory firm that manages client money but relies on a third-party custodian to hold the assets and process trades">RIAs</span>) in the United States. It is structurally a <strong>hybrid broker-bank</strong>: it earns fees on assets it manages and trades it executes, and it earns a spread on the cash its clients leave idle, which Schwab Bank invests in securities and loans. That second engine — <span class="tip" title="Net interest revenue: interest earned on securities and loans minus interest paid on deposits and borrowings. For Schwab this is the spread on client cash.">net interest revenue</span> — is why Schwab trades more like a bank than a broker on rate headlines.</p>
+    <p style="margin-top:14px;"><strong>FY2025 net revenues were $23.92B, up 22.0% <span class="tip" title="Year-over-year — change versus the same period one year earlier">YoY</span></strong>, with GAAP <span class="tip" title="Earnings per share — net income available to common shareholders divided by diluted shares outstanding">EPS</span> of $4.65 (+56%) and adjusted EPS of $4.87 (+50%). Momentum accelerated into 2026: 2Q26 net revenues hit a record <strong>$7.07B, +21% YoY</strong>, on GAAP EPS of $1.54 and adjusted EPS of $1.62. Total client assets reached <strong>$13.08 trillion</strong> at June 30, 2026 (+22% YoY), across 48.0 million brokerage accounts. Schwab ranks <strong>#62 among US public companies</strong> and <strong>#104 globally</strong> by market capitalization.</p>
+    <p style="margin-top:14px;">The <span class="tip" title="Trailing twelve months — the most recent four reported quarters">TTM</span> picture through June 2026 shows $26.03B of revenue (+20.3%) and $9.72B of net income (+38.6%) — a 37.4% net margin and a 20.3% <span class="tip" title="Return on equity — net income divided by average shareholders' equity">ROE</span> that annualized to 25% in the second quarter alone.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 14px;">Notable Executives &amp; Owners</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Chief Executive Officer</div>
+      <div class="card-value" style="font-size:20px;">Rick Wurster</div>
+      <div class="card-note">Named President in 2021 and became <strong>President &amp; CEO effective January 1, 2025</strong>, succeeding Walt Bettinger, who moved to Executive Co-Chairman of the board. Wurster's tenure has been defined by finishing the balance-sheet repair, closing out the TD Ameritrade integration, and pushing Schwab into adjacencies (alternatives, lending, private markets).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Mike Verdeschi</div>
+      <div class="card-note">Joined Schwab as CFO in 2024 after a long career at Citigroup, where he served as Treasurer. His remit has been the funding stack: retiring high-cost supplemental borrowing, rebuilding <span class="tip" title="Net interest margin — net interest revenue as a percentage of average interest-earning assets">net interest margin</span>, and managing capital. He has guided FY2026 NIM to <strong>3.00%–3.10%</strong>, exiting 4Q26 at <strong>3.25%–3.30%</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">~84.4% Inst. Owned</div>
+      <div class="card-note">Largest holders by reported value: <strong>Vanguard ($15.0B)</strong>, <strong>Toronto-Dominion Bank ($13.7B — the legacy stake from the 2020 TD Ameritrade acquisition, steadily reduced since)</strong>, Dodge &amp; Cox ($7.6B), State Street ($7.3B), T. Rowe Price ($4.9B), Geode ($3.8B), Franklin Resources ($3.0B).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <div class="prose" style="margin-bottom:8px;">Schwab reports two operating segments — <strong>Investor Services</strong> (retail brokerage, workplace, and the bank) and <strong>Advisor Services</strong> (RIA custody and support) — but the economically meaningful cut is by <em>revenue engine</em>. The mix below is FY2025 net revenues of $23.92B.</div>
+
+  <div class="seg-bar">
+    <div style="flex:49.1;background:#00a0df;">NII 49%</div>
+    <div style="flex:27.2;background:#3b82f6;">AMAF 27%</div>
+    <div style="flex:16.4;background:#a78bfa;">TRADING 16%</div>
+    <div style="flex:4.1;background:#f59e0b;">BDA 4%</div>
+    <div style="flex:3.2;background:#6b7280;">OTH 3%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#00a0df;"></span>Net Interest Revenue — $11.75B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span>Asset Mgmt &amp; Admin Fees — $6.51B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span>Trading Revenue — $3.92B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span>Bank Deposit Account Fees — $0.98B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span>Other — $0.76B</div>
+  </div>
+
+  <div style="margin-top:28px;"></div>
+
+  <!-- SEG 1 -->
+  <div class="biz-card" style="border-left: 3px solid #00a0df;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Net Interest Revenue — The Bank</div>
+        <span class="biz-badge dominant">LARGEST US BROKER-HELD CASH POOL</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$11.75B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+19%</div><div class="biz-stat-label">2Q26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">3.00%</div><div class="biz-stat-label">2Q26 NIM</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">49.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Schwab sweeps uninvested client cash onto its own balance sheet, pays a low administrative rate on it, and invests the proceeds in securities and loans. At June 30, 2026 <strong>transactional sweep cash stood at $485.7B</strong>, up $24.2B sequentially on tax seasonality, organic growth, and demand for long/short strategies; bank loan balances were <strong>$67.0B (+33% YoY)</strong> and total assets $517.3B (+13% YoY). This is the single largest driver of earnings variance and the reason Schwab's stock trades on the rate path. <strong>2Q26 NIM of 3.00% expanded 12bps sequentially and 34bps YoY from 2.66%</strong>; management guides to 3.00%–3.10% for FY2026 with a 3.25%–3.30% exit rate. Critically, <strong>client cash as a share of total client assets fell to 9.0%, down 90bps YoY</strong> — a reminder that cash sorting is a share-of-wallet phenomenon, not just a rate phenomenon.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US brokerage sweep and cash-management deposits — a multi-trillion-dollar pool; Schwab's ~$486B sweep balance plus ~$67B of bank loans makes it one of the 15 largest US depositories by assets ($517B). TAM expands with total client assets, which grew 22% YoY.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Morgan Stanley (E*TRADE)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$1.9T</div><div class="comp-bubble-label">E*TRADE Assets</div></div><div><div class="comp-bubble-val">Large</div><div class="comp-bubble-label">Sweep Book</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Interactive Brokers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$814B</div><div class="comp-bubble-label">Client Assets</div></div><div><div class="comp-bubble-val">High</div><div class="comp-bubble-label">Cash Yield Paid</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">LPL Financial</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Advisory</div><div class="comp-bubble-label">Channel</div></div><div><div class="comp-bubble-val">Cash Sweep</div><div class="comp-bubble-label">Key Earner</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- SEG 2 -->
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Asset Management &amp; Administration Fees</div>
+        <span class="biz-badge growth">+16% YoY — COMPOUNDING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6.51B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16%</div><div class="biz-stat-label">2Q26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">#1 RIA</div><div class="biz-stat-label">Custodian</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">27.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Fees on proprietary and third-party mutual funds and <span class="tip" title="Exchange-traded fund — a pooled investment vehicle that trades on an exchange like a stock">ETFs</span>, managed-account programs (Schwab Intelligent Portfolios, Wealth Advisory), money-market funds, and custody/administration for independent advisors. <strong>2Q26 AMAF revenue was $1.825B, +16% YoY</strong> — a rate-insensitive, market-beta-linked annuity that grows with total client assets. This is the highest-quality revenue line Schwab has: it scales on an already-built platform, so incremental margins are wide. Advisor Services is the crown jewel here — Schwab is the largest custodian of independent RIA assets in the US, a position materially strengthened by the TD Ameritrade Institutional acquisition.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US RIA channel assets in the multi-trillions and growing faster than wirehouses; Schwab is generally regarded as holding roughly half of US RIA custodied assets <em>(estimate — no verified point-in-time share figure)</em>. US retail investable wealth TAM is tens of trillions.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Fidelity Investments</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$17.5T</div><div class="comp-bubble-label">Assets (Sep '25)</div></div><div><div class="comp-bubble-val">51.5M+</div><div class="comp-bubble-label">Clients</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Vanguard</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$11.6T</div><div class="comp-bubble-label">Assets (Sep '25)</div></div><div><div class="comp-bubble-val">50M+</div><div class="comp-bubble-label">Clients</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">BNY Pershing / Altruist</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">#2/#3</div><div class="comp-bubble-label">RIA Custody</div></div><div><div class="comp-bubble-val">Taking</div><div class="comp-bubble-label">Small-RIA Share</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- SEG 3 -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Trading Revenue</div>
+        <span class="biz-badge growth">+28% YoY — RECORD ENGAGEMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3.92B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+28%</div><div class="biz-stat-label">2Q26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.9M</div><div class="biz-stat-label">2Q26 DATs</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Commissions on options, futures, fixed income, and OTC securities plus order-flow economics — equity commissions are zero. <strong>2Q26 trading revenue was $1.215B, +28% YoY, on daily average trades (DATs) of 11.9 million, +57% YoY</strong>; FY2025 DATs averaged 8.27 million (+31%). Management raised FY2026 DAT guidance to <strong>10.6 million</strong>, implying a step down from the record second quarter on normal seasonality. Margin balances tell the same engagement story: <strong>$165.1B at June 30, +30% sequentially</strong>, including $42.1B of margin loans and $43.7B of short credits tied to long/short strategies. This line is the highest-beta part of the P&amp;L — it explodes in volatile, high-participation markets and compresses fast when retail goes quiet.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US retail order flow and options volumes at record levels; option contract volume has set successive annual records. TAM is cyclical and tied to retail participation, not secularly guaranteed.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Robinhood</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$324B</div><div class="comp-bubble-label">Assets (Jan '26)</div></div><div><div class="comp-bubble-val">27.2M+</div><div class="comp-bubble-label">Funded Users</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Interactive Brokers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$814B</div><div class="comp-bubble-label">Client Assets</div></div><div><div class="comp-bubble-val">+34%</div><div class="comp-bubble-label">Account Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Fidelity / Tastytrade</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Major</div><div class="comp-bubble-label">Options Rivals</div></div><div><div class="comp-bubble-val">$0</div><div class="comp-bubble-label">Equity Comms</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- SEG 4 -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Bank Deposit Account (BDA) Fees</div>
+        <span class="biz-badge emerging">+35% YoY — RUNOFF REVERSING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$0.98B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+35%</div><div class="biz-stat-label">2Q26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">Off-B/S</div><div class="biz-stat-label">Structure</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Fees earned on legacy TD Ameritrade client cash swept to third-party banks under the Insured Deposit Account agreement — an off-balance-sheet arrangement Schwab inherited in the acquisition. <strong>2Q26 BDA fees were $333M, +35% YoY.</strong> Economically this is a lower-margin substitute for on-balance-sheet net interest revenue; Schwab has been moving eligible balances onto its own bank over time, which converts BDA fees into higher-value NII. Small in absolute dollars, but a useful read on how much legacy TD cash remains outside the bank.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Third-party sweep programs across the brokerage industry; declining structurally as brokers internalize deposits to capture full spread.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">TD Bank (IDA counterparty)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Legacy</div><div class="comp-bubble-label">Agreement</div></div><div><div class="comp-bubble-val">$13.7B</div><div class="comp-bubble-label">SCHW Stake</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">LPL Financial</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Similar</div><div class="comp-bubble-label">Sweep Model</div></div><div><div class="comp-bubble-val">Bank</div><div class="comp-bubble-label">Partners</div></div></div></div>
+    </div>
+  </div>
+
+  <!-- SEG 5 -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Other Revenue (incl. Private Markets / Forge)</div>
+        <span class="biz-badge emerging">EMERGING — GROWING SHARE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$0.76B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+32%</div><div class="biz-stat-label">2Q26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/m</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">3.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">Order-flow-adjacent income, service fees, software fees, and — increasingly — new adjacencies. <strong>2Q26 other revenue was $342M, +32% YoY.</strong> The strategic story here is the <strong>Forge Global acquisition</strong>, announced in 2025 and now being integrated to bring private-market secondaries to Schwab clients. Management has been explicit that Forge is <em>not material</em> to 2026 financials but adds roughly <strong>100bps to FY2026 expense growth</strong>, which is why total expense guidance sits at 9.5%–10.5% versus underlying 5.5%–6.5%. This is an option on Schwab extending from public-market plumbing into alternatives.</div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Private-market secondaries and retail alternatives — one of the fastest-growing wealth-management product categories, though still a rounding error in Schwab's revenue today.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Morgan Stanley Wealth</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Alts</div><div class="comp-bubble-label">Platform</div></div><div><div class="comp-bubble-val">HNW</div><div class="comp-bubble-label">Focus</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">iCapital / CAIS</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Private</div><div class="comp-bubble-label">Alt Platforms</div></div><div><div class="comp-bubble-val">RIA</div><div class="comp-bubble-label">Distribution</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Sources of Moat</div>
+  <div class="moat-list">
+    <div class="moat-pill">SCALE ($13.1T ASSETS)</div>
+    <div class="moat-pill">#1 RIA CUSTODY</div>
+    <div class="moat-pill">CAPTIVE DEPOSIT FUNDING</div>
+    <div class="moat-pill">SWITCHING COSTS (ACAT FRICTION)</div>
+    <div class="moat-pill">BRAND TRUST (55 YRS)</div>
+    <div class="moat-pill">LOW-COST OPERATOR</div>
+    <div class="moat-pill">FULL-STACK PRODUCT BREADTH</div>
+  </div>
+  <div class="prose" style="margin-top:22px;">
+    <p>Schwab's moat is a <strong>funding-cost advantage wrapped in a distribution monopoly</strong>. Because it custodies $13.08 trillion of client assets across 48 million accounts, a persistent slice of that money sits as uninvested sweep cash — $485.7B at June 30, 2026 — which Schwab funds at an administrative rate far below wholesale. No competitor can replicate that deposit base without first replicating the distribution. On the advisory side, the RIA custody franchise is a genuine two-sided network: advisors bring clients, Schwab provides trading, custody, reporting, lending, and practice-management technology, and re-papering an entire book to another custodian is a months-long operational ordeal. The TD Ameritrade integration — completed after moving millions of accounts and the thinkorswim platform — removed the last credible scale challenger in RIA custody and is now producing cross-sell evidence, with management noting <strong>27% of thinkorswim users are now legacy Schwab clients</strong>. Layered on top is a cost structure that lets Schwab charge $0 equity commissions and still post a <strong>54.3% adjusted pre-tax margin</strong>.</p>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 14px;">Key Vulnerabilities</div>
+  <div class="prose">
+    <p><strong>1. Cash sorting and yield competition.</strong> The 2023 crisis proved that Schwab's core profit engine is a spread it does not fully control. When short rates rose, clients moved sweep cash into money-market funds and Treasuries, forcing Schwab to replace cheap deposits with expensive Federal Home Loan Bank borrowing. Client cash fell to <strong>9.0% of total client assets, down 90bps YoY</strong> — the sorting pressure has moderated but has not disappeared, and rivals like Interactive Brokers advertise materially higher cash yields as a competitive wedge. Any regulatory or litigation push toward higher sweep rates hits earnings directly.</p>
+    <p style="margin-top:12px;"><strong>2. Duration and AOCI on the securities portfolio.</strong> Schwab invested pandemic-era deposits into long-dated mortgage-backed securities at low yields. A large held-to-maturity portfolio carries unrealized losses that do not flow through earnings but do sit in <span class="tip" title="Accumulated Other Comprehensive Income — unrealized gains and losses on available-for-sale securities and hedges, held in equity rather than earnings">AOCI</span> and in the fair-value footnote, constraining book value and creating the perception that Schwab is capital-impaired if forced to sell. That perception is what turned a rate cycle into a bank run in March 2023.</p>
+    <p style="margin-top:12px;"><strong>3. Fee and price compression.</strong> Equity commissions already went to zero. The next fronts are advisory program fees, money-market expense ratios, and custody economics, where Altruist and other low-cost challengers are aggressively targeting small and mid-sized RIAs. Schwab's fee-based revenue grows with markets, but the <em>rate</em> it charges is under permanent structural pressure.</p>
+    <p style="margin-top:12px;"><strong>4. Regulatory and concentration risk.</strong> As a $517B savings-and-loan holding company, Schwab is subject to bank capital, liquidity, and stress-testing regimes that pure brokers avoid, and to FDIC assessments — including the special assessment levied after the 2023 regional bank failures. Trading revenue is also concentrated in options and retail engagement, which can normalize sharply.</p>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>SCHW</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-earnings ratio — share price divided by trailing twelve-month earnings per share">P/E</span></td><td style="color:var(--amber)!important;">20.20</td><td>~19 (est.)</td><td>~26 (est.)</td><td>Cheap vs the index, roughly in line with capital-markets peers. The market is not yet paying a full premium for the NIM recovery.</td></tr>
+      <tr><td>Forward <span class="tip" title="Share price divided by consensus estimated earnings per share for the next twelve months">P/E</span></td><td style="color:var(--green)!important;">15.35</td><td>~17 (est.)</td><td>~23 (est.)</td><td>Consensus FY2026 EPS of $6.49 (+33%) compresses the multiple fast. Discount to both benchmarks.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth — the P/E ratio divided by the expected earnings growth rate; below 1.0 is generally considered cheap relative to growth">PEG</span> Ratio</td><td style="color:var(--green)!important;">0.75</td><td>~1.4 (est.)</td><td>~2.1 (est.)</td><td>Below 1.0 — growth is not being priced. Caveat: the growth is partly a one-time funding-cost normalization, not a durable rate.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months">EPS</span> (<span class="tip" title="Trailing twelve months">TTM</span>)</td><td style="color:var(--green)!important;">$5.49</td><td>—</td><td>—</td><td>+47.6% YoY. FY2025 GAAP EPS was $4.65; adjusted $4.87. 2Q26 GAAP EPS $1.54, adjusted $1.62.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year">YoY</span>)</td><td style="color:var(--green)!important;">+20.3%</td><td>~+11% (est.)</td><td>~+7% (est.)</td><td>TTM revenue $26.03B. FY2025 grew 22.0%; management guides FY2026 revenue growth of 17.5%–18.5% assuming 13% market appreciation.</td></tr>
+      <tr><td><span class="tip" title="Gross profit as a percentage of revenue — revenue minus cost of goods sold, divided by revenue">Gross Margin</span></td><td style="color:var(--text-dim)!important;">n/m</td><td>n/m</td><td>~34% (est.)</td><td><strong>Not meaningful.</strong> Schwab reports revenue net of interest expense; there is no cost of goods sold. Data services show ~97%, which is an artifact. Use pre-tax margin instead: <strong>51.9% GAAP / 54.3% adjusted in 2Q26</strong>.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green)!important;">37.4%</td><td>~21% (est.)</td><td>~13% (est.)</td><td>$9.72B net income on $26.03B TTM revenue. Wide vs both benchmarks — operating leverage on a fixed platform. Adjusted pre-tax margin 54.3%.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber)!important;">1.15%</td><td>~1.8% (est.)</td><td>~1.2% (est.)</td><td>$1.28/share annualized, ~22.4% payout ratio. Below industry, in line with the index. Buybacks are the larger return channel — $7.3B in FY2025.</td></tr>
+      <tr><td><span class="tip" title="Percentage of a company's freely tradable shares that have been sold short by investors betting the price will fall">Short Interest</span> %</td><td style="color:var(--text-dim)!important;">n/a</td><td>~2.5% (est.)</td><td>~2% (est.)</td><td><strong>Not reliably reported.</strong> StockAnalysis shows 63,209 shares (~0.0% of a 1.63B float), which appears to be a data error rather than a real figure. Treat short interest as low but unverified; confirm with the exchange settlement file.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td><td style="color:var(--amber)!important;">1.51</td><td>~1.6 (est.)</td><td>~1.0 (est.)</td><td>$75.78B total debt against $96.36B cash. For a savings-and-loan holding company this metric is far less informative than regulatory capital: <strong>Tier 1 Leverage 8.7%, adjusted Tier 1 Leverage 6.8%</strong> at 2Q26 — both comfortably above requirements.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure">Current Ratio</span></td><td style="color:var(--text-dim)!important;">n/m</td><td>n/m</td><td>~1.2 (est.)</td><td><strong>Not meaningful.</strong> Reported at 0.66, but banks do not classify assets and liabilities as current/non-current — deposits are demandable by construction. Liquidity is better read through the funding stack: supplemental FHLB borrowing is down to <strong>$0.5B from $9.0B a year ago</strong>.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow — operating cash flow minus capital expenditures">FCF</span></td><td style="color:var(--green)!important;">$10.79B</td><td>—</td><td>—</td><td>Operating cash flow $11.42B less $628M capex. $6.24 FCF per share versus a $110.88 price — a ~5.6% FCF yield. For a bank, cash flow is noisy; treat as directional.</td></tr>
+      <tr><td><span class="tip" title="Return on equity — net income divided by average shareholders' equity">ROE</span></td><td style="color:var(--green)!important;">20.3%</td><td>~13% (est.)</td><td>~18% (est.)</td><td>TTM. The run-rate is higher: <strong>2Q26 annualized ROE was 25% (vs 19% a year earlier) and return on tangible common equity 44% (vs 35%)</strong>. FY2025 ROE was 21%.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital — after-tax operating profit divided by total invested capital">ROIC</span></td><td style="color:var(--amber)!important;">8.6%</td><td>~9% (est.)</td><td>~11% (est.)</td><td>Depressed by the enormous deposit-funded balance sheet in the denominator — a structural artifact of the bank model rather than poor capital allocation. ROTCE of 44% is the more informative figure.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market; 1.0 means it moves in line with the market">Beta</span></td><td style="color:var(--green)!important;">0.75</td><td>~1.2 (est.)</td><td>1.00</td><td>Below-market beta, which understates the real risk profile — Schwab's drawdowns are idiosyncratic and event-driven (see March 2023, −33% in one month) rather than market-correlated.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim)!important;">$83.96 – $112.20</td><td>—</td><td>—</td><td>At $110.88 the stock sits ~1.2% below its 52-week high and +32% off the low. 52-week change +15.3%. Total client assets grew <strong>+22% YoY</strong> over the same window — asset growth has outpaced the share price.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div style="font-size:11px;color:var(--text-dim);margin-top:12px;font-family:'JetBrains Mono',monospace;">Note: SCHW column figures are sourced from StockAnalysis.com and Schwab's own earnings releases. <strong style="color:var(--amber);">Industry Avg and S&amp;P 500 columns are approximate benchmark estimates, not verified point-in-time data</strong> — they are provided for directional context only and should be independently confirmed before use.</div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 14px;">Notable One-Off Items</div>
+  <div class="prose">
+    <p>Schwab's reported numbers over the last three years contain several material non-recurring distortions, and the gap between GAAP and adjusted results is not trivial:</p>
+    <p style="margin-top:12px;"><strong>Acquisition and integration costs.</strong> 2Q26 GAAP results absorbed <strong>$170M of pre-tax transaction and integration-related expense</strong>, which is the entire $0.08 gap between GAAP EPS of $1.54 and adjusted EPS of $1.62. FY2025 excluded <strong>$127M of pre-tax transaction costs tied to the Forge Global acquisition</strong>. Prior years carried far heavier <strong>TD Ameritrade integration costs</strong>, which have now largely rolled off following completion of the client-account conversions — a meaningful tailwind to the GAAP-to-adjusted convergence.</p>
+    <p style="margin-top:12px;"><strong>FDIC special assessment.</strong> Following the March 2023 regional bank failures, the FDIC levied a special assessment on large insured institutions to replenish the Deposit Insurance Fund. Schwab recorded charges for this in FY2023 and revised them in FY2024; these are non-recurring and depress the FY2023–24 base against which current growth is measured. <em>Exact amounts not verified in this snapshot — confirm in the 10-K.</em></p>
+    <p style="margin-top:12px;"><strong>Securities repositioning and AOCI marks.</strong> Schwab has periodically sold or repositioned lower-yielding securities, realizing losses in order to reinvest at higher yields. Separately, the held-to-maturity portfolio carries unrealized losses that never touch the income statement but suppress tangible book value and were the analytical core of the 2023 bear case. Because Schwab has now repaid nearly all of its supplemental funding, it is no longer a forced seller of those securities — but the marks remain a balance-sheet overhang until the portfolio rolls down.</p>
+    <p style="margin-top:12px;"><strong>Capital structure actions.</strong> In 2Q26 Schwab <strong>redeemed $2.1B of Series I preferred stock and issued $1.5B of Series L</strong>, plus repurchased $1.0B of common (11.2 million shares). Preferred dividend changes shift EPS at the margin and should be normalized when comparing quarters.</p>
+    <p style="margin-top:12px;"><strong>Expense guidance distortion.</strong> Management's FY2026 total expense growth guidance of <strong>9.5%–10.5%</strong> versus underlying <strong>5.5%–6.5%</strong> is a roughly 400bps gap driven by volume-related costs and the inclusion of Forge (~100bps). Comparing headline expense growth to prior years without this adjustment overstates cost inflation.</p>
+  </div>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">BUY</div><div class="card-note">22 analysts polled by S&amp;P Global via StockAnalysis. MarketBeat's separate panel shows "Moderate Buy" across 21 analysts.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$125.00</div><div class="card-note"><span style="color:var(--green);">+12.7% upside</span> from $110.88. Median target $126.50 (+14.1%). MarketBeat's panel averages $121.17 (+9.4%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$91 – $145</div><div class="card-note">Low implies −17.9%; high implies +30.8%. A ~59% spread between bull and bear — unusually wide, reflecting disagreement on the rate path.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">18 / 3 / 1</div><div class="card-note">Buy (11 Strong Buy + 7 Buy) / Hold / Sell. 82% of the panel rates it Buy or better; one outright Sell.</div></div>
+  </div>
+
+  <div class="analyst-bar" style="margin-top:24px;">
+    <div style="flex:11;background:#22c55e;"></div>
+    <div style="flex:7;background:#4ade80;"></div>
+    <div style="flex:3;background:#f59e0b;"></div>
+    <div style="flex:1;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span>Strong Buy — 11</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span>Buy — 7</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span>Hold — 3</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span>Sell — 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 14px;">Key Recent Analyst Calls</div>
+  <div class="prose">
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--green);font-size:18px;line-height:1.2;">●</span>
+      <div><strong>Compass Point</strong> — Initiated coverage <strong style="color:var(--green);">Buy</strong>, price target <strong style="color:var(--green);font-family:'JetBrains Mono',monospace;">$135</strong> (Aug 3, 2026). New coverage at a ~22% premium to the then-current price, joining a cluster of post-earnings initiations that see the NIM recovery running further than consensus.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--green);font-size:18px;line-height:1.2;">●</span>
+      <div><strong>Morgan Stanley</strong> — <strong style="color:var(--green);">Overweight</strong>, target raised from $133 to <strong style="color:var(--green);font-family:'JetBrains Mono',monospace;">$136</strong> (Jul 27, 2026). Raised after the record 2Q26 print; among the more constructive views on Schwab's ability to hold NIM expansion into 2027.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--green);font-size:18px;line-height:1.2;">●</span>
+      <div><strong>Raymond James</strong> — Reiterated <strong style="color:var(--green);">Outperform</strong>, street-high target <strong style="color:var(--green);font-family:'JetBrains Mono',monospace;">$145</strong> (Jul 22, 2026). The bull anchor: 11.9M daily average trades, $119.8B of core net new assets, and a supplemental funding balance down to near zero.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--amber);font-size:18px;line-height:1.2;">●</span>
+      <div><strong>Barclays</strong> — <strong style="color:var(--green);">Overweight</strong>, target raised $122 → <strong style="color:var(--green);font-family:'JetBrains Mono',monospace;">$125</strong> (Jul 22, 2026); <strong>Argus</strong> raised $108 → <strong style="color:var(--green);font-family:'JetBrains Mono',monospace;">$114</strong> on Jul 23. Constructive but modest raises — these targets now sit at or below the current price, a sign the stock has run past the middle of the range.</div>
+    </div>
+    <div style="display:flex;gap:12px;padding:12px 0;">
+      <span style="color:var(--red);font-size:18px;line-height:1.2;">●</span>
+      <div><strong>BMO Capital Markets</strong> — Downgraded to <strong style="color:var(--red);">Market Perform</strong> (Jul 20, 2026), the day before earnings. The lone visible bearish action in the recent tape; the bear case is valuation after a large re-rating plus normalization risk in trading volumes.</div>
+    </div>
+    <p style="margin-top:14px;font-size:13px;color:var(--text-dim);">Note the tension in the data: the average target of $125 is only ~13% above spot, and several recently updated targets ($114, $118, $125) are at or below the current $110.88 price. The consensus is bullish in rating but the price has largely caught up to the numbers.</p>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2Q26 Earnings — Record Revenue, Stock Fell</div>
+        <div class="tl-desc">Net revenues of $7.07B (+21%), adjusted EPS $1.62 (+42%), NIM 3.00% (+12bps QoQ), core net new assets $119.8B (+49%), DATs 11.9M (+57%), client assets $13.08T (+22%). Despite the beat, the stock sold off — the market read raised expense guidance (9.5%–10.5%) and the DAT normalization implied by 10.6M full-year guidance as offsets. A record print that was already priced.</div>
+        <div class="tl-impact down">Already occurred — record results, negative price reaction</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Monthly Activity Report — Client Assets &amp; Cash</div>
+        <div class="tl-desc">Schwab publishes monthly metrics on total client assets, core net new assets, new accounts, and — critically — sweep cash balances. With client cash at 9.0% of total assets (down 90bps YoY), each monthly release is a direct read on whether cash sorting has genuinely stabilized. Sweep cash rose $24.2B in 2Q; a reversal would be the single most damaging near-term data point.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FOMC Decision — The Rate Path Is the Thesis</div>
+        <div class="tl-desc">Management's guidance embeds an assumption of <strong>one 25bp Fed rate hike before year end</strong>, with minimal 2026 impact but meaningful 2027 NIM expansion. That is an unusual base case and cuts both ways: a hiking path supports asset yields and the 3.25%–3.30% 4Q exit NIM, but also re-energizes cash sorting as clients chase higher money-market yields. Cuts would do the reverse — relieve sorting pressure but compress asset yields.</div>
+        <div class="tl-impact neutral">Key near-term event — bidirectional</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~Oct 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">3Q26 Earnings (estimated date)</div>
+        <div class="tl-desc">Consensus expects roughly $1.67 EPS. The three things that matter: (1) whether NIM tracks toward the 3.25%–3.30% 4Q exit, (2) whether DATs hold up better than the implied step-down to a 10.6M full-year average, and (3) whether the $0.5B residual supplemental funding balance goes to zero. Expense growth against the 9.5%–10.5% guide will also be scrutinized given the Forge drag.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">4Q26</div>
+      <div class="tl-content">
+        <div class="tl-title">Forge Global Integration — Private Markets Rollout</div>
+        <div class="tl-desc">Management says Forge is "making progress on bringing private market capabilities to our clients" and is not material to 2026 financials, but adds ~100bps to expense growth. Evidence of actual client adoption — private-market secondaries offered through Schwab's retail and RIA channels — would validate a new revenue vector and justify the near-term cost. Failure to show traction makes it a pure margin drag.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback Cadence &amp; Capital Return</div>
+        <div class="tl-desc">Schwab repurchased $7.3B of common stock in FY2025 and $1.0B (11.2M shares) in 2Q26 alone, while redeeming $2.1B of Series I preferred and issuing $1.5B of Series L. With Tier 1 Leverage at 8.7% and adjusted Tier 1 at 6.8%, and supplemental funding essentially retired, capital flexibility is the best it has been since 2022. An acceleration of the repurchase pace is the cleanest lever management has.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SCHW — Monthly Closes, Sep 2021 → Aug 2026</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ STATIC DATA AS OF AUG 19, 2026 — hardcoded, does not update</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin:14px 0 18px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:20px;height:3px;background:#00a0df;display:inline-block;border-radius:2px;"></span>Price</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:20px;height:0;border-top:2px dashed #f59e0b;display:inline-block;"></span>20-Day MA (1-mo)</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:20px;height:0;border-top:2px dashed #3b82f6;display:inline-block;"></span>50-Day MA (3-mo)</span>
+      <span style="display:flex;align-items:center;gap:7px;"><span style="width:20px;height:0;border-top:2px dashed #ef4444;display:inline-block;"></span>200-Day MA (10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">Relative Strength Index (RSI) — 6-Period, Monthly</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-top:4px;">⚠ Static data as of Aug 19, 2026</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:8px;max-width:760px;">In plain English: RSI measures how much of the recent price movement has been up versus down. Above 70 means the stock has been bought hard and may be stretched; below 30 means it has been sold hard and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;margin-top:16px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <div class="prose" style="margin-top:32px;">
+    <p><strong>The five-year trajectory is one of the more dramatic round trips in US large-cap financials.</strong> SCHW closed September 2021 at $72.84 and closed August 19, 2026 at $110.88 — a <strong>price gain of roughly +52%</strong> over five years, or about <strong>8.7% annualized</strong> before dividends. That headline number conceals almost everything that mattered. The stock peaked at $87.70 in January 2022 as the market anticipated Fed tightening (rising rates were, at that point, unambiguously good for Schwab's spread). It then fell through 2022 as the rate shock hit asset values, recovered to $83.26 by December 2022 — and then, in a single month, <strong>collapsed 33% from $77.92 at end-February 2023 to $52.38 at end-March 2023</strong>, with the intraday low in the mid-$40s. Silicon Valley Bank's failure turned the market's attention to Schwab's held-to-maturity securities portfolio, its unrealized losses, and the accelerating flight of client cash out of low-yielding sweep accounts. Schwab did not fail — it plugged the gap with expensive Federal Home Loan Bank borrowing — but the earnings power was gutted and the multiple never fully recovered until the funding cost came back out.</p>
+    <p style="margin-top:16px;">The bottom was <strong>$52.04 at end-October 2023</strong>, coincident with the peak in long-term rates. From there the recovery has been a mechanical function of one variable: <strong>the paydown of supplemental funding</strong>. Bank supplemental funding fell to <strong>$5.1B at year-end 2025 (down $9.7B during 2025 alone)</strong> and then to just <strong>$0.5B of FHLB borrowings at June 30, 2026 — a 94% decline from $9.0B a year earlier</strong>. Every dollar retired swapped a high-cost liability for cheap deposits, and NIM followed: from the crisis trough up to <strong>2.74% for FY2025</strong> and <strong>3.00% in 2Q26</strong>, with guidance to a <strong>3.25%–3.30% exit rate in 4Q26</strong>. That single line explains the earnings recovery — FY2025 EPS +56%, TTM EPS +47.6% — far better than any narrative about markets or trading.</p>
+    <p style="margin-top:16px;">Layered on top was a genuine engagement boom. Total client assets went from roughly $8T at the 2023 trough to <strong>$13.08T (+22% YoY)</strong>; daily average trades ran <strong>11.9 million in 2Q26, +57% YoY</strong>; margin balances reached <strong>$165.1B, +30% sequentially</strong>. The stock cleared its pre-crisis high in 2025 and made a new one at <strong>$112.20</strong> within the last 52 weeks. From the October 2023 low of $52.04 to today's $110.88, the position is up <strong>+113%</strong>.</p>
+    <p style="margin-top:16px;"><strong>Relative performance:</strong> a +52% five-year price return has <em>materially lagged the S&amp;P 500</em> over the same window, which was driven by mega-cap technology through 2023–2025 — SCHW spent two of those five years underwater from a self-inflicted balance-sheet wound while the index compounded. <em>(The precise index return is an estimate and has not been independently verified in this snapshot — confirm before citing.)</em> Against the capital-markets sub-industry, Schwab has also lagged pure-play brokers such as Interactive Brokers and Robinhood, whose earnings never carried duration risk. The counterpoint: over the last twelve months SCHW is <strong>+15.3%</strong>, and the recovery in return on tangible common equity to <strong>44% annualized</strong> is the kind of normalization that historically supports multiple expansion — if it proves durable.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 8px;">Key Inflection Points</div>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jan 2022</div><div class="tl-content"><div class="tl-title">Pre-Tightening High — $87.70</div><div class="tl-desc">The market bid Schwab as a pure rate beneficiary heading into the Fed hiking cycle. The thesis was correct on asset yields and catastrophically wrong on deposit behavior.</div><div class="tl-impact neutral">Cycle high before the drawdown</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2023</div><div class="tl-content"><div class="tl-title">SVB Contagion — $77.92 → $52.38 in One Month</div><div class="tl-desc">Silicon Valley Bank's failure exposed Schwab's held-to-maturity portfolio and accelerating cash sorting. The stock fell 33% in a month, with intraday prints in the mid-$40s. Schwab replaced fleeing deposits with high-cost FHLB borrowing — solvent, but with earnings power impaired for two years.</div><div class="tl-impact down">−33% in one month — the defining event</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Cycle Low — $52.04</div><div class="tl-desc">Coincided with the peak in 10-year Treasury yields and maximum pessimism on unrealized securities losses. NIM was at its trough and supplemental borrowing near its peak.</div><div class="tl-impact down">The bottom — −41% from the Jan '22 high</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">Post-Election Broker Rally — $82.76</div><div class="tl-desc">Financials re-rated broadly on expectations of deregulation and stronger capital markets activity. Schwab broke back above $80 for the first time since the crisis.</div><div class="tl-impact up">Recovery confirmed</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2025</div><div class="tl-content"><div class="tl-title">Volatility Drawdown — $78.28</div><div class="tl-desc">A market-wide risk-off episode pulled the stock back into the high $70s. Notably, this drawdown was ordinary market beta rather than company-specific — the first time since 2022 that Schwab traded on the market rather than on its own balance sheet.</div><div class="tl-impact neutral">Market-driven, not idiosyncratic</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">Record FY2025 Results — $103.92</div><div class="tl-desc">Revenue $23.92B (+22%), GAAP EPS $4.65 (+56%), ROE 21%, ROTCE 38%, supplemental funding down $9.7B to $5.1B, $7.3B of buybacks. The recovery was now in the reported numbers, not just the guidance.</div><div class="tl-impact up">Breakout above $100</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">Rate-Repricing Dip — $87.35</div><div class="tl-desc">A ~16% drawdown from the January high as the market repriced the forward rate path. A reminder that Schwab's multiple remains hostage to Fed expectations even with the balance sheet fixed.</div><div class="tl-impact neutral">−16% from the Jan '26 high</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Near All-Time Highs — $110.88</div><div class="tl-desc">Supplemental funding at $0.5B, NIM at 3.00% heading to 3.25%–3.30%, client assets $13.08T. The stock sits ~1.2% below its 52-week high of $112.20 and just below the $125 average analyst target.</div><div class="tl-impact up">+113% from the Oct '23 low</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The balance-sheet repair is essentially finished and the earnings power it suppressed is coming back mechanically: supplemental funding is down to <strong>$0.5B from $9.0B a year ago</strong>, NIM has recovered to <strong>3.00%</strong> with guidance to a <strong>3.25%–3.30%</strong> exit rate, and adjusted pre-tax margin is <strong>54.3%</strong>. That is happening alongside a genuinely strong franchise — <strong>$13.08T of client assets (+22%)</strong>, <strong>$119.8B of quarterly core net new assets (+49%)</strong>, 1.4 million new accounts in the quarter, and record trading engagement — on a <strong>15.4x forward P/E</strong> and a <strong>0.75 PEG</strong>. With Tier 1 Leverage at 8.7% and $7.3B of buybacks in FY2025, capital return is the accelerant.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Most of the recovery is a one-time normalization, not a growth rate — you cannot pay down $9B of supplemental funding twice. The 2Q26 comparisons flatter: DATs +57% is not repeatable, and management's own <strong>10.6M full-year DAT guide</strong> implies a step down. Expense growth guidance rose to <strong>9.5%–10.5%</strong>. Client cash has fallen to <strong>9.0% of total client assets, down 90bps YoY</strong>, and the guidance assumes a rate <em>hike</em>, which would restart sorting pressure. Meanwhile the stock has run to <strong>$110.88</strong> against an average target of <strong>$125</strong>, with several freshly updated targets ($114, $118) already below spot — the easy re-rating is behind it.</p>
+    </div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 6px;">Top 3 Risks</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Cash sorting reaccelerates.</strong> Sweep cash of $485.7B funds the entire net interest engine at below-market cost. Client cash is already down to 9.0% of total client assets. A rate hike — which management explicitly assumes — or aggressive yield competition from Interactive Brokers and money-market funds could pull balances out again, forcing Schwab back toward wholesale funding and stalling the NIM path to 3.25%–3.30%.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">Trading and engagement normalize hard.</strong> Trading revenue of $1.215B (+28%) on 11.9M DATs (+57%) and $165.1B of margin balances (+30% QoQ) reflects an exceptional retail environment. Options volumes and long/short strategy demand are cyclical. A quiet market removes several hundred million dollars of quarterly revenue at very high incremental margin, and the expense base does not shrink with it.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Duration and AOCI overhang on the securities book.</strong> Unrealized losses on the held-to-maturity portfolio remain a live constraint on tangible book value and a latent confidence risk. Schwab is no longer a forced seller, but if long rates rise materially the marks widen again, and the 2023 experience showed how quickly a securities-portfolio narrative can become a deposit-flight narrative for a broker-bank with $517B of assets.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid" style="grid-template-columns:1fr;">
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">The Rate Path and Deposit Betas</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">Schwab's guidance embeds an unusual base case: <strong>one 25bp Fed hike before year-end 2026</strong>, with minimal impact on 2026 but meaningful NIM expansion in 2027. For a broker-bank this is genuinely two-sided. Higher short rates lift the yield on $517B of interest-earning assets — but they also widen the gap between Schwab's administrative sweep rate and what clients can earn in a money-market fund, which is precisely the mechanism that produced the 2023 crisis. The <span class="tip" title="Deposit beta — the share of a change in market interest rates that a bank passes through to depositors">deposit beta</span> Schwab actually realizes on the next move is the whole ballgame. Evidence so far is encouraging: sweep cash <em>rose</em> $24.2B sequentially in 2Q26 and supplemental FHLB borrowing fell to $0.5B from $9.0B. But client cash at 9.0% of total client assets — down 90bps YoY — shows the structural drift is still one-directional.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Retail Investor Engagement &amp; Trading Volumes</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">The retail participation cycle is running at levels that would have been considered a blow-off top in a prior era and have simply persisted. Schwab opened <strong>1.388 million new brokerage accounts in 2Q26</strong> (48.0 million total), booked <strong>$119.8B of core net new assets (+49% YoY)</strong> including a record $62.7B in June alone, ran <strong>11.9 million DATs (+57%)</strong>, and saw margin balances jump 30% sequentially to <strong>$165.1B</strong>. Industry-wide this is being driven by options, leveraged and long/short products, and a generation of investors who default to self-directed platforms. It is a tailwind — but it is a <em>cyclical</em> tailwind, and management's own FY2026 DAT guide of 10.6M concedes normalization from the 2Q peak.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Competition on Cash Yields — Bull vs Bear</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">The permanent tension in this business is that Schwab's largest profit pool is money it pays clients almost nothing for. Interactive Brokers ($814B client assets, +34% account growth) competes explicitly on cash yield; Fidelity ($17.5T) defaults clients into a money-market fund rather than a low-rate sweep; Vanguard ($11.6T) competes on cost. <strong>Bull framing:</strong> Schwab has held sweep balances at $485.7B and grown them through a full rate cycle, proving that convenience, breadth, and the advisor channel outweigh a few hundred basis points of yield for most clients — and with supplemental funding retired, the spread now drops straight to the bottom line at a 54.3% adjusted pre-tax margin. <strong>Bear framing:</strong> every year of investor education, every fintech that automates cash management, and every regulatory nudge toward sweep-rate disclosure chips away at the pool. If sweep cash structurally reprices toward market yields, Schwab's earnings power resets lower permanently — and a 15.4x forward multiple on peak-normalization earnings would look expensive in hindsight.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 19, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Sources: The Charles Schwab Corporation 2Q26 earnings release and Summer Business Update (July 21, 2026) and 4Q/FY2025 earnings release (January 2026), both via pressroom.aboutschwab.com and Schwab's Form 8-K exhibits; Schwab 2Q26 earnings call transcript (The Motley Fool, July 21, 2026); StockAnalysis.com for price, valuation, statistics, financials, forecast, and monthly price history; CompaniesMarketCap.com for global and US market-capitalization rankings; MarketBeat for analyst rating actions and institutional ownership; WallStreetZen for the estimated next earnings date; investingintheweb.com for competitor client-asset figures (Fidelity, Vanguard, Interactive Brokers, Robinhood, E*TRADE — as-of dates vary from June 2025 to January 2026 and are not contemporaneous with Schwab's June 2026 figures).</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;color:var(--amber);">Estimated / unverified figures are labeled inline. Specifically: the NYSE market-cap rank, all Industry Avg and S&amp;P 500 benchmark column values, the RIA custody market-share characterization, the five-year S&amp;P 500 relative-return comparison, the FDIC special assessment amounts, and the next earnings date are estimates or third-party approximations and have not been independently verified. Competitor client-asset and market-share data are third-party estimates measured on different dates. Short interest is not reliably reported by the source used.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This material is for informational and educational purposes only and does not constitute investment, legal, or tax advice, or a recommendation to buy or sell any security. Past performance is not indicative of future results. All investing involves risk, including possible loss of principal. Conduct your own due diligence and consult a qualified financial professional before making investment decisions. The author may hold positions in securities mentioned.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — SCHW monthly closes, Sep 2021 through Aug 19, 2026 =====
+// Source: StockAnalysis.com monthly history. Final point is the Aug 19, 2026 close (partial month).
+const labels = [
+ 'Sep 21','Oct 21','Nov 21','Dec 21',
+ 'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+ 'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+ 'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+ 'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+ 'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+const prices = [
+ 72.84, 82.03, 77.39, 84.10,
+ 87.70, 84.46, 84.31, 66.33, 70.10, 63.18, 69.05, 70.95, 71.87, 79.67, 82.54, 83.26,
+ 77.42, 77.92, 52.38, 52.24, 52.69, 56.68, 66.10, 59.15, 54.90, 52.04, 61.32, 68.80,
+ 62.92, 66.78, 72.34, 73.95, 73.28, 73.69, 65.19, 65.10, 64.81, 70.83, 82.76, 74.01,
+ 82.72, 79.53, 78.28, 81.40, 88.34, 91.24, 97.73, 95.84, 95.47, 94.52, 92.73, 99.91,
+ 103.92, 95.20, 93.98, 91.64, 87.35, 92.27, 102.54, 110.88
+];
+
+function sma(arr, window) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - window + 1; j <= i; j++) s += arr[j];
+    out.push(+(s / window).toFixed(2));
+  }
+  return out;
+}
+
+function computeRSI(arr, period) {
+  const out = new Array(arr.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = arr[i] - arr[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  for (let i = period + 1; i < arr.length; i++) {
+    const d = arr[i] - arr[i - 1];
+    const g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  }
+  return out;
+}
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+// Annotated inflection points
+const events = [
+  { idx: 4,  label: "Jan '22 — pre-tightening high $87.70",        color: '#f59e0b' },
+  { idx: 18, label: "Mar '23 — SVB contagion, −33% in one month",  color: '#ef4444' },
+  { idx: 25, label: "Oct '23 — cycle low $52.04",                  color: '#ef4444' },
+  { idx: 38, label: "Nov '24 — post-election broker rally",        color: '#22c55e' },
+  { idx: 42, label: "Mar '25 — market-wide volatility drawdown",   color: '#f59e0b' },
+  { idx: 52, label: "Jan '26 — record FY25 results, breaks $100",  color: '#22c55e' },
+  { idx: 56, label: "May '26 — rate-repricing dip $87.35",         color: '#f59e0b' },
+  { idx: 59, label: "Aug '26 — near all-time highs $110.88",       color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(e => { eventMap[e.idx] = e; });
+
+const pointRadii  = prices.map((_, i) => eventMap[i] ? 6 : 0);
+const pointColors = prices.map((_, i) => eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)');
+
+const tooltipStyle = {
+  backgroundColor: '#1a2235',
+  titleColor: '#e2e8f0',
+  bodyColor: '#94a3b8',
+  borderColor: '#1e293b',
+  borderWidth: 1,
+  padding: 12,
+  titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+  bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+  displayColors: false
+};
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(0, 160, 223, 0.20)');
+grad.addColorStop(1, 'rgba(0, 160, 223, 0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#00a0df',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointHoverRadius: 7,
+        order: 1
+      },
+      { label: '20-Day MA',  data: ma1,  borderColor: '#f59e0b', borderWidth: 1.4, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25, order: 2 },
+      { label: '50-Day MA',  data: ma3,  borderColor: '#3b82f6', borderWidth: 1.4, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25, order: 3 },
+      { label: '200-Day MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.4, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: Object.assign({}, tooltipStyle, {
+        callbacks: {
+          title: function(items) { return 'SCHW — ' + items[0].label; },
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            const e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      })
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 14
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function(v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI(6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.25,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: Object.assign({}, tooltipStyle, {
+        callbacks: {
+          title: function(items) { return 'RSI(6) — ' + items[0].label; },
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            let tag = 'Neutral';
+            if (ctx.parsed.y >= 70) tag = 'Overbought';
+            else if (ctx.parsed.y <= 30) tag = 'Oversold';
+            return ctx.parsed.y.toFixed(1) + '  (' + tag + ')';
+          }
+        }
+      })
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.6)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 12
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function(ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) return 'rgba(148,163,184,0.35)';
+            return 'rgba(30,41,59,0.6)';
+          },
+          lineWidth: function(ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          color: function(ctx) {
+            if (ctx.tick.value === 70) return '#ef4444';
+            if (ctx.tick.value === 30) return '#22c55e';
+            if (ctx.tick.value === 50) return '#94a3b8';
+            return '#64748b';
+          },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
