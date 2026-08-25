@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM — Salesforce, Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #00a1e0;
+  --accent-dim: #00a1e033;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+
+<div class="noise-overlay"></div>
+<div class="container">
+
+  <div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 24, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+  <!-- ============ HEADER ============ -->
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="ticker-block" style="flex-wrap:wrap;">
+          <div class="ticker-badge">CRM</div>
+          <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Exchange:</span>NYSE</div>
+          <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Industry:</span>Technology / Software — Application</div>
+          <div style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Mkt Cap:</span>$171.22B</div>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;">Mkt Cap Ranking:</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #126</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #75</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#40 (est.)</span>
+        </div>
+        <div class="company-name" style="margin-top:14px;">Salesforce, Inc.</div>
+      </div>
+      <div class="price-block">
+        <div class="price-current">$209.06</div>
+        <div class="price-change">−$0.11 (−0.05%)</div>
+        <div class="price-date">Close · Aug 24, 2026 · 4:00 PM EDT</div>
+        <div class="price-date">After hours: $209.05 (−0.01, 0.00%) · 7:59 PM EDT</div>
+      </div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item"><span>HQ:</span>San Francisco, California (Salesforce Tower)</div>
+      <div class="meta-item"><span>Employees:</span>83,334</div>
+      <div class="meta-item"><span>Founded:</span>1999 (IPO June 2004)</div>
+      <div class="meta-item"><span>Next Earnings:</span>Aug 26, 2026 (Q2 FY2027)</div>
+      <div class="meta-item"><span>Fiscal Year End:</span>January 31</div>
+    </div>
+    <div style="margin-top:20px;padding:14px 18px;background:var(--amber-dim);border-left:3px solid var(--amber);border-radius:6px;font-size:13px;color:var(--text-muted);line-height:1.7;">
+      <strong style="color:var(--amber);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;">⚑ TWO BRIEF PREMISES CORRECTED BY LIVE DATA</strong><br>
+      <strong style="color:var(--text);">(1) Segment reporting has changed.</strong> Salesforce no longer reports the five legacy clouds (Sales, Service, Platform &amp; Other, Marketing &amp; Commerce, Integration &amp; Analytics). As of Q1 FY2027 subscription revenue is presented in two lines: <strong style="color:var(--text);">Agentforce Apps</strong> and <strong style="color:var(--text);">Data 360, Headless Platform &amp; Other</strong>. This page uses the current presentation.<br>
+      <strong style="color:var(--text);">(2) The de-rating did not start from a 2021 peak.</strong> The highest monthly close in the five-year series is <strong style="color:var(--text);">$337.76 in January 2025</strong>, not the ~$294–$310 area of late 2021. The 2021 high was surpassed twice. Peak-to-date drawdown is −38.1% from January 2025, not from 2021.
+    </div>
+  </div>
+
+  <!-- ============ 01 COMPANY OVERVIEW ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">01</span> Company Overview</div>
+    <div class="prose">
+      <p>Salesforce is the largest independent enterprise application software company in the world — a cloud platform for sales, service, marketing, commerce, integration, analytics and, since 2024, autonomous AI agents. Fiscal 2026 (ended January 31, 2026) revenue was <strong>$41.53B, up 9.6% <span class="tip" title="Year-over-year: this period compared with the same period one year earlier.">YoY</span></strong>, the first sub-10% growth year in the company's history as a public company; trailing-twelve-month revenue through April 2026 is <strong>$42.83B, up 11.0%</strong>, re-accelerated by the Informatica acquisition. At a $171.22B market capitalisation Salesforce ranks <strong>#126 globally and #75 in the United States</strong> — down from a $323.89B market cap at the end of 2024, a two-year decline of 47%.</p>
+      <p style="margin-top:14px;">The company's problem is not profitability. Operating margin has gone from 2.07% (FY2022) to 21.47% (FY2026) on a <span class="tip" title="Generally Accepted Accounting Principles — the standardised US reporting rules. GAAP figures include stock-based compensation and acquisition amortisation.">GAAP</span> basis and 34.8% on a non-GAAP basis, and <span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditure — the cash actually available to repay debt, buy back stock or pay dividends.">FCF</span> is $14.66B on a trailing basis. The problem is growth and the durability of the pricing model. Salesforce sells seats. Agentic AI is explicitly designed to reduce the number of humans who need seats. That tension — not the P&amp;L — is what has compressed the multiple to a 15.0x <span class="tip" title="Forward Price-to-Earnings: share price divided by expected earnings per share over the next twelve months.">forward P/E</span>.</p>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:32px 0 12px;">Notable Executives &amp; Owners</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">Chair &amp; CEO</div>
+        <div class="card-value" style="font-size:20px;">Marc Benioff</div>
+        <div class="card-note">Co-founder (1999) and still Chair and Chief Executive Officer — verified as the quoted CEO in the Q1 FY2027 release of May 27, 2026. A former Oracle executive, Benioff has run Salesforce for its entire life and is the architect of the Agentforce pivot: "Data and context is the true fuel of Agentforce, and without clean, connected, trusted data there is no intelligence — only hallucination."</div>
+      </div>
+      <div class="card">
+        <div class="card-label">President, CFO &amp; COO</div>
+        <div class="card-value" style="font-size:20px;">Robin Washington</div>
+        <div class="card-note">Verified in the Q1 FY2027 release with an expanded title — President, Chief Financial Officer <em>and</em> Chief Operating Officer. Formerly CFO of Gilead Sciences and a long-serving Salesforce board member before taking the role. She is the executive on record guiding to "organic revenue acceleration in H2 FY27, driven by Sales, Service, Slack, Agentforce, Data 360."</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Key Institutional Investors</div>
+        <div class="card-value" style="font-size:20px;">~80% Institutional</div>
+        <div class="card-note">Institutional ownership is approximately 80.4% across roughly 3,500 filers. Largest positions by reported market value: <strong>Vanguard Group (~$23.8B)</strong>, <strong>State Street (~$13.3B)</strong>, <strong>BlackRock (~$11.4B)</strong>, <strong>FMR/Fidelity (~$7.8B)</strong> and Capital International (~$6.0B) — overwhelmingly passive index money. One filing row in the source implied a single pension fund held 23% of the company; that is implausible and has been excluded as a data error. Treat the ranking as approximate.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 02 CORE BUSINESSES ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">02</span> Core Businesses</div>
+    <div class="prose">
+      <p>Revenue mix below reflects the <strong>most recent reported quarter — Q1 FY2027, ended April 30, 2026, reported May 27, 2026</strong>. Total revenue was <strong>$11.13B, up 13% YoY (12% in constant currency)</strong>, of which <strong>$444M came from Informatica</strong>, which closed November 18, 2025 and is therefore not in the year-ago base. Subscription &amp; support revenue was <strong>$10.59B, up 14% (12% constant currency)</strong>, including $428M of Informatica.</p>
+    </div>
+
+    <div class="seg-bar">
+      <div style="flex:62.1;background:#00a1e0;">AGENTFORCE APPS 62%</div>
+      <div style="flex:33.1;background:#3b82f6;">DATA 360 / PLATFORM 33%</div>
+      <div style="flex:4.8;background:#a78bfa;">SVCS 5%</div>
+    </div>
+    <div class="seg-legend">
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#00a1e0;"></div>Agentforce Apps — $6,910M (62.1%)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#3b82f6;"></div>Data 360, Headless Platform &amp; Other — $3,683M (33.1%)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#a78bfa;"></div>Professional Services &amp; Other — $540M (4.8%)</div>
+    </div>
+
+    <div class="biz-card" style="border-left: 3px solid #00a1e0;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Agentforce Apps</div>
+          <span class="biz-badge dominant">~27% OF TRACKED CRM INSTALLS</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$6,910M</div><div class="biz-stat-label">Q1 FY27 Rev</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">+8.9%</div><div class="biz-stat-label">YoY (7% CC)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">~27%</div><div class="biz-stat-label">Install Share</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">62.1%</div><div class="biz-stat-label">Rev Mix</div></div>
+        </div>
+      </div>
+      <div class="biz-desc">This is the renamed application franchise — the former Sales Cloud, Service Cloud, Marketing, Commerce and Slack, now packaged around Agentforce, Salesforce's autonomous-agent layer. It is the seat-based core of the company and it is growing at <strong>7% in constant currency</strong>. That number is the entire bear case in a single figure: the segment that carries 62% of revenue is growing at roughly half the rate of the platform/data side. Agentforce itself reached <strong>$1.2B in annual recurring revenue, up 205% YoY</strong>, with premium-SKU bookings up nearly 60% and 3.8 billion "Agentic Work Units" delivered in the quarter (+111% quarter-over-quarter) against 28.6 trillion tokens processed (+152% QoQ). Usage is compounding far faster than revenue: at $1.2B, Agentforce is under 3% of guided FY2027 revenue. Margin profile is the company's best — gross margin across the business is 77.6% — but pricing is where the risk sits, because every seat Agentforce automates away is a seat that stops renewing.</div>
+      <div class="biz-tam"><strong>Industry size:</strong> tracked public applications peer revenue pool ≈ $105B TTM (CRM $42.8B + SAP $43.6B + ServiceNow $14.7B + HubSpot $3.5B). This is a derived peer-revenue proxy, not a full TAM estimate.</div>
+      <div class="comp-bubbles">
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Microsoft (Dynamics 365)</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~7.4%</div><div class="comp-bubble-label">Install Share</div></div>
+            <div><div class="comp-bubble-val">$331.8B</div><div class="comp-bubble-label">Co. Rev TTM</div></div>
+            <div><div class="comp-bubble-val">+17.8%</div><div class="comp-bubble-label">Co. Growth</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">HubSpot</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~7.4%</div><div class="comp-bubble-label">Install Share</div></div>
+            <div><div class="comp-bubble-val">$3.45B</div><div class="comp-bubble-label">Rev TTM</div></div>
+            <div><div class="comp-bubble-val">+21.1%</div><div class="comp-bubble-label">Growth</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">SAP</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~4.0%</div><div class="comp-bubble-label">Install Share</div></div>
+            <div><div class="comp-bubble-val">$43.6B</div><div class="comp-bubble-label">Rev TTM</div></div>
+            <div><div class="comp-bubble-val">+6.4%</div><div class="comp-bubble-label">Growth</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Data 360, Headless Platform &amp; Other</div>
+          <span class="biz-badge growth">GROWTH ENGINE — 23% CC</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$3,683M</div><div class="biz-stat-label">Q1 FY27 Rev</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">+24.8%</div><div class="biz-stat-label">YoY (23% CC)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Std. Share</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">33.1%</div><div class="biz-stat-label">Rev Mix</div></div>
+        </div>
+      </div>
+      <div class="biz-desc">Data 360 (formerly Data Cloud), MuleSoft, Tableau, the developer platform and now Informatica. This is the consumption-priced, not seat-priced, half of Salesforce and it is growing 3.3x faster than the apps business. <strong>Informatica contributed $428M of subscription revenue and carries $1.1B of cloud ARR</strong>; combined <strong>Agentforce + Data 360 ARR is approximately $3.4B, up more than 200% YoY</strong>. Strategically this is the hedge against the seat problem: if agents replace users, the billing unit migrates from headcount to data volume, integrations and work units — all of which live here. The catch is that the acquired revenue is lower-quality growth (bought, not earned) and Informatica's own organic growth history is modest. Salesforce guided Informatica to be accretive to non-GAAP operating margin and EPS within 12 months of close, a year earlier than originally promised.</div>
+      <div class="biz-tam"><strong>Industry size:</strong> data integration / MDM / iPaaS adjacency. Salesforce paid <strong>$8B</strong> to enter it outright; ServiceNow ($14.7B rev, +22.2%) is the closest-growing public comparable. TAM not independently verified in this session.</div>
+      <div class="comp-bubbles">
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">ServiceNow</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">$132.4B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+            <div><div class="comp-bubble-val">$14.73B</div><div class="comp-bubble-label">Rev TTM</div></div>
+            <div><div class="comp-bubble-val">+22.2%</div><div class="comp-bubble-label">Growth</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Oracle (Fusion / OCI)</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">~3.0%</div><div class="comp-bubble-label">Install Share</div></div>
+            <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Rev TTM</div></div>
+            <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+          </div>
+        </div>
+        <div class="comp-bubble">
+          <div class="comp-bubble-name">Microsoft (Fabric / Azure)</div>
+          <div class="comp-bubble-stats">
+            <div><div class="comp-bubble-val">$3.62T</div><div class="comp-bubble-label">Mkt Cap</div></div>
+            <div><div class="comp-bubble-val">$331.8B</div><div class="comp-bubble-label">Rev TTM</div></div>
+            <div><div class="comp-bubble-val">+17.8%</div><div class="comp-bubble-label">Growth</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+      <div class="biz-header">
+        <div>
+          <div class="biz-name">Professional Services &amp; Other</div>
+          <span class="biz-badge emerging">LOW MARGIN — DELIBERATELY FLAT</span>
+        </div>
+        <div class="biz-stats">
+          <div class="biz-stat"><div class="biz-stat-val">$540M</div><div class="biz-stat-label">Q1 FY27 Rev (derived)</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">+1.5%</div><div class="biz-stat-label">YoY</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">—</div><div class="biz-stat-label">Market Share</div></div>
+          <div class="biz-stat"><div class="biz-stat-val">4.8%</div><div class="biz-stat-label">Rev Mix</div></div>
+        </div>
+      </div>
+      <div class="biz-desc">Implementation, advisory and training. Derived as total revenue ($11,133M, the sum of the disclosed geographic lines) less subscription &amp; support ($10,593M); the prior-year equivalent is $532M. Growth of roughly 1.5% is intentional — Salesforce has been pushing implementation work to partners (Accenture, Deloitte, IBM) for years because services carry a fraction of subscription gross margin. The line matters mainly as a leading indicator: services demand tends to precede subscription bookings, so persistent flatness here argues against a near-term booking inflection.</div>
+      <div class="biz-tam"><strong>Industry size:</strong> Salesforce-ecosystem systems-integration work is largely captured by partners; not separately sized here.</div>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:32px 0 12px;">Revenue by Geography — Q1 FY2027</div>
+    <div class="seg-bar">
+      <div style="flex:65.0;background:#00a1e0;">AMERICAS 65%</div>
+      <div style="flex:24.7;background:#3b82f6;">EUROPE 25%</div>
+      <div style="flex:10.3;background:#f59e0b;">APAC 10%</div>
+    </div>
+    <div class="seg-legend">
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#00a1e0;"></div>Americas — $7,233M (+11.8% reported, +11% CC)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#3b82f6;"></div>Europe — $2,754M (+17.8% reported, +12% CC)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#f59e0b;"></div>Asia Pacific — $1,146M (+12.0% reported, +12% CC)</div>
+    </div>
+    <div class="prose" style="margin-top:16px;">
+      <p>Growth is strikingly uniform across regions in constant currency — 11%, 12%, 12%. Europe's 17.8% reported growth is roughly 6 points of currency tailwind, which will fade if the dollar stabilises. The uniformity matters analytically: it says the deceleration is not geographic or macro-idiosyncratic, it is product-cycle. Americas at 65% of revenue also means the US enterprise IT budget cycle is the dominant swing factor.</p>
+    </div>
+  </div>
+
+  <!-- ============ 03 MOAT ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+    <div class="moat-list">
+      <div class="moat-pill">SYSTEM OF RECORD</div>
+      <div class="moat-pill">SWITCHING COSTS</div>
+      <div class="moat-pill">DATA GRAVITY</div>
+      <div class="moat-pill">PARTNER ECOSYSTEM</div>
+      <div class="moat-pill">APPEXCHANGE NETWORK</div>
+      <div class="moat-pill">MULTI-CLOUD BUNDLING</div>
+      <div class="moat-pill">ENTERPRISE TRUST/COMPLIANCE</div>
+    </div>
+    <div class="prose" style="margin-top:20px;">
+      <p>Salesforce's moat is customer data that has been in one place for fifteen years. A large enterprise CRM instance is not a piece of software, it is a decade of custom objects, workflow rules, Apex code, integrations, permission models and audit history. Ripping it out is a multi-year, eight-figure programme with revenue risk attached, which is why Salesforce holds roughly <strong>27% of tracked CRM installations</strong> — more than Microsoft Dynamics, SAP, Oracle and Odoo combined on the same measure — and why the company can carry a 77.6% <span class="tip" title="Gross Margin: revenue minus the direct cost of delivering the service, as a percentage of revenue.">gross margin</span> and a 34.8% non-GAAP operating margin while growing at only 12% constant currency. The Informatica acquisition is a deliberate deepening of that moat: by owning data cataloguing, quality, lineage and master data management, Salesforce is trying to make itself the governed data layer that any AI agent — its own or a competitor's — has to query. <strong>Total remaining performance obligation of $67.9B</strong> against $42.8B of trailing revenue is the moat expressed as contract: 1.6 years of revenue is already signed.</p>
+    </div>
+    <div class="prose" style="margin-top:24px;">
+      <p><strong>The seat-based pricing model is structurally exposed.</strong> Salesforce charges per user per month. Agentforce's stated purpose is to let software do work that people currently do. If a 5,000-seat service organisation deploys agents and needs 3,500 humans, the renewal is 30% smaller even if the customer is delighted. Salesforce's answer is consumption pricing on work units and Flex Credits, but that transition converts predictable, high-visibility subscription revenue into variable usage revenue — a lower-quality, harder-to-forecast revenue stream that the market has historically valued at a lower multiple. Agentforce ARR of $1.2B is not yet remotely large enough to offset a seat contraction across a $42B base.</p>
+      <p style="margin-top:14px;"><strong>Growth has decelerated to the point where the growth premium is gone.</strong> FY2023 revenue grew 18.3%, FY2024 11.2%, FY2025 8.7%, FY2026 9.6%. The apps segment — 62% of revenue — grew 7% in constant currency last quarter. FY2027 guidance of $45.9–46.2B includes roughly 3 points from Informatica, implying organic growth around 8%. At 8% organic, Salesforce is a mature software company, and mature software companies trade at 15x forward earnings, which is exactly where it trades.</p>
+      <p style="margin-top:14px;"><strong>Competitive encirclement from both ends.</strong> Microsoft can bundle Dynamics 365 and Copilot into an Office/Azure agreement at effectively marginal price; at $3.62T market cap and 17.8% revenue growth it has no need to earn a return on CRM specifically. From below, HubSpot ($3.45B revenue, +21.1%) keeps moving upmarket, and AI-native entrants are building CRM-shaped products where the agent — not the record — is the primary interface, with no legacy seat revenue to protect. Salesforce is defending the middle.</p>
+      <p style="margin-top:14px;"><strong>Balance sheet flexibility has been consumed.</strong> Total debt is $42.55B against $11.84B of cash, <span class="tip" title="Debt-to-Equity: total debt divided by shareholders' equity — a measure of financial leverage.">debt-to-equity</span> is 1.24 and the <span class="tip" title="Current Ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">current ratio</span> is 0.79. This is the direct consequence of returning $27.5B to shareholders in a single quarter, including a $25B accelerated share repurchase. The buyback was almost certainly the right capital allocation at these prices, but it removes the option to do it again at scale, and it means a genuine demand shock would now hit a levered balance sheet rather than a fortress one.</p>
+    </div>
+  </div>
+
+  <!-- ============ 04 METRICS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+    <div style="font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-bottom:4px;">CRM column: live-sourced. Industry Avg and S&amp;P 500 columns: approximate reference points, marked "est." — not live-sourced in this session.</div>
+    <table class="fin-table">
+      <thead>
+        <tr><th>Metric</th><th>CRM</th><th>Industry Avg (est.)</th><th>S&amp;P 500 (est.)</th><th>Context</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="tip" title="Trailing Price-to-Earnings: share price divided by the last twelve months of earnings per share.">Trailing P/E</span></td><td style="color:var(--green);">24.27</td><td>≈42 est.</td><td>≈26 est.</td><td>Cheaper than both software peers and the index — unusual for a 77% gross-margin franchise, and the clearest expression of the market's growth scepticism.</td></tr>
+        <tr><td><span class="tip" title="Forward Price-to-Earnings: share price divided by expected earnings per share over the next twelve months.">Forward P/E</span></td><td style="color:var(--green);">15.00</td><td>≈30 est.</td><td>≈22 est.</td><td>Consensus FY2027 non-GAAP EPS of $14.14. A 15x multiple on 13% EPS growth is a value-stock multiple.</td></tr>
+        <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E ratio divided by the expected earnings growth rate. Below 1.0 is often read as inexpensive relative to growth.">PEG Ratio</span></td><td style="color:var(--green);">0.93</td><td>≈2.2 est.</td><td>≈2.0 est.</td><td>Below 1.0. Either the market disbelieves the growth estimate, or the stock is genuinely mispriced. That is the whole debate.</td></tr>
+        <tr><td><span class="tip" title="Earnings Per Share: net income divided by shares outstanding.">EPS</span> (<span class="tip" title="Trailing Twelve Months: the most recent four reported quarters.">TTM</span>)</td><td style="color:var(--text-dim);">$8.61</td><td>—</td><td>—</td><td>Up 34.8% YoY — but flattered by buybacks shrinking the denominator and by $558M of strategic-investment gains.</td></tr>
+        <tr><td>Revenue Growth (<span class="tip" title="Year-over-year: this period compared with the same period one year earlier.">YoY</span>)</td><td style="color:var(--amber);">11.0%</td><td>≈14% est.</td><td>≈6% est.</td><td>Above the index, below software peers — and roughly 3 points of the FY2027 guide is acquired Informatica revenue, not organic.</td></tr>
+        <tr><td><span class="tip" title="Gross Margin: revenue minus the direct cost of delivering the service, as a percentage of revenue.">Gross Margin</span></td><td style="color:var(--green);">77.64%</td><td>≈74% est.</td><td>≈34% est.</td><td>Best-in-class and still expanding (75.5% in FY2024). Scale in a mature cloud estate.</td></tr>
+        <tr><td><span class="tip" title="Net Profit Margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td style="color:var(--green);">18.73%</td><td>≈13% est.</td><td>≈12% est.</td><td>Was 0.66% in FY2023. The margin-expansion programme that followed the 2022–23 activist campaign is the single most successful thing management has done this decade.</td></tr>
+        <tr><td><span class="tip" title="Dividend Yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--amber);">0.84%</td><td>≈0.5% est.</td><td>≈1.2% est.</td><td>$1.76 annualised ($0.44/qtr). Initiated in 2024 — Salesforce paid no dividend for its first 25 years. Payout ratio only 20.4%, so it is well covered and has room to grow.</td></tr>
+        <tr><td><span class="tip" title="Short Interest: shares sold short as a percentage of shares outstanding — a gauge of bearish positioning.">Short Interest</span> %</td><td style="color:var(--red);">3.59%</td><td>≈3% est.</td><td>≈2% est.</td><td>29.41M shares short. Elevated but not extreme; enough to fuel a squeeze on a strong Aug 26 print.</td></tr>
+        <tr><td><span class="tip" title="Debt-to-Equity: total debt divided by shareholders' equity — a measure of financial leverage.">Debt-to-Equity</span></td><td style="color:var(--red);">1.24</td><td>≈0.6 est.</td><td>≈1.0 est.</td><td>$42.55B total debt vs $11.84B cash. Levered up deliberately to fund the $25B accelerated repurchase.</td></tr>
+        <tr><td><span class="tip" title="Current Ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">Current Ratio</span></td><td style="color:var(--red);">0.79</td><td>≈1.7 est.</td><td>≈1.2 est.</td><td>Below 1.0, but deferred revenue is a large current liability that converts to revenue rather than cash outflow — the ratio overstates the strain for a subscription business.</td></tr>
+        <tr><td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditure — the cash actually available to repay debt, buy back stock or pay dividends.">Free Cash Flow</span></td><td style="color:var(--text-dim);">$14.66B</td><td>—</td><td>—</td><td>$17.90 per share — an 8.6% FCF yield on a $209.06 share price. This is the strongest single number on the page.</td></tr>
+        <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how efficiently the company turns owners' capital into profit.">ROE</span></td><td style="color:var(--amber);">16.91%</td><td>≈15% est.</td><td>≈19% est.</td><td>Depressed by the enormous goodwill balance from Slack, Tableau, MuleSoft and now Informatica sitting in equity.</td></tr>
+        <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total capital (debt plus equity) invested in the business.">ROIC</span></td><td style="color:var(--amber);">11.07%</td><td>≈10% est.</td><td>≈12% est.</td><td>Barely above a plausible cost of capital. Twenty years of large acquisitions have not compounded returns the way organic growth would have.</td></tr>
+        <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means more volatile than the index.">Beta</span></td><td style="color:var(--amber);">1.15</td><td>≈1.20 est.</td><td>1.00</td><td>Modestly more volatile than the index; less so than high-multiple software peers because the multiple has already compressed.</td></tr>
+        <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$146.32 – $269.11</td><td>—</td><td>—</td><td>Current price sits 42.9% above the low and 22.3% below the high. An 84% peak-to-trough spread in twelve months is not the trading pattern of a settled franchise.</td></tr>
+      </tbody>
+    </table>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:32px 0 12px;">Notable One-Off Items</div>
+    <div class="prose">
+      <p>Q1 FY2027 contains four distortions large enough to change the picture, all disclosed in the quarter's reconciliation:</p>
+      <p style="margin-top:12px;"><strong>1. The GAAP-to-non-GAAP gap is 13.7 points and reconciles exactly.</strong> GAAP operating margin 21.1%; non-GAAP 34.8%. The bridge is <strong>stock-based compensation of $870M (7.8% of revenue)</strong>, <strong>amortisation of purchased intangibles of $561M (5.0%)</strong> and <strong>restructuring charges of $96M (0.9%)</strong>. Stock-based compensation is a real cost to shareholders — it is dilution — and at nearly 8% of revenue it is the largest single reason the headline non-GAAP margin overstates economic profitability. Use the GAAP figure, or subtract SBC from the non-GAAP figure, but do not use 34.8% as if it were cash margin.</p>
+      <p style="margin-top:12px;"><strong>2. $558M of net gains on strategic investments flattered GAAP EPS.</strong> These are mark-to-market gains on Salesforce Ventures holdings, excluded from non-GAAP. On roughly 871M diluted shares that is about $0.64 per share pre-tax — meaningful against GAAP EPS of $2.42. They are non-operating, non-recurring and can reverse. GAAP EPS growth of 52% should be discounted accordingly.</p>
+      <p style="margin-top:12px;"><strong>3. Informatica is inorganic revenue.</strong> $444M of total revenue and $428M of subscription revenue in the quarter came from an acquisition that closed November 18, 2025, and therefore has no comparable in the year-ago base. Strip it out and Q1 total revenue growth falls from 13% to roughly 8.5%. Management itself flags that the FY2027 guide includes about 3 points of Informatica contribution.</p>
+      <p style="margin-top:12px;"><strong>4. The $25B accelerated share repurchase distorts every per-share metric.</strong> Salesforce returned $27.5B in one quarter ($27.1B buybacks, $365M dividends), retiring 103M shares upfront on the ASR. Diluted share count in the quarter was 871M; shares outstanding are now 819M. Market cap fell 27.3% year-over-year while the share price fell about 17.7% — the difference is share count. EPS growth of 34.8% is substantially a denominator story, and comparisons of EPS across the next four quarters will be distorted in the same direction.</p>
+      <p style="margin-top:12px;">Restructuring charges of $96M continuing into FY2027 also indicate that the headcount programme begun in 2023 has not fully concluded.</p>
+    </div>
+  </div>
+
+  <!-- ============ 05 ANALYST CONSENSUS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">Consensus Rating</div>
+        <div class="card-value">Buy</div>
+        <div class="card-note">54 analysts polled by S&amp;P Global via StockAnalysis. A second aggregator (MarketBeat, 47 analysts) reads "Moderate Buy" — the same signal with a more conservative label.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Average Price Target</div>
+        <div class="card-value">$243.98</div>
+        <div class="card-note">+16.7% above the $209.06 close. Median target is lower at $236.03 (+12.3%), which means the mean is being pulled up by a small number of very high targets.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Target Range</div>
+        <div class="card-value" style="font-size:20px;">$160 – $475</div>
+        <div class="card-note">−23.9% to +126.0%. A 3x spread between the lowest and highest target is extraordinary for a $171B company and is the cleanest measure of how unresolved the Agentforce question is.</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Rating Breakdown</div>
+        <div class="card-value" style="font-size:20px;">39 / 13 / 2</div>
+        <div class="card-note">Buy 39 (33 Strong Buy + 6 Buy) · Hold 13 · Sell 2 · Strong Sell 0. Sell-side positioning remains constructive despite the price action.</div>
+      </div>
+    </div>
+
+    <div class="analyst-bar">
+      <div style="flex:33;background:#22c55e;"></div>
+      <div style="flex:6;background:#4ade80;"></div>
+      <div style="flex:13;background:#f59e0b;"></div>
+      <div style="flex:2;background:#ef4444;"></div>
+    </div>
+    <div class="seg-legend">
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#22c55e;"></div>Strong Buy — 33 (61%)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#4ade80;"></div>Buy — 6 (11%)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#f59e0b;"></div>Hold — 13 (24%)</div>
+      <div class="seg-legend-item"><div class="seg-dot" style="background:#ef4444;"></div>Sell — 2 (4%)</div>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:32px 0 12px;">Key Recent Analyst Calls</div>
+    <ul style="list-style:none;padding:0;">
+      <li style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);line-height:1.7;">
+        <span style="color:var(--green);font-size:20px;line-height:1;">●</span>
+        <div><strong style="color:#fff;">BTIG Research</strong> — Allan Verkhovski · <strong style="color:var(--green);">Buy reiterated, PT <span style="font-family:'JetBrains Mono',monospace;">$255</span></strong> (Aug 24, 2026). The most recent call on the tape, published two days before the Q2 print. Implies +22% upside and represents the bull framing: that the current multiple already discounts a permanent growth slowdown that the cRPO data does not support.</div>
+      </li>
+      <li style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);line-height:1.7;">
+        <span style="color:var(--green);font-size:20px;line-height:1;">●</span>
+        <div><strong style="color:#fff;">BMO Capital Markets</strong> — Keith Bachman · <strong style="color:var(--green);">Outperform, PT raised <span style="font-family:'JetBrains Mono',monospace;">$215 → $230</span></strong> (Aug 20, 2026). A raise, but note the level: even after raising, BMO's target sits <em>below</em> the consensus average of $243.98 and only ~10% above spot. This is what constructive-but-cautious looks like — margin and buyback support the valuation floor, not a re-rating.</div>
+      </li>
+      <li style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-muted);line-height:1.7;">
+        <span style="color:var(--green);font-size:20px;line-height:1;">●</span>
+        <div><strong style="color:#fff;">Cantor Fitzgerald</strong> — Matthew VanVliet · <strong style="color:var(--green);">Overweight reiterated, PT <span style="font-family:'JetBrains Mono',monospace;">$250</span></strong> (Aug 20, 2026). +21% upside. Sits close to the consensus mean and, alongside Guggenheim's Buy/$228 the same day, marks the centre of gravity of the bull camp in the low-to-mid $200s — a re-rating to roughly 17–18x forward earnings, not a return to growth multiples.</div>
+      </li>
+      <li style="display:flex;gap:14px;padding:14px 0;font-size:14px;color:var(--text-muted);line-height:1.7;">
+        <span style="color:var(--amber);font-size:20px;line-height:1;">●</span>
+        <div><strong style="color:#fff;">Citigroup</strong> — Tyler Radke · <strong style="color:var(--amber);">Neutral, PT raised <span style="font-family:'JetBrains Mono',monospace;">$187 → $204</span></strong> (Aug 18, 2026). The bear-side anchor, and the most informative call in the set: Citi raised its target and it still sits <em>below</em> the current price. Raising a target to a level that implies downside is a statement that the recent rally has outrun the fundamentals, and that Agentforce has not yet produced the evidence a re-rating would require.</div>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ============ 06 CATALYSTS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">Aug 26, 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Q2 FY2027 Earnings — the whole thesis in one print</div>
+          <div class="tl-desc">Two days after this snapshot. Guidance is $11.27–11.35B (+10–11%, 10% constant currency). The number that matters is not revenue but <span class="tip" title="Current Remaining Performance Obligation: contracted revenue expected to be recognised over the next twelve months. Because it is signed but not yet booked, it is the single best forward indicator of near-term subscription growth — better than reported revenue, which reflects deals closed a year ago.">cRPO</span> — it was $33.6B, +14% (13% CC), last quarter. cRPO growth holding at or above 13% CC would support the H2 reacceleration management has guided to; a step down toward 10% would confirm the bear case. Secondary watch items: Agentforce ARR versus the $1.2B base, and any change to the 34.3% non-GAAP margin guide.</div>
+          <div class="tl-impact neutral">Key near-term event</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">May 27, 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Q1 FY2027: record margins, $25B ASR, Agentforce at $1.2B</div>
+          <div class="tl-desc">Revenue $11.13B (+13%), non-GAAP EPS $3.88 (+50%), non-GAAP operating margin 34.8%, FCF $6.6B, and $27.5B returned to shareholders including a $25B accelerated share repurchase that retired 103M shares upfront. Agentforce ARR $1.2B (+205%); Agentforce + Data 360 combined ~$3.4B (+200%+). The stock closed May at $190.61 and then fell to $156.66 by end-June — the market did not reward it.</div>
+          <div class="tl-impact down">Reaction: shares fell 17.8% over the following month</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Nov 18, 2025</div>
+        <div class="tl-content">
+          <div class="tl-title">Informatica acquisition completes — $8B, closed ahead of schedule</div>
+          <div class="tl-desc">Announced May 27, 2025 and completed November 18, 2025 for approximately $8 billion. Informatica brings data cataloguing, integration, governance, quality, privacy, metadata management and master data management, all being embedded into Agentforce 360 and combined with MuleSoft. Salesforce expects accretion to non-GAAP operating margin and EPS within 12 months of close — a year faster than originally promised. It is already contributing $444M a quarter and $1.1B of cloud ARR.</div>
+          <div class="tl-impact up">Integration ahead of plan — but M&amp;A discipline is now the watch item</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">FY2027 (ends Jan 2027)</div>
+        <div class="tl-content">
+          <div class="tl-title">Full-year guidance: $45.9–46.2B revenue, 34.3% non-GAAP margin</div>
+          <div class="tl-desc">Revenue up ~11% including roughly 3 points of Informatica; subscription &amp; support up slightly under 12% (~11% CC); GAAP operating margin 20.6%, non-GAAP 34.3%; operating and free cash flow up ~4–5%. Consensus sits at $46.11B revenue and $14.14 non-GAAP EPS. Note that cash flow growth of 4–5% is well below EPS growth — a reminder of how much of the EPS line is buyback-driven.</div>
+          <div class="tl-impact neutral">Bar is set; the question is organic composition</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">H2 FY2027</div>
+        <div class="tl-content">
+          <div class="tl-title">The promised organic reacceleration</div>
+          <div class="tl-desc">CFO Robin Washington has explicitly guided to "organic revenue acceleration in H2 FY27, driven by Sales, Service, Slack, Agentforce, Data 360." This is a falsifiable, dated management commitment. If the apps segment moves from 7% constant-currency growth back toward double digits without Informatica's help, the 15x multiple is wrong. If it does not, management credibility takes the hit rather than the numbers.</div>
+          <div class="tl-impact up">Potential upside catalyst — and a clear test of guidance credibility</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Ongoing</div>
+        <div class="tl-content">
+          <div class="tl-title">Agentforce monetisation evidence vs. usage theatre</div>
+          <div class="tl-desc">The disclosure gap is the issue. Salesforce reports 3.8 billion Agentic Work Units (+111% QoQ) and 28.6 trillion tokens processed (+152% QoQ) — enormous usage growth — against $1.2B of ARR, under 3% of guided revenue. Investors have learned to discount usage metrics that are not accompanied by revenue conversion. A disclosure change that ties work units to dollars, or a large disclosed Agentforce-led displacement win, would move the stock more than a revenue beat.</div>
+          <div class="tl-impact neutral">Key near-term event — disclosure quality is the catalyst</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 07 PRICE ANALYSIS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+
+    <div class="chart-container">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:6px;">CRM — MONTHLY CLOSING PRICE, SEP 2021 – AUG 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:16px;">⚠ STATIC DATA AS OF AUG 24, 2026</div>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px;font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;">
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:18px;height:3px;background:#00a1e0;"></span>Price</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;"></span>20-Day MA (1-mo)</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;"></span>50-Day MA (3-mo)</div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;"></span>200-Day MA (10-mo)</div>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+
+    <div class="chart-container">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:6px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY · AS OF AUG 24, 2026</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">In plain English: RSI measures how one-sided recent price moves have been. Above 70 the stock has been bought hard and may be stretched; below 30 it has been sold hard and may be washed out. It says nothing about value — only about crowding.</div>
+      <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+    </div>
+
+    <div class="prose" style="margin-top:32px;">
+      <p><strong>Five-year trajectory.</strong> From a September 2021 monthly close of $266.61 to $209.06 on August 24, 2026, Salesforce has delivered a <strong>total price return of −21.6% over five years</strong>, before the small dividend stream that began in 2024. That single number conceals two complete cycles. The stock ran to $294.59 by October 2021 at the peak of the software multiple, collapsed 55.8% to $130.34 by December 2022 as rates repriced every long-duration cash flow, then more than doubled to an all-time monthly closing high of <strong>$337.76 in January 2025</strong> on the margin-expansion story. From there it has fallen 38.1%, bottoming at a $156.66 monthly close in June 2026 — a 53.6% peak-to-trough drawdown — before rebounding 33.4% into the August print. <em>Note the correction to the brief: the de-rating runs from January 2025, not from a 2021 peak; the 2021 high was exceeded in both 2024 and 2025.</em></p>
+      <p style="margin-top:14px;">The technical picture entering earnings is a stock that has recovered above its 3-month and 1-month averages but remains below its 10-month average — a counter-trend rally inside a downtrend, with a 6-period monthly RSI that has moved out of oversold but is not yet overbought. That is a coiled setup: enough short interest (3.59%) and enough recovered momentum for a violent move in either direction on August 26.</p>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-date">Oct 2021</div>
+        <div class="tl-content">
+          <div class="tl-title">Cycle high — $294.59 monthly close</div>
+          <div class="tl-desc">The top of the zero-rate software multiple. Salesforce was valued on revenue growth alone; margins were 2–6% at the operating line.</div>
+          <div class="tl-impact up">Peak of the growth-multiple era</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Dec 2022</div>
+        <div class="tl-content">
+          <div class="tl-title">Cycle low — $130.34, down 55.8% from the high</div>
+          <div class="tl-desc">Rate-driven de-rating plus a 2.07%→5.93% operating margin that looked indefensible next to peers. This trough is what brought activist investors onto the register and triggered the restructuring and margin programme that followed.</div>
+          <div class="tl-impact down">−55.8% drawdown</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Jan 2025</div>
+        <div class="tl-content">
+          <div class="tl-title">All-time monthly closing high — $337.76</div>
+          <div class="tl-desc">The reward for margin discipline: FY2025 operating margin of 20.23% against 2.07% three years earlier, and a market cap that peaked at $323.89B at end-2024. Every subsequent month has been lower on a trend basis.</div>
+          <div class="tl-impact up">Peak of the profitability re-rating</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Nov 2025</div>
+        <div class="tl-content">
+          <div class="tl-title">Informatica closes — $8B, ahead of schedule</div>
+          <div class="tl-desc">Monthly close $229.00, already 32% below the January 2025 high. The deal answered the "where does the data layer come from" question but raised the "is this growth bought rather than earned" question that has dogged the stock since.</div>
+          <div class="tl-impact neutral">Strategic, not immediately re-rating</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">May 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Record Q1 FY2027 and a $25B accelerated repurchase</div>
+          <div class="tl-desc">Non-GAAP margin 34.8%, EPS +50%, Agentforce ARR $1.2B, and the largest buyback in company history. Monthly close $190.61 — and then June closed at $156.66. A record quarter plus a 15%-of-market-cap buyback did not hold the stock. That is the market saying the problem is the model, not the quarter.</div>
+          <div class="tl-impact down">Record results, negative reaction</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Jun 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">Five-year low close — $156.66 (intraday 52-week low $146.32)</div>
+          <div class="tl-desc">Capitulation. At the low the stock traded near 11x forward earnings for a 77% gross-margin business generating $14.7B of free cash flow. Whatever else it was, it was not a growth-stock valuation.</div>
+          <div class="tl-impact down">−53.6% from the Jan 2025 peak</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-date">Aug 2026</div>
+        <div class="tl-content">
+          <div class="tl-title">$209.06 into earnings — a 33.4% rebound off the low</div>
+          <div class="tl-desc">Two months of recovery ahead of the August 26 print, with sell-side targets clustered $204–$255 and Citi's raised target sitting below spot. The market has priced in a stabilisation, not a reacceleration.</div>
+          <div class="tl-impact neutral">Coiled ahead of Q2 FY2027</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top:24px;">
+      <p><strong>Relative performance.</strong> We did not independently source S&amp;P 500 index levels in this session, so the index comparison in the metrics table is marked as an estimate and no precise relative return is claimed here. What <em>is</em> verified is the peer picture, and it reframes the story: over the last twelve months market capitalisation fell <strong>27.3% at Salesforce, 28.5% at ServiceNow, 49.1% at HubSpot and 20.7% at SAP</strong>, while <strong>Microsoft fell only 4.0%</strong>. This is a sector-wide de-rating of application software, not a Salesforce-specific indictment — and the fact that the fastest-growing names (ServiceNow +22.2% revenue growth, HubSpot +21.1%) fell as hard or harder than Salesforce suggests the market is repricing the <em>durability</em> of seat-based SaaS revenue generally, not punishing slow growth per se. Microsoft, which sells the AI layer rather than the seats, was spared. On CompaniesMarketCap's annual series, Salesforce's market cap has gone $250.31B (2021) → $132.58B (2022) → $254.71B (2023) → $323.89B (2024) → $253.30B (2025) → $171.73B (2026).</p>
+    </div>
+  </div>
+
+  <!-- ============ 08 SUMMARY & RISKS ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+    <div class="case-grid">
+      <div class="case-card bull">
+        <h4>Bull Case</h4>
+        <p>You are paying <strong>15.0x forward earnings and 0.93x PEG</strong> for a business with a 77.6% gross margin, a 34.8% non-GAAP operating margin, $14.66B of free cash flow ($17.90 per share — an <strong>8.6% FCF yield</strong>) and $67.9B of contracted backlog. cRPO — the honest forward indicator — is still growing 13% in constant currency, which is not the profile of a business being disrupted; it is the profile of one being priced as if it were. Management is converting the balance sheet into shareholder value at scale, retiring 103M shares in a single quarter and shrinking the count roughly 12% year-over-year, so even flat revenue produces rising EPS. And the Agentforce thesis has an underappreciated symmetry: Data 360 + Agentforce ARR is already ~$3.4B growing over 200%, and it is consumption-priced — if agents do displace seats, Salesforce owns the meter they run on, and Informatica makes it the governed data layer any agent must query. The bull case does not require growth to reaccelerate. It requires growth not to break.</p>
+      </div>
+      <div class="case-card bear">
+        <h4>Bear Case</h4>
+        <p>Salesforce sells seats, and it is selling the technology that eliminates seats. The 62%-of-revenue Agentforce Apps segment grew <strong>7% in constant currency</strong> — that is the core franchise, and it is barely growing. Strip Informatica out and total organic growth is roughly 8.5%, meaning the headline 13% is bought. Agentforce ARR of $1.2B is under 3% of revenue against 28.6 trillion tokens and 3.8 billion work units — enormous usage that is not converting into dollars, which is precisely the pattern that precedes a pricing-model reset rather than a growth reacceleration. Meanwhile the balance-sheet flexibility that funded the defence is spent: $42.55B of debt against $11.84B of cash, D/E of 1.24, current ratio 0.79, and a $25B ASR that cannot be repeated. Note also what the market did with the good news: record margins, record EPS and the largest buyback in company history were followed by a 17.8% decline in the next month to a five-year low. When a stock ignores a great quarter, the market is not disputing the quarter — it is disputing the model. Citigroup's Tyler Radke <em>raised</em> his target on August 18 to a level still below the current price.</p>
+      </div>
+    </div>
+
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:32px 0 4px;">Top 3 Risks</div>
+    <div class="risk-list">
+      <div class="risk-item">
+        <div class="risk-num">01</div>
+        <div><strong style="color:#fff;">Seat-based pricing erosion.</strong> Every successful Agentforce deployment is an argument for fewer human licences at the next renewal. Consumption pricing on work units and Flex Credits is the intended replacement, but it converts high-visibility subscription revenue into variable usage revenue that is harder to forecast and historically carries a lower multiple. At $1.2B of Agentforce ARR against a $42.8B revenue base, the replacement is nowhere near able to absorb a seat contraction.</div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-num">02</div>
+        <div><strong style="color:#fff;">Organic growth is already single-digit and decelerating.</strong> FY2023 +18.3% → FY2024 +11.2% → FY2025 +8.7% → FY2026 +9.6%, with the FY2027 guide of ~11% including roughly 3 points of acquired Informatica revenue. The apps segment grew 7% CC last quarter. Management has publicly committed to organic reacceleration in H2 FY2027; if that fails to appear, the risk is not just to numbers but to guidance credibility, and low-growth software with credibility problems trades below 15x.</div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-num">03</div>
+        <div><strong style="color:#fff;">Leverage plus M&amp;A temptation.</strong> $42.55B of debt, a 0.79 current ratio and $11.84B of cash leave far less room than Salesforce has historically enjoyed. The Informatica deal is tracking ahead of plan, but Salesforce's twenty-year record of large acquisitions is reflected in an 11.07% ROIC — barely above a plausible cost of capital. Another sizeable acquisition, funded with debt at this leverage, would be the fastest route to a lower multiple; the market is watching M&amp;A discipline as closely as it is watching Agentforce.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ INDUSTRY COMMENTARY ============ -->
+  <div class="section">
+    <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+    <div class="card-grid">
+      <div class="card" style="border-left:3px solid var(--red);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="font-size:17px;font-weight:700;color:#fff;">Agentic AI vs. the Seat</div>
+          <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+        </div>
+        <div class="card-note" style="font-size:14px;line-height:1.75;">Enterprise software has priced itself per named user for two decades. Agentic AI attacks that unit directly: the product's value proposition is that fewer people do the work. The evidence that the market believes this is in the tape — over twelve months, market caps fell 27.3% (CRM), 28.5% (ServiceNow), 49.1% (HubSpot) and 20.7% (SAP), while Microsoft, which sells the AI layer rather than the seats, fell 4.0%. The de-rating is not correlated with growth rate: HubSpot grew 21.1% and fell hardest. It is correlated with exposure to per-seat billing. Salesforce's counter is to move the meter — 3.8 billion Agentic Work Units (+111% QoQ) and 28.6 trillion tokens (+152% QoQ) are consumption units, not seats — but $1.2B of Agentforce ARR is under 3% of guided revenue. The transition arithmetic is not yet close to working.</div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--amber);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="font-size:17px;font-weight:700;color:#fff;">IT Budget Scrutiny &amp; Seat Rationalisation</div>
+          <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+        </div>
+        <div class="card-note" style="font-size:14px;line-height:1.75;">Constant-currency growth of 11% (Americas), 12% (Europe) and 12% (Asia Pacific) is remarkably uniform — which tells you the slowdown is not a regional macro shock but a structural change in how enterprises buy. Buyers are consolidating vendors, auditing unused licences and pushing renewals toward shorter terms. The evidence sits in the professional-services line, up just 1.5% YoY: implementation demand typically leads subscription bookings, and its flatness argues against an imminent booking inflection. It also shows up in the gap between EPS growth (+34.8%) and free cash flow growth (guided +4–5% for FY2027): the earnings line is being driven by financial engineering, while the cash line reflects what customers are actually buying.</div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--green);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="font-size:17px;font-weight:700;color:#fff;">Growth-to-Profitability: The Trade Is Done</div>
+          <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND — WITH A CATCH</span>
+        </div>
+        <div class="card-note" style="font-size:14px;line-height:1.75;">Software's decade-long repricing from growth to profitability is complete at Salesforce: operating margin went 2.07% (FY2022) → 5.93% → 17.21% → 20.23% → 21.47% (FY2026) GAAP, and 34.8% non-GAAP, following the activist pressure of 2022–23. The company now returns capital like a mature industrial — $27.5B in a single quarter, a dividend initiated after 25 years, a 20.4% payout ratio with room to grow. <strong>Bull implication:</strong> at 15.0x forward earnings, 0.93 PEG and an 8.6% FCF yield, the market is paying nothing for Agentforce; any evidence of monetisation is upside, and the shrinking share count means EPS rises on flat revenue. <strong>Bear implication:</strong> margin expansion is a one-time lever and it has been pulled. Non-GAAP margin guidance for FY2027 is 34.3% — <em>lower</em> than the 34.8% just reported. With margins near a ceiling, leverage at 1.24x D/E and the ASR spent, there is no remaining lever except growth — which is precisely the variable in question. From here the stock has to be re-rated on cRPO and Agentforce dollars, or not at all.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DISCLAIMER ============ -->
+  <div class="disclaimer">
+    <p style="font-weight:700;color:var(--text-muted);font-size:12px;margin-bottom:12px;">Data as of August 24, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+    <p style="max-width:900px;margin:0 auto 12px;line-height:1.8;"><strong style="color:var(--text-dim);">Sources.</strong> Price, market capitalisation, valuation multiples, margins, balance-sheet items, share count, short interest, dividend, fiscal-year income statement history, analyst consensus and forward estimates: StockAnalysis.com (Salesforce overview, statistics, financials and forecast pages), reflecting the August 24, 2026 close. Sector label "Technology" and Industry label "Software — Application" are StockAnalysis.com's own classifications. Q1 FY2027 operating detail — revenue by service offering and geography, cRPO and RPO, GAAP and non-GAAP margins and EPS, cash flow, Agentforce and Data 360 ARR, work units and tokens, stock-based compensation, amortisation of purchased intangibles, restructuring charges, strategic-investment gains, buybacks, dividends, debt and diluted share count, and FY2027/Q2 guidance: Salesforce's own Q1 FY2027 press release of May 27, 2026 and the accompanying investor materials. Informatica completion date, deal value and strategic rationale: Salesforce press releases of May 27, 2025 and November 18, 2025. Global and US market-capitalisation ranks and the annual market-cap series: CompaniesMarketCap.com. Named analyst ratings and price targets, and institutional ownership: MarketBeat. CRM installed-base share: 6sense (824,724 tracked companies). Peer market caps, revenues and growth rates for Microsoft, SAP, ServiceNow and HubSpot: StockAnalysis.com. Monthly closing prices for the five-year chart: Digrin adjusted monthly closes, cross-checked against StockAnalysis annual and 52-week figures.</p>
+    <p style="max-width:900px;margin:0 auto 12px;line-height:1.8;"><strong style="color:var(--amber);">Estimated and unverified data, flagged explicitly.</strong> The "Industry Avg" and "S&amp;P 500" columns in Section 04 are approximate reference points and are marked "est." — they were not sourced live in this session and should not be relied on. The NYSE market-cap rank of ~#40 is an estimate derived from the verified US rank of #75; the Global (#126) and US (#75) ranks are sourced. Oracle's revenue and growth figures could not be retrieved and are shown as "n/v" (not verified) rather than estimated. Professional Services revenue of $540M is derived as total revenue less subscription &amp; support, not separately disclosed. Total addressable market figures were not independently verified and the "industry size" tags use a derived peer-revenue proxy instead. The institutional-holder ranking is by reported market value and one anomalous filing row was excluded as a probable data error. Installed-base share from 6sense counts company installations, not revenue, and vendor product entries partially overlap — it is not a revenue market share. Anything on this page may be stale; verify against SEC filings and live quotes before acting.</p>
+    <p style="max-width:900px;margin:0 auto;line-height:1.8;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer or solicitation to buy or sell any security. The author may hold positions in securities mentioned. Past performance does not indicate future results. Do your own research and consult a licensed financial adviser before making investment decisions. — <strong style="color:var(--text-muted);">The Tilted Gent</strong></p>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// STATIC DATA — 60 monthly closes, Sep 2021 through Aug 24 2026
+// Source: Digrin adjusted monthly closes. Final point is the
+// Aug 24, 2026 close of $209.06 (month in progress).
+// ============================================================
+const labels = [
+  'Sep 21','Oct 21','Nov 21','Dec 21',
+  'Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22',
+  'Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23',
+  'Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24',
+  'Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25',
+  'Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'
+];
+
+const prices = [
+  266.61, 294.59, 280.11, 249.81,
+  228.67, 206.95, 208.71, 172.95, 157.52, 162.23, 180.89, 153.46, 141.39, 159.82, 157.52, 130.34,
+  165.11, 160.83, 196.38, 195.00, 219.58, 207.67, 221.18, 217.69, 199.33, 197.42, 247.62, 258.66,
+  276.31, 303.57, 296.44, 264.71, 230.75, 253.06, 255.13, 249.31, 270.25, 287.69, 325.82, 330.48,
+  337.76, 294.42, 265.27, 266.03, 262.73, 270.40, 256.16, 254.10, 235.42, 258.67, 229.00, 263.57,
+  211.22, 193.80, 185.72, 176.08, 190.61, 156.66, 184.02, 209.06
+];
+
+// ---- helpers ----
+function sma(data, window) {
+  const out = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    let s = 0;
+    for (let j = i - window + 1; j <= i; j++) s += data[j];
+    out.push(+(s / window).toFixed(2));
+  }
+  return out;
+}
+
+function computeRSI(data, period) {
+  const out = new Array(data.length).fill(null);
+  if (data.length <= period) return out;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = data[i] - data[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  for (let i = period + 1; i < data.length; i++) {
+    const d = data[i] - data[i - 1];
+    const g = d > 0 ? d : 0;
+    const l = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = avgLoss === 0 ? 100 : +(100 - 100 / (1 + avgGain / avgLoss)).toFixed(2);
+  }
+  return out;
+}
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+// ---- annotated events (all verified) ----
+const events = [
+  { idx: 1,  label: 'Oct ’21 — cycle high $294.59',                 color: '#f59e0b' },
+  { idx: 15, label: 'Dec ’22 — cycle low $130.34 (−55.8%)',    color: '#ef4444' },
+  { idx: 40, label: 'Jan ’25 — all-time monthly high $337.76',      color: '#22c55e' },
+  { idx: 50, label: 'Nov ’25 — Informatica closes ($8B)',           color: '#3b82f6' },
+  { idx: 56, label: 'May ’26 — Q1 FY27: $25B ASR, Agentforce $1.2B', color: '#a78bfa' },
+  { idx: 57, label: 'Jun ’26 — 5-yr low close $156.66',             color: '#ef4444' },
+  { idx: 59, label: 'Aug ’26 — $209.06 into Q2 earnings',           color: '#00a1e0' }
+];
+
+const eventMap = {};
+events.forEach(function (e) { eventMap[e.idx] = e; });
+
+// ---- price chart ----
+const pctx = document.getElementById('priceChart').getContext('2d');
+const grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(0, 161, 224, 0.20)');
+grad.addColorStop(1, 'rgba(0, 161, 224, 0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#00a1e0',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: function (c) { return eventMap[c.dataIndex] ? 6 : 0; },
+        pointBackgroundColor: function (c) { return eventMap[c.dataIndex] ? eventMap[c.dataIndex].color : '#00a1e0'; },
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 2,
+        pointHoverRadius: 7
+      },
+      { label: '20-Day MA',  data: ma20,  borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '50-Day MA',  data: ma50,  borderColor: '#3b82f6', borderWidth: 1.4, borderDash: [6, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.4, borderDash: [8, 5], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function (c) {
+            if (c.parsed.y === null) return null;
+            return c.dataset.label + ': $' + c.parsed.y.toFixed(2);
+          },
+          afterBody: function (items) {
+            const e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1e293b', drawTicks: false },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 }
+      },
+      y: {
+        grid: { color: '#1e293b', drawTicks: false },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function (v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+// ---- RSI chart ----
+const rctx = document.getElementById('rsiChart').getContext('2d');
+new Chart(rctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      borderWidth: 2,
+      fill: false,
+      tension: 0.25,
+      pointRadius: 0,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function (c) { return c.parsed.y === null ? null : 'RSI: ' + c.parsed.y.toFixed(1); }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function (c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+          lineWidth: function (c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; },
+          drawTicks: false
+        },
+        ticks: {
+          stepSize: 10,
+          color: function (c) {
+            if (c.tick.value === 70) return '#ef4444';
+            if (c.tick.value === 30) return '#22c55e';
+            return '#64748b';
+          },
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function (v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
