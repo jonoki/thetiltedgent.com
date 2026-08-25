@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>INTU — Intuit Inc. | Stock Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #236cff;
+  --accent-dim: #236cff33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 24, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">INTU</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Exchange:</span>NASDAQ Global Select</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Industry:</span>Technology — Software · Application</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);margin-right:6px;">Mkt Cap:</span>$101.19B</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #235</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: #117</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ≈#55 (approx.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Intuit Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$369.92</div>
+      <div class="price-change" style="color:var(--green);">+$2.92 &nbsp;(+0.80%)</div>
+      <div class="price-date">Close — Aug 24, 2026, 4:00 PM EDT</div>
+      <div class="price-date">After hours: <span style="font-family:'JetBrains Mono',monospace;color:var(--text-muted);">$369.88</span> &nbsp;<span style="color:var(--red);">−$0.04 (−0.01%)</span> · 7:59 PM EDT</div>
+      <div class="price-date" style="color:var(--red);margin-top:6px;">52-week change: −44.18%</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span>Mountain View, California</div>
+    <div class="meta-item"><span>Employees:</span>18,200</div>
+    <div class="meta-item"><span>Founded:</span>1983 (IPO Mar 12, 1993)</div>
+    <div class="meta-item"><span>Next Earnings:</span><strong style="color:var(--amber);">Aug 25, 2026 — TOMORROW (FY2026 Q4 &amp; full year)</strong></div>
+  </div>
+  <div style="margin-top:18px;padding:14px 18px;background:var(--amber-dim);border-left:3px solid var(--amber);border-radius:6px;font-size:13px;color:var(--text-muted);">
+    <strong style="color:var(--amber);">Premise correction:</strong> The brief for this report assumed <span style="font-family:'JetBrains Mono',monospace;">FY2026</span> results had already been reported in late August 2026. Live data disagrees — StockAnalysis lists the next earnings date as <strong style="color:var(--text);">August 25, 2026</strong>, i.e. the fiscal-year print is <em>imminent, not published</em>. Every "full year" figure below is therefore either an <strong style="color:var(--text);">FY2025 actual</strong>, a <strong style="color:var(--text);">trailing-twelve-month actual through the April 2026 quarter</strong>, or <strong style="color:var(--text);">company FY2026 guidance</strong> — labelled as such in each case. Treat all FY2026 segment figures as guidance that will be replaced within 24 hours.
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Intuit builds financial software for small and mid-market businesses and for consumers: QuickBooks (accounting, payroll and payments), Mailchimp (marketing), TurboTax (consumer tax preparation), Credit Karma (consumer credit and lending marketplace) and ProConnect/Lacerte (professional tax). It is the dominant franchise in US small-business accounting and consumer <span class="tip" title="Do-It-Yourself — a taxpayer preparing and filing their own return using software, with no human preparer">DIY</span> tax filing, and it monetises that position through an unusually high-margin subscription model: <span class="tip" title="Trailing Twelve Months — the most recent four reported quarters, here the periods ending April 30, 2026">TTM</span> revenue of <strong>$20.93B</strong> carries an <span class="tip" title="Revenue minus the direct cost of delivering the product, divided by revenue">gross margin</span> of <strong>80.79%</strong> and free cash flow of <strong>$7.76B</strong> (a 37.1% <span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditure; cash genuinely available to owners">FCF</span> margin).</p>
+  <p class="prose" style="margin-top:16px;">The most recent completed fiscal year, <strong>FY2025 (ended July 31, 2025)</strong>, produced revenue of <strong>$18.83B, up 15.63% <span class="tip" title="Year-over-Year — compared with the same period one year earlier">YoY</span></strong>, with net income of $3.87B and <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding">EPS</span> of $13.67. Intuit ranks roughly <strong>#235 globally and #117 in the United States by market capitalisation</strong> at $101.19B. That ranking is itself the story: Intuit was worth <strong>$219B in July 2025</strong> and has since shed more than half its value, becoming the <strong>worst performer in the S&amp;P 500 in 2026</strong> as the market repriced the risk that generative AI commoditises tax and bookkeeping software. The operating business has not deteriorated — it is the terminal-value assumption that broke.</p>
+
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; CEO</div>
+      <div class="card-value" style="font-size:20px;">Sasan Goodarzi</div>
+      <div class="card-note">CEO since January 2019 and Chairman since 2022; joined Intuit in 2004 and previously ran the Small Business and Consumer groups. Named on the Q3 FY2026 release and call, where he framed the pivot as an "AI-driven expert platform" strategy and argued that "customers buy confidence, not code" — noting customers spend at least <strong>7x more on accounting and tax experts than on software alone</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Sandeep Aujla</div>
+      <div class="card-note">CFO, confirmed on the Q3 FY2026 (May 20, 2026) earnings release and call. Describes a "disciplined capital allocation framework designed to compound shareholder value," and told analysts that the "majority of cost reductions flow to the bottom line" rather than being reinvested — an unusually explicit margin commitment alongside the 17% workforce reduction.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Vanguard · T. Rowe · Norges</div>
+      <div class="card-note">Institutional ownership is effectively total: <strong>267.1M shares, 97.65% of shares outstanding</strong>, across 2,062 institutional owners (Fintel, latest 13F/13D-G filings). Vanguard Group is the largest disclosed holder at <strong>28.62M shares</strong>, followed by T. Rowe Price (5.40M), Norges Bank (4.62M) and Northern Trust (3.34M). Ownership this passive-heavy means index flows, not conviction buyers, set the marginal bid.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Intuit reports four segments. The mix below is <strong>FY2026 estimated</strong>, derived from the company's own FY2026 revenue guidance ($21.341–21.374B), its guided segment growth rates (Global Business Solutions ~16%, Consumer ~10%, TurboTax ~7%, Credit Karma ~19%, ProTax ~4%) and the guided full-year TurboTax revenue range of $5.277–5.282B disclosed on May 20, 2026. Credit Karma and ProTax annual splits are <strong>derived estimates</strong>, not reported figures.</p>
+  <div class="seg-bar">
+    <div style="flex:61.6;background:#236cff;">GBS 61.6%</div>
+    <div style="flex:24.8;background:#a78bfa;">Consumer 24.8%</div>
+    <div style="flex:10.8;background:#f59e0b;">Credit Karma 10.8%</div>
+    <div style="flex:2.8;background:#6b7280;color:#fff;">ProTax</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#236cff;"></span> Global Business Solutions — QuickBooks, Mailchimp, payments &amp; payroll · ~$13.2B est.</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Consumer — TurboTax · ~$5.3B</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Credit Karma · ~$2.3B est.</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#6b7280;"></span> ProTax — ProConnect, Lacerte · ~$0.6B est.</div>
+  </div>
+
+  <!-- GBS -->
+  <div class="biz-card" style="border-left: 3px solid #236cff;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Business Solutions Group</div>
+        <span class="biz-badge dominant">DOMINANT — US SMB ACCOUNTING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$13.2B</div><div class="biz-stat-label">FY26E Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">~+16%</div><div class="biz-stat-label">YoY (guided)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~60% est.</div><div class="biz-stat-label">US SMB Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">61.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> Global SMB financial-management &amp; embedded-fintech software — est. $80–100B+ addressable, growing high single digits; Intuit's own mid-market push targets an incremental <strong>$89B</strong> opportunity it has previously sized publicly (company estimate)</div>
+    <p class="biz-desc" style="margin-top:14px;">This is the engine. In Q3 FY2026 (quarter ended April 30, 2026) GBS revenue was <strong>$3.3B, up 15%</strong>, with <strong>Online Ecosystem revenue of $2.5B, up 19%</strong>. Stripping out Mailchimp — which declined slightly year-over-year and is being "rightsized" — GBS grew <strong>17%</strong> and the Online Ecosystem grew <strong>22%</strong>. Within that, <strong>QuickBooks Online Accounting grew 22%</strong>, driven explicitly by higher effective prices, customer growth and mix-shift, while <strong>Online Services grew 15%</strong> (money/payments and payroll). International online revenue grew 10% on a constant-currency basis. The margin profile is the best in the company: subscription accounting revenue at ~80%+ gross margin, with payments and payroll layering incremental take-rate on top of an installed base that has almost no churn once the general ledger is populated.</p>
+    <p class="biz-desc">The incremental <span class="tip" title="Total Addressable Market — the full revenue opportunity available if a product captured 100% of its market">TAM</span> is mid-market. <strong>QuickBooks Advanced plus Intuit Enterprise Suite (IES) grew approximately 38%</strong> in Q3 FY2026, with IES contract growth accelerating <strong>37% quarter-over-quarter</strong> and the direct sales force scaling 30%. Management stated that the mid-market businesses it now serves are "growing north of 30 percent." IES is Intuit's attempt to move upmarket into the ERP tier — multi-entity, multi-currency, AI-driven bookkeeping, and "Intuit Intelligence Chat" — and it is the single most important structural offset to the consumer-tax problem. AI agents already run recommendations across <strong>50+ million transactions weekly</strong>, and the August 2026 platform expansion introduces consumption-based pricing for AI and human expert services, most heavily adopted at the Advanced and Plus tiers.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Xero</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~10% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$1.5B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--green);">~+20% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Sage Group</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~8% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">~$3.0B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--green);">~+9% est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Block / Square</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Payments</div><div class="comp-bubble-label">Overlap</div></div><div><div class="comp-bubble-val">Large est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--amber);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">ADP &amp; Gusto</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Payroll</div><div class="comp-bubble-label">Overlap</div></div><div><div class="comp-bubble-val">Large est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--amber);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">FreshBooks</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">&lt;3% est.</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">Private</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--amber);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:10px;font-family:'JetBrains Mono',monospace;">⚠ Competitor share, revenue and growth figures above are ESTIMATES — they were not verifiable from a live source within this report's search budget. "n/v" = not verified. Do not rely on them without independent confirmation.</p>
+  </div>
+
+  <!-- Consumer -->
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Consumer Group — TurboTax</div>
+        <span class="biz-badge" style="background:#a78bfa22;color:#a78bfa;">DOMINANT BUT UNDER ATTACK</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$5.3B</div><div class="biz-stat-label">FY26E Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">~+7%</div><div class="biz-stat-label">TurboTax YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~65% est.</div><div class="biz-stat-label">US DIY Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US assisted-tax category <strong>$37B</strong> (management-cited) — the category TurboTax Live is attacking; the incumbent US <strong>DIY software category is ~$5B</strong> and shrinking in units</div>
+    <p class="biz-desc" style="margin-top:14px;">The consumer growth engine is now <strong>assisted</strong>, not DIY. <strong>TurboTax Live revenue grew 36% to ~$2.8B and now represents 53% of total TurboTax revenue, up 11 percentage points year-over-year</strong>, with TurboTax Live customers up 38% and new TurboTax Live customers up 29% — of which 36% acquired through the local-expert channel were entirely new to TurboTax. Full-year TurboTax revenue is guided to <strong>$5.277–5.282B</strong>, cut on May 20, 2026 from a prior $5.305–5.330B. Online paying units are expected to grow only <strong>2%</strong>, with average revenue per user rising <strong>~11%</strong> — i.e. essentially all revenue growth is price and mix, none of it is unit expansion.</p>
+    <p class="biz-desc">That is the crux of the bear case. Goodarzi conceded pressure "among the most price-sensitive DIY filers earning less than $50 thousand a year" and acknowledged the company <strong>lost share in the ~$5B DIY segment</strong>, with plans to "evolve our business model" through competitive low-end pricing while monetising beyond tax via Credit Karma. Compounding it, total IRS filers are expected to decline roughly <strong>30 basis points (~2 million units)</strong> — described on the call as the most significant industry-wide contraction since the post-COVID tax season — even as e-files rise 1%. Cross-platform economics are the offset: customers using both TurboTax and Credit Karma generate approximately <strong>30% higher ARPU</strong>, and over <strong>35% of TurboTax customers</strong> adopted "fast money" refund-advance offerings. Seasonality is extreme — Q3 FY2026 alone carried ~$4.4B of segment revenue against a ~$5.3B full year.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">H&amp;R Block</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~15% est.</div><div class="comp-bubble-label">DIY Share</div></div><div><div class="comp-bubble-val">~$3.6B est.</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--amber);">~flat est.</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Prime Meridian</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Emerging</div><div class="comp-bubble-label">AI Tax</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--green);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Perplexity Tax</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Emerging</div><div class="comp-bubble-label">AI Tax</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--green);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Chime Tax</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Emerging</div><div class="comp-bubble-label">AI Tax</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val" style="color:var(--green);">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:10px;font-family:'JetBrains Mono',monospace;">⚠ Prime Meridian, Perplexity Tax and Chime Tax were named by Goldman Sachs (June 2, 2026) as the emerging AI-powered tax competitors driving its downgrade. Their revenue and share figures are not publicly verifiable. Share percentages are estimates.</p>
+  </div>
+
+  <!-- Credit Karma -->
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Credit Karma</div>
+        <span class="biz-badge growth">FASTEST-GROWING SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$2.3B est.</div><div class="biz-stat-label">FY26E Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">~+19%</div><div class="biz-stat-label">YoY (guided)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US consumer credit-marketplace and lead-generation advertising — est. $20B+, cyclical with credit availability</div>
+    <p class="biz-desc" style="margin-top:14px;">Credit Karma delivered <strong>$631M in Q3 FY2026, up 15%</strong>, with strength cited in personal loans, auto insurance and home loans, and is guided to roughly <strong>+19% for FY2026</strong> — the fastest-growing reported segment. Its economics are advertising/lead-gen, not subscription: Intuit is paid by lenders and insurers for qualified applications, which makes revenue a levered bet on credit supply. It is also the strategic bridge for the consumer franchise — the "monetise beyond tax" answer to DIY price compression, given cross-platform users generate ~30% higher ARPU. Acquired in 2020, it remains a source of ongoing acquisition-related intangible amortisation that widens the <span class="tip" title="Generally Accepted Accounting Principles — the standardised US accounting rules; GAAP results include all costs, non-GAAP results exclude items management deems non-recurring">GAAP</span>-to-non-GAAP gap.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">NerdWallet</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">LendingTree</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Experian / Equifax</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:10px;font-family:'JetBrains Mono',monospace;">⚠ Credit Karma competitor metrics were not verifiable from a live source ("n/v"). Segment revenue is derived from company guidance, not a reported annual figure.</p>
+  </div>
+
+  <!-- ProTax -->
+  <div class="biz-card" style="border-left: 3px solid #6b7280;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">ProTax — ProConnect &amp; Lacerte</div>
+        <span class="biz-badge" style="background:#6b728033;color:#9ca3af;">MATURE — LOW GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$0.6B est.</div><div class="biz-stat-label">FY26E Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">~+4%</div><div class="biz-stat-label">YoY (guided)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-tam"><strong>Industry Size:</strong> US professional tax-preparation software — est. $3–4B, low single-digit growth</div>
+    <p class="biz-desc" style="margin-top:14px;">ProTax delivered <strong>$278M in Q3 FY2026, flat year-over-year</strong>, against guidance of ~+4% for the full year. Small in revenue terms, it matters strategically out of proportion to its size: it is the distribution channel into accounting firms, and Goodarzi explicitly reframed the relationship — "we are treating accountants like customers" rather than merely channels — enabling consumption-based monetisation of AI agents and expert services alongside seat subscriptions. The August 2026 partnership with Citrin Cooperman to co-develop back-office finance AI agents runs through this motion. Competitors are Thomson Reuters (UltraTax), Wolters Kluwer (CCH Axcess) and Drake Software; comparative share and revenue figures were not verifiable here.</p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">General-Ledger Switching Cost</span>
+    <span class="moat-pill">Accountant Channel</span>
+    <span class="moat-pill">Brand (TurboTax / QuickBooks)</span>
+    <span class="moat-pill">Proprietary Financial Data</span>
+    <span class="moat-pill">Expert Network at Scale</span>
+    <span class="moat-pill">Embedded Payments &amp; Payroll</span>
+    <span class="moat-pill">Regulatory / Filing Compliance</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">Intuit's moat has historically rested on three legs, and the market is currently repricing all three. First, <strong>switching costs</strong>: once a small business's chart of accounts, bank feeds, payroll history and payment rails live inside QuickBooks, migration is a multi-week accounting project rather than a software swap — which is why QuickBooks Online Accounting could grow revenue 22% on higher effective prices without a customer revolt. Second, the <strong>accountant channel</strong>: roughly the entire US small-business accounting profession is trained on Intuit's file formats, and ProTax exists largely to keep it that way. Third, <strong>brand and compliance</strong>: filing a tax return is a low-frequency, high-consequence transaction where trust dominates price, which is exactly Goodarzi's "customers buy confidence, not code" argument, backed by the observation that customers spend <strong>at least 7x more on human experts than on software</strong>. The strategic response to AI is therefore not to compete on model quality but to bundle model output with a credentialed human — TurboTax Live at 53% of TurboTax revenue, and consumption-priced AI-plus-expert services in the August 2026 platform launch. Whether that reframing holds is the entire investment debate; at 13.8x forward earnings, the market is currently pricing meaningful doubt.</p>
+
+  <p class="prose" style="margin-top:24px;"><strong style="color:var(--text);">Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:#fff;">Generative AI commoditises the DIY value proposition.</strong> The core historical product — explaining a deduction, classifying an expense, summarising a tax rule — is precisely what a general-purpose language model now does for free. Goldman Sachs downgraded on June 2, 2026 with analyst Gabriela Borges warning that "Intuit will likely be hit with lower average revenue and lower market share as competition increases over the next two years," naming <strong>Prime Meridian, Perplexity Tax and Chime Tax</strong> as emerging AI-native entrants, and cutting the price target from $519 to $276. Management has already conceded share loss in the ~$5B DIY segment.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:#fff;">Consumer concentration and extreme seasonality.</strong> TurboTax accounts for roughly a quarter of revenue and, per press reporting, a comparable share of operating income — and virtually all of it is earned in a ten-week window. Online paying units are guided to grow just 2%, so revenue growth of ~7% is almost entirely price and mix. Total IRS filers are expected to fall ~30bps (~2 million units), the sharpest industry contraction since the post-COVID season. A single bad filing season translates directly into a broken fiscal year.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:#fff;">Tax-policy and free-file risk.</strong> Any expansion of government-provided free filing — the IRS Direct File programme and the legacy Free File Alliance — attacks the low end of TurboTax's funnel exactly where management already reports the most price sensitivity (filers earning under $50,000). <em>Note: the current legislative and administrative status of IRS Direct File for the 2027 filing season could not be verified from a live source within this report's search budget and is deliberately not stated here.</em> It should be treated as an unquantified but real tail risk, not a resolved question.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:#fff;">Mailchimp underperformance and integration drag.</strong> Mailchimp revenue declined slightly year-over-year and was named as a specific target of the 17% workforce reduction and organisational "rightsizing," with churn and small-customer acquisition cited as problems. Excluding Mailchimp, GBS grew 17% versus 15% reported and the Online Ecosystem grew 22% versus 19% — a roughly 200–300bps drag on the company's best segment, plus continuing intangible amortisation from the acquisition.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong style="color:#fff;">Securities litigation overhang.</strong> Multiple securities class actions allege Intuit overstated TurboTax strength and issued unreliable FY2026 tax guidance over a class period running <strong>August 22, 2025 to May 20, 2026</strong>. No damages figure has been established. Separately, Intuit has a documented history of regulatory scrutiny over TurboTax "free" advertising claims; specific current-status details on those matters were not verifiable here.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">All INTU figures below are live, sourced from StockAnalysis.com as of the August 24, 2026 close. Industry and index columns are marked with an asterisk — see the note beneath the table.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>INTU</th><th>Industry Avg*</th><th>NASDAQ-100*</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings — share price divided by earnings per share over the last twelve months; how many dollars you pay per dollar of current profit">P/E</span></td><td style="color:var(--green);">22.62</td><td>~45*</td><td>~33*</td><td>Cheaper than both. A software franchise with 80%+ gross margins has not traded here in years — this is the derating, not a bargain by construction.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price-to-Earnings using next twelve months' consensus estimated earnings rather than reported earnings">P/E</span></td><td style="color:var(--green);">13.84</td><td>~30*</td><td>~27*</td><td>Implies ~$26.7 of forward EPS, above FY2026 non-GAAP guidance of $23.80–23.85 — so this is a forward-year non-GAAP figure. On guided FY2026 <span class="tip" title="Generally Accepted Accounting Principles earnings — includes stock-based compensation and acquisition amortisation">GAAP</span> EPS (~$15.82) the multiple is ~23.4x.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — the P/E divided by the expected earnings growth rate; below 1.0 conventionally suggests growth is under-priced">PEG</span> Ratio</td><td style="color:var(--green);">0.91</td><td>~2.2*</td><td>~2.0*</td><td>Sub-1.0 for a franchise business is rare. It only holds if the growth in the denominator survives AI competition — which is exactly what the market disputes.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding">EPS</span> (<span class="tip" title="Trailing Twelve Months — the most recent four reported quarters">TTM</span>)</td><td>$16.35</td><td>—</td><td>—</td><td>GAAP, through the April 2026 quarter. Up 33.6% YoY — earnings accelerated while the stock halved.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year — versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">15.07%</td><td>~12%*</td><td>~13%*</td><td>TTM through April 2026. Faster than both comparisons, and faster than FY2024's 13.34%. The fundamentals are not what broke.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, divided by revenue — how much of each sales dollar survives the direct cost of delivery">Gross Margin</span></td><td style="color:var(--green);">80.79%</td><td>~72%*</td><td>~55%*</td><td>Top-decile software economics. Every incremental subscription dollar is nearly all contribution.</td></tr>
+      <tr><td><span class="tip" title="Net income divided by revenue — the share of each sales dollar that becomes bottom-line profit after all costs and taxes">Net Profit Margin</span></td><td style="color:var(--green);">21.91%</td><td>~12%*</td><td>~18%*</td><td>Ahead of both. Note this is GAAP and already absorbs stock-based compensation and acquisition amortisation.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price — the cash yield you receive from holding the stock">Dividend Yield</span></td><td style="color:var(--green);">1.30%</td><td>~0.4%*</td><td>~0.6%*</td><td>$4.80/share annualised; quarterly dividend raised 15% to $1.20, paid July 17, 2026. Payout ratio 29.4%. Yield is high mainly <em>because</em> the price fell.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of freely tradeable shares — a gauge of how much capital is positioned for the stock to fall">Short Interest</span> %</td><td style="color:var(--red);">4.54%</td><td>~2.5%*</td><td>~1.8%*</td><td>12.14M shares short against a 267.2M float. Elevated versus both — and part of what powered the +42% bounce off the June low.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — how much borrowed money supports the balance sheet relative to owners' capital">Debt-to-Equity</span></td><td style="color:var(--green);">0.33</td><td>~0.55*</td><td>~0.60*</td><td>$6.90B debt against $20.63B book equity. Net cash is roughly nil (−$120M), but leverage is immaterial against $7.76B of annual free cash flow.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a rough test of whether near-term obligations are covered by near-term resources">Current Ratio</span></td><td style="color:var(--red);">1.45</td><td>~1.7*</td><td>~1.6*</td><td>Below both, and the quick ratio is only 0.62 — but a business collecting subscriptions in advance carries large deferred revenue, which inflates current liabilities without being a cash claim.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditure; the cash actually available for dividends, buybacks and debt repayment">Free Cash Flow</span></td><td>$7.76B</td><td>—</td><td>—</td><td>$7.89B operating cash flow on just $133M of capex — a 37.1% FCF margin and $28.35 per share. At $369.92 that is a 7.7% FCF yield.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity; how efficiently owner capital generates profit">ROE</span></td><td style="color:var(--amber);">22.50%</td><td>~15%*</td><td>~28%*</td><td>Mixed: comfortably ahead of the software-application average, behind the mega-cap-heavy NASDAQ-100 whose index ROE is dominated by a handful of enormous franchises.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by all capital employed (debt plus equity); the cleanest test of whether a business creates value">ROIC</span></td><td style="color:var(--green);">20.63%</td><td>~11%*</td><td>~17%*</td><td>Ahead of both, and roughly double a plausible cost of capital. ROCE of 21.25% corroborates. This is a genuinely high-return business.</td></tr>
+      <tr><td><span class="tip" title="A measure of how much a stock moves relative to the overall market; 1.0 means it moves in line, below 1.0 means less volatile than the market">Beta</span></td><td style="color:var(--green);">0.96</td><td>~1.15*</td><td>~1.15*</td><td>Below 1.0 — and badly misleading right now. Realised volatility has been far higher than beta implies: a −44% twelve-month move and a single −20%+ session on May 21, 2026.</td></tr>
+      <tr><td>52-Week Range</td><td>$252.84 – $705.08</td><td>—</td><td>—</td><td>The current $369.92 sits 46.5% below the 52-week high and 46.3% above the low. Also: 50-day MA $301.19 versus 200-day MA $441.01 — the stock is in a confirmed downtrend but trading well above its short-term average.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:var(--text-dim);margin-top:14px;font-family:'JetBrains Mono',monospace;line-height:1.7;">* Industry Avg = approximate Software–Application sector composite; NASDAQ-100 = approximate index composite. <strong style="color:var(--amber);">These two columns are ESTIMATES.</strong> They could not be verified from a live data source within this report's search budget and are provided only as directional context. The INTU column is live-sourced. Verify benchmark figures independently before acting on any comparison.</p>
+
+  <p class="prose" style="margin-top:28px;"><strong style="color:var(--text);">Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:10px;">There are three material non-recurring or non-cash distortions to be aware of, and they are large.</p>
+  <p class="prose" style="margin-top:14px;"><strong>1. The GAAP-to-non-GAAP gap is enormous.</strong> FY2026 guidance is for GAAP operating income of $5.705–5.725B against non-GAAP operating income of $8.784–8.804B — a gap of roughly <strong>$3.08B, about 14.4% of guided revenue</strong>. At the EPS line, GAAP $15.79–15.84 versus non-GAAP $23.80–23.85 is a gap of roughly <strong>$8.00 per share, or 34% of the non-GAAP number</strong>. That wedge is principally <span class="tip" title="Stock-Based Compensation — equity granted to employees; a real economic cost to shareholders through dilution, but excluded from most non-GAAP profit measures">stock-based compensation</span> plus acquisition-related intangible amortisation from <strong>Credit Karma (2020)</strong> and <strong>Mailchimp (2021)</strong>. The precise split between SBC and amortisation was not disclosed in the sources verified for this report — but a company buying back stock at $1.6B per quarter while excluding equity compensation from headline earnings is, in substance, using cash to fund a cost it does not report. Prefer the GAAP series and the free cash flow line.</p>
+  <p class="prose" style="margin-top:14px;"><strong>2. Restructuring charges of $300–340M.</strong> The 17% workforce reduction (~3,000 roles) announced May 20, 2026 carries estimated charges of $300–340M, landing largely in <strong>Q4 FY2026 — the quarter being reported August 25, 2026</strong>. Expect a visibly depressed GAAP Q4. The CFO stated the majority of the resulting cost savings flow to the bottom line rather than being reinvested, which should make FY2027 margins look artificially strong against an FY2026 base carrying the charge.</p>
+  <p class="prose" style="margin-top:14px;"><strong>3. Litigation.</strong> Securities class actions covering the August 22, 2025 – May 20, 2026 class period allege overstated TurboTax strength and unreliable FY2026 guidance. No accrual or damages estimate was verifiable. Intuit also has a well-documented history of regulatory action over TurboTax "free" advertising claims; the current status of those matters could not be confirmed from a live source here and is therefore not quantified.</p>
+  <p class="prose" style="margin-top:14px;"><strong>4. Capital return is genuinely large.</strong> $1.6B of buybacks in Q3 FY2026 alone, a new <strong>$8B repurchase authorisation</strong>, and a dividend raised 15% to $1.20 quarterly. Buyback yield is 1.15% and total shareholder yield 2.45%. Against a $101.19B market cap, the $8B authorisation is ~7.9% of shares — meaningful support, and management is buying at multiples it has not seen in a decade.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">BUY</div><div class="card-note">Based on 35 covering analysts (StockAnalysis.com, August 2026). The Street has largely refused to capitulate despite the −44% twelve-month move.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$444.50</div><div class="card-note"><span style="color:var(--green);font-family:'JetBrains Mono',monospace;">+20.16% upside</span> from $369.92. Median target $427.00 (+15.43%) — the mean is dragged up by one extreme high target.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$250 – $921</div><div class="card-note">Low implies −32.42%, high implies +148.97%. A 3.7x spread between low and high is extraordinary dispersion and tells you the Street has no consensus on terminal value at all.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">24 / 9 / 2</div><div class="card-note">Buy-equivalent 24 (19 Strong Buy + 5 Buy) · Hold 9 · Sell-equivalent 2 (1 Sell + 1 Strong Sell). 68.6% buy-rated.</div></div>
+  </div>
+  <div class="analyst-bar" style="margin-top:24px;">
+    <div style="flex:19;background:var(--green);"></div>
+    <div style="flex:5;background:#4ade80;"></div>
+    <div style="flex:9;background:var(--amber);"></div>
+    <div style="flex:1;background:#f87171;"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy · 19</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy · 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold · 9</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f87171;"></span> Sell · 1</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Strong Sell · 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);text-transform:uppercase;letter-spacing:1.5px;margin-top:36px;margin-bottom:14px;">Key Recent Analyst Calls</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">Jefferies — Brent Thill</strong> · Buy · PT cut <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$550 → $500</span> · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">Aug 23, 2026</span><br>The most recent call in the dataset, published two days before the FY2026 print. Rating maintained but the target trimmed roughly 9% — the pattern across the Street in August: keep the rating, lower the number.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">DBS — Andy Yu, CFA</strong> · Buy · PT maintained <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$550</span> · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">Aug 21, 2026</span><br>The most aggressive of the recent maintained targets — roughly 49% above the current price, and above Jefferies' post-cut number. Implies belief that the AI-disruption discount is a sentiment problem rather than an earnings problem.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">Morgan Stanley — Adam Wood</strong> · Hold · PT maintained <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$335</span> · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">Aug 20, 2026</span><br>The clearest bearish-neutral marker: a target <em>below</em> the current price, implying −9.4% downside. Morgan Stanley is effectively saying the August rally has already run past fair value ahead of the print.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">Bank of America — Tal Liani</strong> · Buy · PT maintained <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$400</span> · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">Aug 20, 2026</span><br>A notably modest Buy — only 8.1% above spot. The rating says own it; the target says the easy money from the June low has already been made.</div></div>
+    <div class="risk-item"><span style="color:var(--red);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">Goldman Sachs — Gabriela Borges</strong> · Downgrade · PT cut <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$519 → $276</span> · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">June 2, 2026</span><br>The single most consequential call of the year: it moved the stock <strong>−8.9% in one session</strong> and marked Intuit as the S&amp;P 500's worst 2026 performer. Borges warned Intuit "will likely be hit with lower average revenue and lower market share as competition increases over the next two years," naming Prime Meridian, Perplexity Tax and Chime Tax. The target flipped from a 61% implied gain to a 14% implied decline.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1.2;">●</span><div><strong style="color:#fff;">Citi · Mizuho · TD Cowen</strong> · Buy/Outperform/Hold maintained · targets trimmed · <span style="font-family:'JetBrains Mono',monospace;color:var(--text-dim);">August 2026</span><br>All three cut price targets while holding ratings, leaving the Street average clustered in the mid-$430s to low-$440s — consistent with the $444.50 consensus.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Aug 25, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 Q4 &amp; Full-Year Results — plus first FY2027 guidance</div>
+        <div class="tl-desc">The dominant near-term event, and it lands tomorrow. Consensus expects FY2026 revenue of ~$21.37B (+13.47%) and non-GAAP EPS of ~$23.83 (+18.27%), against company guidance of $21.341–21.374B and $23.80–23.85. The reported quarter also carries the bulk of the $300–340M restructuring charge, so GAAP Q4 will look depressed by design. The number that matters is not FY2026 — it is the <strong>FY2027 revenue and margin guide</strong>, which is the first hard datapoint on whether the AI-disruption thesis is showing up in the numbers or only in the multiple.</div>
+        <div class="tl-impact neutral">Key near-term event — binary</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">AI Expert Platform launch with consumption-based pricing</div>
+        <div class="tl-desc">Intuit began rolling out an expanded AI-driven Expert platform in August 2026 — described by Goodarzi as "a unified system of intelligence that serves as a strategic control tower for both businesses and accountants." Critically, it introduces <strong>consumption-based pricing for AI and human intelligence services</strong> alongside subscriptions, with strongest expected adoption among QuickBooks Advanced and Plus customers. This is the first real test of whether Intuit can monetise AI as revenue rather than absorb it as cost.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 18, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Citrin Cooperman partnership; stock +4.83% intraday</div>
+        <div class="tl-desc">Intuit announced a partnership with accounting firm Citrin Cooperman to co-develop AI agents for back-office finance automation and expand distribution — evidence for the "treat accountants as customers" strategy. The stock traded up 4.83% to $351.80 on the day, part of a recovery from the $296 July 24 close toward the current $369.92.</div>
+        <div class="tl-impact up">Already reacted — positive</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 FY2027 results — first clean read on Enterprise Suite</div>
+        <div class="tl-desc">Fiscal Q1 (August–October) is the smallest quarter and carries almost no tax revenue, which makes it the cleanest available look at the business Intuit wants investors to underwrite: mid-market. Watch QuickBooks Advanced plus Intuit Enterprise Suite, which grew ~38% in Q3 FY2026 with IES contract growth accelerating 37% quarter-over-quarter, and watch whether Mailchimp has stabilised after rightsizing.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan–Apr 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Tax season 2027 — the single largest swing factor</div>
+        <div class="tl-desc">Roughly a quarter of revenue and a comparable share of operating income is earned in a ten-week window. The FY2026 season already saw online paying units grow just 2% with ARPU up ~11%, DIY share loss, and total IRS filers contracting ~30bps (~2 million units). If AI-native entrants take visible share in the 2027 season — or if Intuit is forced into defensive low-end pricing as management hinted — the consumer franchise re-rates again.</div>
+        <div class="tl-impact neutral">Key near-term event — highest variance</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">IRS Direct File / free-file policy</div>
+        <div class="tl-desc">Government-provided free filing directly targets the price-sensitive sub-$50,000 filer cohort management already identified as its weakest flank. <strong>The current legislative and administrative status of IRS Direct File for the 2027 season could not be verified from a live source for this report and is deliberately left unquantified.</strong> It remains an unresolved tail risk that could be re-priced by an administrative announcement at any time, in either direction.</div>
+        <div class="tl-impact neutral">Unquantified policy risk — verify current status</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Securities class actions (class period Aug 22, 2025 – May 20, 2026)</div>
+        <div class="tl-desc">Multiple class actions allege management overstated TurboTax strength and issued unreliable FY2026 tax guidance, downplaying pricing pressure and competitive headwinds. No damages figure or accrual has been established. Historically these resolve for amounts immaterial to a company generating $7.76B of annual free cash flow, but they create headline risk and discovery exposure around the FY2027 guide.</div>
+        <div class="tl-impact down">Overhang — headline risk</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#fff;margin-bottom:4px;">INTU — MONTHLY CLOSING PRICE, 60 MONTHS (SEP 2021 – AUG 2026)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:16px;">⚠ STATIC DATA AS OF AUG 24, 2026 — hardcoded monthly closes, will not update</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:3px;background:#236cff;display:inline-block;"></span>Price</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #f59e0b;display:inline-block;"></span>20-Day MA (1-mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #3b82f6;display:inline-block;"></span>50-Day MA (3-mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:18px;height:0;border-top:2px dashed #ef4444;display:inline-block;"></span>200-Day MA (10-mo)</span>
+      <span style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:#fff;display:inline-block;"></span>Key event</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#fff;margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF AUG 24, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">In plain English: RSI measures how much of the recent price movement has been upward versus downward, on a 0–100 scale. Above 70 usually means the stock has run hot and buyers may be exhausted; below 30 usually means it has been sold hard and may be due a bounce. It describes momentum, not value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong style="color:var(--text);">Five-year trajectory.</strong> On a monthly-close basis Intuit went from <strong>$539.51 in September 2021 to $369.92 on August 24, 2026 — a price return of −31.4% over five years</strong>, against a period in which the NASDAQ-100 roughly doubled. Including dividends the total return is modestly better but still deeply negative in relative terms. That headline conceals two entirely different regimes. From September 2021 the stock rode the post-pandemic software bid to a monthly-close high of <strong>$652.30 in November 2021</strong>, then gave back 41% into the rate-shock trough of <strong>$385.44 in June 2022</strong>. It then compounded steadily for three years — $389 (Dec 2022) → $625 (Dec 2023) → $628 (Dec 2024) — before a spectacular final melt-up to an all-time monthly close of <strong>$787.63 in June 2025</strong>, when market capitalisation reached roughly $219B.</p>
+  <p class="prose" style="margin-top:16px;">The second regime is the 2026 collapse. From <strong>$662.42 at the December 2025 close</strong> the stock lost <strong>25% in January 2026 alone</strong> (to $498.92) as the "SaaS-pocalypse" narrative — accelerated by Anthropic's Claude model release in February 2026 — spread through application software. It kept bleeding through the spring, then broke on <strong>May 21, 2026</strong>, falling more than 20% in one to two sessions after the Q3 print cut TurboTax guidance and announced a 17% workforce reduction. Goldman's June 2 downgrade drove a further −8.9% day and confirmed Intuit as the <strong>worst performer in the S&amp;P 500 for 2026</strong>, with market cap bottoming near <strong>$88.1B</strong>. The June 2026 monthly close of <strong>$261.00</strong> marked the low. From there the stock has rallied <strong>+41.7%</strong> in under two months into the FY2026 print — but at $369.92 it still sits below its 200-day moving average of $441.01, and the 50-day ($301.19) below the 200-day is a textbook confirmed downtrend. This is a violent counter-trend rally inside a broken chart, not yet a new uptrend.</p>
+
+  <div class="timeline" style="margin-top:8px;">
+    <div class="tl-item"><div class="tl-date">Nov 2021</div><div class="tl-content"><div class="tl-title">Cycle high — $652.30 monthly close</div><div class="tl-desc">Peak of the post-pandemic software multiple expansion, shortly after the Mailchimp acquisition closed. Everything that followed for the next eight months was rate-driven multiple compression, not an earnings problem.</div><div class="tl-impact down">−41% into June 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">Rate-shock trough — $385.44</div><div class="tl-desc">The bottom of the duration selloff. Revenue in FY2022 had just grown 32.11%, so this was pure discount-rate repricing. Buying here returned more than 100% over the next three years.</div><div class="tl-impact up">Cycle low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2023</div><div class="tl-content"><div class="tl-title">AI-platform re-rating — $625.03</div><div class="tl-desc">Intuit was initially treated as an <em>AI winner</em> — Intuit Assist and generative-AI-embedded QuickBooks were the bull thesis. The stock rose 61% in calendar 2023. The same technology is now the bear thesis; the narrative inverted, the product roadmap did not.</div><div class="tl-impact up">+61% in CY2023</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">All-time monthly-close high — $787.63</div><div class="tl-desc">Market capitalisation ~$219B. From this level to the June 2026 low the company lost roughly <strong>$131B of market value in twelve months</strong> while revenue grew 15% and EPS grew 34%.</div><div class="tl-impact up">Peak valuation</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">Derating begins — $498.92, −24.7% in one month</div><div class="tl-desc">The largest single monthly decline of the five-year period. AI-disruption fears spread across application software; Intuit, as the most AI-exposed consumer franchise in the group, took the sharpest hit.</div><div class="tl-impact down">−24.7% in one month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 20–21, 2026</div><div class="tl-content"><div class="tl-title">Q3 FY2026 print — TurboTax guide cut, 17% workforce reduction</div><div class="tl-desc">Revenue grew 10% and non-GAAP EPS 10%, but full-year TurboTax guidance was trimmed to $5.277–5.282B from $5.305–5.330B and 3,000 roles were eliminated. The stock fell more than 20% across one to two sessions, trading at $310.83 intraday on May 21. This is the event that anchors the securities class actions.</div><div class="tl-impact down">−20%+ in two sessions</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2, 2026</div><div class="tl-content"><div class="tl-title">Goldman Sachs downgrade — PT $519 → $276; −8.9% session</div><div class="tl-desc">Gabriela Borges named Prime Meridian, Perplexity Tax and Chime Tax as structural threats. Market cap troughed near $88.1B; the June monthly close of $261.00 was the five-year low on this series.</div><div class="tl-impact down">Worst S&amp;P 500 performer</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">+41.7% counter-trend rally into the FY2026 print</div><div class="tl-desc">From $261.00 (June close) through $316.07 (July close) to $369.92 on August 24. Elevated 4.54% short interest, an $8B buyback authorisation and a 7.7% free-cash-flow yield all contributed. The 50-day MA remains far below the 200-day MA — the downtrend is not yet broken.</div><div class="tl-impact up">+41.7% off the low</div></div></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong style="color:var(--text);">Relative performance.</strong> Over the trailing twelve months INTU returned <strong>−44.18%</strong>. Over the same window the NASDAQ-100 and the S&amp;P 500 were both positive, and the application-software peer group broadly outperformed Intuit — Intuit was, by press account, the <em>single worst performer in the S&amp;P 500 for calendar 2026</em>, down roughly 51% year-to-date as of June 2. The relative drawdown is therefore on the order of 55–65 percentage points versus the index over twelve months. <em>Exact index return figures were not verified from a live source for this report and are deliberately not stated as precise numbers.</em> What is verified and unambiguous: a company that grew TTM revenue 15.07% and TTM EPS 33.60% lost more than half its market value, which means essentially the entire move was multiple compression driven by a change in the market's view of the durability of the franchise — not by realised results.</p>
+</div>
+
+<!-- ============ 08 SUMMARY & RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying an 80.8% gross-margin franchise with 20.6% <span class="tip" title="Return on Invested Capital — after-tax operating profit over total capital employed">ROIC</span>, 15% revenue growth and a 7.7% free-cash-flow yield at <strong>13.8x forward earnings and a 0.91 PEG</strong> — a valuation Intuit has not seen in a decade. The growth engines are working: QuickBooks Online Accounting +22%, Online Ecosystem +22% ex-Mailchimp, QuickBooks Advanced plus Intuit Enterprise Suite ~+38% with IES contracts accelerating 37% quarter-over-quarter, Credit Karma +19%, and TurboTax Live +36% to 53% of TurboTax revenue while attacking a $37B assisted-tax category. Management has taken $300–340M of restructuring pain to cut 17% of headcount with the CFO explicitly committing the savings to the bottom line, and is buying back stock under an $8B authorisation (~7.9% of the float) at the lowest multiple in years.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The market is not mispricing Intuit — it is pricing a genuine terminal-value problem. Generative AI reproduces the core DIY value proposition (explain the deduction, classify the expense, summarise the rule) at near-zero marginal cost, and management has <em>already conceded</em> share loss in the ~$5B DIY segment and acute price sensitivity below $50,000 of income. TurboTax online paying units grow just 2%; all ~7% revenue growth is price and mix, which is exactly the kind of growth that snaps when a free substitute appears. Total IRS filers are contracting ~30bps. Goldman sees "lower average revenue and lower market share... over the next two years." Meanwhile GAAP earnings are 34% below the non-GAAP headline on ~$3.08B of annual add-backs, and free-file policy remains an unquantified tail risk on the most profitable ten weeks of the year.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong style="color:var(--text);">Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">AI substitution in consumer tax and bookkeeping.</strong> This is the risk that halved the stock and it is unresolved. Emerging AI-native filers named by Goldman — Prime Meridian, Perplexity Tax, Chime Tax — attack the price-sensitive end of a category where Intuit already reports share loss and only 2% unit growth. If the 2027 filing season shows visible unit defection rather than the current price-and-mix growth, the ~25% of revenue and comparable share of operating income sitting in Consumer re-rates a second time, and the mid-market/Enterprise Suite offset is nowhere near large enough to fill the hole yet.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">A disappointing FY2027 guide on August 25, 2026.</strong> The print lands within 24 hours of this snapshot, after a +41.7% rally off the June low that has taken the stock past Morgan Stanley's $335 target and close to Bank of America's $400. Positioning is stretched, 4.54% of the float is short, and Q4 GAAP results will be distorted by the $300–340M restructuring charge. A soft FY2027 revenue or margin guide into that setup produces asymmetric downside — the same asymmetry that produced a −20%+ two-session move in May.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Tax-policy shock to the consumer franchise.</strong> Any expansion of government free filing or a change to the Free File framework strikes precisely the sub-$50,000 filer cohort management identified as its weakest flank, in a business earning nearly all its money in ten weeks. The current status of IRS Direct File could not be verified for this report and is therefore unquantified — which is itself the risk: it is a binary policy variable that can be repriced by an administrative announcement, with no warning and no offsetting hedge.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card" style="border-left:3px solid var(--red);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">AI agents versus the small-business software stack</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">The defining question in application software in 2026 is whether vertical SaaS franchises are moats or interfaces. The "SaaS-pocalypse" trade accelerated after Anthropic's Claude model release in February 2026, and Intuit — the most AI-exposed consumer franchise in the group — became its clearest expression, losing roughly <strong>$131B of market value between July 2025 and May 2026</strong> while revenue grew 15%. Intuit's counter-argument is empirical rather than rhetorical: its own AI agents already process recommendations across <strong>50+ million transactions weekly</strong>, TurboTax Live grew 36% to 53% of TurboTax revenue, and customers demonstrably spend <strong>7x more on human experts than on software</strong> — so the durable margin pool may sit in the assisted layer AI cannot yet credential, not the software layer it is commoditising. The August 2026 consumption-based pricing for AI and expert services is the direct test of that thesis. Until the 2027 filing season produces unit data, this is unresolvable from the outside.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--amber);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">Small-business formation, filer counts and the shrinking top of funnel</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">Intuit's two largest businesses both depend on unit formation, and both are seeing it stall. Total IRS filers are expected to decline approximately <strong>30 basis points, roughly 2 million units</strong> — described by management as the most significant industry-wide contraction since the post-COVID tax season — even as e-files rise 1%, meaning the mix is shifting digital while the pie shrinks. On the business side, growth is being carried by <em>existing</em> customers paying more: QuickBooks Online Accounting's 22% growth was attributed to higher effective prices, customer growth and mix-shift, in that order, and management signalled it will "take pricing actions at the higher end of our portfolio." Price-led growth against flat-to-shrinking units is durable only while switching costs hold. The genuine bright spot is upmarket: the mid-market businesses Intuit now serves are themselves "growing north of 30 percent," which is why Enterprise Suite matters so much more than its current revenue contribution suggests.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green);">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">The mid-market land grab — where the incremental TAM actually is</div>
+      <span class="biz-badge growth">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">Intuit Enterprise Suite is the bull case's load-bearing wall. QuickBooks Advanced plus IES grew approximately <strong>38%</strong> in Q3 FY2026, IES contract growth accelerated <strong>37% quarter-over-quarter</strong>, and the direct sales force is scaling 30% with improving productivity. The product now carries multi-entity, multi-currency, AI-driven bookkeeping and Intuit Intelligence Chat — an explicit run at the mid-market ERP tier where incumbents charge far more and where AI-native competition is far less mature than in consumer tax. <strong>Bull framing:</strong> if IES compounds near 38% for two more years it becomes a multi-billion-dollar business growing three times faster than the consolidated company, which alone justifies re-rating from 13.8x forward earnings, and the consumer question becomes a valuation footnote rather than the thesis. <strong>Bear framing:</strong> Consumer is roughly a quarter of revenue and profit today while IES is a rounding error — the arithmetic simply does not work yet, and the market is right to demand two more years of proof before paying a franchise multiple. The August 25 FY2027 guide is the first instalment of that proof.</p>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER ============ -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;margin-bottom:14px;">Data as of August 24, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 14px;line-height:1.8;">Sources: price, valuation, margin, balance-sheet, cash-flow, return and 52-week data from <strong>StockAnalysis.com</strong> (quote, statistics, financials and forecast pages, August 24, 2026 close). Analyst ratings, consensus, price targets and the named calls from Jefferies (Brent Thill), DBS (Andy Yu, CFA), Morgan Stanley (Adam Wood) and Bank of America (Tal Liani) from <strong>StockAnalysis.com forecast data</strong>; the Goldman Sachs downgrade (Gabriela Borges) and the S&amp;P 500 worst-performer framing from <strong>Forbes</strong> (June 2, 2026). Segment revenue, growth rates, guidance, restructuring charges, dividend and buyback details from <strong>Intuit's Q3 FY2026 press release</strong> (investors.intuit.com, May 20, 2026) and the <strong>Q3 FY2026 earnings call transcript</strong> (The Motley Fool). TurboTax guidance-cut detail from <strong>InvestingLive</strong>; workforce-reduction reporting from <strong>CNBC</strong>; litigation and August partnership detail from <strong>StocksToTrade</strong> (August 18, 2026). Institutional ownership from <strong>Fintel</strong>. Market-cap rankings from <strong>CompaniesMarketCap.com</strong>. The 60 monthly closing prices in Section 07 are real monthly closes from <strong>Digrin</strong>, cross-checked against StockAnalysis daily closes for June, July and August 2026 (exact match) and against Macrotrends annual closes for 2021–2024.</p>
+  <p style="max-width:900px;margin:0 auto 14px;line-height:1.8;color:var(--amber);"><strong>Explicitly flagged as estimates or unverified:</strong> (1) all competitor market shares, revenues and growth rates in Section 02, including Xero, Sage, H&amp;R Block, Block/Square, ADP, Gusto and FreshBooks — these could not be verified from a live source and are directional only, with "n/v" marking figures not verified at all; (2) the Industry Avg and NASDAQ-100 columns in Section 04; (3) the FY2026 segment revenue split, which is derived from company guidance and Q3 disclosures rather than reported annual segment figures, with Credit Karma and ProTax annual revenue being derived estimates; (4) the approximate NASDAQ market-cap rank; (5) the current status of IRS Direct File and of FTC/regulatory advertising matters, which is left deliberately unquantified; (6) index relative-return figures in Section 07, stated only as ranges. Company-profile fields (headquarters, founding year) are standard public-profile data not re-verified in this snapshot. <strong>Intuit reports FY2026 Q4 and full-year results on August 25, 2026 — one day after this snapshot — which will supersede much of the guidance-based data above.</strong></p>
+  <p style="max-width:900px;margin:0 auto;line-height:1.8;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Past performance does not predict future results. All figures should be independently verified against primary sources — in particular SEC filings on EDGAR — before any investment decision. The author may hold positions in securities mentioned. Do your own research.</p>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ===================================================================
+// STATIC DATA — hardcoded as of August 24, 2026. No API calls.
+// 60 monthly closing prices, Sep 2021 through Aug 2026 (Aug = Aug 24 close).
+// Source: Digrin monthly "real price" series; June/July/August 2026 values
+// verified identical to StockAnalysis.com daily closes.
+// ===================================================================
+var labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+
+var prices = [539.51,625.99,652.30,643.22,555.23,474.37,480.84,418.75,414.46,385.44,456.17,431.78,387.32,427.50,407.59,389.22,422.67,407.18,445.83,443.95,419.12,458.19,511.70,541.81,510.94,494.95,571.46,625.03,631.33,662.89,650.00,625.62,576.44,657.21,647.35,630.26,621.00,610.30,641.73,628.50,601.51,613.84,613.99,627.47,753.47,787.63,785.13,667.00,682.91,667.55,634.08,662.42,498.92,409.03,432.38,388.50,331.53,261.00,316.07,369.92];
+
+// Simple moving average over a window of monthly bars.
+function sma(data, window) {
+  var out = [];
+  for (var i = 0; i < data.length; i++) {
+    if (i < window - 1) { out.push(null); continue; }
+    var sum = 0;
+    for (var j = i - window + 1; j <= i; j++) { sum += data[j]; }
+    out.push(sum / window);
+  }
+  return out;
+}
+
+// 20-day MA ~ 1 monthly bar; 50-day ~ 3 bars; 200-day ~ 10 bars.
+var ma20  = sma(prices, 1);
+var ma50  = sma(prices, 3);
+var ma200 = sma(prices, 10);
+
+// Wilder-style RSI over `period` bars.
+function computeRSI(data, period) {
+  var out = [];
+  var gains = 0, losses = 0;
+  for (var i = 0; i < data.length; i++) {
+    if (i === 0) { out.push(null); continue; }
+    var chg = data[i] - data[i - 1];
+    var gain = chg > 0 ? chg : 0;
+    var loss = chg < 0 ? -chg : 0;
+    if (i <= period) {
+      gains += gain; losses += loss;
+      if (i === period) {
+        gains = gains / period; losses = losses / period;
+        out.push(losses === 0 ? 100 : 100 - (100 / (1 + gains / losses)));
+      } else {
+        out.push(null);
+      }
+    } else {
+      gains = (gains * (period - 1) + gain) / period;
+      losses = (losses * (period - 1) + loss) / period;
+      out.push(losses === 0 ? 100 : 100 - (100 / (1 + gains / losses)));
+    }
+  }
+  return out;
+}
+
+var rsi = computeRSI(prices, 6);
+
+// Annotated inflection points (index into the monthly arrays).
+var events = [
+  { idx: 2,  label: 'Nov 2021 — cycle high $652.30',                          color: '#f59e0b' },
+  { idx: 9,  label: 'Jun 2022 — rate-shock trough $385.44',                   color: '#22c55e' },
+  { idx: 27, label: 'Dec 2023 — AI-platform re-rating; +61% in CY2023',       color: '#22c55e' },
+  { idx: 45, label: 'Jun 2025 — all-time monthly close $787.63 (~$219B cap)', color: '#22c55e' },
+  { idx: 52, label: 'Jan 2026 — AI-disruption derating; -24.7% in one month', color: '#ef4444' },
+  { idx: 56, label: 'May 2026 — Q3 print: TurboTax cut, 17% job cuts, -20%+', color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — trough $261.00; Goldman cut PT $519 -> $276', color: '#ef4444' },
+  { idx: 59, label: 'Aug 24 2026 — $369.92, +41.7% off the low',              color: '#236cff' }
+];
+
+var eventMap = {};
+events.forEach(function (e) { eventMap[e.idx] = e; });
+
+var pointRadii  = prices.map(function (p, i) { return eventMap[i] ? 6 : 0; });
+var pointColors = prices.map(function (p, i) { return eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)'; });
+
+var pctx = document.getElementById('priceChart').getContext('2d');
+var grad = pctx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(35,108,255,0.20)');
+grad.addColorStop(1, 'rgba(35,108,255,0)');
+
+new Chart(pctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price',
+        data: prices,
+        borderColor: '#236cff',
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.25,
+        pointRadius: pointRadii,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: '#0a0e17',
+        pointBorderWidth: 2,
+        pointHoverRadius: 8,
+        order: 1
+      },
+      { label: '20-Day MA (1-mo)',  data: ma20,  borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4, 4], fill: false, tension: 0.25, pointRadius: 0, order: 2 },
+      { label: '50-Day MA (3-mo)',  data: ma50,  borderColor: '#3b82f6', borderWidth: 1.4, borderDash: [6, 4], fill: false, tension: 0.25, pointRadius: 0, order: 3 },
+      { label: '200-Day MA (10-mo)',data: ma200, borderColor: '#ef4444', borderWidth: 1.4, borderDash: [8, 5], fill: false, tension: 0.25, pointRadius: 0, order: 4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 12,
+        displayColors: true,
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null) { return null; }
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function (items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 13
+        }
+      },
+      y: {
+        grid: { color: 'rgba(30,41,59,0.55)' },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 10 },
+          callback: function (v) { return '$' + v; }
+        }
+      }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{
+      label: 'RSI (6)',
+      data: rsi,
+      borderColor: '#a78bfa',
+      backgroundColor: 'rgba(167,139,250,0.08)',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.25,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+      spanGaps: true
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235',
+        borderColor: '#1e293b',
+        borderWidth: 1,
+        titleColor: '#e2e8f0',
+        bodyColor: '#94a3b8',
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont:  { family: "'JetBrains Mono', monospace", size: 11 },
+        padding: 10,
+        callbacks: {
+          label: function (ctx) {
+            if (ctx.parsed.y === null) { return null; }
+            var v = ctx.parsed.y;
+            var tag = v >= 70 ? ' (overbought)' : (v <= 30 ? ' (oversold)' : '');
+            return 'RSI: ' + v.toFixed(1) + tag;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 10
+        }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: {
+          color: function (ctx) {
+            if (ctx.tick.value === 70 || ctx.tick.value === 30) { return 'rgba(148,163,184,0.45)'; }
+            return 'rgba(30,41,59,0.5)';
+          },
+          lineWidth: function (ctx) {
+            return (ctx.tick.value === 70 || ctx.tick.value === 30) ? 1.6 : 1;
+          }
+        },
+        ticks: {
+          stepSize: 10,
+          color: '#64748b',
+          font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function (v) {
+            if (v === 70) { return '70 — OVERBOUGHT'; }
+            if (v === 50) { return '50 — Neutral'; }
+            if (v === 30) { return '30 — OVERSOLD'; }
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
