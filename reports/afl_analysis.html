@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AFL — Aflac Incorporated | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4FA3D9;
+  --accent-dim: #4FA3D933;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of August 28, 2026 (last market close) — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">AFL</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Insurance — Life</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $58.4B</span>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #437</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: top ~300 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: top ~150 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Aflac Incorporated</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:6px;font-family:'JetBrains Mono',monospace;">Global rank sourced from CompaniesMarketCap (Aug 2026); US and NYSE ranks are order-of-magnitude estimates, not sourced figures.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$116.52</div>
+      <div class="price-change">−$0.06 (−0.05%)</div>
+      <div class="price-date">Close, Friday August 28, 2026 · NYSE</div>
+      <div class="price-date">After-hours quote: not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Columbus, Georgia, USA</div>
+    <div class="meta-item"><span>Employees:</span> 12,716</div>
+    <div class="meta-item"><span>Founded:</span> 1955</div>
+    <div class="meta-item"><span>Last Earnings:</span> Aug 6, 2026 (Q2 2026)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 2026 — early Nov 2026 (est.)</div>
+  </div>
+</div>
+
+<!-- ============ 01 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <div class="prose">
+    <p>Aflac Incorporated underwrites <strong>supplemental</strong> health and life insurance — cash-benefit policies that pay the policyholder directly when a covered event occurs (cancer diagnosis, hospitalisation, accident, disability), sitting alongside rather than replacing major medical cover. It is not a property-and-casualty insurer, and it is not a major-medical carrier. It reports in two operating segments, <strong>Aflac Japan</strong> and <strong>Aflac U.S.</strong>, plus a Corporate and Other line that now houses a fast-growing reinsurance business.</p>
+    <p style="margin-top:14px;">Full-year 2025 revenue was <strong>$17.16 billion, down 9.31%</strong> from $18.93 billion in 2024, with diluted <span class="tip" title="Earnings per share — net profit divided by diluted shares outstanding">EPS</span> of $6.82 versus $9.63; both lines are heavily distorted by investment and currency marks rather than by underwriting (see Notable One-Off Items). On a <span class="tip" title="Trailing twelve months — the most recent four reported quarters">TTM</span> basis through June 2026 revenue is $18.07 billion and net income $4.86 billion. Aflac ranks <strong>#437 among all listed companies worldwide by market capitalisation</strong> and is the second-largest US-listed name in StockAnalysis's Insurance — Life industry group behind Manulife Financial.</p>
+    <p style="margin-top:14px;"><strong>The fact most casual readers get wrong: Japan, not the United States, is the larger and far more profitable half of this company.</strong> In the first six months of 2026, Aflac Japan produced <strong>$4.3 billion</strong> of total adjusted revenue against Aflac U.S.'s <strong>$3.6 billion</strong>, and <strong>$1.5 billion</strong> of pretax adjusted earnings against the U.S. segment's <strong>$733 million</strong> — roughly <strong>two-thirds of segment pretax profit from Japan</strong>. The investment case, the currency exposure and the structural risk all follow from that single split.</p>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 14px;">Notable Executives &amp; Ownership</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Chairman &amp; CEO</div>
+      <div class="card-value" style="font-size:20px;">Daniel P. Amos</div>
+      <div class="card-note">Quoted in the Q2 2026 release: "Aflac delivered solid earnings for the quarter and for the first six months. These results reflect execution of our strategy, driving long-term value for shareholders." On the Q2 call he reaffirmed the intent to extend Aflac's <strong>43-year record of consecutive dividend increases</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">EVP &amp; CFO</div>
+      <div class="card-value" style="font-size:20px;">Max Brodén</div>
+      <div class="card-note">Owns the capital and hedging framework: ~63% of group debt is yen-denominated as a deliberate enterprise hedge, adjusted leverage 21.8% (20–25% target), unencumbered liquidity $3.3B against a $1B minimum. Also fronted the Aflac Re Bermuda transaction with Japan Post Insurance.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">Holder-level 13F data could not be retrieved from a live source in this session, so no institutional names are listed. What is verified: <strong>501.34M</strong> shares outstanding against a <strong>497.00M</strong> float, shares outstanding <strong>down 5.75% year over year</strong>, and <strong>$983M</strong> of buybacks plus <strong>$309M</strong> of dividends in Q2 2026 alone.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <div class="prose">Segment mix below uses <strong>first-half 2026 total adjusted revenues</strong>: Aflac Japan $4.3B, Aflac U.S. $3.6B, Corporate and Other $583M (segment total $8.48B).</div>
+  <div class="seg-bar">
+    <div style="flex:50.7;background:#4FA3D9;">JAPAN 50.7%</div>
+    <div style="flex:42.4;background:#3b82f6;">U.S. 42.4%</div>
+    <div style="flex:6.9;background:#a78bfa;">CORP 6.9%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4FA3D9;"></span> Aflac Japan — $4.3B (1H26)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Aflac U.S. — $3.6B (1H26)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Corporate &amp; Other — $583M (1H26)</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #4FA3D9;" >
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Aflac Japan</div>
+        <span class="biz-badge dominant">LARGEST JAPANESE CANCER &amp; MEDICAL INSURER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4.3B</div><div class="biz-stat-label">1H26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−3.7%</div><div class="biz-stat-label">Q2 NEP (yen)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">34.3%</div><div class="biz-stat-label">Pretax Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">50.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Aflac Japan sells cancer, medical, nursing-care and whole-life policies and is described in the FY2025 10-K as <strong>the largest insurer in Japan for cancer and medical policies</strong>, with <strong>over 22 million individual policies in force</strong> including roughly <strong>14 million cancer policies</strong> and <strong>¥1.18 trillion of annualised premium in force</strong> at end-2025.
+      In Q2 2026 <span class="tip" title="Net earned premium — premium revenue actually earned in the period after reinsurance cessions">net earned premium</span> (NEP) was <strong>¥245.1 billion, down 3.7% in yen</strong> and <strong>down 12.7% in dollars</strong>; total adjusted revenue was ¥344.6 billion (−3.6% in yen). Pretax adjusted earnings were <strong>¥118.2 billion, up 3.4% as reported but down 2.1% currency-neutral</strong> — the reported gain came from the segment's own accounting, not from volume.
+      The <span class="tip" title="Benefit ratio — policy benefits and claims paid expressed as a percentage of premium revenue; the supplemental insurer's equivalent of a loss ratio">benefit ratio</span> improved 250 basis points to <strong>64.0%</strong> from 66.5%, and the expense ratio improved 40bp to <strong>20.2%</strong>, together lifting the pretax margin to 34.3% from 32.0%. Premium persistency slipped to 92.7% from 93.7%.
+      Here is the arithmetic that matters: at the Q2 average rate of ¥159.45/$, Japan's ¥245.1bn of NEP converts to roughly <strong>$1.54 billion — level with Aflac U.S.'s $1.539 billion</strong> — yet Japan's ¥118.2bn of pretax earnings converts to about <strong>$741 million, roughly double the U.S. segment's $370 million</strong>. Same premium base, twice the profit.
+      Product strategy is now openly demographic. With Japan's population shrinking and ageing, management is pushing first-sector savings-type cover to reach younger buyers: <strong>Tsumitasu</strong> (savings) is running at about <strong>20% of total Japan sales</strong> with attached cancer/medical sales "largely exceeding" the 25% target; <strong>Miraito</strong> (cancer) launched in 2025 and is driving elevated lapse-and-reissue; <strong>Anshin Palette</strong> (medical) launched December 2025. Q2 Japan sales fell 5.6% to ¥19.6 billion against the Miraito launch comparison, but first-half sales were <strong>up 7% year over year</strong>.
+    </div>
+    <div class="biz-tam"><strong>Market context:</strong> Japan life/health — mature and contracting by headcount; Aflac's ¥1.18T annualised premium in force sits on 22M+ policies. Segment TAM growth is negative on population and positive only on mix and price.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Japan Post Insurance</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">Partner</div><div class="comp-bubble-label">Relationship</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Distribution partner and, since 31 Mar 2026, Aflac Re Bermuda's first external reinsurance counterparty. Market-share and revenue figures not sourced.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Manulife Financial (MFC)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$69.04B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$22.95B</div><div class="comp-bubble-label">Revenue</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Largest name in the Insurance — Life group; substantial Asian life franchise. Share of Japan supplemental not disclosed.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Prudential plc (PUK)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$35.14B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$14.43B</div><div class="comp-bubble-label">Revenue</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Asia-focused life insurer. Not a direct Japanese cancer-insurance competitor; included as an Asia-exposure comparable.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Aflac U.S.</div>
+        <span class="biz-badge growth">GROWING — WORKSITE &amp; GROUP EXPANSION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3.6B</div><div class="biz-stat-label">1H26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+2.3%</div><div class="biz-stat-label">Q2 NEP Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.9%</div><div class="biz-stat-label">Pretax Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      Aflac U.S. sells accident, disability, cancer, critical illness, hospital indemnity, dental, vision and life products, distributed overwhelmingly through <span class="tip" title="Worksite distribution — selling voluntary insurance to employees at their place of work, with premiums collected through employer payroll deduction">worksite distribution</span> (voluntary benefits offered through the employer and paid by payroll deduction) via a career agency force plus a broker channel.
+      Q2 2026 NEP was <strong>$1.539 billion, up 2.3%</strong>; total adjusted revenue $1.771 billion, up 2.5%; sales $349 million, up 2.6%. Pretax adjusted earnings fell <strong>4.6% to $370 million</strong> and the pretax margin compressed to <strong>20.9% from 22.5%</strong>, because the <span class="tip" title="Benefit ratio — policy benefits and claims paid as a percentage of premium revenue">benefit ratio</span> deteriorated <strong>220bp to 49.5%</strong> from 47.3%. The expense ratio improved marginally to 36.1% from 36.3% and persistency edged up to 79.4%.
+      Note the structural contrast with Japan: the U.S. book runs a <em>lower</em> benefit ratio (49.5% vs 64.0%) but a far <em>higher</em> expense ratio (36.1% vs 20.2%) — U.S. supplemental is an acquisition-cost-heavy, agent-intensive business, and that is why the same premium dollar earns roughly half as much pretax profit as it does in Japan.
+      Growth is coming from the newer product lines rather than the legacy individual book: <strong>dental and vision sales rose 47%</strong> in Q2, "heavily driven by our agency force"; group life, absence and disability (PLADS) combined with dental/vision grew 7.1%; and management reported <strong>$1.07 of voluntary-benefit sales generated per $1.00 of dental/vision sales</strong> — "better than we ever expected." Management now expects 2026 growth "just below" the 3–6% CAGR guidance range, with a second half "heavily weighted in the fourth quarter due to seasonality."
+    </div>
+    <div class="biz-tam"><strong>Market context:</strong> US voluntary/supplemental benefits — growth tied to employment, employer benefit budgets and rising major-medical deductibles. TAM figure not sourced; treat any specific number as unverified.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Unum Group (UNM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$14.29B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">The closest US worksite/voluntary-benefits competitor. CompaniesMarketCap shows $14.73B on a separate date.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Globe Life (GL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$13.87B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Agent-distributed life and supplemental health; overlaps in the individual supplemental channel.</div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">The Cigna Group (CI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$73.24B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Far larger health carrier; competes for the employer benefits wallet including supplemental and dental/vision.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Corporate &amp; Other — including Aflac Re Bermuda</div>
+        <span class="biz-badge emerging">EMERGING — GROWING SHARE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$583M</div><div class="biz-stat-label">1H26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−$10M</div><div class="biz-stat-label">1H26 Pretax</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/a</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <div class="biz-desc">
+      The Corporate and Other line carries group investments, financing and the captive reinsurer <strong>Aflac Re Bermuda</strong>. This is the newest lever in the story. On the Q2 call management disclosed that internal reinsurance capacity has been expanded from <strong>10% of US GAAP assets to 30% of FSA reserves</strong> — off a <strong>¥10.8 trillion</strong> reserve base — which they said will "allow us to continue to reduce risk, improve balance sheet efficiency and ultimately generate a higher ROE."
+      On <strong>31 March 2026</strong> Aflac Re Bermuda announced its <strong>first external transaction</strong>, coinsuring a block of whole-life annuities from <strong>Japan Post Insurance</strong>, with Japan Post retaining servicing. CFO Brodén called it "a significant milestone… the first transaction with an external party"; Aflac Re president Tsana Nobles said they "look forward to leveraging our expertise to provide similar support for other Japanese life insurers." Management frames third-party reinsurance as a lumpy, annual-cycle business that will become "a very, very good supplemental business" without overtaking the primary Japan and U.S. operations.
+    </div>
+    <div class="biz-tam"><strong>Market context:</strong> Japanese life reinsurance / balance-sheet optimisation. Reserve base referenced by management: <strong>¥10.8 trillion</strong> FSA reserves at Aflac Japan, against which up to 30% may now be internally reinsured.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Third-party Japanese life reinsurers</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/a</div><div class="comp-bubble-label">Revenue</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">Competitor set for external Japanese life reinsurance was not identified by any source fetched; no figures asserted.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">#1 JAPAN CANCER &amp; MEDICAL</span>
+    <span class="moat-pill">22M+ JAPAN POLICIES IN FORCE</span>
+    <span class="moat-pill">92.7% JAPAN PERSISTENCY</span>
+    <span class="moat-pill">¥1.18T PREMIUM IN FORCE</span>
+    <span class="moat-pill">43-YEAR DIVIDEND STREAK</span>
+    <span class="moat-pill">WORKSITE AGENCY FORCE</span>
+    <span class="moat-pill">RBC &gt;600% · ESR 226%</span>
+  </div>
+  <div class="prose" style="margin-top:24px;">
+    <p>Aflac's moat is distribution plus incumbency in a product category almost nobody else built. In Japan it has spent decades assembling the country's largest cancer and medical book — 22 million-plus individual policies, roughly 14 million of them cancer policies, ¥1.18 trillion of annualised premium in force — sold through bank, post-office and agency channels that took years to license and populate. Persistency of <strong>92.7%</strong> means the block renews almost automatically; a benefit ratio of <strong>64.0%</strong> against an expense ratio of <strong>20.2%</strong> leaves a <strong>34.3% pretax margin</strong>, which is extraordinary for any insurance operation and reflects both underwriting experience on a claims history no competitor possesses and a cost base amortised over an enormous in-force book. In the US the equivalent asset is the worksite agency force and the employer relationships it sits inside: once Aflac is on the payroll-deduction menu at an employer, adding dental, vision or group disability is incremental, which is exactly what the <strong>$1.07 of voluntary-benefit sales per $1.00 of dental/vision sales</strong> statistic measures. Capital strength reinforces it — <span class="tip" title="Risk-Based Capital ratio — US regulatory measure of capital adequacy">RBC</span> above 600%, Japanese <span class="tip" title="Economic Solvency Ratio — Japan's economic-value-based regulatory capital measure">ESR</span> of 226% (240% with the undertaking-specific parameter), adjusted leverage 21.8%, $3.3 billion of unencumbered liquidity against a $1 billion minimum — and it funds a 43-year run of dividend increases that anchors a large income shareholder base.</p>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 8px;">Key Vulnerabilities</div>
+  <div class="prose">
+    <p style="margin-top:14px;"><strong>1. Japanese demographics are a one-way structural headwind.</strong> Two-thirds of pretax profit comes from a country whose population is shrinking and ageing. The evidence is in the numbers already: Japan net earned premium fell <strong>3.7% in yen</strong> in Q2 2026 — that is the local-currency, currency-neutral decline, so it is real volume and mix, not translation. Persistency also slipped, from 93.7% to 92.7%. Management's response is to sell savings-type first-sector products (Tsumitasu, ~20% of sales) to reach younger buyers, which is a different, lower-margin business than the cancer franchise it is meant to backfill.</p>
+    <p style="margin-top:14px;"><strong>2. Currency translation swamps operating performance.</strong> Earnings are generated in yen and reported in dollars. The Q2 average rate of ¥159.45 was <strong>9.3% weaker</strong> than the prior year's ¥144.60, which turned a 3.7% yen NEP decline into a <strong>12.7% dollar decline</strong> and knocked <strong>$0.05</strong> off adjusted EPS. Adjusted EPS fell 1.7% as reported but rose 1.1% excluding FX. Reported dollar results can therefore move materially with nothing operational changing in either direction.</p>
+    <p style="margin-top:14px;"><strong>3. US margin compression.</strong> The US benefit ratio deteriorated <strong>220 basis points to 49.5%</strong> in Q2, pushing pretax earnings down 4.6% and the pretax margin from 22.5% to 20.9% despite premium growth of 2.3%. Growth guidance was also trimmed to "just below" the 3–6% CAGR range. The growth half of the company is currently the margin-losing half.</p>
+    <p style="margin-top:14px;"><strong>4. Investment portfolio composition and reinvestment risk.</strong> A supplemental insurer with very long-dated yen liabilities cannot fund them with plain yen government bonds at acceptable yields, so the portfolio reaches into US private credit, middle-market loans and commercial real estate. Adjusted net investment income fell <strong>9.6% to $937 million</strong> in Q2. Management repositioned <strong>$4.8 billion (about 5% of the portfolio)</strong> via switch trades in the quarter for roughly <strong>$50 million</strong> of annualised NII benefit, and booked <strong>$11 million</strong> of US statutory impairments plus <strong>¥15.8 billion</strong> of securities impairments on a Japan FSA basis. That is small in context but it is a live line item, not a theoretical one.</p>
+  </div>
+</div>
+
+<!-- ============ 04 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <div class="prose" style="margin-bottom:8px;">Comparison columns: <strong>Industry Avg</strong> = StockAnalysis "Insurance — Life" industry group (18 stocks, $339.27B combined market cap). <strong>S&amp;P 500</strong> = index-level figures where a live source was available; cells marked <em>n/a</em> could not be verified and are deliberately left empty rather than estimated.</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>AFL</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-earnings ratio — share price divided by trailing twelve-month earnings per share">Trailing P/E</span></td>
+        <td style="color:var(--green);">12.44</td><td>13.82</td><td>29.47</td>
+        <td>$116.52 ÷ $9.37 TTM EPS. Cheaper than both the life-insurance group and the index — but the E is flattered by prior-year investment marks.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Forward price-to-earnings — share price divided by the consensus estimate of next twelve months' earnings per share">Forward P/E</span></td>
+        <td style="color:var(--green);">15.96</td><td>n/a</td><td>26.27</td>
+        <td>Forward multiple is <em>higher</em> than trailing because consensus 2026 EPS ($7.02) is below TTM EPS ($9.37). S&amp;P forward figure is the Dec-2026 estimate.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/earnings-to-growth — the P/E ratio divided by the expected earnings growth rate">PEG Ratio</span></td>
+        <td style="color:var(--amber);">1.81</td><td>n/a</td><td>n/a</td>
+        <td>Above 1.0 — the low headline P/E is not paired with growth. No verified comparison available.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td>
+        <td>$9.37</td><td>—</td><td>—</td>
+        <td>Versus FY2025 diluted EPS of $6.82 and FY2024 of $9.63. FY2025 adjusted EPS was $7.49.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Year-over-year — change versus the same period one year earlier">Revenue Growth (YoY)</span></td>
+        <td style="color:var(--amber);">+13.57% TTM</td><td>n/a</td><td>n/a</td>
+        <td>FY2025 revenue was <em>−9.31%</em>; the positive TTM number is a rebound off that depressed base, not underlying premium growth (Japan NEP is negative in yen).</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Gross margin — revenue less cost of goods sold, as a percentage of revenue">Gross Margin</span></td>
+        <td style="color:var(--text-dim);">n/m</td><td>n/a</td><td>n/a</td>
+        <td><strong>n/m — not meaningful for a supplemental insurer.</strong> There is no cost of goods sold; use the benefit and expense ratios below instead. (Data provider shows 50.89% as a mechanical calculation; ignore it.)</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net profit margin — net income as a percentage of revenue">Net Profit Margin</span></td>
+        <td style="color:var(--green);">26.91%</td><td>9.13%</td><td>n/a</td>
+        <td>Nearly 3× the life-insurance group. Reflects Japan's 34.3% segment pretax margin.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Dividend yield — annual dividend per share divided by share price">Dividend Yield</span></td>
+        <td style="color:var(--green);">2.10%</td><td>2.06%</td><td>~1.13%</td>
+        <td>$2.44 annualised; Q3 2026 declared at $0.61. Payout ratio 26.04%; 43 consecutive years of increases. S&amp;P yield is a Jan-2026 reading.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Short interest — shares sold short as a percentage of shares outstanding or free float">Short Interest %</span></td>
+        <td style="color:var(--green);">2.21% of float</td><td>n/a</td><td>n/a</td>
+        <td>11.00M shares short, 2.19% of shares outstanding. Low — this is not a crowded short.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Debt-to-equity — total debt divided by shareholders' equity">Debt-to-Equity</span></td>
+        <td style="color:var(--green);">0.53</td><td>n/a</td><td>n/a</td>
+        <td>Adjusted leverage 21.8%, inside the 20–25% target. About 63% of debt is yen-denominated as a deliberate enterprise hedge. Interest coverage 24.91×.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current ratio — current assets divided by current liabilities">Current Ratio</span></td>
+        <td style="color:var(--text-dim);">n/m</td><td>n/a</td><td>n/a</td>
+        <td><strong>n/m — not meaningful for a supplemental insurer.</strong> Insurance balance sheets are not split into current and non-current in a comparable way; solvency measures (RBC &gt;600%, ESR 226%) are the right test. (Provider shows 0.89.)</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free cash flow — operating cash flow less capital expenditure">Free Cash Flow</span></td>
+        <td>$2.65B</td><td>—</td><td>—</td>
+        <td>Equal to operating cash flow. P/FCF 22.02×. Comfortably funds the $2.6B returned to shareholders in 1H26.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span></td>
+        <td style="color:var(--green);">16.91%</td><td>n/a</td><td>n/a</td>
+        <td>Q2 annualised GAAP ROE was 10.9%; annualised <em>adjusted</em> ROE excluding FX remeasurement was 16.6%. The gap is currency, not operations.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital — after-tax operating profit divided by total invested capital">ROIC</span></td>
+        <td style="color:var(--green);">11.14%</td><td>n/a</td><td>n/a</td>
+        <td>Management's stated rationale for expanding internal reinsurance is precisely to lift this.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Beta — sensitivity of the stock's returns to the overall market; 1.0 moves with the market">Beta</span></td>
+        <td style="color:var(--green);">0.60</td><td>n/a</td><td>1.00</td>
+        <td>5-year beta. Defensive on paper — but the yen is an uncorrelated risk factor beta does not capture.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$104.66 – $130.22</td><td>—</td><td>—</td>
+        <td>Close of $116.52 sits 11.3% above the low and 10.5% below the high. 52-week change +8.84%.</td>
+      </tr>
+      <tr style="background:rgba(79,163,217,0.05);">
+        <td colspan="5" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;padding-top:22px;">Supplemental-insurer metrics — carried in place of Gross Margin and Current Ratio. NOTE: a combined ratio is a property-and-casualty measure and is deliberately NOT used here.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Benefit ratio — policy benefits and claims paid expressed as a percentage of premium revenue">Benefit Ratio — Japan</span></td>
+        <td style="color:var(--green);">64.0%</td><td>n/a</td><td>n/a</td>
+        <td>Q2 2026 vs 66.5% a year earlier — a 250bp improvement. Lower is better: it means less of each premium yen goes out as claims.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Benefit ratio — policy benefits and claims paid expressed as a percentage of premium revenue">Benefit Ratio — U.S.</span></td>
+        <td style="color:var(--red);">49.5%</td><td>n/a</td><td>n/a</td>
+        <td>Q2 2026 vs 47.3% — a 220bp <em>deterioration</em>, and the direct cause of the US segment's earnings decline.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Expense ratio — operating and acquisition expenses as a percentage of premium revenue">Expense Ratio</span></td>
+        <td>JP 20.2% · US 36.1%</td><td>n/a</td><td>n/a</td>
+        <td>Both improved YoY (from 20.6% and 36.3%). The 16-point gap is the structural cost of US agent-led worksite distribution.</td>
+      </tr>
+      <tr>
+        <td>Pretax Profit Margin by Segment</td>
+        <td style="color:var(--green);">JP 34.3% · US 20.9%</td><td>n/a</td><td>n/a</td>
+        <td>Japan up from 32.0%, US down from 22.5%. The gap is why Japan produces ~2/3 of pretax profit on ~1/2 of revenue.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net earned premium — premium revenue actually earned in the period, after reinsurance cessions">Net Earned Premium</span> Growth</td>
+        <td style="color:var(--amber);">JP −3.7% (¥) / −12.7% ($) · US +2.3%</td><td>n/a</td><td>n/a</td>
+        <td>Q2 2026. Japan's yen decline is demographic and mix-driven; the extra 9 points of dollar decline is purely translation.</td>
+      </tr>
+      <tr>
+        <td>Adjusted Book Value / Share (ex-<span class="tip" title="Accumulated other comprehensive income — unrealised gains and losses on investments and currency translation, recorded in equity rather than through earnings">AOCI</span>)</td>
+        <td>$55.01</td><td>n/a</td><td>n/a</td>
+        <td>Vs $51.78 a year ago. <strong>Price-to-book on this basis: 2.12×</strong> ($116.52 ÷ $55.01), versus 1.93× on reported BVPS of $60.35. Excluding FX remeasurement as well, adjusted BVPS is $41.22 (2.83×).</td>
+      </tr>
+      <tr>
+        <td>Net Investment Income</td>
+        <td style="color:var(--red);">$937M (−9.6%)</td><td>n/a</td><td>n/a</td>
+        <td>Q2 2026 adjusted NII; 1H26 total $1.839B. The $4.8B switch-trade repositioning is expected to add ~$50M annualised.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 8px;">Notable One-Off Items</div>
+  <div class="prose">
+    <p>Aflac's headline <span class="tip" title="Generally Accepted Accounting Principles — the US financial reporting standard">GAAP</span> numbers are unusually noisy and several of them should not be read at face value.</p>
+    <p style="margin-top:12px;"><strong>The FY2025 collapse and the TTM rebound are the same item seen twice.</strong> FY2025 revenue fell 9.31% and diluted EPS fell 29.18% to $6.82, yet FY2025 <em>adjusted</em> earnings were $4.0 billion ($7.49 per share) versus $4.1 billion ($7.21) in 2024 — essentially flat per share. The reported swing is investment and currency remeasurement, not underwriting. The TTM EPS growth figure of <strong>+111.56%</strong> is the mirror image of that base effect and is meaningless as a growth rate.</p>
+    <p style="margin-top:12px;"><strong>Q2 2026 GAAP vs adjusted.</strong> Net earnings were $825 million ($1.63 per diluted share, against $1.11 a year earlier) while adjusted earnings were $883 million ($1.75, down 1.7%). GAAP rose while adjusted fell — the gap is again FX remeasurement and investment marks.</p>
+    <p style="margin-top:12px;"><strong>Currency.</strong> A negative <strong>$0.05</strong> per share of FX impact in Q2. Excluding it, adjusted EPS was $1.80, up 1.1%.</p>
+    <p style="margin-top:12px;"><strong>Portfolio repositioning.</strong> $4.8 billion of switch trades (~5% of the portfolio) executed in the quarter for ~$50 million of annualised net investment income and "minimal capital impact." Impairments: $11 million US statutory, $1 million of mortgage loan valuation allowance, and ¥15.8 billion on a Japan FSA basis — described by management as "well within our expectations."</p>
+    <p style="margin-top:12px;"><strong>Reinsurance.</strong> The Aflac Re Bermuda / Japan Post Insurance coinsurance deal effective 31 March 2026 is the first external transaction; no reserve amount was disclosed in the press release, so its earnings contribution cannot be quantified here.</p>
+  </div>
+</div>
+
+<!-- ============ 05 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value">HOLD</div>
+      <div class="card-note">15 analysts (StockAnalysis). MarketBeat separately shows Hold across 14 analysts.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$118.53</div>
+      <div class="card-note"><span style="color:var(--green);">+1.73%</span> versus the $116.52 close. MarketBeat's average is $116.62 — essentially the current price on either measure.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$99 – $138</div>
+      <div class="card-note">Low implies −15.0%, high implies +18.4%. A genuinely two-sided book.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">1 / 2 / 8 / 1 / 3</div>
+      <div class="card-note">Strong Buy / Buy / Hold / Sell / Strong Sell. Four of fifteen are negative — unusually heavy for a mega-cap-adjacent dividend name.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:6.7;background:var(--green);"></div>
+    <div style="flex:13.3;background:#4ade80;"></div>
+    <div style="flex:53.3;background:var(--amber);"></div>
+    <div style="flex:6.7;background:#f87171;"></div>
+    <div style="flex:20;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy 1 (6.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 2 (13.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold 8 (53.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f87171;"></span> Sell 1 (6.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Strong Sell 3 (20.0%)</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 12px;">Key Recent Analyst Calls</div>
+  <div class="prose">
+    <ul style="list-style:none;padding:0;">
+      <li style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--red);font-size:18px;line-height:1;">●</span><span><strong>Wolfe Research</strong> — Tracy Benguigui — <em>initiated</em> at <strong>Underperform</strong>, price target <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$103</span> (19 Aug 2026). The most bearish new voice on the name; the shares fell 3.81% that session to $116.51.</span></li>
+      <li style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><span><strong>Wells Fargo</strong> — Wesley Carmichael — <strong>Equal Weight</strong>, target raised <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$120 → $122</span> (19 Aug 2026).</span></li>
+      <li style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><span><strong>KBW</strong> — Ryan Krueger — <strong>Market Perform</strong>, target raised <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$120 → $125</span> (11 Aug 2026), following the Q2 print.</span></li>
+      <li style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><span><strong>JPMorgan Chase</strong> — Pablo Singzon — <strong>Neutral</strong>, target trimmed <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$117 → $116</span> (11 Aug 2026).</span></li>
+      <li style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><span><strong>Piper Sandler</strong> — Paul Newsome — reiterated <strong>Overweight</strong>, target raised <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$130 → $138</span> (10 Aug 2026) — the high end of the Street.</span></li>
+      <li style="display:flex;gap:12px;padding:10px 0;"><span style="color:var(--text-dim);font-size:18px;line-height:1;">●</span><span><em>Also on file (pre-Q2):</em> Barclays — Alex Scott — Sell, $98; Mizuho — Yaron Kinar — Sell, $112; Jefferies — Suneet Kamath — Hold, $108; UBS — Michael Ward, CFA — Hold, $124; Morgan Stanley — Bob Huang — Hold, $125; Bank of America — Joshua Shanker — Buy (no target listed).</span></li>
+    </ul>
+    <p style="margin-top:14px;font-size:13px;color:var(--text-dim);">Every call above was read from a fetched ratings page (MarketBeat for the August entries, StockAnalysis for the pre-Q2 list). No analyst name, firm or target has been inferred or estimated.</p>
+  </div>
+</div>
+
+<!-- ============ 06 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Mar 31, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Aflac Re Bermuda's first external reinsurance transaction</div>
+        <div class="tl-desc">Aflac Re Bermuda agreed to coinsure a block of whole-life annuities from Japan Post Insurance, with Japan Post retaining servicing and administration. CFO Max Brodén called it "a significant milestone… the first transaction with an external party," and Aflac Re president Tsana Nobles signalled intent to "provide similar support for other Japanese life insurers." No reserve amount was disclosed.</div>
+        <div class="tl-impact up">Structural opportunity — third-party reinsurance line established</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — Japan margin beat, US margin miss</div>
+        <div class="tl-desc">Total revenue $4.1bn (−1.0%); net earnings $825m ($1.63/sh); adjusted earnings $883m (−7.7%), adjusted EPS $1.75 (−1.7%, or $1.80 and +1.1% excluding FX). Japan's benefit ratio improved 250bp to 64.0% and its pretax margin rose to 34.3%; the US benefit ratio worsened 220bp to 49.5% and US pretax earnings fell 4.6%. $1.3bn returned to shareholders in the quarter.</div>
+        <div class="tl-impact neutral">Already reported — mixed reaction</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 10–11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-earnings target revisions split three ways</div>
+        <div class="tl-desc">Piper Sandler raised its Overweight target to $138, KBW lifted Market Perform to $125, and JPMorgan trimmed Neutral to $116 — all within 48 hours of each other. The dispersion is the story: the same quarter supports a $116 and a $138 target depending on how much credit the Japan margin gets.</div>
+        <div class="tl-impact neutral">Already reacted — consensus unchanged at Hold</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 19, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Wolfe Research initiates at Underperform, $103 — shares fall 3.81%</div>
+        <div class="tl-desc">Tracy Benguigui launched coverage with the Street's second-lowest target. AFL opened at $120.01, traded to a $116.01 low and closed at $116.51, a 3.81% decline on 2.77m shares — roughly double the recent average volume. The stock has not recovered that level since. The same day, Wells Fargo nudged its Equal Weight target up to $122 and the Q3 ex-dividend date passed.</div>
+        <div class="tl-impact down">Already reacted — −3.81% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 dividend payment — $0.61 per share</div>
+        <div class="tl-desc">Declared alongside Q2 results; ex-dividend date was 19 August 2026. Annualised $2.44 gives a 2.10% yield on a 26.04% payout ratio. Management has publicly committed to extending the 43-year streak of annual increases, which points to a further raise being declared with Q4 results.</div>
+        <div class="tl-impact up">Potential upside catalyst — dividend-growth streak intact</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">US seasonal selling season — the year's swing factor</div>
+        <div class="tl-desc">Management guided to a "stronger second half of the year, heavily weighted in the fourth quarter due to seasonality," while cutting full-year US growth expectations to "just below" the 3–6% CAGR range. Dental and vision sales rose 47% in Q2 and the group PLADS plus dental/vision block grew 7.1%; whether that carries into the enrolment season determines if the US segment re-rates or keeps compressing.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results</div>
+        <div class="tl-desc">Date not confirmed on any page fetched; the estimate follows the Aug 6 Q2 release cadence. The three things to watch: whether Japan's 64.0% benefit ratio holds, whether the US benefit ratio stops deteriorating from 49.5%, and the average yen rate — Q2 averaged ¥159.45 but the rate had strengthened to roughly ¥158 from ¥164 by the time of the call.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">AFL — 60 Monthly Closes, Sep 2021 → Aug 2026</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Monthly closing prices. Final point is the 28 Aug 2026 close of $116.52.</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF AUG 28, 2026</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin:14px 0 16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#4FA3D9;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>20-Day MA (≈1-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>50-Day MA (≈3-mo)</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>200-Day MA (≈10-mo)</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:6px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Plain English: RSI measures how one-sided recent price moves have been. Above 70 the stock has run hot and may be due a pause; below 30 it has been sold hard and may be due a bounce. Neither is a signal on its own.</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">AS OF AUG 28, 2026</div>
+    </div>
+    <div style="position:relative;width:100%;height:150px;margin-top:12px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <div class="prose" style="margin-top:32px;">
+    <p><strong>Five-year trajectory.</strong> AFL closed September 2021 at $52.13 and the last session of the window, 28 August 2026, at $116.52 — a <strong>price return of about +123.5%</strong> over five years, or roughly <strong>+149%</strong> on a dividend-adjusted basis. That is a genuinely strong run for a low-beta insurer, and almost all of it came in two bursts rather than steadily: the October 2022 to January 2023 rate-driven re-rating, and a sharp step up in the second half of 2024. Since roughly November 2024 the stock has been range-bound between the high $90s and the low $130s and has gone effectively nowhere for eighteen months, with the 52-week change of +8.84% flattering an essentially flat two-year picture.</p>
+    <p style="margin-top:14px;"><strong>Relative performance — an honest caveat.</strong> A live S&amp;P 500 total-return series could not be retrieved in this session, so no precise index-relative number is asserted here. What can be verified: the S&amp;P 500's trailing P/E stood at <strong>29.47</strong> on 28 August 2026 against AFL's <strong>12.44</strong>, and AFL's beta is <strong>0.60</strong> — the stock is priced and behaves as a defensive, well below index multiples. For historical context, a Barchart piece dated 1 December 2025 recorded AFL at −3.9% over the prior 52 weeks against the Nasdaq Composite's +21.1%, and +5.9% year-to-date in 2025 against the Nasdaq's +20.5% — those are stale figures nine months old and should not be read as current.</p>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle trough at $56.20</div>
+        <div class="tl-desc">The low of the five-year window on a monthly-close basis, reached during the broad 2022 rate-shock drawdown.</div>
+        <div class="tl-impact down">Monthly-close low of the period</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2022 – Jan 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate-driven re-rating: $56.20 → $73.50</div>
+        <div class="tl-desc">A four-month, roughly +31% move as higher reinvestment yields turned from a liability-discounting problem into an earnings tailwind for life insurers.</div>
+        <div class="tl-impact up">Strongest sustained advance of the period</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Step change: $95.38 → $110.36 in a single month</div>
+        <div class="tl-desc">A +15.7% monthly gain — the largest one-month move in the window — that reset the trading range roughly $15 higher and has framed the stock ever since.</div>
+        <div class="tl-impact up">+15.7% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov–Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Give-back from the highs: $114.00 → $103.44</div>
+        <div class="tl-desc">A −9.3% December unwound most of the autumn advance and began the long sideways range that has persisted since.</div>
+        <div class="tl-impact down">−9.3% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Range low at $99.36</div>
+        <div class="tl-desc">The last visit below $100 on a monthly close. The 52-week low of $104.66 was set later, so this marks the bottom of the current multi-year range.</div>
+        <div class="tl-impact down">Bottom of the current range</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Range high — monthly close of $127.48</div>
+        <div class="tl-desc">The best monthly close of the five years, within reach of the $130.22 52-week intraday high. From here the stock gave back roughly 8.6% into late August.</div>
+        <div class="tl-impact up">Best monthly close of the window</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 19, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Wolfe Research initiation knocks 3.81% off in a session</div>
+        <div class="tl-desc">Opened $120.01, closed $116.51 on 2.77m shares. The stock has traded in a tight $116–$118 band for the seven sessions since, closing the month at $116.52 — the exact level the initiation drove it to.</div>
+        <div class="tl-impact down">−3.81% single-session</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 08 ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying a 34.3%-pretax-margin Japanese franchise — the country's largest cancer and medical insurer, 22 million-plus policies, 92.7% persistency — at 12.44× trailing earnings and 2.12× adjusted book excluding AOCI, while the index trades at 29.47×. The Japan benefit ratio improved 250bp year over year, adjusted EPS <em>rose</em> 1.1% excluding currency, and management is shrinking the share count 5.75% a year on top of a 2.10% yield and a 43-year dividend-increase record. The reinsurance option is free: capacity was just expanded to 30% of a ¥10.8 trillion FSA reserve base, the first external deal is signed, and management says it is explicitly aimed at lifting ROE.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Two-thirds of pretax profit comes from a shrinking, ageing country, and Japan's net earned premium is already falling <strong>3.7% in yen</strong> — that decline is real volume, not translation. The growth half of the business is losing margin: the US benefit ratio deteriorated 220bp, pretax earnings fell 4.6%, and guidance was cut to "just below" the 3–6% range. Net investment income fell 9.6%. Consensus 2026 EPS of $7.02 is 25% below TTM EPS of $9.37, which is why the forward P/E (15.96) is <em>higher</em> than the trailing (12.44) — the cheapness is partly an accounting artefact. Four of fifteen analysts are outright negative and Wolfe Research initiated at $103.</p>
+    </div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin:32px 0 8px;">Top 3 Risks</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><span><strong>Japanese demographic decline.</strong> Japan NEP is down 3.7% in yen with persistency slipping from 93.7% to 92.7%. Aflac's answer — savings-type first-sector products like Tsumitasu, now ~20% of Japan sales — reaches younger buyers but is structurally a lower-margin product than the 14-million-policy cancer book it is meant to backfill. If mix shift accelerates, the 34.3% Japan pretax margin is not a permanent feature.</span></div>
+    <div class="risk-item"><span class="risk-num">02</span><span><strong>Yen translation and hedge basis.</strong> The Q2 average of ¥159.45 was 9.3% weaker year over year and cost $0.05 of adjusted EPS, turning a −3.7% yen premium decline into −12.7% in dollars. Management hedges economically — roughly 63% of group debt is yen-denominated and hedges are set on "a very long-term view" — which protects the dollar value of the Japanese business but does not protect the reported quarterly earnings line. Reported results can miss on currency alone.</span></div>
+    <div class="risk-item"><span class="risk-num">03</span><span><strong>Investment portfolio and net investment income.</strong> Long-dated yen liabilities push the portfolio into US private credit, middle-market loans and commercial real estate rather than domestic government bonds. Adjusted NII fell 9.6% to $937m in Q2 even after $4.8bn of switch trades booked for ~$50m of annualised benefit, and impairments ran at $11m US statutory plus ¥15.8bn on the Japan FSA basis. Credit deterioration in that reach-for-yield sleeve would hit both earnings and regulatory capital.</span></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Japan's Demographics Are the Constraint</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">Aflac's profit centre sits inside a shrinking, ageing customer base, and the effect is already visible in reported numbers rather than in projections. Japan net earned premium fell <strong>3.7% in yen</strong> in Q2 2026 — currency-neutral, so genuinely fewer or smaller policies — and premium persistency fell from 93.7% to 92.7%. The in-force book remains vast (<strong>22m+ policies, ~14m cancer policies, ¥1.18tn of annualised premium</strong>), which is precisely why margins are so high and why the decline is slow. But the direction is set. The company's counter is to change what it sells: <strong>Tsumitasu</strong>, a first-sector savings product now running at about <strong>20% of Japan sales</strong>, explicitly targets younger buyers, with cancer and medical attachment "largely exceeding" the 25% target; <strong>Miraito</strong> (cancer, 2025) and <strong>Anshin Palette</strong> (medical, December 2025) refresh the core. First-half Japan sales were <strong>up 7%</strong> even though Q2 fell 5.6% against the Miraito launch comparison.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">The Yen Moves the P&amp;L Without Anything Happening</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">Aflac earns in yen and reports in dollars, so the exchange rate is an earnings input in its own right. In Q2 2026 the yen averaged <strong>¥159.45</strong> against <strong>¥144.60</strong> a year earlier — <strong>9.3% weaker</strong> — which is the entire difference between Japan NEP falling 3.7% (yen) and 12.7% (dollars), and it cost <strong>$0.05</strong> of adjusted EPS. Adjusted EPS was $1.75, down 1.7%; excluding FX it was <strong>$1.80, up 1.1%</strong>. The hedge is structural rather than transactional: roughly <strong>63% of group debt is yen-denominated</strong>, an "intentional" enterprise hedge designed to protect the dollar economic value of Aflac Japan, and CFO Brodén described the hedges as taking "a very long-term view" that makes 4% near-term swings "quite minor." Note what that does and does not do — it defends the balance sheet, not the quarterly earnings line. It also shows up in book value: adjusted book value per share excluding AOCI is <strong>$55.01</strong>, but excluding FX remeasurement as well it is <strong>$41.22</strong>, so price-to-book is 1.93×, 2.12× or 2.83× depending which currency effects you strip out.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-size:17px;font-weight:700;color:#fff;">Reinsurance and the Portfolio — Where Bull and Bear Actually Divide</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note" style="font-size:14px;line-height:1.75;">Two things are happening on the balance sheet at once, and how you weigh them decides the stock. On the constructive side, internal reinsurance capacity has been expanded from 10% of US GAAP assets to <strong>30% of FSA reserves on a ¥10.8 trillion base</strong>, which management says will "reduce risk, improve balance sheet efficiency and ultimately generate a higher ROE," and Aflac Re Bermuda closed its <strong>first external deal</strong> — Japan Post Insurance whole-life annuities, effective 31 March 2026 — opening a third-party line management expects to become "a very, very good supplemental business." On the cautious side, funding very long-dated yen liabilities has pushed the investment portfolio into US private credit, middle-market loans and commercial real estate; adjusted net investment income still fell <strong>9.6% to $937m</strong>, and the quarter's <strong>$4.8bn (≈5% of portfolio)</strong> of switch trades bought only about <strong>$50m</strong> of annualised income. <strong>Bull:</strong> a cheap, over-capitalised (RBC &gt;600%, ESR 226%) insurer converting balance-sheet slack into ROE and buybacks. <strong>Bear:</strong> a shrinking core franchise using financial engineering and a reach-for-yield portfolio to hold EPS flat, with consensus 2026 EPS of $7.02 telling you the market does not believe the trailing $9.37.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of August 28, 2026 (last market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:14px;max-width:900px;margin-left:auto;margin-right:auto;">Sources actually fetched for this report: StockAnalysis.com (AFL overview, statistics, financials, forecast, ratings, price history, and Insurance — Life industry page) for price, valuation, ratios and consensus; Digrin.com for the 60-month price series used in the chart; Aflac Incorporated investor relations (Q2 2026 earnings press release and the Aflac Re Bermuda / Japan Post Insurance release) and the Q2 2026 earnings-release PDF on the company's filing host for all segment, benefit-ratio, expense-ratio, premium, book-value and currency figures; The Motley Fool's Q2 2026 earnings-call transcript for management commentary on hedging, portfolio repositioning, Japanese product strategy and reinsurance capacity; MarketBeat for the August 2026 named analyst actions; CompaniesMarketCap.com for the global market-cap rank and peer market caps; TradingView's summary of Aflac's FY2025 SEC 10-K for policies-in-force and market-position statements; GuruFocus for the S&amp;P 500 trailing and forward P/E; InvestSnips for the S&amp;P 500 dividend yield (a January 2026 reading); Barchart (1 December 2025) for the historical index-relative figures explicitly flagged as stale.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Explicitly not verified and therefore not asserted: institutional holder names and stakes; Aflac's US and NYSE market-cap ranks (shown as order-of-magnitude estimates); competitor market shares and total addressable market sizes; a current S&amp;P 500 total-return series; and the Q3 2026 earnings date, which is an estimate based on the prior release cadence. Peer market capitalisations are drawn from two providers on slightly different dates and differ marginally as a result. Gross Margin and Current Ratio are shown as "n/m — not meaningful for a supplemental insurer"; a combined ratio is a property-and-casualty measure and is deliberately not used anywhere in this report.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This document is for information and education only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. Insurance-company accounting is unusually sensitive to currency and investment marks; figures presented as GAAP, adjusted, yen and dollar are not interchangeable. Do your own research and consult a licensed adviser before acting. The author may hold positions in securities mentioned.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — AFL monthly closes, Sep 2021 through Aug 2026 =====
+// Sep 2021 - Jul 2026: monthly closing prices (Digrin, real/unadjusted).
+// Aug 2026 final point = 28 Aug 2026 NYSE close of 116.52 (StockAnalysis price history).
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26'];
+const prices = [52.13,53.67,54.14,58.39,62.82,61.09,64.39,57.28,60.57,55.33,57.30,59.42,56.20,65.11,71.93,71.94,73.50,68.15,64.52,69.85,64.21,69.80,72.34,74.57,76.75,78.11,82.71,82.50,84.34,80.74,85.86,83.65,89.87,89.31,95.38,110.36,111.80,104.79,114.00,103.44,107.38,109.47,111.19,108.68,103.54,105.46,99.36,106.86,111.70,107.19,110.31,110.27,110.95,112.93,109.71,113.67,112.42,117.25,127.48,116.52];
+
+function sma(data, w) {
+  return data.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += data[j];
+    return +(s / w).toFixed(2);
+  });
+}
+
+function computeRSI(data, period) {
+  var out = new Array(data.length).fill(null);
+  if (data.length <= period) return out;
+  var gains = 0, losses = 0;
+  for (var i = 1; i <= period; i++) {
+    var d = data[i] - data[i - 1];
+    if (d >= 0) gains += d; else losses -= d;
+  }
+  var ag = gains / period, al = losses / period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var k = period + 1; k < data.length; k++) {
+    var ch = data[k] - data[k - 1];
+    var g = ch > 0 ? ch : 0, l = ch < 0 ? -ch : 0;
+    ag = (ag * (period - 1) + g) / period;
+    al = (al * (period - 1) + l) / period;
+    out[k] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const ma20 = sma(prices, 1);
+const ma50 = sma(prices, 3);
+const ma200 = sma(prices, 10);
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — cycle trough $56.20', color: '#ef4444' },
+  { idx: 16, label: 'Jan 2023 — rate re-rating peak $73.50', color: '#22c55e' },
+  { idx: 35, label: 'Aug 2024 — +15.7% step change to $110.36', color: '#22c55e' },
+  { idx: 39, label: 'Dec 2024 — give-back to $103.44', color: '#ef4444' },
+  { idx: 46, label: 'Jul 2025 — range low $99.36', color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — best monthly close $127.48', color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — Wolfe initiation, close $116.52', color: '#f59e0b' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ptRadius = prices.map(function(_, i) { return eventMap[i] ? 6 : 0; });
+const ptColors = prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : 'rgba(0,0,0,0)'; });
+
+const pc = document.getElementById('priceChart').getContext('2d');
+const grad = pc.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(79,163,217,0.20)');
+grad.addColorStop(1, 'rgba(79,163,217,0)');
+
+new Chart(pc, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Price', data: prices, borderColor: '#4FA3D9', backgroundColor: grad, borderWidth: 2, fill: true, tension: 0.25,
+        pointRadius: ptRadius, pointBackgroundColor: ptColors, pointBorderColor: ptColors, pointHoverRadius: 8 },
+      { label: '20-Day MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [4, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '50-Day MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [6, 4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '200-Day MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [8, 5], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: 'JetBrains Mono', size: 12 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.parsed.y === null) return null;
+            return ctx.dataset.label + ': $' + ctx.parsed.y.toFixed(2);
+          },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? '● ' + e.label : '';
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+const rsi = computeRSI(prices, 6);
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [{ label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 1.8, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: 'JetBrains Mono', size: 12 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        callbacks: { label: function(ctx) { return ctx.parsed.y === null ? null : 'RSI: ' + ctx.parsed.y.toFixed(1); } }
+      }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.8 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: 'JetBrains Mono', size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
