@@ -15,6 +15,7 @@ Static site for The Tilted Gent (TTG): finance/risk education with a Las Vegas p
 - `ttg-mark-neon.svg` — card + monogram only, square (nav, about, footer, avatars)
 - `ttg-favicon.svg` — simplified: heavier gold frame, no glow, black rounded square
 - `ttg-og.png` — 1200×630 social card (neon lockup on black)
+- `favicon-32.png`, `apple-touch-icon.png` (180×180) — raster fallbacks rendered from `ttg-favicon.svg`; the SVG stays the primary icon
 
 **Palette** (CSS custom properties on the chrome pages):
 `--bg #070607 · --bg2 #0D0A0B · --card #131011 · --line #2B2225 · --cream #F1E6CF · --dim #9C9189 · --gold #D9A85C · --gold-hi #FFD57A · --gold-deep #B8863E · --red #E0384F · --red-neon #FF5C70 · --red-deep #7F1122 · --green #3FA46A`
