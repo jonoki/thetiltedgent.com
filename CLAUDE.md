@@ -17,10 +17,14 @@ Static site for The Tilted Gent (TTG): finance/risk education with a Las Vegas p
 - `ttg-og.png` — 1200×630 social card (neon lockup on black)
 - `favicon-32.png`, `apple-touch-icon.png` (180×180) — raster fallbacks rendered from `ttg-favicon.svg`; the SVG stays the primary icon
 
-**Palette** (CSS custom properties on the chrome pages):
-`--bg #070607 · --bg2 #0D0A0B · --card #131011 · --line #2B2225 · --cream #F1E6CF · --dim #9C9189 · --gold #D9A85C · --gold-hi #FFD57A · --gold-deep #B8863E · --red #E0384F · --red-neon #FF5C70 · --red-deep #7F1122 · --green #3FA46A`
+**Palette** ("Fremont Street", live since Sep 4 2026; CSS custom properties on the chrome pages, reference copy in `assets/palettes/fremont-street.css`):
+`--bg #06050B · --bg2 #0B0913 · --card #120E1C · --card2 #1A1428 · --line #2C2440 · --cream #F1E6CF · --dim #A399A6 · --dim2 #736A78 · --gold #D9A85C · --gold-hi #FFD57A · --gold-deep #B8863E · --pink #FF3E9A · --pink-neon #FF77C0 · --pink-deep #7A1449 · --cyan #1FCBE3 · --cyan-neon #6FF2FF · --cyan-deep #0A4F5C · --violet #7C4DFF · --violet-neon #B79CFF · --violet-deep #2E1A66 · --green #3FA46A · --red #E0384F · --red-neon #FF5C70`
 
-Glows: gold `0 0 14px rgba(255,201,94,.35), 0 0 40px rgba(255,201,94,.16)`; red `0 0 14px rgba(224,56,79,.55), 0 0 40px rgba(224,56,79,.25)`.
+Roles: gold is the brand and the only solid fill; pink is the emphasis (the one glowing phrase per heading, accent rules, first pillar bar), never data; cyan is the interactive tube (ghost buttons, play rings, secondary hovers, focus outline), never in a heading; violet lives only in gradients and shadow, never text; green/red are data only (up/down, win/bust). The logo keeps its crimson tube.
+
+Glows: gold `0 0 14px rgba(255,201,94,.35), 0 0 40px rgba(255,201,94,.16)`; pink `0 0 14px rgba(255,62,154,.55), 0 0 40px rgba(255,62,154,.25)`; cyan `0 0 14px rgba(31,203,227,.50), 0 0 40px rgba(31,203,227,.22)`.
+
+The previous palette (black, gold, crimson; Sep 3–4 2026) is archived at `assets/palettes/original-black-gold-crimson.css` with restore notes. Nav backgrounds are `rgba(6,5,11,…)`.
 
 **Type**: Cinzel 500/600/700 for display and the wordmark (matches the Roman caps of the logo), DM Sans 400/500/700 for body, JetBrains Mono 400/500/700 for kickers and data. Playfair Display was retired from the chrome pages. In the wordmark the word TILTED is an inline-block rotated −5° in `--gold-hi` — deliberate (the "tilt"), keep it.
 
