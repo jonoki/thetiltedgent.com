@@ -31,7 +31,7 @@ Glows: gold `0 0 14px rgba(255,201,94,.35), 0 0 40px rgba(255,201,94,.16)`; red 
 - `reports/index.html` — 189 report cards grouped by sector with filter chips (incl. Dow 30); brand chrome.
 - `reports/view.html` — iframe viewer (`view.html?r=aapl`) that loads `<ticker>_analysis.html` and removes the report's embedded `#tg-sitenav`; brand chrome.
 - `reports/*_analysis.html` — 189 self-contained tear-sheets (Playfair headings, Chart.js price chart, per-company accent). **These are documents, not chrome: leave their internal design alone.** Each embeds static data as of its own date, with a "Static data as of …" banner at the top. Eleven of them (aapl, amgn, bac, crwd, ge, ibm, lin, meta, nflx, pgr, unh) embed a `#tg-sitenav` block right after `<body>`; the rest have no site nav.
-- `brand.html` — brand board from before the final logo; stale.
+- `brand.html` — brand system reference (marks, palette tokens, type, wordmark rules, components, voice); brand chrome, `noindex`. Rebuilt Sep 4 2026.
 
 The three "chrome pages" are `index.html`, `reports/index.html`, `reports/view.html`.
 
