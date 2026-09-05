@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROP — Roper Technologies, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4DA6E8;
+  --accent-dim: #4DA6E833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">ROP</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software – Application</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $40.28B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #652</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#110 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Roper Technologies, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$407.28</div>
+      <div class="price-change">−$15.07 (−3.57%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · last completed market close</div>
+      <div class="price-date">After-hours: $423.14 (+$15.86, +3.89%) at 7:54 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Sarasota, Florida</div>
+    <div class="meta-item"><span>Employees:</span> 19,400</div>
+    <div class="meta-item"><span>Founded:</span> 1981 (IPO February 12, 1992)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 22, 2026</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Roper Technologies buys and holds niche vertical-market software companies — legal practice management, government project accounting, insurance distribution, freight brokerage networks, utility billing, autism-therapy practice software — alongside a smaller portfolio of technology-enabled products such as water meters, ultrasound accessories and surgical navigation systems. FY2025 revenue was <strong>$7,903M, up 12.3%</strong> from $7,039M in FY2024; the trailing-twelve-month figure through June 2026 is <strong>$8,280M, up 10.9%</strong>. At a $40.28B market capitalisation the company ranks roughly <strong>#652 globally</strong> — a rank that has fallen materially, because the stock is down <strong>22.3% over the past 52 weeks</strong> and the market cap is down <strong>28.6%</strong> once buybacks are netted out.</p>
+  <p class="prose" style="margin-top:16px;">The central debate is straightforward and it cuts both ways. Roper is a <strong>serial acquirer</strong>: it pays large multiples for small, sticky software businesses, records most of the price as goodwill and intangibles, and then amortises those intangibles through the income statement. That amortisation is a real accounting charge but not a recurring cash cost, so <span class="tip" title="Generally Accepted Accounting Principles — the standard U.S. financial reporting framework">GAAP</span> earnings genuinely understate the cash the portfolio throws off: FY2025 GAAP diluted <span class="tip" title="Earnings Per Share">EPS</span> was <strong>$14.20</strong> against adjusted diluted EPS of roughly <strong>$20.00</strong>, a gap of about $5.80 per share, or roughly $625M, that is dominated by amortisation of acquired intangibles. That is the bull's framing, and it is defensible. The bear's framing uses the same fact differently: <strong>organic revenue growth is only about 5–6%</strong>, so the difference between 6% and the 8–10% headline comes from buying other people's revenue with borrowed money. Net debt sits at <strong>3.4× EBITDA</strong>, goodwill and intangibles are <strong>87% of total assets</strong>, and <span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span> is <strong>6.66%</strong> — which is at or below most estimates of the company's cost of capital. Both statements are true simultaneously. Everything below is an attempt to weigh them.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Neil Hunn</div>
+      <div class="card-note">President and CEO (listed on stockanalysis.com's company profile as Laurence Neil Hunn, and named as President &amp; CEO on the Q2 2026 earnings call). Joined Roper in 2011, became CEO in 2018. Has pushed the portfolio decisively from industrial products toward vertical software, most visibly through the 2022 Indicor carve-out and the 2025 CentralReach and Subsplash deals. <strong>Verified</strong> from two independently fetched sources.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Jason Conley</div>
+      <div class="card-note">Executive Vice President and Chief Financial Officer (Jason P. Conley). Owner of the adjusted-<span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortization">EBITDA</span> / adjusted-DEPS / adjusted-free-cash-flow framing the company leads with, and of the leverage policy now steering capital toward de-leveraging rather than buybacks. <strong>Verified</strong> from the Q2 2026 call transcript and the company profile page.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">Specific institutional holders and stakes could not be retrieved from the sources fetched (the holders page returned an error) and are therefore <strong>not listed rather than estimated</strong>. What is verified: <strong>98.90M shares outstanding</strong>, down <strong>2.63% year over year</strong>, with 9.0M shares — about 8% of the count — repurchased for <strong>$3.2B</strong> in the first eight months of 2026.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Roper reports three segments. The mix below uses the <strong>six months ended June 30, 2026</strong> — the most recent verified segment disclosure — rather than a full year, because two of the three segments absorbed acquisitions mid-2025 and the half-year split is the cleaner read on where the company is now. Six-month revenue totalled <strong>$4,204.2M, up 9.9%</strong> year over year.</p>
+  <div class="seg-bar">
+    <div style="flex:56.4;background:#4DA6E8;">APPLICATION SOFTWARE 56.4%</div>
+    <div style="flex:20.4;background:#a78bfa;">NETWORK 20.4%</div>
+    <div style="flex:23.2;background:#f59e0b;">TEP 23.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4DA6E8;"></span> Application Software — $2,372.3M (H1 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Network Software — $858.5M (H1 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Technology Enabled Products — $973.4M (H1 2026)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note the shape of Q2 2026: total revenue growth of <strong>+9%</strong> decomposed into <strong>+5% organic</strong> and <strong>+3% from acquisitions</strong> (with rounding and currency making up the balance). That three-point wedge is the whole business model in one number — and it is a wedge that must be re-purchased every single year.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4DA6E8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Application Software</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,372.3M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+9.7%</div><div class="biz-stat-label">YoY (reported)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">56.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The core of the company: enterprise software sold into narrow professional verticals where Roper is often the one credible vendor. Deltek (government contractor project accounting), Vertafore (insurance agency management), Aderant (law firm practice management), PowerPlan (utility financial compliance), Frontline Education (K-12 school administration), and since April 2025 <strong>CentralReach</strong> (applied behaviour analysis therapy practice management). These are recurring-revenue, high-renewal, mission-critical systems of record — the customer's billing, compliance and payroll run through them, so switching is a multi-year project nobody wants to sponsor. Q2 2026 segment operating margin was <strong>27.4%</strong>; the six-month margin improved to <strong>27.1% from 26.4%</strong>. Management said on the Q2 call that CentralReach is running <strong>ahead of the deal model</strong> after a year of ownership and turns organic in the next quarter — meaning from Q3 2026 its growth starts counting against the organic number rather than the acquired one.</p>
+    <div class="biz-tam"><strong>TAM:</strong> Roper does not disclose segment market shares or addressable market sizes, and no third-party TAM estimate was verified from the sources fetched — so none is given here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Constellation Software (TSX:CSU)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">C$64.45B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">C$17.95B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+17.7%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Tyler Technologies</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Private equity sponsors</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">The real bidder</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Network Software</div>
+        <span class="biz-badge growth">HIGHEST MARGIN — SLOWEST ORGANIC</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$858.5M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+12.8%</div><div class="biz-stat-label">YoY (reported)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two-sided networks and data businesses where the asset is the participant list, not the code: DAT (freight matching between shippers and carriers), MHA (long-term-care pharmacy group purchasing), Foundry (media and entertainment software), ConstructConnect (construction project data), and since July 2025 <strong>Subsplash</strong> (church engagement, giving and streaming software). This is the most profitable segment in the company — <strong>41.0% operating margin in Q2 2026</strong> — because network businesses have almost no incremental cost of serving one more participant. It is also where the tension in the model is most visible: <strong>reported growth of 12.8% against organic growth of 4%</strong>, and a six-month operating margin that <em>fell</em> from <strong>44.1% to 40.8%</strong>. Management characterises Subsplash as a "faster growth business with lower but steadily improving margin profile" — an honest description of what dilutes a 44% margin toward 41%. The freight business inside DAT is also the most macro-exposed line Roper owns; a soft truckload market shows up here first.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> the segment absorbed Subsplash ($800.0M, July 25, 2025), Convoy/Flexport freight technology ($250.0M, July 30, 2025) and Outgo ($39.4M, May 15, 2025) inside twelve months. Margin dilution is the price of the growth wedge.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Descartes Systems</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Trimble / project44</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Technology Enabled Products</div>
+        <span class="biz-badge emerging">FASTEST ORGANIC — THE LEGACY THAT WORKS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$973.4M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+7.9%</div><div class="biz-stat-label">YoY (reported)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+7%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The remnant of the old industrial Roper, and the quiet embarrassment of the software story: it is the <strong>fastest-growing segment organically</strong>. Verathon (bladder scanners and video laryngoscopes), Neptune (water meters and utility metering networks), Northern Digital (surgical navigation measurement), CIVCO (medical imaging and radiotherapy accessories), plus Muni-Link (utility billing, acquired February 19, 2025 for $118.0M). These are razor-and-blade franchises — install a base of instruments, sell consumables and service against it forever. Q2 2026 operating margin was <strong>33.3%</strong>, but the six-month margin <em>fell from 35.2% to 32.9%</em>, the largest margin decline of the three segments, which deserves more attention than it usually gets in a story framed around software. Note the awkward fact for the thesis: the segment growing organically at 7% is the one with physical products and inventory, while the two software segments grew organically at 5% and 4%.</p>
+    <div class="biz-tam"><strong>TAM:</strong> not disclosed by segment; no verified third-party estimate available from the sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Danaher (DHR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$145.98B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Badger Meter (BMI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$3.84B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Xylem / Itron (metering)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">SYSTEM-OF-RECORD LOCK-IN</span>
+    <span class="moat-pill">NICHE VERTICAL SCALE</span>
+    <span class="moat-pill">RECURRING REVENUE BASE</span>
+    <span class="moat-pill">NEGATIVE WORKING CAPITAL</span>
+    <span class="moat-pill">CAPEX-LIGHT (0.6% OF SALES)</span>
+    <span class="moat-pill">DECENTRALISED OPERATING MODEL</span>
+    <span class="moat-pill">$5B+ M&amp;A CAPACITY</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The real moat operates at the level of the individual subsidiary, not the parent. A law firm running Aderant, a defence contractor running Deltek, an ABA therapy practice running CentralReach — each of these is a system of record that touches billing, compliance and payroll. Ripping it out means re-implementing a business process, retraining staff and risking a revenue interruption, for a piece of software that costs a rounding error relative to the firm's payroll. That is why these businesses renew at very high rates and can push price above inflation for years. Roper's contribution on top is deliberately light: it is a capital allocator, not an operator, and it says so. The financial signature of that model is unusual and genuinely attractive — <strong>capital expenditure of roughly $50M against $8.28B of revenue</strong> (operating cash flow $2.67B less free cash flow $2.62B, about <strong>0.6% of sales</strong>), a <span class="tip" title="Current assets divided by current liabilities — short-term liquidity">current ratio</span> of <strong>0.55</strong> because customers pay for software annually in advance, and <span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure — the cash generated after maintaining the asset base">free cash flow</span> of <strong>$2.62B, or 31.6% of revenue</strong>, equal to about <strong>81% of adjusted EBITDA</strong>. Deferred revenue funds the working capital; there is essentially no plant to maintain. Cash conversion of that quality is the single strongest argument that GAAP earnings understate the business.</p>
+  <p class="prose" style="margin-top:20px;">The honest counterweight: the moat protects the <em>installed base</em>, not the <em>growth rate</em>. A system of record that nobody leaves and nobody new adopts still produces 4–5% organic growth in perpetuity. Roper's compounding has never come from the software growing fast; it has come from buying more of it. That makes the moat a <em>durability</em> asset and the M&amp;A machine a <em>growth</em> asset — and only one of those is under the company's control.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The model requires perpetual M&amp;A, and M&amp;A requires a price.</strong> Organic growth of 5–6% versus reported growth of 8–10% means roughly a third of top-line growth is purchased. Management said on the Q2 2026 call that it has <strong>over $5B of annualised deployment capacity</strong> but that it is being "patient and disciplined" and expects deal activity to "break loose later this year and into 2027." Only <strong>two small bolt-ons totalling under $50M</strong> were completed in the first half of 2026 — against roughly <strong>$3.3B deployed in the first nine months of 2025</strong>. A capital allocator that cannot allocate capital is, temporarily, an ordinary 5%-growth software company with leverage.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Balance-sheet composition.</strong> At June 30, 2026: goodwill of <strong>$21,330.7M</strong> and other intangibles of <strong>$9,347.3M</strong> against total assets of <strong>$35,169.5M</strong> — <strong>87.2% of the balance sheet is purchase accounting</strong>. Shareholders' equity of roughly $18.6B (derived from the reported 0.61 <span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">debt-to-equity</span> ratio on $11,319.4M of debt) is therefore backed by <em>negative</em> tangible book value of roughly $12B. This is not inherently a scandal — it is what buying software companies looks like — but it means any impairment is an equity event, and it is why ROE of 13.07% sits on a denominator that is mostly other people's businesses at the price Roper paid.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Leverage at 3.4× in a higher-rate world.</strong> Net debt/EBITDA rose from <strong>3.1× at Q1 2026 to 3.4× at Q2 2026</strong> — largely because the company spent <strong>$1.2B on buybacks in Q2 alone</strong> at an average of about $341 per share. Management has now signalled a near-term preference for <strong>de-leveraging over buybacks</strong>. That is prudent, and it is also an admission: the same balance sheet cannot simultaneously fund $5B of acquisitions, a buyback and a lower leverage ratio.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>ROIC below plausible cost of capital.</strong> Reported ROIC is <strong>6.66%</strong>, against ROE of 13.07% and ROA of 4.23%. For a company whose entire identity is capital allocation, a mid-single-digit return on invested capital is the most uncomfortable number on the page. The defence — that ROIC is depressed by goodwill from deals still ramping, and that incremental deals earn far more than the blended average — is plausible and is exactly what Constellation Software's bulls say too. It is also unfalsifiable from outside the company.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">ROP column from stockanalysis.com statistics as of the September 4, 2026 close. <strong>The Industry Avg and NASDAQ-100 columns are approximations, not fetched from a single verified source, and are labelled (est.) throughout</strong> — directional context only, never a basis for a decision.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>ROP</th><th>App Software Avg (est.)</th><th>NASDAQ-100 (est.)</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--green);">17.13</td><td>~34 (est.)</td><td>~32 (est.)</td><td>$407.28 ÷ $23.77. <strong>Misleading.</strong> TTM EPS includes an $835M Indicor equity-investment gain; strip the $6.24/share excluded from Q2 adjusted DEPS and trailing P/E is roughly <strong>23×</strong> (calculated).</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--green);">17.32</td><td>~27 (est.)</td><td>~27 (est.)</td><td>Reported. Against the company's own FY2026 adjusted DEPS guidance of $22.15–$22.30 the multiple is <strong>18.3×</strong>; against 2026 consensus EPS of $22.22, also 18.3×.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--red);">2.39</td><td>~2.2 (est.)</td><td>~2.0 (est.)</td><td>The metric that says the quiet part: the multiple is not high, but neither is the growth. A serial acquirer's PEG is only as good as its next deal.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$23.77</td><td>—</td><td>—</td><td>GAAP, +67.0% YoY — almost entirely the Indicor gain. FY2025 GAAP EPS was $14.20 against ~$20.00 adjusted; that ~$5.80 gap is the amortisation argument in one line.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--amber);">+10.9%</td><td>~12% (est.)</td><td>~14% (est.)</td><td>TTM. Q2 2026 was +9% reported, of which <strong>+5% organic</strong> and +3% acquired. FY2026 guidance: 8%+ total, ~6% organic.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">69.53%</td><td>~72% (est.)</td><td>~55% (est.)</td><td>Software-like, dragged down slightly by the hardware in Technology Enabled Products. Stable across five years.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">30.24%</td><td>~15% (est.)</td><td>~15% (est.)</td><td>Flattered by the Indicor gain. FY2025 was 19.4% ($1,536M on $7,903M) — still strong, and still after a heavy amortisation charge.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">0.89%</td><td>~0.5% (est.)</td><td>~0.8% (est.)</td><td>$3.64 annualised, payout ratio 15.31%, ex-dividend October 2, 2026. Roper is a long-running dividend grower; capital return is secondary to M&amp;A by design.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--red);">5.19% of shares<br>5.21% of float</td><td>~2.5% (est.)</td><td>~2% (est.)</td><td>5.13M shares short. Elevated for a defensive compounder — consistent with a market actively questioning the model, not just the price.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--amber);">0.61</td><td>~0.5 (est.)</td><td>~0.8 (est.)</td><td>$11.32B debt vs $364.9M cash. Optically fine — but the equity denominator is 87% goodwill and intangibles. <strong>Net debt/EBITDA of 3.4× is the number that matters.</strong></td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--amber);">0.55</td><td>~1.4 (est.)</td><td>~1.5 (est.)</td><td>Below 1.0 and that is a <em>feature</em>: deferred revenue from annual software prepayments sits in current liabilities. Negative working capital funds growth.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--green);">$2.62B</td><td>—</td><td>—</td><td>TTM; operating cash flow $2.67B, so capex is ~$50M (0.6% of revenue). FCF is <strong>31.6% of revenue</strong> and ~<strong>81% of EBITDA</strong>. This is the cash-economics evidence.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--red);">13.07%</td><td>~22% (est.)</td><td>~22% (est.)</td><td>And this is on Indicor-inflated earnings. On FY2025 net income the figure would be roughly 8%. The equity base is swollen with acquisition goodwill.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--red);">6.66%</td><td>~15% (est.)</td><td>~18% (est.)</td><td><strong>The most important number on this table.</strong> Below most estimates of Roper's cost of capital. If the deals do not earn more than this at the margin, the compounding thesis is arithmetic, not economics.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--green);">0.75</td><td>~1.1 (est.)</td><td>~1.15 (est.)</td><td>Genuinely defensive on a five-year measure. Note that a low beta did not prevent a 45% peak-to-trough drawdown — beta measures co-movement, not risk of loss.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$305.96 – $530.00</td><td>—</td><td>—</td><td>$407.28 sits 45% of the way up the range. 52-week price change: <strong>−22.29%</strong>. The stock has round-tripped roughly three years of gains.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">There are three material distortions in this reporting period and they all sit in the earnings line rather than the cash line.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The Indicor equity-investment gain, $835M, Q2 2026.</strong> Roper carved out its industrial businesses into Indicor in 2022 and retained a minority stake. AMETEK agreed to buy the instrumentation businesses, and Roper marked its retained interest, producing an <strong>$835M gain</strong> that lifted Q2 2026 GAAP net earnings to <strong>$1,168.6M</strong> against operating income of just <strong>$584.7M</strong> — net income more than double operating income, which should always trigger a second look. GAAP diluted EPS of <strong>$11.62</strong> compares with <strong>adjusted DEPS of $5.38</strong>, and the gain is excluded from adjusted. Every trailing GAAP ratio on the page above — P/E, net margin, ROE — is distorted by it. Roper expects roughly <strong>$1.2B of after-tax proceeds</strong> from the transaction, which is real cash and real M&amp;A firepower.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Amortisation of acquired intangibles — recurring, non-cash, and the whole argument.</strong> This is not a one-off, but it belongs here because it is the largest single wedge between GAAP and cash. Roper capitalised <strong>$9,347.3M of other intangible assets</strong> as of June 30, 2026, from deals including CentralReach ($842.0M of identifiable intangibles plus $48.0M of trade names, on a $1,850.0M purchase price completed April 23, 2025) and Subsplash ($365.1M plus $26.0M, on $800.0M completed July 25, 2025). Those amortise through operating expense. The FY2025 gap between GAAP EPS of $14.20 and adjusted EPS of roughly $20.00 — about <strong>$625M pre-share-count</strong> — is dominated by it. The bull says: this is an accounting entry for cash spent years ago, ignore it. The bear says: the cash <em>is</em> being spent, continuously, on the next deal — Roper deployed roughly <strong>$3.3B in the first nine months of 2025 alone</strong> — so treating the amortisation as costless while treating the acquired revenue as free is double-counting. The honest answer is that amortisation is the wrong <em>timing</em> for a real cost, not a fake cost.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The 2025 acquisition cohort.</strong> Verified from Roper's business-combinations footnote: <strong>CentralReach</strong> ($1,850.0M, April 23, 2025 — announced March 24, 2025 at a $1.65B <em>net</em> purchase price after expected tax benefits, which is why two different numbers circulate; Application Software), <strong>Subsplash</strong> ($800.0M, July 25, 2025; Network Software), <strong>Convoy/Flexport freight technology</strong> ($250.0M, July 30, 2025), <strong>Orchard Software</strong> ($174.0M, July 28, 2025), <strong>Muni-Link</strong> ($118.0M, February 19, 2025), <strong>Outgo</strong> ($39.4M, May 15, 2025), plus <strong>HerculesAI/Zero Cognitive Systems</strong> (August 8, 2025) and <strong>Spectrum AI</strong> (August 15, 2025), both undisclosed. Combined goodwill recognised on the bolt-ons alone was $448.0M.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Buyback.</strong> 9.0M shares for <strong>$3.2B</strong> in the first eight months of 2026 — roughly 8% of shares outstanding, at an average near $355 per share in Q2 (3.6M shares for $1.2B at ~$341). That is a genuinely large, genuinely accretive repurchase executed near the lows, and it is the clearest evidence management thinks the derating overshot. It also consumed the balance-sheet capacity that funds acquisitions, which is why leverage went from 3.1× to 3.4× and why the stated priority has now shifted to de-leveraging.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">20 analysts (stockanalysis.com). Note the composition below — this is a "Buy" carried by a minority of strong bulls against a large neutral bloc.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$445.20</div><div class="card-note">+9.31% versus the $407.28 close. A single-digit implied return from a consensus "Buy" is itself a signal.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$335 – $550</div><div class="card-note">−17.8% to +35.0%. The 1.6× spread is about whether you capitalise adjusted or GAAP earnings, not about the revenue forecast.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">8 / 10 / 2</div><div class="card-note">7 Strong Buy + 1 Buy, 10 Hold, 1 Sell + 1 Strong Sell. Half the panel is on the fence and two are outright negative — unusual for a name of this pedigree.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:7;background:var(--green);"></div>
+    <div style="flex:1;background:#4ade80;"></div>
+    <div style="flex:10;background:var(--amber);"></div>
+    <div style="flex:2;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 7</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 1</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 10</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell / Strong Sell — 2</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>BMO Capital</strong> — Daniel Jester, <strong>initiates at Hold</strong>, price target <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$393</span> (Jul 10, 2026). The most recent action on the panel, and it is a fresh set of eyes choosing neutral with a target <em>below</em> today's price. New coverage initiated at Hold is a harder signal than a maintained Hold.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Citi</strong> — George Kurosawa, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$450</span> (Jun 25, 2026). Maintained through the drawdown, roughly at the consensus target.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>TD Cowen</strong> — Joseph C. Giordano, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$550</span> (Apr 24, 2026). The high seat on the Street — 35% above the current price, and a target set before the Q2 print.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>RBC Capital</strong> — Deane Dray, <strong>Hold</strong>, target raised $393 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$407</span> (Apr 24, 2026). Note the shape: target up, rating unchanged at neutral, and the new target is almost exactly the current price. That is an analyst saying the stock is worth what it costs.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Piper Sandler</strong> — Clarke Jeffries, <strong>Buy</strong>, target raised $530 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$540</span> (Apr 24, 2026); <strong>Robert W. Baird</strong> — Joseph Vruwink, <strong>Buy</strong>, $464 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$470</span> (Apr 24, 2026). Both raised into the April print; both targets now sit 15–33% above the market.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read from a fetched stockanalysis.com ratings page. The forecast page separately shows an <strong>Argus Research</strong> upgrade to Buy with a $450 target and a maintained <strong>Truist Financial</strong> Buy at $475; those two carried no date on the page fetched, so they are noted here rather than dated. No other named calls were verified.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat, second guidance raise of the year</div>
+        <div class="tl-desc">Revenue $2,109M (+9%, +5% organic), adjusted EBITDA $815M at a 38.6% margin, adjusted DEPS $5.38 (+10%), adjusted free cash flow $447M (+11%, ~21% of revenue). GAAP DEPS of $11.62 was more than double the adjusted figure because of the $835M Indicor gain. Full-year adjusted DEPS guidance raised to $22.15–$22.30 from $21.80–$22.05, and organic growth to ~6%. The stock closed July at $391.97 against $338.39 at the end of June — a <strong>+15.8% month</strong>.</div>
+        <div class="tl-impact up">Reaction already happened — sharply positive</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date — $3.64 annualised</div>
+        <div class="tl-desc">A 0.89% yield on a 15.31% payout ratio. Small in absolute terms, but Roper's long dividend-growth record is part of why the shareholder base skews toward quality-compounder mandates — the same mandates that have been selling the stock over the past year.</div>
+        <div class="tl-impact neutral">Low impact</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — CentralReach turns organic</div>
+        <div class="tl-desc">Management said CentralReach is running ahead of the deal model and moves into the organic base next quarter. That is a mechanical tailwind to the organic growth rate and it will be tempting to read as underlying acceleration. Watch instead for the segment margin lines: Network Software fell from 44.1% to 40.8% and Technology Enabled Products from 35.2% to 32.9% in the first half. Whether those stabilise is the real question.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Indicor / AMETEK instrumentation proceeds — ~$1.2B after tax</div>
+        <div class="tl-desc">The transaction that produced the $835M non-cash gain also produces cash. Roughly $1.2B of after-tax proceeds, arriving into a balance sheet at 3.4× net leverage with management stating a near-term preference for de-leveraging. How this money is spent — debt paydown, buyback, or a platform acquisition — is the clearest available read on where the board thinks the model stands.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late 2026 – 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">M&amp;A pipeline — management expects deals to "break loose"</div>
+        <div class="tl-desc">On the Q2 call, management described sponsor conversations as "real conversations" with private valuations resetting, and said it expects activity to break loose later this year and into 2027, against <strong>$5B+ of annualised deployment capacity</strong>. It also explicitly declined to count on a near-term surge. With under $50M deployed in the first half of 2026, this is the single largest swing factor in the story: the growth wedge is currently missing, and only M&amp;A restores it.</div>
+        <div class="tl-impact up">Potential upside catalyst — and the key dependency</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">AI product rollout across 21 software verticals</div>
+        <div class="tl-desc">Management is commercialising "agentic SKUs" across the portfolio and describes early adoption signals as very positive, while stating it is <em>not</em> baking meaningful AI revenue into 2026. That is the right posture — and it also means AI is currently a cost line and a narrative, not a number. For a portfolio of systems of record sitting on proprietary vertical data, the opportunity is real; so is the risk that AI-native entrants attack exactly the workflow layers Roper monetises.</div>
+        <div class="tl-impact neutral">Watch item — no financial contribution modelled</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR STOCK PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;">ROP — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:18px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4DA6E8;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:10px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;max-width:800px;">RSI compares the size of recent gains to the size of recent losses on a 0–100 scale. Readings above 70 conventionally mean a stock has risen quickly enough to be considered "overbought"; below 30, "oversold". It is a momentum gauge, not a valuation measure — a cheap stock can stay oversold for a year, and an expensive one overbought.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the October 2021 close of <strong>$487.87</strong> to the September 4, 2026 close of <strong>$407.28</strong>, ROP has delivered a <strong>price return of −16.5%</strong> — before the roughly 0.7–1.0% annual dividend. That is a poor outcome for a stock that spent most of the period being described as one of the highest-quality compounders in the market, and the shape of it matters more than the total. The stock ground higher through 2022–2024 while the software complex was volatile, made an all-time monthly closing high of <strong>$589.58 in March 2025</strong>, and then fell almost without interruption for fourteen months to a low monthly close of <strong>$325.53 in May 2026</strong> — a <strong>44.8% drawdown</strong>. The rally since then (+25.1% off the low, driven by the Q2 beat and the $3.2B buyback) has recovered roughly a third of it.</p>
+  <p class="prose" style="margin-top:16px;"><strong>The derating is the story, and it should be stated plainly.</strong> Revenue over that fourteen-month decline did not fall; it grew every quarter, from $1,883M in Q1 2025 to $2,109M in Q2 2026. Adjusted DEPS rose. Free cash flow rose. What changed was the multiple the market was willing to pay for mid-single-digit organic growth funded by leverage — and that repricing was not company-specific. Constellation Software, the closest structural analogue to Roper anywhere in public markets, has seen its <strong>market capitalisation fall 33.4% over its own trailing year</strong> on 17.7% revenue growth. When two serial acquirers on different continents with different growth rates derate together, the market is repricing the <em>category</em>: the cost of the debt that funds the deals, the price competition from private-equity buyers for the same assets, and the possibility that AI makes small vertical software franchises less defensible than the last decade assumed.</p>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">$487.87 — the zero-rate plateau</div>
+        <div class="tl-desc">Roper enters the window near record territory, having completed the pivot away from industrials. Cheap debt makes the acquisition model look self-evidently correct.</div>
+        <div class="tl-impact neutral">Starting point</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">$359.64 — rate-shock low, −26.3%</div>
+        <div class="tl-desc">The first stress test of the leveraged-compounder model. Roper held up far better than unprofitable software, which is what a 0.75 beta buys you, but the drawdown still exceeded a quarter of the market cap.</div>
+        <div class="tl-impact down">−26.3% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2023 – Mar 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Break to new highs — $538.25 → $560.84</div>
+        <div class="tl-desc">The rate-cut trade plus consistent low-double-digit revenue growth re-rated the stock through its 2021 highs. FY2023 revenue grew 15.0%, the fastest of the five years.</div>
+        <div class="tl-impact up">New all-time territory</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$589.58 — cycle high, and the CentralReach announcement</div>
+        <div class="tl-desc">The all-time monthly closing high, in the same month Roper announced CentralReach at a $1.65B net purchase price (March 24, 2025; closed April 23 at $1,850.0M gross). The largest deal in years landed at the exact top of the stock. That coincidence is the bear case in a sentence: the acquirer paid a peak multiple with peak-valued currency and a levered balance sheet.</div>
+        <div class="tl-impact neutral">Peak — $589.58</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep – Dec 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$498.69 → $445.13 — the derating accelerates</div>
+        <div class="tl-desc">A clean break of the 10-month moving average and a −10.8% quarter. This is where the market stopped paying a premium for the model. The 2025 acquisition cohort — CentralReach, Subsplash, Convoy, Orchard — had by now been funded, and net leverage was building.</div>
+        <div class="tl-impact down">−24.6% from the March 2025 peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan – May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$371.23 → $325.53 — capitulation</div>
+        <div class="tl-desc">January alone was −16.6%. The trough monthly close of $325.53 in May 2026 was 44.8% below the March 2025 high, on a stock with a 0.75 beta and growing revenue. Management responded by repurchasing 3.6M shares for $1.2B at an average near $341 — and pushed net leverage from 3.1× to 3.4× to do it.</div>
+        <div class="tl-impact down">−44.8% peak-to-trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul – Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$391.97 → $424.64 → $407.28 — recovery, then a −3.57% day</div>
+        <div class="tl-desc">The July 23 beat-and-raise drove a +15.8% month; August added another +8.3% to $424.64. September 4 gave back 3.57% to $407.28, though the after-hours quote of $423.14 (+3.89%) points the other way. The stock is now +25.1% off the May low and still −22.3% over 52 weeks.</div>
+        <div class="tl-impact up">+25.1% off the low</div>
+      </div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> A precise NASDAQ-100 and S&amp;P 500 total-return comparison over this identical five-year window could not be verified from the sources fetched and is deliberately <em>not</em> estimated here. What is verified is the direction: ROP's 52-week price change is <strong>−22.29%</strong> and its market capitalisation is down <strong>28.6%</strong> over a period in which the NASDAQ-100, of which it is a member, has not fallen. Against its closest structural peer, Constellation Software (−33.4% market cap over its own trailing year), Roper has fallen less; against the diversified-compounder comparison, Danaher, at a $145.98B market capitalisation, Roper is now roughly a quarter of the size of a company it was frequently bracketed with. The five-year picture is a stock that behaved defensively in the 2022 rate shock and then materially underperformed in a period when the index did not — the opposite of what a low-beta quality compounder is supposed to do, and precisely what happens when the market stops paying for the mechanism rather than the results.</p>
+</div>
+
+<!-- ============ 08 SUMMARY & RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The cash economics are genuinely better than GAAP shows: <strong>$2.62B of free cash flow on $8.28B of revenue (31.6%)</strong>, roughly 81% of EBITDA, against capex of about 0.6% of sales, from a portfolio of systems of record with negative working capital. The FY2025 GAAP-to-adjusted EPS gap of ~$5.80 per share is overwhelmingly amortisation of intangibles bought years ago. At <strong>18.3× guided FY2026 adjusted DEPS</strong> — versus a five-year history of trading at more than twice that multiple — the market is now paying a below-market price for an above-market-quality asset. Management has $5B+ of deployment capacity, ~$1.2B of Indicor proceeds arriving, a private-market valuation reset in front of it, and it just repurchased 8% of the shares near the lows.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Strip out M&amp;A and this is a <strong>5–6% organic grower</strong> with <strong>ROIC of 6.66%</strong>, <strong>3.4× net leverage</strong>, and <strong>87% of its balance sheet in goodwill and intangibles</strong> — negative tangible book value of roughly $12B. Compounding requires a permanent flow of accretive deals, and in the first half of 2026 Roper deployed under $50M against $3.3B in the first nine months of 2025. Segment operating margins fell year over year in all three segments. The derating is not a mistake the market is making about accounting; it is a repricing of a model whose growth is purchased, whose cost of capital has risen, and whose acquired assets may be less defensible in an AI-native software market. Constellation Software derating 33.4% simultaneously says this is structural, not idiosyncratic.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:32px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The M&amp;A engine stalls.</strong> Under $50M deployed in H1 2026 against $5B+ of stated capacity. If private sellers do not reset to prices Roper will pay, the company becomes a 5%-growth software holding company at 3.4× leverage — and the multiple that implies is lower than today's.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Return on capital does not improve.</strong> ROIC of 6.66% is at or below most estimates of cost of capital. If incremental deals do not clear that bar by a wide margin, every dollar deployed destroys value even while it adds revenue and adjusted EPS. This is the risk the adjusted-earnings framing is least equipped to detect.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>AI erodes vertical-software defensibility.</strong> Roper's moat is that nobody rebuilds a niche system of record. If AI materially lowers the cost of rebuilding vertical workflow software, the renewal rates and pricing power that justify 20-plus-times-EBITDA acquisition multiples come under pressure — and the goodwill on the balance sheet becomes an impairment question rather than an accounting convention.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid var(--red);">
+    <div class="biz-header">
+      <div><div class="biz-name">The cost of capital repriced the serial-acquirer model</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    </div>
+    <p class="biz-desc">For a decade, buying vertical software with cheap debt was close to a free lunch: the assets compounded at 5–8% organically, threw off cash, and the debt cost less than the earnings yield of what it bought. That arithmetic broke. Roper carries <strong>$11.32B of debt against $364.9M of cash</strong> at <strong>3.4× net EBITDA</strong>, and has now prioritised de-leveraging over buybacks. The market's verdict is visible in two places at once: ROP is down <strong>22.3% over 52 weeks</strong> and Constellation Software's market cap is down <strong>33.4%</strong> over its own trailing year despite 17.7% revenue growth. When the two purest expressions of the same strategy derate together on different continents, the repricing is of the strategy, not the execution.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div><div class="biz-name">Private-market valuations are resetting — slowly</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    </div>
+    <p class="biz-desc">Roper competes for assets primarily with private-equity sponsors, not with strategic buyers. Management's Q2 commentary — sponsor conversations are now "real conversations," valuations are resetting, activity should "break loose later this year and into 2027" — is a polite way of saying that sellers' price expectations have not yet fallen far enough. The evidence is the deal log: <strong>roughly $3.3B deployed in the first nine months of 2025</strong> (CentralReach $1,850.0M, Subsplash $800.0M, six bolt-ons totalling $648.5M) versus <strong>under $50M in the first half of 2026</strong>. Discipline is the correct response and management deserves credit for it. But a capital allocator earns its multiple by allocating capital, and for two quarters it has not.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div><div class="biz-name">AI: the same technology is both the threat and the option</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    </div>
+    <p class="biz-desc">Roper is shipping agentic products across 21 software verticals and explicitly models no meaningful 2026 revenue from them. Read the bull and bear implications side by side. <strong>Bull:</strong> systems of record sitting on proprietary vertical data — legal time entry, government contract accounting, insurance policy records, ABA therapy notes — are among the best-positioned assets in software for AI monetisation, because the data is captive, the workflows are repetitive and the customers have no alternative vendor to buy the feature from. Every incremental AI SKU sold into an existing base is close to pure margin. <strong>Bear:</strong> the same technology lowers the cost of building the ninth-best practice-management system for a niche vertical, which is precisely the barrier that makes those franchises worth 20-plus times EBITDA to acquire. Roper has bought two AI-adjacent businesses (HerculesAI and Spectrum AI, both August 2025, both undisclosed) — small enough to read as option premium rather than strategy. The resolution will not be visible in the 2026 numbers, which is exactly why the multiple has to guess.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($407.28), daily change, market cap, 52-week range, sector/industry labels, employees, HQ, founding and IPO dates, next earnings date, executives and full statistics from stockanalysis.com — <strong>https://stockanalysis.com/stocks/rop/</strong> (overview, statistics, financials, quarterly financials, forecast, ratings and company pages, retrieved September 5, 2026). Sixty unadjusted monthly closing prices from digrin.com ROP price history ("Real Price" column), whose September 2026 value of $407.28 is an exact match to the stockanalysis.com September 4, 2026 close. Q2 2026 segment revenue and operating profit, organic growth, adjusted EBITDA and margin, adjusted DEPS, adjusted free cash flow, guidance, and the June 30, 2026 balance sheet (goodwill $21,330.7M, other intangibles $9,347.3M, total assets $35,169.5M, total debt $11,319.4M) from Roper's Q2 2026 earnings release filed with the SEC. Per-segment organic growth rates, CFO identity, buyback detail, net leverage, M&amp;A capacity and pipeline commentary from the Q2 2026 earnings call transcript (investing.com). Acquisition names, dates, purchase prices, goodwill and intangibles from Roper's business-combinations footnote (SEC EDGAR, nine months ended September 30, 2025). Global market-cap rank #652 from companiesmarketcap.com. Constellation Software and Danaher comparison figures from stockanalysis.com and companiesmarketcap.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source — this includes the entire Industry Avg and NASDAQ-100 comparison columns in Section 04 and the US and NASDAQ market-cap rank pills. Items marked <strong>n/d</strong> or "not fetched" are not disclosed by the company or were not verified; competitor revenue and growth figures for Tyler Technologies, Descartes, Trimble, Xylem and Itron were <strong>not fetched and are therefore not stated</strong>. Roper does not disclose segment market shares or addressable market sizes, and no TAM figures have been estimated here. Specific institutional holders could not be retrieved and are not listed. <strong>No chart months were reconstructed</strong> — all sixty monthly closes are real month-end values from a single source, and the final value equals the header price. The trailing P/E of ~23× ex-Indicor-gain, the ~$12B negative tangible book value, the ~$18.6B equity figure, the 87.2% goodwill-and-intangibles share of assets, the 81% FCF/EBITDA conversion and the 0.6%-of-sales capex are <strong>calculated by the author</strong> from the sourced figures above, not quoted. A NASDAQ-100 and S&amp;P 500 total-return comparison over the identical five-year window could not be verified and is deliberately omitted. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [487.87,464.15,491.86,437.16,448.22,472.23,469.92,442.44,394.65,436.67,402.58,359.64,414.54,438.89,432.09,426.75,430.20,440.69,454.78,454.22,480.80,493.05,499.06,484.28,488.57,538.25,545.17,537.00,544.73,560.84,511.46,532.76,563.66,544.75,554.41,556.44,537.73,566.44,519.85,575.65,584.50,589.58,560.08,570.27,566.84,550.40,526.31,498.69,446.15,446.22,445.13,371.23,349.73,353.86,354.81,325.53,338.39,391.97,424.64,407.28];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — zero-rate plateau $487.87',            color: '#94a3b8' },
+  { idx: 11, label: 'Sep 2022 — rate-shock low $359.64 (−26.3%)',      color: '#ef4444' },
+  { idx: 29, label: 'Mar 2024 — breakout to $560.84',                  color: '#22c55e' },
+  { idx: 41, label: 'Mar 2025 — cycle high $589.58; CentralReach',     color: '#f59e0b' },
+  { idx: 47, label: 'Sep 2025 — derating accelerates $498.69',         color: '#ef4444' },
+  { idx: 55, label: 'May 2026 — trough $325.53 (−44.8% from peak)',    color: '#ef4444' },
+  { idx: 57, label: 'Jul 2026 — Q2 beat & raise, +15.8% month',        color: '#22c55e' },
+  { idx: 59, label: 'Sep 4, 2026 — $407.28 (−3.57% on the day)',       color: '#4DA6E8' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(77,166,232,0.22)');
+grad.addColorStop(1, 'rgba(77,166,232,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4DA6E8', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4DA6E8'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
