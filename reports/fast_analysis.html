@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAST — Fastenal Company | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3D9BE9;
+  --accent-dim: #3D9BE933;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">FAST</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Industrial Distribution</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $56.92B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #450</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#75 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Fastenal Company</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$49.60</div>
+      <div class="price-change" style="color:var(--green);">+$0.37 (+0.75%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $49.60 (0.00%) at 4:18 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Winona, Minnesota</div>
+    <div class="meta-item"><span>Employees:</span> 24,489</div>
+    <div class="meta-item"><span>Founded:</span> 1967 (IPO 1987)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 14, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Fastenal distributes the unglamorous stuff that keeps factories running — threaded fasteners, safety gear, cutting tools, janitorial and MRO (maintenance, repair and operations — the consumable supplies a plant burns through that never end up inside the finished product) — and, increasingly, sells the <em>service</em> of managing that inventory on the customer's own floor through vending machines, smart bins and embedded "Onsite" teams. FY2025 revenue was <strong>$8.20B, up 8.7%</strong> from $7.55B, and the trailing twelve months through June 2026 reached <strong>$8.75B, up 12.5%</strong>. It is the world's roughly <strong>#450 company by market capitalisation</strong> at $56.92B, and the second-largest listed U.S. industrial distributor behind W.W. Grainger.</p>
+  <p class="prose" style="margin-top:16px;">The debate on this page is a single number: <strong>42×</strong>. That is the trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months">P/E</span> the market is paying for a company that sells nuts and bolts, with a 44.7% gross margin that has slipped every year since 2021, in a business Grainger trades at 33× and MSC Industrial at 30×. Either Fastenal is doing something structurally different from a distributor — and the FMI, Onsite and contract-customer data below are the evidence to weigh — or it is a very good cyclical carrying a very rich multiple into a leadership change. The report quantifies what 42× actually buys.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jeffery M. Watts</div>
+      <div class="card-note">CEO effective <strong>July 16, 2026</strong>, succeeding Daniel Florness (CEO for ten years, 30 years at the company). Watts joined Fastenal in 1996, was named President and Chief Sales Officer in August 2024, and was announced as successor on December 19, 2025. Florness stays on as strategic advisor into early 2028 and left the board at transition. <em>Correction to the task brief: Florness is no longer CEO.</em></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Max H. Tunnicliff</div>
+      <div class="card-note">CFO, per the Q2 2026 earnings-call participant list (July 14, 2026). Owner of the "we do not provide guidance on gross margin unless there is a big up or down movement" posture. <em>Correction to the task brief: Sheryl Lisowski was named there; the live source shows Tunnicliff as CFO.</em></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">86.9% institutional</div>
+      <div class="card-note">Institutions hold 86.91% of 1.15B shares; insiders 0.09% (stockanalysis.com). A March 2026 secondary source listed TD Asset Management, American Century and Mitsubishi UFJ Asset Management among holders, but that list omits the index giants and could not be reconciled, so a ranked top-holder table is deliberately not shown here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Fastenal reports a <strong>single operating segment</strong>. What it does disclose, every quarter, is a cut by product line and by end market, plus the metrics that describe <em>how</em> it sells — FMI devices, Onsite, contract vs non-contract, and digital penetration. The bar below is the Q2 2026 product-line mix (direct and indirect channels combined from the company's release).</p>
+  <div class="seg-bar">
+    <div style="flex:30.7;background:#3D9BE9;">FASTENERS 30.7%</div>
+    <div style="flex:21.0;background:#f59e0b;">SAFETY 21.0%</div>
+    <div style="flex:48.3;background:#a78bfa;">OTHER (TOOLS, MRO, JANITORIAL) 48.3%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3D9BE9;"></span> Fasteners — 30.7% of Q2'26 sales (21.0% direct + 9.7% indirect)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Safety — 21.0%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Other — 48.3% (cutting tools 5.2%, other direct 13.0%, other indirect 30.1%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">End-market cut, same quarter: <strong>Manufacturing 75.9%</strong> (heavy 44.1%, other 31.8%) · <strong>Non-residential construction 8.2%</strong> · Other end markets 15.9%. Contract customers were <strong>75.8% of sales</strong> and grew 17.6% on a daily-sales basis; non-contract customers grew 7.3%.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #3D9BE9;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Fasteners — the original franchise</div>
+        <span class="biz-badge dominant">HIGHEST-MARGIN LINE — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$733M</div><div class="biz-stat-label">Q2'26 Rev (30.7% × $2,387M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16.1%</div><div class="biz-stat-label">Daily Sales YoY (blended)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Threaded fasteners are where the company started in 1967 and still the line with the fattest gross margin — a bolt is cheap, engineered, hard to source correctly, and mission-critical, so customers pay for availability rather than shop price. The company now splits this line between <strong>direct</strong> fasteners (sold into the customer's production, +16.8% daily sales, 21.0% of total) and <strong>indirect</strong> fasteners (MRO use, +14.6%, 9.7%). Heavy manufacturing — the biggest fastener consumer — grew 18.1% in the quarter, the fastest of any end market. This line is also the most exposed to steel tariffs: the price/cost squeeze that cost 40 bps of gross margin in Q2 runs largely through imported fasteners.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed by the company; third-party TAM estimates were not verified from sources fetched and are omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">W.W. Grainger (GWW)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$62.38B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$18.85B</div><div class="comp-bubble-label">Rev TTM (all lines)</div></div>
+          <div><div class="comp-bubble-val">+7.8%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">MSC Industrial (MSM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$6.78B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$3.91B</div><div class="comp-bubble-label">Rev TTM (all lines)</div></div>
+          <div><div class="comp-bubble-val">+4.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Safety Products</div>
+        <span class="biz-badge emerging">VENDING-LED — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$501M</div><div class="biz-stat-label">Q2'26 Rev (21.0% × $2,387M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13.1%</div><div class="biz-stat-label">Daily Sales YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Gloves, eyewear, respirators, hearing protection. Safety is the product line the FASTVend machine was built for: a worker badges in, takes a pair of gloves, and the customer's consumption drops because nobody grabs three pairs when one is metered. It is lower-margin than fasteners and more competitive — every broadline distributor sells the same Honeywell and 3M SKUs — which is why safety grew slowest of the three lines in Q2 (+13.1%). Its strategic value is as the wedge that gets a vending device installed; once the machine is on the floor, the fastener and tooling business follows it.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; third-party estimates not verified and omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">W.W. Grainger (GWW)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">33.5×</div><div class="comp-bubble-label">Trailing P/E</div></div>
+          <div><div class="comp-bubble-val">$1.87B</div><div class="comp-bubble-label">Net Inc TTM</div></div>
+          <div><div class="comp-bubble-val">−2.7%</div><div class="comp-bubble-label">NI YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Amazon Business / Cintas</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Other — Cutting Tools, MRO, Janitorial, Electrical</div>
+        <span class="biz-badge growth">LARGEST LINE — BROADLINE CATALOGUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$1,153M</div><div class="biz-stat-label">Q2'26 Rev (48.3% × $2,387M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+15.2%</div><div class="biz-stat-label">Daily Sales YoY (blended)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">48.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Everything else the plant consumes: cutting tools (+14.8%, 5.2% of sales), other direct production supplies (+16.7%, 13.0%) and the long tail of indirect MRO, janitorial and electrical (+14.6%, 30.1%). This is the category where Fastenal looks most like Grainger — a catalogue business competing on breadth and delivery. Its growth is the clearest evidence of the "share of wallet" argument: once a customer is on contract with an Onsite or a bank of vending machines, Fastenal sells it categories it never sold as a branch. The trade-off is mix — this line's gross margin is below fasteners, so the faster it grows relative to fasteners, the more structural pressure on the blended 44.7%.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; third-party estimates not verified and omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">MSC Industrial (MSM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">29.6×</div><div class="comp-bubble-label">Trailing P/E</div></div>
+          <div><div class="comp-bubble-val">$231M</div><div class="comp-bubble-label">Net Inc TTM</div></div>
+          <div><div class="comp-bubble-val">+16.5%</div><div class="comp-bubble-label">NI YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">W.W. Grainger (GWW)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">27.1×</div><div class="comp-bubble-label">Forward P/E</div></div>
+          <div><div class="comp-bubble-val">0.75%</div><div class="comp-bubble-label">Div Yield</div></div>
+          <div><div class="comp-bubble-val">25,000</div><div class="comp-bubble-label">Employees</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:24px;"><strong>How it sells — the metrics the multiple actually rests on.</strong> Fastenal's quarterly release is unusually rich on the delivery model, and these numbers matter more than the product split:</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card"><div class="card-label">FMI devices signed, Q2'26</div><div class="card-value">6,993 MEU</div><div class="card-note">109 weighted devices per selling day, +8.3% YoY (6,458 a year ago). Installed base <strong>140,789 MEU, +6.5%</strong>. The 2026 signings goal was <em>cut</em> to 27,000–29,000 from 28,000–30,000.</div></div>
+    <div class="card"><div class="card-label">FMI sales, Q2'26</div><div class="card-value">$1,081M</div><div class="card-note">44.6% of sales, +16.4% daily. FASTBin/FASTVend $781M (+17.4%), FASTStock $300M (+13.8%). Digital Footprint (FMI + eBusiness) <strong>61.6%</strong>; the 2026 target was trimmed to 63–64% from 66%.</div></div>
+    <div class="card"><div class="card-label">$50k+/month sites</div><div class="card-value">3,125</div><div class="card-note">+16.5% YoY; 2,568 manufacturing, 557 non-manufacturing. Revenue from these sites rose ~26% to ~$1.38B in the quarter — more than half of sales. Total active sites fell to <strong>93,283 from 101,440</strong>: the company is shedding small accounts and concentrating on large ones.</div></div>
+    <div class="card"><div class="card-label">Onsite locations</div><div class="card-value" style="font-size:20px;">Not verified</div><div class="card-note">Active Onsite count and Q2 signings were not disclosed in the Q2 2026 release or call transcript as fetched. The company's own proxy for the Onsite/branch shift is the $50k+ site count above and contract mix of 75.8% (from 73.2%). Treat the Onsite figure as an open item to check against the Q3 release.</div></div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">140,789 FMI DEVICES ON CUSTOMER FLOORS</span>
+    <span class="moat-pill">ONSITE EMBEDDED STAFF</span>
+    <span class="moat-pill">75.8% CONTRACT REVENUE</span>
+    <span class="moat-pill">FASTENER SOURCING DEPTH</span>
+    <span class="moat-pill">OWNED TRUCKING &amp; HUB NETWORK</span>
+    <span class="moat-pill">32% ROIC, NET-CASH BALANCE SHEET</span>
+    <span class="moat-pill">DECENTRALISED "BLUE TEAM" CULTURE</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>physical presence inside the customer's plant</strong>, not product. A vending machine or a bank of smart bins bolted to a factory wall, restocked by a Fastenal employee who knows the plant manager by name, converts a purchasing decision into a habit — and it generates consumption data no competitor can see. That is why FMI is now <strong>44.6% of sales</strong> and why contract customers, who grew 17.6% in Q2, are 75.8% of revenue. The economics show up in the return line: trailing <span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span> is <strong>32%</strong>, back above 30% for the first time in more than a decade according to management, on a balance sheet carrying $441M of total debt (largely leases) against $4.07B of book equity. A distributor earning 32% on capital with 4.18× current-ratio liquidity is not a normal distributor; it is closer to a route-based service business. The weakness of the moat is that it is <em>expensive to extend</em> — every new device and Onsite costs capex (guided to $310–330M in 2026, up from $231M) and headcount — and that it is <em>cyclical underneath</em>: 75.9% of sales go to manufacturers, and the U.S. PMI (Purchasing Managers' Index — a survey above 50 means factory activity is expanding) has only been above 50 for six months.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Tariffs and price/cost.</strong> Fasteners are steel, and a large share are imported. Fastenal pushed roughly <strong>2.9% of price in Q2 2026</strong> (4.5% on a two-year stack) and still ran a <strong>negative 40 bps net price/cost</strong>, driving gross margin to 44.6% from 45.3%. Management said tariff uncertainty shows up "through cost planning and pricing discussions rather than demand" — which is exactly the problem: the cost is certain, the ability to pass it on is a negotiation with 75.8%-contract customers who have leverage.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Gross margin drift.</strong> 46.20% (FY2021) → 46.07% → 45.66% → 45.08% → 45.01% (FY2025) → 44.70% TTM. Five consecutive years of decline, and Q2 2026 (44.56%) was the lowest quarter in the eight shown. The company attributes it to customer and product mix — larger contract customers and non-fastener products carry lower margins — which means the drift is <em>the strategy working</em>, not a fixable execution problem. Operating margin has held at ~20–21% only because SG&amp;A leverage offsets it.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Manufacturing cyclicality.</strong> Three-quarters of revenue is manufacturing, 44% is <em>heavy</em> manufacturing. FY2024 revenue grew 2.7% and EPS fell 1% when the PMI sat below 50; today's +14.7% daily sales growth arrived with a PMI averaging 53. At 42× earnings the stock is priced as though the current growth rate is structural. The FY2024 print says a meaningful part of it is not.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Leadership transition and softened targets.</strong> Jeff Watts became CEO on July 16, 2026 after 30 years of Florness/Kierlin continuity. In the same quarter the company cut its 2026 FMI signings goal (to 27–29k from 28–30k) and its Digital Footprint target (to 63–64% from 66%), and Q2's 20.5% June growth was flagged as partly "one-off orders". None of these is alarming alone; together they are the first soft data points in a story the multiple assumes is accelerating.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">FAST column from stockanalysis.com statistics as of the September 4, 2026 close. The <strong>peer column is the simple average of Grainger (GWW) and MSC Industrial (MSM)</strong>, both read from fetched stockanalysis.com overview pages, and only for metrics those pages showed. The NASDAQ-100 column is left as "—" where no verified figure was fetched — nothing in it is estimated.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>FAST</th><th>Peer Avg (GWW, MSM)</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">42.08</td><td>31.6 (GWW 33.5 / MSM 29.6)</td><td>—</td><td>$49.60 ÷ $1.17 <span class="tip" title="Earnings Per Share">EPS</span> ≈ 42.4×; source shows 42.08 on unrounded EPS. A 10-turn premium to Grainger, 12 to MSC, for a slower-margin, faster-growth business.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--red);">36.68</td><td>25.1 (GWW 27.1 / MSM 23.2)</td><td>—</td><td>On 2026 consensus EPS of $1.26 the multiple is 39.4×; on 2027's $1.40 it is 35.4×. Still the richest in the group by a wide margin.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--red);">3.20</td><td>—</td><td>—</td><td>Expensive by the textbook. Consensus EPS growth is 15.8% for 2026 and 10.9% for 2027; the multiple implies faster.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$1.17</td><td>—</td><td>—</td><td>Split-adjusted, +12.8% YoY. FY2025 $1.09; FY2024 $1.00 (a down year, −1.0%).</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+12.5%</td><td>+6.1% (GWW +7.8% / MSM +4.4%)</td><td>—</td><td>TTM. Q2 2026 +14.7%; August 2026 net sales +16.6% to $812M. Roughly 3 points of that is price.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--text-dim);">44.70%</td><td>—</td><td>—</td><td>Down from 46.20% in FY2021; Q2 2026 44.6% (−75 bps YoY). Peer gross margins not on fetched pages, so no colour coding.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">15.45%</td><td>~7.9% (GWW 9.9% / MSM 5.9%)</td><td>—</td><td>Peer margins computed from fetched TTM net income ÷ revenue. Fastenal earns nearly double Grainger's net margin — this is the core of the premium-multiple argument.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">1.94%</td><td>1.81% (GWW 0.75% / MSM 2.86%)</td><td>—</td><td>$0.96 annual ($0.24 quarterly), 27 years of growth, +12.9% YoY. Payout ratio 82% — high, and the reason buybacks are token ($29.7M in Q2).</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--text-dim);">2.72% of shares</td><td>—</td><td>—</td><td>31.20M shares short against 1.15B outstanding. Not a crowded short.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--green);">0.11</td><td>—</td><td>—</td><td>$441.5M total debt (incl. leases) vs $204.7M cash and $4.07B book equity. Effectively unlevered.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--green);">4.18</td><td>—</td><td>—</td><td>Inventory-heavy by design: $1,735M of inventory, $1,557M of receivables. Quick ratio 2.00.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--amber);">$1.16B</td><td>—</td><td>—</td><td>TTM; OCF $1.40B less $243M capex. Q2 OCF was only 69% of net income as receivables grew 17.6%. <span class="tip" title="Price to Free Cash Flow">P/FCF</span> 49.2×.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">34.33%</td><td>—</td><td>—</td><td>Achieved with almost no leverage — the honest kind of ROE.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--green);">32.06%</td><td>—</td><td>—</td><td>Back above 30% on a trailing basis for the first time in over a decade per management. The single best argument for the multiple.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--green);">0.71</td><td>—</td><td>—</td><td>5-year. Low-vol despite 42× — the market treats this as a compounder, not a cyclical.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$38.97 – $52.92</td><td>—</td><td>—</td><td>Current $49.60 sits 76% of the way up the range. 52-week price change: +0.28% — flat for a year despite double-digit earnings growth, i.e. the multiple has compressed from ~47× to 42×.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">Fastenal's accounts are unusually clean — no acquisitions, no adjusted-EBITDA reconciliation, no restructuring charges in the periods reviewed — but three things distort the trailing numbers and should be held in mind:</p>
+  <p class="prose" style="margin-top:12px;"><strong>The 2-for-1 stock split (May 22, 2025).</strong> All per-share figures here are split-adjusted. Any source showing pre-split EPS of ~$2.00 or prices in the $70–80s is stale. The chart in Section 07 halves every pre-May-2025 close.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Pricing is inflating growth.</strong> Roughly <strong>290 bps</strong> of Q2 2026's 14.7% daily-sales growth was price (versus 140–170 bps a year earlier), taken largely to recover tariff-driven fastener costs. Volume-and-mix growth is therefore closer to 11–12%. The price came with a <em>negative</em> 40 bps price/cost — the company raised prices and still lost margin, which is the definition of cost push rather than pricing power.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Working capital absorbed cash.</strong> Q2 operating cash flow of $265.7M was 69.4% of net income, with receivables up 17.6% on faster sales; accounts payable stretched 25.2% partly offsets it. The 2026 capex step-up to $310–330M (from $230.6M) for hub and FMI capacity will hold FCF conversion below 100% this year. June's 20.5% daily-sales growth included "one-off orders" per management — so the Q2 exit rate overstates the run rate, though August's +16.6% suggests not by much.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">18 analysts (stockanalysis.com, August 2026). Zacks separately carries a #2 Buy rank with a "D" Value score — a fair summary of the Street's split.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$48.53</div><div class="card-note"><strong>−2.2%</strong> versus the $49.60 close. Median $47.00 (−5.2%). The stock trades above the average target — the Street likes the business and not the price.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$39.90 – $59.00</div><div class="card-note">−19.6% to +19.0%. A tight, symmetric range for a 42× stock: nobody is arguing about the earnings, only about the multiple.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">6 / 7 / 5</div><div class="card-note">6 Strong Buy, 0 Buy, 7 Hold, 3 Sell, 2 Strong Sell. Five sell-side sells on a $57B company is unusual and speaks to the valuation debate.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:6;background:var(--green);"></div>
+    <div style="flex:0.01;background:#4ade80;"></div>
+    <div style="flex:7;background:var(--amber);"></div>
+    <div style="flex:3;background:var(--red);"></div>
+    <div style="flex:2;background:#b91c1c;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 6</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 0</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 7</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 3</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#b91c1c;"></span> Strong Sell — 2</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Robert W. Baird</strong> — David Manthey, price target raised $51 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$54</span> (early August 2026, per stockanalysis.com news and forecast pages). Rating not captured on the fetched page; the target sits near the top of the range and implies +8.9%.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Barclays</strong> — Guy Hardwick, price target lowered to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$46</span> (recent months, per stockanalysis.com forecast page). Rating not captured; the target is 7% below the current price.</div></div>
+    <div class="risk-item"><span style="color:var(--text-dim);">●</span><div><strong>Other named calls not verified from sources fetched.</strong> MarketBeat and TipRanks were not reached within the research budget; the remaining 16 analysts' individual ratings and targets are represented only in the aggregate figures above.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">August net sales +16.6% to $812.06M</div>
+        <div class="tl-desc">Fastenal is one of very few large industrials that publishes monthly sales, and today's release extended the streak: coverage described it as a fifth straight sequential beat. August growth of 16.6% is <em>above</em> Q2's 14.7% daily rate, easing the concern that June's 20.5% was a one-off. Shares closed +0.75%.</div>
+        <div class="tl-impact up">Positive — acceleration confirmed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">~Oct 6, 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">September and Q3 monthly sales release</div>
+        <div class="tl-desc">The September sales report (typically the first week of the following month; exact date not verified) will effectively pre-announce Q3 revenue. Watch the daily-sales rate against Q2's 14.7% and the July–August run rate, and whether management again splits out pricing contribution.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — Jeff Watts' first quarter as CEO</div>
+        <div class="tl-desc">Confirmed date per stockanalysis.com. The items to check: gross margin against Q2's 44.6% and the −40 bps price/cost; FMI signings against the 27–29k full-year goal (13.5k needed in H2 if H1 tracked ~14k); the $50k+ site count; and — the open item on this page — active Onsite locations. Q3 2025 was reported on October 13, 2025 and the stock fell ~16% that month (Sep 30 close $49.04 → Oct 31 $41.15), so the reaction risk into this print is real.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 16, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CEO transition completed — Watts in, Florness to advisor</div>
+        <div class="tl-desc">Announced December 19, 2025; effective July 16, 2026. Watts (with the company since 1996) had run sales since August 2024, so continuity is high, but this is the first CEO change in a decade and Florness leaves the board. The stock has risen from $47.71 (Jul 31 close) to $49.60 since.</div>
+        <div class="tl-impact neutral">Reaction: neutral to mildly positive</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026: sales +14.7%, EPS $0.33 (+15.9%), gross margin −75 bps</div>
+        <div class="tl-desc">Revenue $2,387M, operating margin flat at 21.0%, ROIC above 30%. Also: 2026 FMI signings goal cut to 27–29k and Digital Footprint target trimmed to 63–64%. The stock traded $46.15 on Jul 23 and $47.71 at month-end after $48.03 on Jun 30 — a flat-to-down reaction to a headline beat, consistent with a market already paying for it.</div>
+        <div class="tl-impact neutral">Mixed — beat, but targets trimmed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Capex $310–330M and tariff pass-through</div>
+        <div class="tl-desc">Capex rises ~40% from $230.6M for distribution-hub and FMI capacity. Meanwhile the price stack has reached 4.5% and price/cost is still negative; whether Q3–Q4 pricing catches up to landed fastener costs determines if gross margin stabilises near 44.5% or slides toward 44%. Management's stated view is "fairly consistent with historical trends" with no gross-margin guidance.</div>
+        <div class="tl-impact neutral">Ongoing — margin watch</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">FAST — 60 MONTH-END CLOSES, SEP 2021 → AUG 2026, PLUS SEP 4, 2026 CLOSE (split-adjusted for the May 2025 2-for-1)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#3D9BE9;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the September 2021 close of <strong>$25.81</strong> (split-adjusted; $51.61 at the time) to the September 4, 2026 close of <strong>$49.60</strong>, FAST has returned <strong>+92.2%</strong> in price — a compound annual rate of about <strong>13.9%</strong>, plus a dividend that has run near 2% a year. For a company whose EPS grew from $0.80 (FY2021) to $1.17 (TTM), or +46%, that means roughly half the return came from the multiple expanding from the low-30s to 42×. The path was orderly by growth-stock standards: the worst monthly-close drawdown was <strong>−28%</strong> (Dec 2021 $32.03 → Sep 2022 $23.02), and the sharpest single-month drop was <strong>−16%</strong> in October 2025 after the Q3 2025 print. A verified NASDAQ-100 or S&amp;P 500 total-return figure for the identical window was not fetched and is deliberately not stated; the qualitative point is that a 0.71-beta industrial nearly doubling in five years is a re-rating story, and re-ratings run in reverse too. The <strong>52-week change of +0.28%</strong> says that reverse has quietly been under way for a year: earnings grew ~13%, the stock did not.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2021</div><div class="tl-content"><div class="tl-title">$25.81 — start of the window</div><div class="tl-desc">Coming off the 2021 reopening boom; FY2021 revenue grew 6.4% and EPS 7.4%. Gross margin 46.2%, the high-water mark of the period.</div><div class="tl-impact neutral">Starting point</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">$23.02 — five-year low, −28% from Dec 2021</div><div class="tl-desc">Rate shock compresses every long-duration multiple. Ironically FY2022 was a strong operating year: revenue +16.1%, EPS +18.1%. The stock bottomed while the business boomed — the multiple was doing all the work.</div><div class="tl-impact down">Multiple compression, not earnings</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">$38.57 — first peak, +68% off the low</div><div class="tl-desc">A soft-landing rally lifted quality industrials even as Fastenal's own growth slowed to 2.7% for FY2024 and EPS fell 1%. The April 2024 Q1 print (below-50 PMI, sluggish daily sales) knocked the stock to $33.97 within a month.</div><div class="tl-impact down">Earnings miss into a rich multiple</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">$41.78 — post-election industrial rally</div><div class="tl-desc">Reshoring and tariff-protection enthusiasm lifted domestic industrial distributors. December gave back 14% ($35.96) as rates rose again.</div><div class="tl-impact up">Macro rotation</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">2-for-1 split (May 22) at ~$41</div><div class="tl-desc">The company's growth had re-accelerated — Q2 2025 daily sales +8.6% after +3.4% in Q1 — and the split arrived as the stock cleared $80 pre-split. Every price on this chart before this point is halved.</div><div class="tl-impact neutral">Cosmetic, but marks the growth re-acceleration</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2025</div><div class="tl-content"><div class="tl-title">$49.66 — five-year monthly-close high</div><div class="tl-desc">Q2 2025 EPS +15.1% and daily sales +8.6% brought the multiple to roughly 47× trailing. The 52-week intraday high of $52.92 sits just above this level.</div><div class="tl-impact up">Peak multiple</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">$41.15 — −16% in one month after Q3 2025</div><div class="tl-desc">Q3 2025 delivered +11.7% sales and +11.5% EPS growth — and the stock fell 16% from $49.04. That is what happens when a 47× stock "only" grows 12%. The slide continued to $40.13 by December, a 19% drawdown from the August peak.</div><div class="tl-impact down">Valuation air pocket</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2026</div><div class="tl-content"><div class="tl-title">$49.60 — +23.6% off the December low</div><div class="tl-desc">Three consecutive double-digit quarters (11.1%, 12.4%, 14.7%), a CEO handover without drama, and August sales +16.6% have brought the stock back to within 1% of its 2025 high — at a lower multiple (42× vs ~47×), because earnings caught up.</div><div class="tl-impact up">Earnings-led recovery</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>What 42× buys, itemised.</strong> Start with the top line. Daily sales grew <strong>14.7% in Q2 2026</strong> and <strong>16.6% in August</strong>, of which roughly 3 points is price. Strip that out and volume-plus-mix is running 11–13% — for a $8.7B distributor in a PMI-53 economy, genuinely excellent, and roughly double Grainger's 7.8% and triple MSC's 4.4%. Next, the mechanism: <strong>44.6% of sales flow through FMI devices</strong> (FASTBin / FASTVend / FASTStock — Fastenal-owned vending machines, weight-sensing bins and scanned shelf-stock on the customer's floor), up 60 bps of mix in a year, with the installed base at <strong>140,789 MEU</strong> (Machine Equivalent Units — a weighting that counts a full vending machine as 1.0 and smaller bins as fractions), growing 6.5%. Then the customer concentration the model is designed to produce: <strong>3,125 sites spending $50k+ a month, +16.5%</strong>, generating ~$1.38B of the quarter's $2.39B, while total active sites <em>fell</em> 8% to 93,283. Fastenal is deliberately trading many small branch walk-ins for fewer large embedded relationships — that is the "branches to Onsites" shift in the task brief, expressed in the numbers the company actually discloses. The result: <strong>15.45% net margin, 32% ROIC, 34% ROE, 0.11 debt-to-equity</strong>.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>And what it does not buy.</strong> It does not buy gross-margin stability: 46.2% → 44.7% over five years, and the company itself frames the decline as a consequence of the strategy (bigger customers, more non-fastener product), not a blip. It does not buy pricing power in the strict sense — 2.9% of price in Q2 still produced a <em>negative</em> 40 bps price/cost, meaning tariffs on imported fasteners are being passed through late and incompletely. It does not buy immunity from the cycle: FY2024 grew 2.7% with EPS down 1%. And it does not buy the Onsite disclosure this report went looking for — the active Onsite count was not in the Q2 release or call as fetched, so the single cleanest measure of the branch-to-Onsite shift remains an open item for the Q3 release.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation, three ways.</strong> (i) <strong>42.1× trailing GAAP EPS of $1.17</strong> — the honest number, and there is no adjusted-EPS fudge here: Fastenal reports GAAP and nothing else. (ii) <strong>39× 2026 consensus EPS of $1.26, 35× 2027's $1.40</strong>. (iii) <strong>49× trailing free cash flow of $1.16B</strong>, flattered downward by the working-capital build and the capex step-up. Against Grainger at 33.5× trailing / 27.1× forward and MSC at 29.6× / 23.2×, the premium is roughly 10 turns on every measure. The bull says a 32%-ROIC business growing 12% organically at 15% net margins <em>should</em> trade like a compounder, and that Grainger's 33× is the wrong anchor — Cintas or Old Dominion is the right one. The bear says the PEG of 3.2 is the whole story: consensus EPS growth decelerates to 10.9% in 2027, and paying 42× for 11% growth is what investors did in August 2025, right before a 19% drawdown on an 11.5% EPS-growth quarter.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Fastenal has quietly converted from a branch-based distributor into an embedded-supply-chain service with 140,789 devices and 3,125 large sites generating over half its revenue on contract. That model is producing 15%-plus net margins and 32% ROIC with essentially no debt, and it is growing 12% organically before price. Reshoring, a PMI back above 50 for six straight months and tariff-driven demand for domestic supply chains give the manufacturing base a multi-year tailwind. If the $1.40 2027 EPS is beaten the way 2026 has been so far, 35× forward turns into 30× and the stock re-rates on earnings alone. A new CEO from sales, not finance, is the right person to keep the device-signing engine running.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>At 42× trailing, 3.2× PEG and a Hold consensus with an average target <em>below</em> the price, the stock has already discounted the good news. Gross margin has fallen for five straight years and Q2's 44.6% was the lowest quarter on the page; price/cost is negative despite 2.9% of price; the company just cut both its FMI signings and Digital Footprint targets for 2026; and 76% of revenue is manufacturing that grew 2.7% the last time the PMI sat below 50. The stock fell 16% in one month in October 2025 on an 11.5% EPS-growth quarter. Consensus has 2027 EPS growth at 10.9%. Same setup, one year later, with a first-time CEO.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Multiple compression on deceleration.</strong> The Oct 2025 episode is the template: double-digit growth that merely decelerates from the prior quarter can cost 15–20% at this valuation. The Q3 2026 print on October 14 will lap a +11.7% quarter with an August run-rate of +16.6% — a high bar to keep clearing into 2027, when consensus growth steps down to 10.9%.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Tariff cost push outrunning price.</strong> Fasteners are 30.7% of sales and disproportionately imported steel. A negative 40 bps price/cost on 2.9% of price means the current tariff regime is not yet fully in the P&amp;L; a further round of Section 232 or reciprocal tariff increases would force either another price push into 75.8%-contract customers or further gross-margin erosion below 44.5%.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Manufacturing cycle turning.</strong> Heavy manufacturing is 44% of sales and grew 18% in Q2 — the most cyclical slice growing fastest. If the PMI slips back below 50, FY2024 (revenue +2.7%, EPS −1%) is the base-rate outcome, and at 0.71 beta the market is not pricing that scenario at all.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Tariffs Turn Distributors Into Price-Takers</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Industrial distribution's economics assume the distributor can re-price faster than its costs move. In 2025–26 that assumption is being tested: Fastenal's realised price rose from 140–170 bps (Q2 2025) to 290 bps (Q2 2026) — a 4.5% two-year stack — and gross margin still fell 75 bps with 40 bps of that explicitly price/cost. The company's own language is that tariff uncertainty is showing up "through cost planning and pricing discussions rather than demand." Read plainly: costs are certain, recovery is negotiated, and the customer base most exposed (large contract manufacturers, 75.8% of sales) has the most negotiating leverage. Every broadline peer faces the same squeeze; Fastenal's fastener weighting makes it the most steel-exposed of the three.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Consolidation Toward the Embedded Model</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">The $50k+/month site count rising 16.5% while total active sites fall 8% is the industry in one line: the large customer is consolidating vendors, the small customer is going to Amazon Business or a regional house, and the middle is disappearing. Fastenal's response — FMI devices and Onsite staff that make it structurally hard to unbundle — is working (contract mix 73.2% → 75.8% in a year) but it costs money: 2026 capex of $310–330M is up 40%, headcount is up 423, and the company just trimmed its 2026 device and digital targets. Grainger is running the same play with its Keepstock program; MSC is a smaller, more metalworking-centric version. The winners will be the ones with the density to restock a bin cheaply; the losers are anyone still relying on counter sales.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Reshoring and a PMI Back Above 50</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Six consecutive months of a U.S. PMI above 50 — averaging 53 in Q2 2026 — is the first sustained manufacturing expansion since 2022, and heavy manufacturing (+18.1%) and non-residential construction (+17.0%) are Fastenal's two fastest end markets as a result. Tariff-driven reshoring, if it persists, adds domestic factory floors that need bins and vending machines. <strong>Bull framing:</strong> Fastenal is the cleanest listed way to own U.S. factory-floor activity, with 76% manufacturing exposure and a device base that scales with new plants; 42× is a fair price for that scarcity. <strong>Bear framing:</strong> the PMI has been above 50 for six months, not six years; the FY2024 numbers (revenue +2.7%, EPS −1%) show exactly what this business does below 50, and the stock's flat 52-week return says the market already knows it.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close, 4:00 PM EDT). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($49.60, +$0.37 / +0.75%), market cap, 52-week range, sector/industry labels, valuation statistics, annual and quarterly financials, and analyst consensus from stockanalysis.com (https://stockanalysis.com/stocks/fast/ and its statistics, financials, and forecast sub-pages, retrieved Sep 4, 2026). Monthly closes from digrin.com FAST price history ("Real Price" column, unadjusted for dividends), with all closes before May 22, 2025 divided by two for the 2-for-1 split; June 30, 2026 ($48.03) and May 29, 2026 ($44.20) closes cross-checked against the stockanalysis.com daily history and matched exactly; the final point is the Sep 4, 2026 close and matches the header. No chart months were reconstructed. Q2 2026 operating detail (product line, end market, FMI, digital, pricing, capex, headcount, working capital) from the Fastenal Q2 2026 earnings release as republished by Yahoo Finance and the Motley Fool call transcript (Jul 14, 2026); CEO/CFO from the call participant list, Industrial Supply Magazine (Dec 2025) and Digital Commerce 360 (Jul 2026); global market-cap rank from companiesmarketcap.com; Grainger and MSC Industrial figures from their stockanalysis.com overview pages; August 2026 sales headline from the stockanalysis.com news feed.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations — the US and NASDAQ rank pills and the September sales-release date. Items marked <strong>n/d</strong> are not disclosed by the company; no market-share or TAM figures have been estimated. Product-line revenue dollar figures are computed as disclosed mix percentage × reported quarterly net sales; blended growth rates for fasteners and "other" are sales-weighted averages of the disclosed direct and indirect rates. The Peer Avg column uses only Grainger and MSC Industrial and only metrics visible on fetched pages; peer net margins are computed from fetched TTM net income and revenue. The NASDAQ-100 column and a five-year relative-return comparison were not verified and are left blank. Active Onsite location count and Q2 Onsite signings were not found in the sources fetched. Only two named analyst actions were seen on fetched pages; ratings for those two were not captured. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com "Real Price", pre-May-2025 values ÷ 2 for the split) + Sep 4, 2026 close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 4 26'];
+const prices = [25.81,28.54,29.59,32.03,28.34,25.73,29.70,27.66,26.78,24.96,25.68,25.17,23.02,24.17,25.76,23.66,25.28,25.78,26.97,26.92,26.93,29.50,29.31,28.79,27.32,29.17,29.99,32.39,34.12,36.51,38.57,33.97,32.99,31.42,35.38,34.14,35.71,39.09,41.78,35.96,36.62,37.87,38.78,40.49,41.34,42.00,46.13,49.66,49.04,41.15,40.40,40.13,43.36,46.04,46.40,44.93,44.20,48.03,47.71,49.31,49.60];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Sep 2021 — window start $25.81 (split-adj.)',        color: '#94a3b8' },
+  { idx: 12, label: 'Sep 2022 — five-year low $23.02 (−28% from Dec 21)', color: '#ef4444' },
+  { idx: 30, label: 'Mar 2024 — first peak $38.57; Q1 miss followed',     color: '#f59e0b' },
+  { idx: 38, label: 'Nov 2024 — post-election rally $41.78',              color: '#3b82f6' },
+  { idx: 44, label: 'May 2025 — 2-for-1 split (May 22)',                  color: '#a78bfa' },
+  { idx: 47, label: 'Aug 2025 — monthly-close high $49.66, ~47× P/E',     color: '#22c55e' },
+  { idx: 49, label: 'Oct 2025 — −16% after Q3 2025 print',                color: '#ef4444' },
+  { idx: 60, label: 'Sep 4 2026 — $49.60, Aug sales +16.6%',              color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(61,155,233,0.22)');
+grad.addColorStop(1, 'rgba(61,155,233,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3D9BE9', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3D9BE9'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
