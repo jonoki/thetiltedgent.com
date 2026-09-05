@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MSTR — Strategy Inc | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #F7931A;
+  --accent-dim: #F7931A33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">MSTR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software – Application</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $54.87B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #451</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#170 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#75 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Strategy Inc</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:2px;">formerly MicroStrategy · the StockAnalysis sector label says "Software"; the balance sheet says "845,050 bitcoin"</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$142.80</div>
+      <div class="price-change">−$2.02 (−1.39%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $142.69 (−0.08%) at 6:24 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Tysons Corner, Virginia</div>
+    <div class="meta-item"><span>Employees:</span> 1,539</div>
+    <div class="meta-item"><span>Founded:</span> 1989 (IPO Jun 11, 1998 · 10-for-1 split Aug 8, 2024)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Late Oct / early Nov 2026 (est. — last report Jul 30, 2026; Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Strategy is the world's largest corporate holder of bitcoin — <strong>845,050 BTC as of August 30, 2026</strong>, bought for an aggregate <strong>$63.73B</strong> (average cost <strong>$75,412 per coin</strong>) — wrapped around a small enterprise-analytics software business that produced <strong>$477.2M of FY2025 revenue, up 3.0%</strong>. The software is what the stock exchange's sector tags describe; the bitcoin is what the $54.87B market capitalisation is pricing. The company ranks roughly <strong>#451 globally by market cap</strong>, having lost <strong>56.8%</strong> of its value over the past twelve months.</p>
+  <p class="prose" style="margin-top:16px;">The debate this page is built around is a single ratio. At a bitcoin price of roughly <strong>$79,300</strong>, Strategy's coins are worth about <strong>$67.0B</strong> — <em>more than the entire equity market cap</em>. On the basic <strong>mNAV</strong> (market cap ÷ market value of bitcoin held) the stock trades at <strong>~0.82×</strong>, a discount to its own bitcoin, after spending most of 2024–2025 at premiums of 1.5×–3×. That inversion breaks the machine the company was built on: issuing stock above NAV to buy bitcoin below it. Strategy spent June–August 2026 <em>selling</em> bitcoin (about 6,900 coins at ~$62,000) to fund preferred dividends and debt reduction, then in late August sold $602.8M of common stock at a discount to NAV to buy 4,603 coins back at $80,318. Whether the discount is a gift or a warning is the whole question.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Founder &amp; Executive Chairman</div>
+      <div class="card-value" style="font-size:20px;">Michael Saylor</div>
+      <div class="card-note">Co-founded MicroStrategy in 1989, ran it as CEO until August 2022, and authored the August 2020 pivot to a bitcoin treasury. Verified as Founder &amp; Executive Chairman in the Q1 2026 results release (May 5, 2026). The public face of the strategy and of the "Digital Credit" preferred-stock franchise.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">President &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Phong Le</div>
+      <div class="card-note">President &amp; CEO since August 2022 (previously CFO and President). Verified from the Q1 2026 release. Per coverage fetched, Le has said the company sold bitcoin this summer "to cover its preferred dividends and reduce its debt" — the first sales in the treasury era.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Andrew Kang</div>
+      <div class="card-note">CFO, verified from the Q1 2026 release, where he described Strategy as "the dominant issuer of Digital Credit in the world, with over $13.5 billion of preferred equity outstanding." Institutional ownership is <strong>57.9%</strong> and insider ownership <strong>5.3%</strong> (StockAnalysis); individual holder names were not verified from sources fetched and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Strategy has two "businesses," but only one produces revenue. The bitcoin treasury generates no revenue at all — its results flow through the income statement as fair-value gains and losses on digital assets. The bar below is therefore the revenue mix of the <strong>software segment only</strong> (Q1 2026 product-line disclosure, $124.3M total). Keep the scale in mind: a single week of the company's August ATM equity sales ($2.01B, week of Aug 17–23) raised more than four years of software revenue.</p>
+  <div class="seg-bar">
+    <div style="flex:47.4;background:#F7931A;">Subscription 47.4%</div>
+    <div style="flex:35.6;background:#3b82f6;color:#fff;">Support 35.6%</div>
+    <div style="flex:12.6;background:#a78bfa;">Other 12.6%</div>
+    <div style="flex:4.4;background:#64748b;color:#fff;">Lic.</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#F7931A;"></span> Subscription services — $58.9M (Q1 2026, +58.7% YoY)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Product support — $44.2M (−15.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Other services — $15.7M (+10.9%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Product licenses — $5.5M (−24.4%)</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #F7931A;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Bitcoin Treasury — 845,050 BTC</div>
+        <span class="biz-badge dominant">~4.0% OF ALL BITCOIN THAT WILL EVER EXIST</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$0</div><div class="biz-stat-label">Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$67.0B</div><div class="biz-stat-label">Mkt value @ ~$79.3k</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$75,412</div><div class="biz-stat-label">Avg cost / BTC</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">0.0022</div><div class="biz-stat-label">BTC per share</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>The numbers, with their inputs.</strong> Holdings: 845,050 BTC (8-K, week ending Aug 30, 2026). Aggregate cost: $63.73B → average $75,412. Bitcoin price used here: <strong>~$79,300</strong>, the price implied by bitcointreasuries.net's $67.0B valuation on Sep 4, 2026, and consistent with the $79,558 quoted by The Motley Fool on Sep 3 and the "bitcoin reclaims $80,000" headlines of the same day. Holdings value: 845,050 × $79,300 ≈ <strong>$67.0B</strong>. Unrealised gain: roughly <strong>$3.3B (+5%)</strong> on cost — thin, for a position whose average entry has drifted up from $73,971 (Sep 2025) as the company kept buying above $100,000 through late 2025. Shares outstanding: 384.23M (StockAnalysis). <strong>BTC per basic share: 845,050 ÷ 384.23M = 0.00220</strong>, worth about <strong>$174 per share</strong> at $79,300. The stock closed at $142.80.</p>
+    <p class="biz-desc"><strong>mNAV.</strong> Basic mNAV = $54.87B ÷ $67.0B = <strong>0.82×</strong> (bitcointreasuries.net shows 0.80× basic / 0.81× diluted on a slightly lower market cap). Adding the liabilities that sit ahead of common — about $8.2B of convertible debt (Q1 2026 balance sheet; StockAnalysis shows $6.77B total debt at the latest quarter) and ~$13.5B of preferred notional — and netting $6.71B of USD reserve and cash gives an enterprise-value mNAV of roughly <strong>1.04×</strong> by this page's arithmetic; The Block quoted 1.07× and bitcointreasuries 1.08× using their own debt and preferred figures. Read together: <em>the common trades below the bitcoin, the whole capital structure trades slightly above it.</em> The premium has migrated from the equity to the preferreds.</p>
+    <div class="biz-tam"><strong>Bitcoin market:</strong> ~$1.6T at $79,300 (est. — 21M cap × price; circulating supply is ~19.9M, not verified from sources fetched). Strategy holds about 4.0% of terminal supply and, per bitcointreasuries.net, ~19× the second-largest corporate holder.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Twenty One Capital</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">43,514</div><div class="comp-bubble-label">BTC held (#2 corporate)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">mNAV</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Spot bitcoin ETFs (IBIT et al.)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">AUM — not fetched</div></div>
+          <div><div class="comp-bubble-val">~1.00×</div><div class="comp-bubble-label">mNAV by construction</div></div>
+          <div><div class="comp-bubble-val">0.25%</div><div class="comp-bubble-label">Typical fee (est.)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">"Digital Credit" — Perpetual Preferred Stock</div>
+        <span class="biz-badge emerging">~$13.5B NOTIONAL — LARGEST PREFERRED ISSUER BY MARKET CAP</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$13.5B</div><div class="biz-stat-label">Pref outstanding (May 2026)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$1.5B</div><div class="biz-stat-label">Annual dividends (est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$5.10B</div><div class="biz-stat-label">USD Reserve (Aug 30)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$25.2B</div><div class="biz-stat-label">Remaining pref ATM capacity</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Not a business in the revenue sense — a funding channel the company markets as a product. Four listed perpetual preferreds (all Nasdaq, all verified on StockAnalysis on Sep 4, 2026): <strong>STRC</strong> ("Stretch"), variable-rate, $12.00 annualised per the current quote (11.5% at the Q1 release), price $96.80, current yield 12.40%, ~$10.0B liquidation preference and the workhorse of the program; <strong>STRK</strong> ("Strike"), 8% coupon, convertible into common, price $74.26, yield 10.77%; <strong>STRF</strong> ("Strife"), 10% coupon, senior, price $101.65, yield 9.84%; <strong>STRD</strong> ("Stride"), 10% coupon, non-cumulative, price $72.05, yield ~14.7% on StockAnalysis's trailing figure. Three of the four trade below their $100 liquidation preference — the market is demanding 10–15% to fund bitcoin at a moment when the bitcoin itself has returned roughly 5% over cost. The cash cost of the dividends — roughly <strong>$1.4–1.5B a year (est.: $10B × ~11.75% plus $3.5B × ~9%)</strong> — is <em>three times</em> the software segment's annual revenue. It is covered for now by a <strong>$5.10B USD Reserve</strong> plus <strong>$1.61B of "USD Cash,"</strong> roughly four years of runway with no bitcoin sales; the company also guides that the distributions should qualify as non-taxable return of capital for a decade or more.</p>
+    <div class="biz-tam"><strong>Program capacity:</strong> STRC $17.51B · STRD $4.01B · STRK $2.10B · STRF $1.62B remaining under ATM programs (8-K, Aug 24, 2026). Zero preferred sold in the week of Aug 17–23; $136.4M of preferreds <em>repurchased</em>.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Enterprise Analytics Software (Strategy One)</div>
+        <span class="biz-badge emerging">SHARE NOT DISCLOSED — NICHE BI VENDOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$477.2M</div><div class="biz-stat-label">FY2025 revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.0%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">67.6%</div><div class="biz-stat-label">Gross margin (TTM)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">100%</div><div class="biz-stat-label">Of revenue</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The original company: business-intelligence and analytics software sold to large enterprises, now branded Strategy One and pitched around AI-driven analytics. Revenue has been flat for five years — <strong>$510.8M (FY2021) → $499.3M → $496.3M → $463.5M → $477.2M (FY2025)</strong> — with the internal mix shifting from perpetual licenses and support toward cloud subscriptions (Q1 2026 subscription revenue +58.7% YoY to $58.9M; support −15.8%). Q2 2026 revenue was <strong>$122.4M, +6.9%</strong>, and the trailing twelve months <strong>$498.4M, +7.8%</strong>. Gross margin is a healthy 67.6%, but the segment's operating contribution is dwarfed by everything else on the P&amp;L: the TTM operating loss is <strong>−$36.4B</strong>, essentially all of it bitcoin fair-value marks. At a generous 5× revenue the software is worth ~$2.5B (est.) — under 5% of the market cap. It exists on this page for completeness and because it is what the SEC filings still call the "reportable segment."</p>
+    <div class="biz-tam"><strong>Category:</strong> business intelligence / analytics platforms — TAM not verified from sources fetched and deliberately not estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Microsoft (Power BI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">BI rev not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Salesforce (Tableau)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">BI rev not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Google (Looker)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">BI rev not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose"><strong>Sources of Moat</strong></p>
+  <div class="moat-list">
+    <span class="moat-pill">Scale: 845k BTC, ~19× the #2 holder</span>
+    <span class="moat-pill">Capital-markets access ($44B+ ATM capacity)</span>
+    <span class="moat-pill">Preferred-stock franchise (STRC $10B)</span>
+    <span class="moat-pill">Index / options liquidity (Nasdaq-100)</span>
+    <span class="moat-pill">Saylor brand &amp; retail following</span>
+    <span class="moat-pill">$6.7B USD reserve = dividend runway</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The honest description of Strategy's advantage is that it is a <strong>capital-markets moat, not an operating one</strong>. Bitcoin is a commodity anyone can buy; what Strategy has that a spot ETF does not is the ability to issue securities other than shares — convertible notes at near-zero coupons in 2021–2024, and since 2025 a family of perpetual preferreds — and to use the proceeds to buy more bitcoin per share than the shares it issued represented. That works only while the common trades at a premium to NAV. The company's own metric, <strong>BTC Yield</strong> (the percentage change in bitcoin held per assumed diluted share), was <strong>9.4% year-to-date as of May 3, 2026</strong>, against 26.0% YTD at the same point in 2025. It is worth being precise about what that number is: it is <em>dilution accounting</em>. It measures how much faster the coin pile grew than the share count. It is not a return on bitcoin, not a cash yield, and it can be positive while the stock falls 57% — which is exactly what happened over the past year, with shares outstanding up 24.6% YoY.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The premium is gone, so the flywheel runs backwards.</strong> With basic mNAV at ~0.82×, every dollar of common stock sold to buy bitcoin buys <em>less</em> bitcoin per share than existing holders already own. In the week of Aug 24–30 the company sold 4.53M shares for $602.8M (~$133/share, or ~0.00168 BTC per share at $79,300) while existing shares each represent 0.00220 BTC. That is BTC-per-share dilutive on the arithmetic shown here, even if some proceeds went to preferred buybacks and cash. The ATM machine only manufactures BTC Yield when mNAV is above 1.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Fixed-cost preferred dividends on a zero-cash-flow asset.</strong> ~$1.4–1.5B a year (est.) of dividends must be paid from the USD reserve, new issuance, or bitcoin sales. Two of the three are pro-cyclical: preferred demand and bitcoin prices fall together. The summer 2026 sales — ~6,900 BTC near $62,000 — were the first time the "never sell" company sold, and it bought back at $80,318 ten weeks later.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Cheaper substitutes now exist.</strong> Spot bitcoin ETFs deliver 1.00× NAV exposure for ~0.25%; a leveraged bitcoin ETF delivers the beta. The 2020–2024 case for paying a premium (no ETF, no easy institutional wrapper) has weakened structurally, which is one reason the premium collapsed.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Accounting volatility as a governance cost.</strong> Under fair-value accounting (ASU 2023-08, adopted Jan 1, 2025) every quarter's bitcoin move hits net income. Q1 2026 alone booked a <strong>$14.46B unrealised loss</strong>; TTM net loss is <strong>$31.37B</strong>. The company itself has flagged the possibility of corporate alternative-minimum-tax exposure on unrealised gains in prior filings — not re-verified here, but a live consideration whenever bitcoin rallies.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Read this table with one fact in mind: since <span class="tip" title="Accounting Standards Update 2023-08 — the FASB rule, effective for fiscal years beginning after Dec 15, 2024, requiring crypto assets to be carried at fair value with changes recognised in net income each period">ASU 2023-08</span> took effect in 2025, Strategy's reported earnings are almost entirely the quarterly mark-to-market on 845,050 bitcoin. A $10,000 move in bitcoin is an $8.45B swing in pre-tax income against $498M of revenue. Every earnings-based ratio below is therefore marked <strong>n/m</strong> (not meaningful) rather than dressed up as a valuation signal. Industry-average and NASDAQ-100 columns are left blank where no sourced figure was available.</p>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>MSTR</th><th>Industry Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings: share price divided by the last twelve months of earnings per share">Trailing P/E</span></td><td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td><td>TTM EPS is −$99.30, so the ratio is negative and meaningless. Price ÷ EPS = −1.4×. The loss is the bitcoin mark, not an operating result.</td></tr>
+      <tr><td><span class="tip" title="Price divided by analysts' forecast earnings for the next fiscal year">Forward P/E</span></td><td style="color:var(--text-dim);">n/m (3.63 quoted)</td><td>—</td><td>—</td><td>StockAnalysis displays 3.63×, but its own 2026 EPS forecast is −$17.44. A forward multiple on a bitcoin-price forecast dressed as EPS is not a valuation tool; ignore it.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: P/E divided by expected earnings growth rate">PEG Ratio</span></td><td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td><td>Undefined with negative earnings and no forecastable earnings-growth path.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td><td style="color:var(--red);">−$99.30</td><td>—</td><td>—</td><td>TTM net loss $31.37B. Quarterly EPS swung from +$32.60 (Q2 2025) to −$43.03 (Q4 2025) to −$24.45 (Q2 2026) — the bitcoin chart in EPS form.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year over year">YoY</span>)</td><td style="color:var(--amber);">+7.8% (TTM)</td><td>—</td><td>—</td><td>Software only. FY2025 +3.0%; Q2 2026 +6.9%. Subscription is growing ~59%, legacy licenses and support are shrinking.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a % of revenue">Gross Margin</span></td><td style="color:var(--green);">67.6%</td><td>—</td><td>—</td><td>Typical for enterprise software. Applies to $498M of revenue; irrelevant to the $67B asset.</td></tr>
+      <tr><td><span class="tip" title="Net income as a % of revenue">Net Profit Margin</span></td><td style="color:var(--text-dim);">n/m (−6,294%)</td><td>—</td><td>—</td><td>−$31.37B ÷ $498M. Operating margin −7,295%. Arithmetically true, analytically meaningless.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share as a % of share price">Dividend Yield</span></td><td style="color:var(--text-dim);">0% (common)</td><td>—</td><td>—</td><td>Common pays nothing. The preferreds yield 9.8%–14.7% (STRF / STRC / STRK / STRD) — that is where the cash goes.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a % of the tradable float — a gauge of bearish positioning">Short Interest</span></td><td style="color:var(--amber);">8.77% of float</td><td>—</td><td>—</td><td>31.88M shares short, 2.04 days to cover. Elevated but not extreme; much of it is convertible-arbitrage hedging rather than an outright bet.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity">Debt-to-Equity</span></td><td style="color:var(--amber);">0.15 (debt only)</td><td>—</td><td>—</td><td>$6.77B debt vs equity inflated by bitcoin at fair value. Excludes ~$13.5B of preferred stock that ranks ahead of common; including it roughly triples the figure (est.).</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--green);">5.39</td><td>—</td><td>—</td><td>Driven by the $5.10B USD Reserve and $1.61B USD Cash. Convertible maturities begin 2027–2028; only $31.4M of debt is current.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow: operating cash flow minus capital expenditure">Free Cash Flow</span></td><td style="color:var(--red);">−$41.2M (TTM)</td><td>—</td><td>—</td><td>Operating cash flow −$20.1M. The software roughly breaks even; the ~$1.4–1.5B (est.) of preferred dividends sits in financing cash flow, not here.</td></tr>
+      <tr><td><span class="tip" title="Return on equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--text-dim);">n/m (−63.6%)</td><td>—</td><td>—</td><td>Bitcoin fell, so equity "earned" a large negative return. Flip the sign in a bitcoin bull year (FY2025 Q2: +$10.0B net income in one quarter).</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital: after-tax operating profit divided by debt plus equity">ROIC</span></td><td style="color:var(--text-dim);">n/m (−71.8%)</td><td>—</td><td>—</td><td>Same distortion. The relevant "return on capital" is bitcoin's price change vs the ~10–12% cost of the preferred capital funding it.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to the overall market; 1.0 = moves with the market">Beta</span></td><td style="color:var(--red);">3.60</td><td>—</td><td>—</td><td>Among the highest in the Nasdaq-100. MSTR is functionally a leveraged bitcoin position: 52-week change −56.8% vs bitcoin ~−36% from its Oct 2025 high (Fool).</td></tr>
+      <tr><td>52-Week Range</td><td>$81.81 – $365.21</td><td>—</td><td>—</td><td>Price is at 39% of the range. High set Jul 2025 (monthly closes above $400 in Jun–Jul 2025); low set Jun 2026 as bitcoin approached $60,000.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:20px;"><strong>Notable One-Off Items.</strong> Almost everything is a "one-off" in the conventional sense. (1) <strong>Q1 2026: $14.46B unrealised digital-asset loss</strong> as carrying value fell from $58.85B to $51.65B while the company kept buying — the largest quarterly loss in its history. (2) <strong>Q4 2025: net loss of $12.62B against an operating loss of $5.41B</strong> — a $7.2B gap below the operating line that the StockAnalysis tables do not itemise; it is most plausibly a deferred-tax item (a valuation allowance or reversal of the deferred tax asset booked on adoption of fair-value accounting), but that explanation was <em>not</em> verified from the sources fetched and is flagged as unexplained. (3) <strong>Q2 2025: +$14.03B operating income</strong> on bitcoin's rally to ~$107,000 — the mirror image. (4) <strong>Summer 2026 bitcoin sales</strong>: ~6,916 BTC at $59,256–$64,262 (avg ~$62,081) for ~$430M — realised losses against a $75,412 average cost, and a break with the company's stated policy. (5) <strong>$136.4M of preferred repurchases</strong> in a single August week, the first sign the company will buy back its own "Digital Credit" when it trades at a discount.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Strong Buy</div><div class="card-note">16 analysts (S&amp;P Global via StockAnalysis). Note the sell side is effectively rating bitcoin plus a premium that no longer exists.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$224.60</div><div class="card-note">+57.3% vs $142.80. Median $200 (+40%). Most targets are derived from a bitcoin-price forecast times an assumed mNAV — check which mNAV.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$125 – $435</div><div class="card-note">Low $125 (−12.5%) to high $435 (+205%). A 3.5× spread between the most and least bullish desks — wide even for a beta-3.6 stock.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">13 / 2 / 1 / 0</div><div class="card-note">Strong Buy 13 · Buy 2 · Hold 1 · Sell 0. Zero sells on a stock down 57% in a year and trading below the value of its own assets.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:13;background:var(--green);"></div>
+    <div style="flex:2;background:#4ade80;"></div>
+    <div style="flex:1;background:var(--amber);"></div>
+  </div>
+  <div style="display:flex;gap:18px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);flex-wrap:wrap;">
+    <span><span style="color:var(--green);">■</span> Strong Buy 13</span><span><span style="color:#4ade80;">■</span> Buy 2</span><span><span style="color:var(--amber);">■</span> Hold 1</span><span><span style="color:var(--red);">■</span> Sell 0</span>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-top:28px;letter-spacing:1px;">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>B. Riley</strong> — Fedor Shabalin, <strong>Buy</strong> maintained, target raised $155 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$175</span> (Sep 3, 2026). The raise followed the resumption of bitcoin purchases and bitcoin's move back through $80,000; the target still implies only about 1.0× basic mNAV at current bitcoin prices.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>TD Cowen</strong> — Lance Vitanza, <strong>Buy</strong> maintained, target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260</span> (Sep 3, 2026). Long-standing bull on the "BTC Yield" framework; a $260 target implies either a materially higher bitcoin price or a return to a ~1.5× premium.</div></div>
+    <div class="risk-item"><span style="color:var(--text-dim);">●</span><div><strong>Other named calls not verified from sources fetched.</strong> StockAnalysis's forecast page listed only the two Sep 3 updates above in the visible feed; the $125 low and $435 high targets are unattributed there and are not attributed here.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Aug 31, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">"We're back" — 4,603 BTC bought for $369.7M after a ten-week pause</div>
+        <div class="tl-desc">The 8-K for Aug 24–30 disclosed the first purchase since late June, at $80,318 per coin, funded by $602.8M of common-stock ATM sales (4.53M shares) with the balance to $151.8M of preferred buybacks and cash. Holdings: 845,050 BTC. The catch: the coins were bought ~29% above the ~$62,000 at which roughly 6,900 coins were sold over the summer, and the purchase does not fully replace what was sold. MSTR rose 6.3% that week.</div>
+        <div class="tl-impact neutral">Mixed — buying resumed, but at a discount to NAV</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Bitcoin reclaims $80,000; B. Riley lifts target to $175</div>
+        <div class="tl-desc">Strategy and Coinbase rallied as bitcoin crossed $80,000 for the first time since the spring. Bitcoin remains roughly 36% below its ~$126,000 October 2025 high, and Strategy's average cost of $75,412 sits only ~5% below spot — the cushion between "unrealised gain" and "unrealised loss" is one bad week.</div>
+        <div class="tl-impact up">Potential upside catalyst — if it holds</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Weekly (Mondays)</div>
+      <div class="tl-content">
+        <div class="tl-title">8-K purchase / ATM disclosures — watch the mNAV at which shares are sold</div>
+        <div class="tl-desc">Each Monday filing reports the prior week's bitcoin purchases and ATM activity by security. The single most informative line is whether common is being issued while basic mNAV is below 1.0× (BTC-per-share dilutive) or whether issuance shifts to the preferreds, whose remaining capacity is $25.2B across STRC/STRD/STRK/STRF versus ~$19B for common.</div>
+        <div class="tl-impact neutral">Key near-term event — every week</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Quarter-end mark: Q3 net income will be roughly (BTC price − ~$66k) × 845k</div>
+        <div class="tl-desc">Bitcoin's June 30 price sets the base for the Q3 fair-value gain or loss. With bitcoin near $80,000 versus roughly $60,000–65,000 at the end of June (est. — inferred from the company's June–July sale prices), Q3 is on track for a multi-billion-dollar reported profit, after two consecutive quarters of $8.6B and $12.5B losses. Expect headlines to treat it as earnings; it is a price mark.</div>
+        <div class="tl-impact up">Potential upside catalyst (headline)</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct / early Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results — first full quarter after the bitcoin sales</div>
+        <div class="tl-desc">Date not confirmed on sources fetched (Q2 reported Jul 30). Items to read: realised loss on the summer sales, the USD Reserve balance after another quarter of ~$350M+ in preferred dividends, updated BTC Yield (9.4% YTD at May 3), and any change to the semi-monthly STRC dividend proposal flagged in the Q1 release.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Preferred-stock pricing — three of four series below $100 liquidation preference</div>
+        <div class="tl-desc">STRC $96.80, STRK $74.26, STRD $72.05, STRF $101.65 (Sep 4). Preferreds trading at a discount cap the company's ability to raise cheap "Digital Credit" and raise its marginal funding cost above 12%. A return of STRC to par would reopen the largest program ($17.5B capacity); a further slide would push the company toward the two remaining sources — common issuance below NAV, or bitcoin sales.</div>
+        <div class="tl-impact down">Ongoing headwind</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">MSTR — 59 MONTH-END CLOSES, OCT 2021 → AUG 2026, PLUS THE SEP 4, 2026 CLOSE (60 points, split-adjusted for the Aug 2024 10-for-1)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026 · final point is a partial month (Sep 4 close), not a month-end</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#F7931A;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. For MSTR it is really a momentum gauge on bitcoin with the volume turned up — it is not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$71.51</strong> (split-adjusted from $715.06) to the September 4, 2026 close of <strong>$142.80</strong>, MSTR roughly <strong>doubled: +99.7%, about 15% compounded</strong>, with no dividend. Almost nobody experienced it that way. The stock fell <strong>80%</strong> from that October 2021 close to <strong>$14.16</strong> in December 2022 as bitcoin broke below $17,000 and the company impaired its coins under the old cost-less-impairment rules. It then rose <strong>28-fold</strong> — from $14.16 to a monthly-close peak of <strong>$404.23 in June 2025</strong> — as bitcoin ETFs launched, bitcoin went from $16,500 to over $100,000, and the equity premium over NAV expanded to 2–3× at the November 2024 peak. Since June 2025 it has fallen <strong>65%</strong> to today, with the June 2026 close of $86.93 marking the low. The 52-week change of <strong>−56.8%</strong> is against bitcoin's roughly −36% from its October 2025 high: the stock has behaved like a ~1.6× leveraged position on the way down, with the extra leg of decline coming from the premium collapsing to a discount.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Relative performance.</strong> The NASDAQ-100 and S&amp;P 500 total returns over the identical window could not be verified from the sources fetched and are deliberately not quoted. What the data on this page does establish: a beta of 3.60, the highest-volatility path of any large-cap in the batch, and a five-year outcome that beat neither index on a risk-adjusted basis despite the headline doubling. The 200-day moving average ($139.09) now sits almost exactly at the current price, with the 50-day at $103.50 well below — the stock has recovered to its long-run trend line, not above it.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2021</div><div class="tl-content"><div class="tl-title">$72.14 — bitcoin's $69,000 top; the zero-rate high</div><div class="tl-desc">MicroStrategy had 121,000 BTC and a "software company with a bitcoin treasury" narrative. Convertible notes carried 0%–0.75% coupons.</div><div class="tl-impact neutral">Cycle peak</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2022</div><div class="tl-content"><div class="tl-title">$14.16 — cycle low, −80% from Oct 2021</div><div class="tl-desc">FTX collapse, bitcoin below $17,000, and cumulative impairment charges (FY2022 net loss $1.47B) under the old accounting. The company also executed its first-ever bitcoin sale (a small tax-loss sale) that month; Saylor had stepped down as CEO in August.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb–Mar 2024</div><div class="tl-content"><div class="tl-title">$102.28 → $170.46 — spot ETFs approved, stock triples in three months</div><div class="tl-desc">U.S. spot bitcoin ETFs launched Jan 11, 2024. Bitcoin ran to a new high above $73,000 in March; MSTR ran harder as the premium to NAV widened and the ATM machine scaled.</div><div class="tl-impact up">Regime change</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2024</div><div class="tl-content"><div class="tl-title">$132.42 — 10-for-1 split effective Aug 8</div><div class="tl-desc">Every price before this point on the chart is divided by 10. The split broadened options participation, which matters for a stock whose volatility is itself a product.</div><div class="tl-impact neutral">Structural</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">$387.47 — post-election peak, mNAV ~3× (est.)</div><div class="tl-desc">The largest monthly gain in the window (+58% from October). The company announced its "21/21" plan to raise $42B over three years and became a Nasdaq-100 constituent in December 2024. This is the moment the equity premium over bitcoin peaked.</div><div class="tl-impact up">Peak premium</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Jul 2025</div><div class="tl-content"><div class="tl-title">$404.23 / $401.86 — the price high, on bitcoin above $100,000</div><div class="tl-desc">Q2 2025 net income of $9.97B (+$32.60 EPS) as fair-value accounting turned the rally into reported profit. The STRC preferred launched in July. Monthly-close high of the entire five-year window.</div><div class="tl-impact up">All-time high (monthly close)</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025</div><div class="tl-content"><div class="tl-title">$177.18 — −34% in one month as bitcoin broke down from $126,000</div><div class="tl-desc">The premium began compressing toward 1× while the company kept buying above $100,000 — which is why the average cost rose from $73,971 (Sep 2025) to over $75,000. Q4 2025 net loss: $12.62B.</div><div class="tl-impact down">Premium compression</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">$86.93 — five-year-window low since 2023; the company starts selling bitcoin</div><div class="tl-desc">Bitcoin approached $60,000. Roughly 6,900 BTC were sold between late June and early August at $59,256–$64,262 to fund preferred dividends and reduce debt. The stock fell through 1.0× mNAV and stayed there.</div><div class="tl-impact down">Thesis stress test</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2026</div><div class="tl-content"><div class="tl-title">$142.80 — +64% off the June low, still ~0.82× NAV</div><div class="tl-desc">Bitcoin back through $80,000, purchases resumed, but the common still trades below the value of the coins it represents ($174/share at $79,300).</div><div class="tl-impact neutral">Recovery without a premium</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <p class="prose"><strong>What you actually own.</strong> One share of MSTR at $142.80 is a claim on <strong>0.00220 BTC (~$174 at $79,300)</strong>, minus a pro-rata share of roughly $8B of convertible debt and ~$13.5B of preferred stock that rank ahead of you, plus a pro-rata share of $6.7B of cash reserves and a flat, cash-neutral software business. The market is discounting that package at <strong>~0.82× the bitcoin alone</strong>. Two things explain the discount: the senior claims (on this page's arithmetic, enterprise value ÷ bitcoin ≈ 1.04×, so the <em>whole structure</em> is not cheap — only the common is), and the loss of the mechanism that justified a premium. When the stock traded at 2× NAV, each $100 of new shares bought $100 of bitcoin for holders who had paid $200 for the same exposure; BTC per share rose every time the ATM ran. At 0.82×, the arithmetic reverses, and the company's late-August common issuance was — on the numbers shown in Section 03 — dilutive to bitcoin per share.</p>
+  <p class="prose" style="margin-top:20px;"><strong>BTC Yield, translated.</strong> The company's headline KPI was <strong>9.4% YTD</strong> at May 3, 2026. It is the percentage growth in bitcoin per assumed-diluted share. It is a useful number for exactly one thing — measuring whether the financing machine is accretive — and a misleading one for everything else. It is not income; there is no cash. It goes up when preferred stock or convertibles fund purchases (no new common shares) regardless of what bitcoin does, and it can be strongly positive in a year when the stock loses half its value, as it just was. Treat it as the company's dilution report card, and note that with the common below NAV and preferred issuance stalled (zero sold in the Aug 17–23 week), the report card is likely to weaken through the second half unless the premium returns.</p>
+  <p class="prose" style="margin-top:20px;"><strong>The preferred stack is the real story of 2026.</strong> $13.5B of perpetual preferreds paying 8%–12% (~$1.4–1.5B a year, est.) is a fixed obligation against an asset that yields nothing. Management's answer is the <strong>$5.10B USD Reserve plus $1.61B USD Cash</strong> — about four years of dividends — and the argument that bitcoin's expected appreciation exceeds a 10–12% cost of capital. The summer sales showed what happens when both bitcoin and the preferreds fall at once: the company sold coins at a realised loss and bought them back 29% higher. The preferreds trading below par (STRK $74, STRD $72 on a $100 preference) says the market currently prices that risk at 11%–15%.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying 845,050 bitcoin at an 18% discount through the common, with a $6.7B cash buffer covering four years of preferred dividends and no meaningful debt maturity until 2027–28. If bitcoin recovers toward its $126,000 high, the fair-value mark alone is a ~$39B reported gain, the premium historically re-expands in bull phases, and the preferred franchise reopens at lower yields — a three-way lever on the way up. Sixteen analysts see $224.60 on average; beta of 3.6 works in both directions.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The discount is rational: enterprise value already exceeds the bitcoin (~1.04×), the flywheel is dilutive below 1× mNAV, and ~$1.5B a year of preferred dividends must be paid from reserves, new issuance or coin sales — the company has now done all three. Spot ETFs offer the same exposure at 0.25% with no senior claims. A bitcoin round-trip to $60,000 puts the coins $13B under water on cost, shrinks the reserve's runway, and forces the choice between selling bitcoin or issuing common at an even deeper discount. Average cost $75,412 vs spot $79,300 leaves a 5% cushion.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Bitcoin price.</strong> Everything else is derivative. At 845,050 coins, each $1,000 move is $845M of equity value and reported income; a return to the June 2026 lows (~$60,000) would be a ~$16B fair-value loss and would push the position ~$13B below cost.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Funding the preferred dividends without a premium.</strong> With basic mNAV below 1× and three of four preferreds below par, the marginal funding options are common issuance below NAV (dilutive to BTC per share) or bitcoin sales (realising losses and breaking the narrative). The USD Reserve buys roughly four years, not forever.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Structural substitution and index / regulatory risk.</strong> Spot and leveraged bitcoin ETFs have eliminated the scarcity premium MSTR once commanded. Separately, any change to Nasdaq-100 eligibility for companies whose assets are overwhelmingly non-operating, or to the tax treatment of unrealised crypto gains, would hit both the premium and the funding model — neither was verified as imminent from sources fetched, both are live.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Treasury-Company Premium Has Collapsed Sector-Wide</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">The 2024–2025 boom in "bitcoin treasury companies" rested on one trade: sell stock at a premium to NAV, buy bitcoin, report BTC Yield, repeat. Strategy is the template and the largest by a factor of ~19 over the next holder (Twenty One Capital, 43,514 BTC per bitcointreasuries.net). With the leader itself at ~0.82× basic mNAV and having sold coins to pay dividends, the sector's business model is in question. For MSTR specifically, the constraint is that the largest and most liquid version of the trade is now a discount vehicle — and discount vehicles historically close the gap through buybacks or liquidation, both of which mean selling bitcoin, not buying it.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Fair-Value Accounting Makes the Income Statement a Price Chart</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Since ASU 2023-08 took effect in 2025, Strategy has reported quarterly net income of +$10.0B, +$2.6B, −$12.6B, −$12.5B (restated on the release as −$12.77B attributable to common) and −$8.6B in five consecutive quarters on $111M–$129M of revenue. Screens, index methodologies and quantitative funds ingest those numbers as "earnings," which drives forced flows in both directions and inflates realised volatility (beta 3.60). It also creates a recurring headline problem: a "record loss" quarter when bitcoin falls, a "record profit" when it rises, neither of which changes the coin count.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Bitcoin Back Above $80,000 — With a Buyer of Last Resort Returning</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Bitcoin's recovery from roughly $60,000 in June to above $80,000 on Sep 3 has restored a ~$3B unrealised gain on Strategy's book and let management restart purchases. <strong>Bull framing:</strong> the discount to NAV is the best entry the stock has offered since 2023; if bitcoin holds and preferred demand returns, the flywheel resumes and the premium historically re-expands quickly. <strong>Bear framing:</strong> the company just demonstrated that it will sell coins into weakness and buy them back into strength — the opposite of what a "permanent capital" holder is supposed to do — and the next leg of preferred dividends ($350M+ per quarter, est.) is due regardless of where bitcoin trades. The cushion between average cost ($75,412) and spot ($79,300) is about 5%.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, daily change, market cap, 52-week range, sector/industry labels, statistics, financials and analyst consensus from stockanalysis.com (https://stockanalysis.com/stocks/mstr/ and its /statistics/, /financials/, /financials/?p=quarterly and /forecast/ pages, retrieved Sep 4, 2026); preferred-stock quotes from stockanalysis.com STRC, STRK, STRF and STRD pages (Sep 4, 2026); 59 unadjusted month-end "Real Price" closes Oct 2021–Aug 2026 from digrin.com MSTR price history, divided by 10 for months before the Aug 8, 2024 split, with the Sep 4, 2026 close from stockanalysis.com as the final point (Aug 2026 monthly close $132.94; the 52-week change of −56.8% implies ~$330 a year ago, consistent with the Aug/Sep 2025 closes of $334.41/$322.21); bitcoin holdings, cost basis, ATM activity and reserves from Strategy Form 8-K filings on sec.gov (Aug 24, 2026) and coverage of the Aug 31, 2026 8-K by CoinDesk, The Block, The Motley Fool and The Coin Republic; Q1 2026 figures, executive names and titles, preferred notional, debt and software product-line revenue from the Q1 2026 results release (Form 8-K exhibit 99.1, sec.gov, May 5, 2026); holdings valuation, mNAV cross-check and BTC-per-share from bitcointreasuries.net (Sep 4, 2026); global market-cap rank from companiesmarketcap.com (Sep 3, 2026). Bitcoin price of ~$79,300 is the Sep 4 price implied by bitcointreasuries.net's $67.0B holdings value, corroborated by $79,558 (Motley Fool, Sep 3) and $78,400 (CoinDesk, Aug 31); a direct exchange quote could not be fetched.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source: the US and NASDAQ market-cap rank pills, annual preferred-dividend cost, enterprise-value mNAV (computed here from Q1 debt, May preferred notional and Aug 30 reserves), bitcoin's June 30 level, the software segment's implied value, historical mNAV levels, the next earnings date and the ETF fee. No chart months were reconstructed; the final chart point is a partial month and is labelled as such. The Q4 2025 gap between operating loss and net loss is flagged as unexplained rather than attributed. Industry-average and NASDAQ-100 comparison columns are blank where no sourced figure was available. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Bitcoin and securities linked to it are exceptionally volatile. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 59 month-end closes Oct 2021 → Aug 2026 (digrin.com "Real Price", ÷10 before Aug 2024 split) + Sep 4, 2026 close (stockanalysis.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 4 26'];
+const prices = [71.51,72.14,54.45,36.80,44.30,48.63,35.42,26.47,16.43,28.61,23.16,21.23,26.75,19.81,14.16,25.17,26.23,29.23,32.84,30.16,34.24,43.79,35.75,32.83,42.34,49.83,63.16,50.12,102.28,170.46,106.50,152.45,137.75,161.44,132.42,168.60,244.50,387.47,289.62,334.79,255.43,288.27,380.11,369.06,404.23,401.86,334.41,322.21,269.51,177.18,151.95,149.71,129.50,124.80,165.45,159.09,86.93,93.28,132.94,142.80];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 1,  label: 'Nov 2021 — bitcoin $69k top, $72.14',                 color: '#94a3b8' },
+  { idx: 14, label: 'Dec 2022 — cycle low $14.16 (−80%)',                   color: '#ef4444' },
+  { idx: 29, label: 'Mar 2024 — spot ETFs approved, $170.46',               color: '#22c55e' },
+  { idx: 34, label: 'Aug 2024 — 10-for-1 split (Aug 8)',                    color: '#3b82f6' },
+  { idx: 37, label: 'Nov 2024 — peak premium, $387.47',                     color: '#f59e0b' },
+  { idx: 44, label: 'Jun 2025 — monthly-close high $404.23',                color: '#22c55e' },
+  { idx: 56, label: 'Jun 2026 — low $86.93; bitcoin sales begin',           color: '#ef4444' },
+  { idx: 59, label: 'Sep 4 2026 — $142.80, ~0.82× mNAV',                    color: '#F7931A' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(247,147,26,0.22)');
+grad.addColorStop(1, 'rgba(247,147,26,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#F7931A', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#F7931A'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
