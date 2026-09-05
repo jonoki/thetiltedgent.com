@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROST — Ross Stores, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #5B9BFF;
+  --accent-dim: #5B9BFF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">ROST</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Apparel Retail</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $73.67B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #349</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#170 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#75 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Ross Stores, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$230.69</div>
+      <div class="price-change">−$0.98 (−0.42%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $230.69 (0.00%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Dublin, California</div>
+    <div class="meta-item"><span>Employees:</span> 111,000</div>
+    <div class="meta-item"><span>Founded:</span> 1982 (fiscal year ends late Jan / early Feb)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 FY2026, mid/late November 2026 (est. — date not yet announced on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Ross Stores is the second-largest off-price retailer in the United States, selling branded apparel, footwear, accessories and home fashions at 20–60% below department-store prices through <strong>2,328 stores</strong> under two banners: <strong>Ross Dress for Less</strong> (1,952 stores) and <strong>dd's DISCOUNTS</strong> (376 stores). Fiscal 2025, the 52 weeks ended January 31, 2026, produced record revenue of <strong>$22.75B, up 7.7%</strong>, on comparable-store sales of +5%; the trailing twelve months through August 1, 2026 have accelerated sharply to <strong>$24.51B, up 14.0%</strong>. The company ranks roughly <strong>#349 globally by market capitalisation</strong> at $73.67B and is a member of the NASDAQ-100.</p>
+  <p class="prose" style="margin-top:16px;">Off-price is traded on exactly two numbers — <strong>comparable-store sales</strong> (comps: sales growth from stores open at least a year, stripping out new-store growth) and <strong>merchandise margin</strong> (what the buyer pays for goods versus what they sell for). Ross has just printed <strong>+10% comps for a second straight quarter</strong> while TJX's comparable U.S. apparel division, Marmaxx, comped <strong>+1%</strong> and Burlington comped <strong>+2%</strong> in the same thirteen weeks. That gap is the whole page. Either Ross has captured a genuine trade-down wave from full-price retail under new CEO Jim Conroy, or it is taking share from two competitors who stumbled at the same time — and the distinction determines whether 28× trailing earnings is a bargain or a peak-cycle multiple. The complicating detail: <strong>$253M of one-time tariff refunds</strong> sit inside the Q2 print, worth $0.60 of the $2.66 reported EPS. Section 04 separates the two.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jim Conroy</div>
+      <div class="card-note">Verified as CEO in the company's Q1 2025 (May 22, 2025) and Q2 2026 (Aug 20, 2026) earnings releases — he has run the company through the entire tariff episode and the current comp acceleration. Formerly CEO of Boot Barn. His exact start date and the Boot Barn background were not confirmed from a fetched page and are stated per the task brief.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">William W. Sheehan II</div>
+      <div class="card-note">Executive Vice President and CFO, quoted in the March 3, 2026 and August 20, 2026 releases. This is a change: the May 2025 Q1 release quoted <strong>Adam Orvos</strong> as EVP and CFO. The transition happened between May 2025 and March 2026; the announcement date was not captured from sources fetched.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Capital Return</div>
+      <div class="card-value" style="font-size:20px;">Buyback machine</div>
+      <div class="card-note">319.45M shares outstanding, 311.71M float (97.6%). A new <strong>$2.55B two-year repurchase authorisation</strong> was approved in March 2026, with $1.275B targeted for fiscal 2026; $319M was spent in Q2 alone. Quarterly dividend $0.445 (raised 10% in March 2026). Specific institutional holders were not verified from the sources fetched and are therefore not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Ross reports as a <strong>single operating segment</strong> and does not disclose revenue by banner, category or geography in its earnings releases. The only clean disaggregation available is the store base, so the bar below is store count, not revenue. dd's stores are smaller-box and lower-ticket than Ross stores, so dd's share of revenue is lower than its 16% share of doors — the company does not say by how much.</p>
+  <div class="seg-bar">
+    <div style="flex:83.8;background:#5B9BFF;">Ross Dress for Less — 1,952 stores (83.8%)</div>
+    <div style="flex:16.2;background:#a78bfa;color:#000;">dd's — 376 (16.2%)</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#5B9BFF;"></span> Ross Dress for Less — 1,952 stores in 44 states, DC, Guam, Puerto Rico (Aug 1, 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> dd's DISCOUNTS — 376 stores in 23 states (Aug 1, 2026)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Store count grew from 1,904 Ross + 363 dd's at fiscal year-end (Jan 31, 2026) to 1,952 + 376 by August 1 — 61 net openings in six months. The FY2026 plan was raised from 110 to <strong>115 new stores (about 90 Ross, 25 dd's)</strong>, with 51 scheduled for Q3 alone.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #5B9BFF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Ross Dress for Less</div>
+        <span class="biz-badge dominant">CORE BANNER — REVENUE SPLIT NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6.27B</div><div class="biz-stat-label">Q2 FY26 Revenue (total co.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13%</div><div class="biz-stat-label">Sales YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+10%</div><div class="biz-stat-label">Q2 Comps</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">83.8%</div><div class="biz-stat-label">Share of Stores</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The flagship: a ~25,000 sq ft treasure-hunt box selling name-brand apparel and home goods bought opportunistically from manufacturers' excess. Q2 FY2026 (13 weeks to August 1, 2026) delivered <strong>$6.27B of sales, +13%</strong>, on <strong>+10% comps</strong> against a +2% comp a year earlier; the first half ran <strong>$12.3B, +17%</strong>, on +13% comps. Management said the comp was <strong>primarily driven by customer traffic</strong> — transactions, not ticket — with gains split among new customers, lapsed shoppers returning and existing customers visiting more often. Home and cosmetics led; ladies' apparel comped positive but slightly below the company average in Q2 after outperforming in Q1; the Midwest was the strongest region and every region grew. Merchandise margin expanded <strong>110 basis points</strong> excluding the tariff refunds — the buyers are getting better goods at better prices, which is what a strong off-price cycle looks like. Inventory rose 18% YoY with packaway (goods bought now and warehoused for a later season) at 36% of the total versus 38% a year ago; management called the higher in-store levels deliberate to support the traffic.</p>
+    <div class="biz-tam"><strong>Category size:</strong> U.S. off-price TAM estimates were not verified from sources fetched and are omitted. Sourced peer comparison: TJX consolidated revenue $62.36B TTM, Burlington $12.21B, Ross $24.51B.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">TJX Companies (Marmaxx)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$145.67B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$62.36B</div><div class="comp-bubble-label">Rev TTM (+7.7%)</div></div>
+          <div><div class="comp-bubble-val">+1%</div><div class="comp-bubble-label">Marmaxx Q2 Comp</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Burlington Stores</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$16.71B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$12.21B</div><div class="comp-bubble-label">Rev TTM (+10.9%)</div></div>
+          <div><div class="comp-bubble-val">+2%</div><div class="comp-bubble-label">Q2 Comp</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">dd's DISCOUNTS</div>
+        <span class="biz-badge emerging">GROWTH BANNER — LOWER-INCOME CUSTOMER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">376</div><div class="biz-stat-label">Stores (Aug 1, 2026)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13</div><div class="biz-stat-label">Net Adds YTD FY26</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~25</div><div class="biz-stat-label">FY26 Planned Openings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.2%</div><div class="biz-stat-label">Share of Stores</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The deeper-discount chain aimed at a lower- and moderate-income household, with a smaller box and a lower average price point. Management described Q2 as "solid": <strong>one-year comps slightly below Ross, two-year comps in line with the company average</strong>. That matters for the trade-down thesis. If the comp acceleration were purely about a squeezed low-end consumer, dd's would be leading, not lagging — instead it is the higher-income Ross customer driving the outperformance, which points to share gains from department stores and from Marmaxx rather than a pure macro-distress trade. dd's revenue, margin and customer metrics are not disclosed separately.</p>
+    <div class="biz-tam"><strong>Disclosure gap:</strong> no banner-level revenue, comp or margin. Everything about dd's above is qualitative management commentary from the Q2 call coverage.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Burlington Stores</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">1,287</div><div class="comp-bubble-label">Stores (Q2 end)</div></div>
+          <div><div class="comp-bubble-val">~115</div><div class="comp-bubble-label">FY26 Net New Stores</div></div>
+          <div><div class="comp-bubble-val">+70bps</div><div class="comp-bubble-label">Q2 Merch Margin</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Five Below / Dollar chains</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Comp</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Capital Return Programme</div>
+        <span class="biz-badge growth">$2.55B AUTHORISATION · 0.77% YIELD</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.275B</div><div class="biz-stat-label">FY26 Buyback Target</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$319M</div><div class="biz-stat-label">Q2 Repurchased (1.4M sh)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$0.445</div><div class="biz-stat-label">Quarterly Dividend</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.60%</div><div class="biz-stat-label">Shareholder Yield</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Not a business line, but it is how a third of the earnings leave the building, so it belongs here. Ross runs a fixed two-year authorisation cycle: the current <strong>$2.55B programme (fiscal 2026–2027)</strong> was approved in March 2026 alongside a <strong>10% dividend increase to $0.445 per quarter</strong> ($1.78 annualised, 0.77% yield, 21.5% payout ratio). The fiscal 2026 target of $1.275B implies roughly 5.5M shares at current prices, or about 1.7% of the count — consistent with the 1.83% buyback yield stockanalysis.com reports. Q2's $319M bought 1.4M shares at an average of about $228. The balance sheet can afford more: <strong>$4.3B of cash against $1.0B of borrowings</strong> ($241M current, $777M long-term) at August 1, 2026, with $2.79B of trailing free cash flow. The programme is steady rather than opportunistic — the company did not visibly accelerate purchases during the 2025 tariff drawdown, when the stock traded in the $120s.</p>
+    <div class="biz-tam"><strong>Note on leverage:</strong> stockanalysis.com's $4.74B "total debt" includes operating-lease liabilities. Financial debt per the company's balance sheet is about $1.0B. Net cash is roughly $3.3B.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">OPPORTUNISTIC BUYING SCALE</span>
+    <span class="moat-pill">VENDOR RELATIONSHIPS</span>
+    <span class="moat-pill">PACKAWAY INVENTORY</span>
+    <span class="moat-pill">TREASURE-HUNT TRAFFIC</span>
+    <span class="moat-pill">LOW-COST STORE MODEL</span>
+    <span class="moat-pill">NO E-COMMERCE DRAG</span>
+    <span class="moat-pill">NET-CASH BALANCE SHEET</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The off-price moat is a <strong>buying moat</strong>. Ross employs a large merchant organisation that buys close-outs, cancelled orders and overruns from thousands of vendors, often in-season, for cash, with no return privileges and no advertising allowances — terms full-price retailers cannot offer. The bigger the buyer, the more of a vendor's problem it can take in one call, so scale compounds: Ross at $24.5B of revenue and TJX at $62.4B sit in a two-player tier that Burlington ($12.2B) is still climbing toward. <strong>Packaway</strong> — buying goods now and warehousing them for next season — converts vendor distress into future margin and is why merchandise margin can expand (+110bps in Q2 ex-refunds) in a quarter when input costs were supposedly rising. The stores are cheap to run (no fixtures to speak of, minimal marketing, no e-commerce fulfilment cost — Ross does not sell online), which is how a 33% gross margin produces a 12.7% operating margin and a <strong>36% ROIC</strong>. The vulnerability of the moat is that it is <em>shared</em>: TJX has every one of these advantages at 2.5× the scale. Ross wins when it executes better — which this year it clearly has — not because it holds something TJX lacks.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Sourcing concentration and tariff exposure.</strong> In May 2025 CEO Conroy told investors that <strong>"more than half of the goods we sell originate from China"</strong> and withdrew full-year guidance, guiding Q2 2025 EPS to $1.40–1.55 with a $0.11–0.16 per-share tariff hit. The full-year 2025 tariff cost came in at about $0.16 per share. The refund of those IEEPA (International Emergency Economic Powers Act) duties — $253M in Q2 2026 — is what makes the current quarter look so good. Off-price buys what vendors over-ordered, so Ross's sourcing mix is the industry's sourcing mix; it cannot easily diversify it.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Competitors reinvesting refunds into price.</strong> Burlington received $55M of refunds and stated it will <strong>"fully invest these refunds back into the business in the back-half of the year, to deliver even sharper values"</strong> — 40% in Q3, 60% in Q4. TJX received $331M (net $219M after compensation accruals). Ross took its $253M to earnings. If competitors use their windfall to cut prices while Ross books its as profit, Ross's Q4 comp guide of +4–5% is the number at risk.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Comp cycle mean reversion.</strong> Ross is lapping a +2% comp with a +10%; next year it laps a +10%. Management's own guide already steps down — Q3 +6–7%, Q4 +4–5% — and the original FY2026 guide in March was only +3–4%. TJX's Marmaxx comp of +1% was blamed on "self-inflicted" merchandising errors that management says are "within our control"; if TJX fixes them, some of Ross's share gain reverses.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>New leadership, thin track record at this scale.</strong> The CEO and CFO both changed within roughly a year of each other. The results under Conroy have been excellent, but one strong year against a weak comparison and a stumbling rival is not yet a cycle. Ross also has <strong>no e-commerce channel</strong> — a cost advantage today, and an unhedged bet that the treasure hunt stays a store experience.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">ROST column from stockanalysis.com statistics as of the September 4, 2026 close. The peer column shows <strong>TJX and Burlington values actually fetched from stockanalysis.com and company releases</strong> — not an industry average. A sourced NASDAQ-100 aggregate was not available and that column is left as "—" rather than estimated. Colour coding compares ROST against the two named peers where both were sourced.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>ROST</th><th>Off-Price Peers (TJX · BURL)</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">28.02</td><td>24.47 · 23.91</td><td>—</td><td>$230.69 ÷ $8.27 = 27.9×. Ross now trades at a premium to both peers — a reversal of the historical relationship, earned by comps. Strip the $0.60 refund from TTM EPS and the multiple is ~30×.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--red);">27.27</td><td>24.44 · 22.05</td><td>—</td><td>Consensus FY2026 EPS $8.36 vs. company guide $8.61–8.77 (incl. $0.60 refund). Ex-refund guide of ~$8.01–8.17 implies ~28.5×.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--text-dim);">1.87</td><td>—</td><td>—</td><td>Flattered by the one-time refund inside this year's growth. Consensus FY2027 EPS growth is only +6.9%, which would put a normalised PEG near 4.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$8.27</td><td>—</td><td>—</td><td>+31.2% YoY. Includes ~$0.60 of tariff refunds; ex-refund TTM EPS ≈ $7.67, still +16% on FY2025's $6.61.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+14.0%</td><td>+7.7% · +10.9%</td><td>—</td><td>TTM. Q2 +13.3%, Q1 +20.6% (Q1 included a calendar shift). FY2025 was +7.7%.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold (which for Ross includes buying, occupancy and distribution costs), as a percentage of revenue">Gross Margin</span></td><td style="color:var(--text-dim);">33.4%</td><td>—</td><td>—</td><td>TTM 34.2% on the financials page. Q2 gross margin was 33.8% and included ~405bps of tariff refunds. Peers define cost of sales differently (Burlington reports 46.2%), so no peer comparison is made.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">10.85%</td><td>9.7% · 5.8%</td><td>—</td><td>TTM; peer figures computed from fetched net income ÷ revenue. FY2025 was 9.43%; Q2 alone was 13.6% with the refund.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">0.77%</td><td>1.45% · none</td><td>—</td><td>$0.445 quarterly ($1.78/yr), raised 10% in March 2026. Ex-dividend Sep 8, payable Sep 30, 2026. Payout ratio 21.5%.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--text-dim);">2.92% of shares<br>3.00% of float</td><td>—</td><td>—</td><td>9.34M shares short. Low; nobody is crowded into the bear side despite a 53% one-year run.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--text-dim);">0.70</td><td>—</td><td>—</td><td>Includes $3.7B+ of operating-lease liabilities in the $4.74B "debt". Borrowings are $1.0B against $4.3B cash — net cash ~$3.3B.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--text-dim);">1.61</td><td>—</td><td>—</td><td>Quick ratio 0.93 — inventory ($3.1B, +18% YoY) is the bulk of current assets, as you would expect.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--green);">$2.79B</td><td>—</td><td>—</td><td>TTM; operating cash flow $3.66B. 11.4% FCF margin. P/FCF 26.5×. Funds the $1.275B buyback and ~$570M of dividends with room to spare.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">42.6%</td><td>—</td><td>—</td><td>Equity is only $6.7B because buybacks continuously shrink it; P/B is 10.98×. Read ROIC instead.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--green);">36.3%</td><td>—</td><td>—</td><td>Exceptional for a retailer, and it is the honest version of the story: cheap stores, fast inventory turns, no online fulfilment cost.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--amber);">0.86</td><td>0.59 · 1.42</td><td>—</td><td>5-year. A defensive-ish consumer name — it tends to go up when the consumer is stressed. Between TJX and the more levered Burlington.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$143.39 – $257.00</td><td>—</td><td>—</td><td>Current $230.69 sits 77% of the way up the range. 52-week price change: <strong>+53.1%</strong> — versus TJX's market cap down 5.5% and Burlington's down 8.4% over their trailing years per stockanalysis.com.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">There is one large distortion and it sits right in the headline quarter.</p>
+  <p class="prose" style="margin-top:12px;"><strong>IEEPA tariff refunds, ~$253M pre-tax, recognised in Q2 FY2026.</strong> Duties paid under the 2025 emergency tariffs were refunded and booked through cost of goods sold, adding about <strong>405 basis points to Q2 operating margin</strong> and <strong>$0.60 to EPS</strong>. Reported Q2 EPS was $2.66 (+70.5%); excluding the refund it was roughly <strong>$2.06, +32%</strong> — still a big number, and still well above the company's own $1.85–1.93 pre-refund guidance. Reported operating margin expanded 610bps to 17.6%; the underlying 205bps expansion beat the 130–150bps plan. The full-year EPS guide of <strong>$8.61–8.77 includes the $0.60</strong>, so the clean FY2026 number is about $8.01–8.17 against $6.61 last year, roughly +21–24%. Ross, unlike Burlington, is not committing to reinvest the refund into price.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Tariff costs in FY2025</strong> were about $0.16 per share — so the FY2025 base was slightly depressed and the FY2026 comparison slightly flattered even before the refund.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Fiscal calendar:</strong> stockanalysis.com labels Ross's fiscal years by the year they end in (the year ended January 31, 2026 appears as "FY2026" and the current year as "FY2027"). The company calls the same periods fiscal 2025 and fiscal 2026. This page uses the company's convention throughout.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">20 analysts (stockanalysis.com, August 2026 ratings).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$269.94</div><div class="card-note">+17.0% versus the $230.69 close.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$176 – $310</div><div class="card-note">−23.7% to +34.4%. The low target sits below where the stock traded before the Q4 print in March — someone is modelling full comp mean-reversion.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">14 / 5 / 1</div><div class="card-note">12 Strong Buy + 2 Buy, 5 Hold, 1 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:12;background:var(--green);"></div>
+    <div style="flex:2;background:#4ade80;"></div>
+    <div style="flex:5;background:var(--amber);"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 12</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Deutsche Bank</strong> — <strong>Buy</strong> reiterated, price target raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$294</span> (Aug 21, 2026), the day after the Q2 print. Sits near the top of the range; implies ~34× the clean FY2026 EPS guide.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Guggenheim</strong> — <strong>Buy</strong> maintained, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$290</span> (Aug 31, 2026). Reaffirmed after the stock had given back most of its post-earnings pop.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Morgan Stanley</strong> — <strong>Hold</strong> (Equal Weight), price target <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$234</span> (Aug 21, 2026). Target roughly at the current price after a +10% comp quarter — the neutral seat is arguing the multiple already discounts the comp cycle.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">The three calls above were read off the stockanalysis.com forecast page. Analyst names and rationales were not shown there and are not invented here. The single Sell rating in the breakdown could not be attributed to a firm from sources fetched.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Aug 20, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 FY2026: +10% comps, EPS $2.66, guidance raised — stock +4.4% next day</div>
+        <div class="tl-desc">Sales $6.3B (+13%), comps +10% on top of +2%, EPS $2.66 vs. $1.56 including $0.60 of tariff refunds; ex-refund EPS ~$2.06 beat the $1.85–1.93 guide. Full-year EPS raised to $8.61–8.77 from the original March guide of $7.02–7.36. ROST closed $228.99 on the day and $239.04 on Aug 21 (+4.39%) — then slid to $228.54 by month-end as Burlington's Aug 27 report (ROST −2.7% that day) reminded the market that competitors are cutting price with their refunds.</div>
+        <div class="tl-impact up">Beat and raise — reaction largely faded</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend: $0.445 per share, payable September 30</div>
+        <div class="tl-desc">Third quarterly payment at the rate set in March 2026 (a 10% increase). Small in yield terms (0.77%) but the dividend has been raised every year since it was reinstated after the 2020 suspension.</div>
+        <div class="tl-impact neutral">Routine — key near-term date</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 FY2026 (Aug–Oct)</div>
+      <div class="tl-content">
+        <div class="tl-title">Guidance: comps +6–7%, EPS $1.75–1.83; 51 store openings</div>
+        <div class="tl-desc">The comp guide steps down from +10% but is still above anything Ross printed between 2022 and mid-2025. It laps a +7% comp from Q3 FY2025, so a two-year stack of 13–14% is roughly flat with Q2's two-year stack of 12%. The test is whether traffic holds as TJX fixes Marmaxx and Burlington deploys 40% of its refund into sharper prices this quarter.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mid/late Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026 earnings</div>
+        <div class="tl-desc">Date not yet announced on the sources fetched; Ross typically reports Q3 in the third week of November. First quarter with no tariff refund in the base and the first read on holiday buying. Watch merchandise margin ex-refunds (was +110bps in Q2) as much as the comp.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 FY2026 (Nov–Jan)</div>
+      <div class="tl-content">
+        <div class="tl-title">Holiday quarter: comps +4–5%, EPS $2.17–2.26, against a +9% comp</div>
+        <div class="tl-desc">The toughest comparison of the year and the quarter in which Burlington intends to spend the remaining 60% of its refund on price. If Ross clears +4–5% here, the trade-down thesis survives its first real test; a miss would be read as the cycle turning.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">March 2027 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 / fiscal 2026 results and fiscal 2027 guidance</div>
+        <div class="tl-desc">Ross guides conservatively — the March 2026 FY guide was +3–4% comps and $7.02–7.36 EPS, and the year is now tracking +8% or so and $8.61–8.77. Consensus FY2027 EPS of $8.94 assumes only +6.9% growth on a base that includes the $0.60 refund, i.e. roughly +10% underlying. The initial FY2027 guide will set the tone for the multiple.</div>
+        <div class="tl-impact up">Potential upside catalyst if guide beats a +3% comp</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">ROST — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted; final point = Sep 4, 2026 close)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#5B9BFF;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$113.20</strong> to <strong>$230.69</strong> on September 4, 2026, ROST has roughly doubled — <strong>+103.8%</strong> in price terms, about <strong>15.5% annualised</strong> before a dividend that added roughly 1% a year. But almost the entire gain arrived in the last fourteen months. The stock spent <strong>June 2022 to June 2025 oscillating between $70 and $155</strong> — it closed June 2025 at $127.58, only 13% above where it closed October 2021 — and then rose <strong>+81%</strong> from that June 2025 low to today, including a <strong>+53.1% twelve-month change</strong>. Over the same trailing year stockanalysis.com shows TJX's market capitalisation down 5.5% and Burlington's down 8.4%: the off-price group did not re-rate, <em>Ross</em> did, and the divergence maps cleanly onto the +10% versus +1% versus +2% comp gap. A NASDAQ-100 and S&amp;P 500 total-return comparison over the identical five-year window was not verified from the sources fetched and is not stated; the relevant point is that a 0.86-beta retailer has just delivered growth-stock returns, which means the next twelve months are being asked to justify the last twelve rather than the last sixty.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">$70.23 — the 5-year low</div><div class="tl-desc">Fiscal 2022 (ended Jan 2023) saw revenue fall 1.2% and EPS drop 10% to $4.38 as the post-stimulus consumer rolled over and freight costs spiked. Off-price's own inventory was too heavy going into a slowdown. −38.6% from the Dec 2021 close of $114.28.</div><div class="tl-impact down">Trough — margin squeeze priced as permanent</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2022</div><div class="tl-content"><div class="tl-title">$117.67 — +23% in one month</div><div class="tl-desc">Q3 FY2022 results beat with comps flat against expectations for a decline, and management flagged the vendor-inventory glut as a buying opportunity — the classic off-price setup. The stock recovered the whole 2022 drawdown in five months.</div><div class="tl-impact up">Thesis reset</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2024</div><div class="tl-content"><div class="tl-title">$148.96 — the range top</div><div class="tl-desc">Fiscal 2023 EPS +26.9% to $5.56 on revenue +9.0%. The stock then spent the next eighteen months unable to hold above the low $150s (Nov 2024 $154.87 was the pre-2026 monthly high).</div><div class="tl-impact neutral">Ceiling established</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–Jun 2025</div><div class="tl-content"><div class="tl-title">$127.79 → $127.58 — tariff shock, guidance withdrawn</div><div class="tl-desc">April 2025 tariff announcements hit a company sourcing more than half its goods from China. On May 22, 2025 Ross withdrew full-year guidance, cited a $0.11–0.16 per-share Q2 tariff cost, and printed flat Q1 comps. The June 2025 monthly close of $127.58 was the base for everything since.</div><div class="tl-impact down">Guidance withdrawn — the low of the new regime</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025 – Jan 2026</div><div class="tl-content"><div class="tl-title">$176.36 → $188.65 — comps accelerate to +7%, then +9%</div><div class="tl-desc">Q3 FY2025 comps +7% (Nov 2025 print, +11% for the month) and a Q4 that would come in at +9%. The stock broke out of a three-year range for the first time.</div><div class="tl-impact up">Breakout</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–May 2026</div><div class="tl-content"><div class="tl-title">$216.63 → $231.73 — Q4 beat, new $2.55B buyback, +10% Q1 comp</div><div class="tl-desc">March 3: Q4 EPS $2.00 "well above guidance", dividend +10%, new two-year authorisation. May 21: Q1 comps +10% (vs. +7–8% guide) and the stock jumped 8.1% on May 22.</div><div class="tl-impact up">Confirmation of the cycle</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">$251.07 — monthly-close high; intraday 52-week high $257 in early August</div><div class="tl-desc">The stock ran into the Q2 print, peaking at a $255.23 close on Aug 7. It then fell 10% into the report (−4.1% on Aug 17 alone) before the +4.4% relief pop on Aug 21.</div><div class="tl-impact neutral">Peak — sell-the-news set-up</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2026</div><div class="tl-content"><div class="tl-title">$230.69 — 10% below the high despite the beat</div><div class="tl-desc">Post-earnings gains fully surrendered by Aug 27–28 as Burlington announced it would reinvest refunds into price. The monthly RSI has cooled from overbought territory; the 10-month MA sits well below at roughly $208.</div><div class="tl-impact neutral">Consolidating — market weighing peak comps</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>The two numbers, side by side.</strong> Off-price is a simple machine: buy goods cheaply because someone else made a mistake, sell them quickly in a cheap box. So the market watches whether customers are showing up (comps) and whether the buyers are getting good deals (merchandise margin). In Q2 FY2026 both went the right way at once — <strong>comps +10%, traffic-led, in every region</strong>, and <strong>merchandise margin +110bps excluding the refund</strong>. When traffic is that strong, the temptation is to chase it with worse-quality inventory and give the margin back; Ross did the opposite. That is the strongest single argument that this is execution, not luck.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The peer test.</strong> In the identical thirteen weeks to August 1, 2026, TJX's Marmaxx comped <strong>+1%</strong> (TJX consolidated +4%, carried by HomeGoods at +7%) and Burlington comped <strong>+2%</strong>. TJX's CEO called the Marmaxx miss "self-inflicted" — the wrong apparel in the wrong stores at the wrong time. That is both the bull and the bear case in one quote. Bull: Ross took share from a wounded competitor with better merchandising and is keeping the customers it gained (management says lapsed customers are returning and existing ones visiting more often — habits, not a one-time event). Bear: TJX is the best operator in the industry, says the problem is within its control, and has a $331M refund it has not yet spent on price. Burlington has already said it will spend its $55M on <strong>"even sharper values"</strong> — 40% this quarter, 60% in the holiday quarter — while Ross booked its $253M as profit. Ross is choosing margin; its competitors are choosing traffic. The Q3 (+6–7%) and Q4 (+4–5%) comp guides are where that choice gets marked.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The trade-down question.</strong> The macro version of the thesis is that a stretched consumer trades down from department stores to off-price. The dd's evidence cuts against a pure distress reading: the lower-income banner comped <em>below</em> Ross on a one-year basis and only in line on two-year. If the customer were simply poorer, dd's would lead. Instead the Ross customer — middle-income, brand-aware — is the one accelerating, and home and cosmetics (discretionary categories) led the quarter. That looks more like <strong>share gain from full-price and from Marmaxx</strong> than macro trade-down, which is better for durability (habits stick) but worse for the "this works in a recession" framing.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Tariffs — the round trip.</strong> The 2025 episode cost about $0.16 per share for the year, forced a guidance withdrawal, and knocked the stock to $127. The 2026 refund returned $0.60 in a single quarter. Net, tariffs have been a <strong>positive</strong> for reported earnings across the two years — which is absurd, and exactly why the clean numbers matter: ex-refund FY2026 EPS of roughly <strong>$8.01–8.17 versus $6.61</strong> is the real +21–24%, and that is the number the forward multiple should be applied to. The structural exposure has not changed: more than half of what Ross sells originates in China because that is what its vendors make. Any re-escalation lands on Ross first.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Growth algorithm and capital return.</strong> Store growth of 115 a year on 2,328 is ~5% unit growth; add a mid-single-digit comp and modest margin expansion and the algorithm is low-double-digit EBIT growth. Buybacks of $1.275B a year retire roughly 1.7% of shares, the dividend pays 0.77%, so shareholder yield is about <strong>2.6%</strong>. On $2.79B of free cash flow and $3.3B of net cash the programme is easily covered, and the March 2026 authorisation resets every two years like clockwork. The one criticism is that it is calendar-driven rather than price-driven: the company bought no more aggressively at $127 than at $228.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation.</strong> At $230.69: <strong>28.0× trailing EPS of $8.27</strong>, or about <strong>30× ex-refund</strong>; <strong>~28.5× the clean FY2026 guide</strong> of ~$8.01–8.17; <strong>25.8× consensus FY2027 EPS of $8.94</strong>; <strong>26.5× free cash flow</strong>; <strong>EV/EBITDA 20.3×</strong>. TJX trades at 24.5× trailing and Burlington at 23.9×. Ross has flipped from a discount to a premium versus TJX, and the premium is roughly the size of the comp gap. If Ross sustains a 3–4 point comp advantage, the premium is deserved; if Marmaxx normalises to mid-single-digit comps and Ross to the +3–4% it originally guided, the two should trade in line and ROST has ~15% of multiple to give back before any earnings miss. A PEG of 1.87 on refund-inflated growth, or ~4 on consensus FY2027 growth of 6.9%, says the market is not pricing in a structural re-rating — it is pricing in that FY2027 consensus is too low. That is a reasonable bet given how conservatively this management guides, but it is a bet on continued outperformance, not on cheapness.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Two consecutive +10% traffic-led comps with expanding merchandise margin, across every region and led by discretionary categories, while the two direct competitors comped +1% and +2% — this is share gain that sticks, not a macro blip. The clean FY2026 earnings guide is up 21–24%, consensus for FY2027 (+6.9%) is almost certainly too low given how conservatively this management guides (March's +3–4% comp guide is now tracking roughly +8%), and 36% ROIC with $3.3B of net cash funds 5% unit growth plus a 2.6% shareholder yield without strain. A defensive 0.86-beta retailer growing earnings 20%+ deserves the premium to TJX it now carries.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Reported EPS growth of 70% is 40 points of one-time tariff refund; the stock trades at ~30× clean trailing earnings, a premium to the better operator (TJX at 24.5×) for the first time in memory, and 53% above where it was a year ago while peers went nowhere. Management's own guide steps comps down to +4–5% by the holiday quarter, exactly when Burlington deploys 60% of its refund into price and TJX has fixed a Marmaxx problem it calls self-inflicted. More than half of merchandise originates in China, the CEO and CFO are both new, there is no e-commerce channel, and the short interest at 3% means no squeeze fuel. A return to in-line multiples is ~15% downside before any operational miss.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Comp deceleration into the holiday quarter.</strong> Q4 laps a +9% comp with a +4–5% guide while both competitors have announced or hold un-deployed tariff refunds to spend on price. A Q4 comp below +4% would break the "share gain sticks" narrative and, at a premium multiple, the stock reaction would be disproportionate to the miss.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Tariff re-escalation.</strong> More than half of Ross's merchandise originates in China and the company cannot diversify what its vendors over-produce. The 2025 episode cost $0.16 per share and forced a guidance withdrawal; a repeat would hit at a time when the stock no longer carries a valuation cushion versus peers.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Margin give-back.</strong> Inventory is up 18% YoY against 13% sales growth and the packaway share has fallen to 36% from 38% — more goods on the floor. That is fine while traffic is +10%; if traffic slows to the guided +4–6% the markdown risk rises, and merchandise margin — the second number the market trades on — would reverse just as the refund comparison turns unfavourable in Q2 FY2027.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Refund Is Becoming a Price War</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">All three U.S. off-price chains received IEEPA tariff refunds in the same quarter — TJX $331M (net $219M), Ross $253M, Burlington $55M — and they are doing three different things with them. Ross booked its to earnings. TJX reported adjusted figures excluding it and has not said how it will use the cash. Burlington said explicitly it will "fully invest these refunds back into the business in the back-half of the year, to deliver even sharper values," 40% in Q3 and 60% in Q4. In a business where the value gap versus department stores <em>is</em> the product, a competitor announcing it will widen its gap with found money is a direct threat to Ross's Q4 comp guide of +4–5% — and Ross has already spent its ammunition on the P&amp;L.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">China Sourcing Is the Industry's Fixed Exposure</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Off-price does not choose its sourcing — it buys what full-price vendors over-ordered, so its country mix is a lagged copy of the apparel industry's. Ross disclosed that more than half its goods originate in China; the 2025 tariff round cost it about $0.16 per share and its guidance for a quarter. The same duties were refunded a year later, but the policy volatility itself is the cost: it forced a guidance withdrawal, a $50 drawdown in the stock and a year of hedged commentary. Ross's advantage is the packaway model — it can buy the vendor's tariff-stranded inventory at distress prices, as it did in 2022 with the freight glut. Its disadvantage is that it cannot pre-buy its way out of a duty it does not know is coming.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Off-Price Keeps Taking the Department Store's Customer</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">The three chains are opening a combined 250+ stores this year (Ross 115, Burlington ~115, TJX targeting 4% annual store growth toward 7,500 stores from 2028) into a mall-anchor base that keeps shrinking. Ross's Q2 traffic gains came from new customers, lapsed customers and higher frequency — a customer-acquisition story, not a ticket story. <strong>Bull framing:</strong> the structural shift from full-price to off-price is a decade-long trend with 5% unit growth on top, and Ross has just proven it can out-merchandise TJX; the premium multiple is the price of the best comp in retail. <strong>Bear framing:</strong> the trend is shared by all three and Ross's <em>relative</em> outperformance rests on one competitor's admitted execution error and a refund the others are turning into price cuts. The industry tailwind is real; the Ross-specific premium is the part that has to be re-earned every quarter.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($230.69, Sep 4, 2026 close), daily change, market cap, sector/industry, valuation, statistics, annual and quarterly financials, and analyst consensus from stockanalysis.com (https://stockanalysis.com/stocks/rost/ and its statistics, financials, forecast and history pages, retrieved Sep 4, 2026); 59 monthly unadjusted "Real Price" closes from digrin.com ROST price history (Oct 2021 – Aug 2026), cross-checked against stockanalysis.com daily closes for May 29, 2026 ($231.73, exact match) and Aug 31, 2026 ($228.54, exact match), with the Sep 4, 2026 close as the 60th point; operating metrics, guidance, tariff refund, store counts, buyback and executive names from Ross Stores investor relations releases (Q2 FY2026 release of Aug 20, 2026 via SEC EDGAR exhibit 99.1 and investors.rossstores.com; Q4 FY2025 release of Mar 3, 2026; Q1 FY2025 release of May 22, 2025) and BigGo Finance's Q2 FY2026 earnings-call coverage (merchandise margin, dd's, category and region commentary); TJX Q2 FY27 figures from investor.tjx.com and Yahoo Finance; Burlington Q2 FY2026 figures from burlingtoninvestors.com; TJX and Burlington market data from stockanalysis.com; global market-cap rank from companiesmarketcap.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations: the US and NASDAQ market-cap rank pills, the next earnings date, the ex-refund EPS calculations (derived from the company's stated ~$0.60 per-share benefit), the implied share count of the FY2026 buyback and the Q2 average repurchase price. Items marked <strong>n/d</strong> are not disclosed by the company. Ross reports a single segment and does not disclose revenue by banner; the Section 02 bar is store count, not revenue. No industry-average or NASDAQ-100 aggregate metrics were sourced; the peer column in Section 04 shows fetched TJX and Burlington figures only. Jim Conroy's CEO start date and Boot Barn background, and the timing of the Adam Orvos → William Sheehan CFO transition, were not confirmed from a fetched page. No chart months were reconstructed. A NASDAQ-100 / S&amp;P 500 relative-return comparison over the identical five-year window was not verified and is omitted. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com; final point = Sep 4, 2026 close, stockanalysis.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [113.20,109.09,114.28,97.75,91.39,90.46,99.77,85.02,70.23,81.26,86.27,84.27,95.69,117.67,116.07,118.19,110.54,106.13,106.73,103.62,112.13,114.64,121.81,112.95,115.97,130.38,138.39,140.28,148.96,146.76,129.55,139.76,145.32,143.23,150.61,150.51,139.72,154.87,151.27,150.56,140.32,127.79,139.00,140.09,127.58,136.54,147.16,152.39,158.92,176.36,180.14,188.65,205.64,216.63,227.79,231.73,212.85,251.07,228.54,230.69];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 8,  label: 'Jun 2022 — 5-year low $70.23',                       color: '#ef4444' },
+  { idx: 13, label: 'Nov 2022 — Q3 beat, +23% in a month',                color: '#22c55e' },
+  { idx: 28, label: 'Feb 2024 — range top $148.96',                        color: '#94a3b8' },
+  { idx: 44, label: 'Jun 2025 — tariff shock, guidance withdrawn (May 22)', color: '#ef4444' },
+  { idx: 51, label: 'Jan 2026 — comps +7%/+9%, range breakout',            color: '#3b82f6' },
+  { idx: 55, label: 'May 2026 — Q1 comps +10%, stock +8.1% on May 22',     color: '#22c55e' },
+  { idx: 57, label: 'Jul 2026 — monthly-close high $251.07',               color: '#f59e0b' },
+  { idx: 59, label: 'Sep 4, 2026 — $230.69, post-Q2 pop faded',            color: '#5B9BFF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(91,155,255,0.22)');
+grad.addColorStop(1, 'rgba(91,155,255,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#5B9BFF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#5B9BFF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
