@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WDAY — Workday, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4DA3FF;
+  --accent-dim: #4DA3FF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">WDAY</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software - Application</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $47.19B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: ~#507 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#95 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Workday, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$195.79</div>
+      <div class="price-change">−$11.13 (−5.38%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $195.81 (+$0.02, +0.01%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Pleasanton, California</div>
+    <div class="meta-item"><span>Employees:</span> ~21,000</div>
+    <div class="meta-item"><span>Founded:</span> 2005 (IPO Oct 12, 2012) · Fiscal year ends Jan 31</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 FY27, late November 2026 (est. — date not yet posted on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Workday sells cloud software that runs the two systems every large organisation cannot switch off: human capital management (HCM — payroll, HR records, talent, scheduling) and financial management (the general ledger, planning, procurement, spend). It has been named a Leader in Gartner's Cloud HCM Magic Quadrant for eleven consecutive years and serves more than 11,500 customers. Fiscal 2026 (ended January 31, 2026) revenue was <strong>$9.55B, up 13.1%</strong>; trailing-twelve-month revenue through July 2026 is <strong>$10.16B, up 13.4%</strong>. At $47.19B of market value it ranks roughly <strong>#507 globally (est.)</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The question on this page is the one the whole application-software group has been fighting over since early 2026: <strong>is Workday cheap, or is it broken?</strong> Subscription growth has decelerated from the high teens to <strong>13.9%</strong>, and the stock was cut in half between December 2025 and April 2026 on the fear that AI agents will do the work of the seats Workday charges for. Then, on August 13, 2026, Reuters reported that Silver Lake was in talks to take the company private, and the stock had its best day in a decade. So there are now two bids for this name — the public market's and, possibly, a private one — and the report below tries to work out what the public one is actually paying for: <strong>a 6.0% free-cash-flow yield, a 4.7× EV/sales multiple, a 4.3% buyback yield, and a non-GAAP operating margin that has climbed to 31%</strong>. Whether that is a bargain or a value trap depends almost entirely on whether 13–14% subscription growth holds.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Aneel Bhusri</div>
+      <div class="card-note">Co-founder, Chair and CEO. Returned as CEO on <strong>February 9, 2026</strong>, replacing Carl Eschenbach, who stepped down as CEO and director after a two-year sole-CEO tenure (co-CEO from Dec 2022, sole CEO from Jan 2024) and stays on as a strategic advisor. Verified from Workday's Feb 9, 2026 press release and the Aug 27, 2026 Q2 FY27 release. <strong>Note: this corrects the brief, which listed Eschenbach as CEO.</strong></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Zane Rowe</div>
+      <div class="card-note">CFO, quoted in the Q2 FY27 results release (Aug 27, 2026) — verified. Former CFO of VMware and United Airlines. Owner of the subscription-revenue / 12-month-backlog / non-GAAP-margin guidance framework and of the capital-return program that has retired 4.3% of shares in the past year.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Elliott — $2B+</div>
+      <div class="card-note">Elliott Investment Management disclosed a <strong>$2 billion stake on September 16, 2025</strong>, describing itself as supportive of the multiyear plan (verified via Nasdaq.com coverage). Insiders own 19.1% and institutions 91.2% (stockanalysis.com); Bhusri's founder stake carries super-voting Class B shares. A ranked list of the largest index and active holders was not verified from sources fetched and is not shown.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Workday reports a <strong>single operating segment</strong> and discloses revenue two ways: by type (subscription services versus professional services) and by geography. It does not break out HCM versus Financials revenue, so the product cards below carry the operating colour the company does give — customer counts, backlog and AI attach — rather than invented segment dollars. The bar shows the verified revenue-by-type split for the twelve months to April 30, 2026 (stockanalysis.com breakdown; the Jul-26 quarter alone was 93.3% subscription).</p>
+  <div class="seg-bar">
+    <div style="flex:92.6;background:#4DA3FF;">SUBSCRIPTION 92.6%</div>
+    <div style="flex:7.4;background:#f59e0b;">SVCS 7.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4DA3FF;"></span> Subscription services — $9.13B (TTM to Apr 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Professional services — $727M (TTM to Apr 2026)</div>
+  </div>
+  <div class="seg-bar" style="height:22px;margin-top:20px;">
+    <div style="flex:75;background:#a78bfa;">UNITED STATES 75%</div>
+    <div style="flex:25;background:#22c55e;">INTERNATIONAL 25%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> United States — $7.39B (TTM to Apr 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Other countries — $2.47B (TTM to Apr 2026)</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #4DA3FF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Subscription Services — HCM &amp; Financial Management</div>
+        <span class="biz-badge dominant">CORE — GARTNER CLOUD HCM LEADER, 11 CONSECUTIVE YEARS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2.471B</div><div class="biz-stat-label">Q2 FY27 Sub Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13.9%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">92.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the business. Multi-year, prepaid-annually contracts for HCM (the original product, launched 2006) and Financial Management (the second act, which sells into the same buyer — the CFO and CHRO — and lifts contract value per customer). The three numbers management leads with, in order: <strong>subscription revenue $2,471M, +13.9%</strong>; <strong>12-month subscription revenue backlog (cRPO — the portion of contracted revenue that will be recognised in the next four quarters) $9,034M, +14.2%</strong>; and <strong>total subscription backlog $27,403M, +8.0%</strong>. Read them together: the 12-month backlog is growing a touch faster than revenue, which argues against a sharp near-term deceleration, but total backlog growth of only 8% says customers are signing shorter or smaller renewals — the long-dated visibility is thinning even as the next twelve months look fine. Full-year FY27 subscription revenue is guided to <strong>$9.940–9.950B (+13%)</strong>, Q3 to <strong>$2.515B (+12%)</strong>. Gross margin on the whole company runs 75.8%; subscription gross margin is materially higher than that blended figure because professional services is roughly break-even.</p>
+    <div class="biz-tam"><strong>Category size:</strong> Workday does not disclose HCM or ERP share; third-party TAM estimates were not verified from sources fetched and are omitted rather than guessed.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">SAP (SuccessFactors / S/4HANA Cloud)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">HCM share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment rev</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Oracle (Fusion Cloud HCM / ERP)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment rev</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Dayforce (taken private, Feb 2026)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$12.3B</div><div class="comp-bubble-label">Buyout value</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">AI Agents — Illuminate, Agent System of Record, Sana</div>
+        <span class="biz-badge emerging">EMERGING — &gt;25% OF NEW ACV, NOT SEPARATELY DISCLOSED AS REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">5,500+</div><div class="biz-stat-label">Customers using agents</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+35%</div><div class="biz-stat-label">QoQ</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">&gt;25%</div><div class="biz-stat-label">Of new ACV</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The strategic answer to the "AI kills seats" bear case is to sell the AI. <strong>Illuminate</strong> is Workday's AI platform, trained on the company's proprietary corpus of HR and finance transactions; the <strong>Agent System of Record</strong> is the pitch that an enterprise will need one governed registry to onboard, permission and audit both human employees and software agents — i.e. Workday wants to be the HR system for the bots too. The <strong>Sana</strong> acquisition (announced September 2025; price not disclosed on sources fetched) supplied the conversational front-end and now powers Workday Learning; Evisort (contracts), Paradox (conversational recruiting) and Flowise (low-code agent builder) round out the stack. Q2 FY27 shipped a Developer Agent, Agent Passport, Adaptive Decision Intelligence and a Financial Audit Agent. The verified adoption data: <strong>more than 5,500 customers using Workday's own agents (+35% quarter-on-quarter) and AI driving more than 25% of new annual contract value</strong>; Wells Fargo cited more than 200% YoY growth in new agentic-AI ACV. What is <strong>not</strong> disclosed is AI revenue in dollars, so the size of this line is unknown — it is an attach story, not yet a P&amp;L line.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> the pricing model. If agents are sold per-consumption or per-outcome rather than per-seat, Workday can grow revenue while customer headcount shrinks — that is the whole bull case, and it is not yet proven in the numbers.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Microsoft (Copilot / Dynamics)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment rev</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ServiceNow (Now Assist)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment rev</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Professional Services</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">FLAT BY DESIGN — PUSHED TO PARTNERS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$178M</div><div class="biz-stat-label">Q2 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~0%</div><div class="biz-stat-label">YoY (FY25 → TTM)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/m</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Implementation and deployment work. Workday deliberately hands most of this to a partner ecosystem — Accenture, Deloitte, KPMG (a new customer this quarter as well as a partner), BDO Canada (new partnership) — because services revenue carries near-zero margin and dilutes the subscription gross margin. Professional services was <strong>$728M in FY25 and $727M in the twelve months to April 2026</strong>: flat, on purpose. Treat it as a leading indicator of new-logo activity rather than as a profit centre; a sustained decline would be a warning that implementations are slowing.</p>
+    <div class="biz-tam"><strong>Margin profile:</strong> roughly break-even; each point of mix shift toward subscription is accretive to blended gross margin (75.8% TTM).</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">SYSTEM-OF-RECORD STICKINESS</span>
+    <span class="moat-pill">PAYROLL SWITCHING COST</span>
+    <span class="moat-pill">SINGLE DATA MODEL (HCM + FIN)</span>
+    <span class="moat-pill">$27.4B CONTRACTED BACKLOG</span>
+    <span class="moat-pill">PROPRIETARY HR/FINANCE DATA CORPUS</span>
+    <span class="moat-pill">11-YEAR GARTNER LEADER</span>
+    <span class="moat-pill">PARTNER ECOSYSTEM</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>inertia, and it is a very good moat</strong>. Nobody rips out payroll for fun: a Workday HCM migration is a multi-year, eight-figure project touching every employee's paycheque, and the failure mode is a front-page story. Once Financials is layered on the same data model, the two systems reinforce each other — headcount plans feed the budget, the budget feeds the ledger — and the exit cost roughly doubles. That is why <strong>$27.4B of contracted subscription backlog</strong> sits on the books and why gross retention in this category is historically very high. The eleventh straight Gartner Leader placement matters less as marketing than as evidence that the product has not fallen behind the two giant incumbents, SAP and Oracle, that own most of the remaining on-premise base Workday still wants to convert. The newest layer — the proprietary corpus of HR and finance transactions that trains Illuminate — is a genuine data advantage if agents need domain-specific grounding, and a much smaller one if a general-purpose model with API access can do the same job. That single uncertainty is what the market has been repricing all year.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Seat-based pricing in an agent world.</strong> Workday charges largely per employee under management. If AI agents allow customers to run leaner HR and finance teams — or if they eliminate categories of knowledge-worker jobs altogether — the denominator Workday bills on shrinks. Management's counter is to sell agents on their own price line (they already drive &gt;25% of new ACV), but there is not yet a disclosed AI revenue figure to prove that new revenue exceeds seat leakage. Total backlog growing only 8.0% while 12-month backlog grows 14.2% is consistent with customers hedging on contract length.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Growth deceleration with a rich cost of talent.</strong> Subscription growth has stepped from ~19% (FY23) to 16% (FY25) to 13.9% today, and Q3 is guided to 12%. The margin story has been funded by three rounds of layoffs (3% in early 2023, <strong>8.5% — roughly 1,750 roles — in February 2025</strong>, and a further ~2% in February 2026) and by outsourcing services. There is a limit to how many times a software company can expand margins by shrinking headcount before product velocity suffers, and the company is simultaneously promising the most ambitious product roadmap in its history.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Incumbent bundling.</strong> SAP and Oracle sell HCM and ERP inside far larger suites, often at a discount to protect the database or the broader cloud contract; Microsoft is pushing Copilot agents into the same workflows from the productivity layer. Workday is a best-of-breed vendor in a market that periodically swings back toward suites, and the AI cycle is exactly the kind of platform shift that has historically favoured the platform owner.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Leadership churn and a founder-control structure.</strong> Two CEO changes in four years (Eschenbach in, then out on February 9, 2026), a rebuilt technology leadership team drawn from Google Cloud (Gerrit Kazmaier, Peter Bailis), a $2B activist on the register and now reported take-private talks. Bhusri's Class B super-voting shares mean public holders get the economics but not the decision on whether — and at what price — the company is sold.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Ticker column from stockanalysis.com (overview and statistics pages, retrieved Sep 4, 2026) with the Sep 4 close of $195.79 substituted where the statistics page still carried the Sep 3 close of $206.92. <strong>Industry Avg and NASDAQ-100 columns are left as "—" wherever a verified figure was not fetched</strong> — no comparison values have been estimated silently.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>WDAY</th><th>App Software Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--text-dim);">40.3×</td><td>—</td><td>—</td><td>$195.79 ÷ $4.86 <span class="tip" title="Generally Accepted Accounting Principles — the official, fully-loaded accounting basis, including stock compensation and amortisation">GAAP</span> EPS (site shows 42.62× on the Sep 3 close). Flattered by a $1.52/share one-off tax benefit in Q2 — strip it and trailing GAAP P/E is ~59×.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--text-dim);">17.7× / 21.2×</td><td>—</td><td>—</td><td>17.7× on FY28 consensus non-GAAP EPS of $11.06; 21.2× on FY27 consensus of $9.23. Site reports 17.18×. Non-GAAP excludes stock comp — see one-offs.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--text-dim);">0.87</td><td>—</td><td>—</td><td>Sub-1.0 on an 18.7% three-year EPS growth forecast — the growth is coming from margin and buyback, not revenue (3-yr revenue forecast 10.9%).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--text-dim);">$4.86</td><td>—</td><td>—</td><td>GAAP, +125% YoY. Includes $1.52 from the Q2 FY27 intra-entity IP transfer tax benefit. Underlying ~$3.34.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--text-dim);">+13.4%</td><td>—</td><td>—</td><td>TTM. Subscription +13.9% in Q2; FY27 subscription guided +13%; Q3 guided +12%. The deceleration is gentle but unbroken.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--text-dim);">75.8%</td><td>—</td><td>—</td><td>TTM. Blended; dragged by ~7% of revenue in near-break-even professional services.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--text-dim);">12.3%</td><td>—</td><td>—</td><td>TTM GAAP. Non-GAAP operating margin is 31.1% (Q2) — the 19-point gap is mostly stock-based compensation and acquired-intangible amortisation.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>—</td><td>—</td><td>No dividend. Capital return is buyback: 9.8M shares for $1.3B in Q2 alone; buyback yield 4.32%; new $4.0B authorisation.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--text-dim);">8.35% of shares<br>10.36% of float</td><td>—</td><td>—</td><td>20.12M shares short, 3.97 days to cover. Elevated for a large-cap — the "broken SaaS" trade is crowded, which also explains the 17.8% one-day squeeze on Aug 13.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--text-dim);">0.58</td><td>—</td><td>—</td><td>$3.77B debt vs $3.40B cash — a small net debt position (−$369M) after aggressive buybacks. Debt/FCF 1.33×; interest coverage 11×. Not a balance-sheet story.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--text-dim);">0.91</td><td>—</td><td>—</td><td>Below 1.0, but normal for prepaid SaaS: deferred revenue (cash already collected) is the largest current liability.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base — but not adjusted for stock-based compensation.">Free Cash Flow</span></td><td style="color:var(--text-dim);">$2.84B</td><td>—</td><td>—</td><td>TTM; 28.0% FCF margin; $11.80/share. <strong>FCF yield 6.0%</strong> on $47.19B market cap; P/FCF 16.6×; EV/FCF 16.7×.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--text-dim);">16.0%</td><td>—</td><td>—</td><td>Inflated by the tax benefit and by buybacks shrinking the equity base.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--text-dim);">18.4%</td><td>—</td><td>—</td><td>Versus a 9.7% WACC shown on the same page — clearly value-creating on GAAP operating profit even before adjustments.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--text-dim);">1.08</td><td>—</td><td>—</td><td>5-year. Understates recent realised volatility — the stock moved ±5% or more on 14 trading days in July–August 2026 alone.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$110.36 – $249.85</td><td>—</td><td>—</td><td>$195.79 sits 61% of the way up the range. 52-week price change −14.9%; 50-day MA $165.85, 200-day MA $160.20 — price is well above both after the August spike.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;"><strong>The $374M tax benefit.</strong> Q2 FY27 GAAP net income was $632M on GAAP operating income of just $313M. The difference is an <strong>intra-entity intellectual-property transfer that created a $374M deferred tax asset, worth $1.52 of the $2.57 GAAP EPS</strong>. It is real, but it is not earnings power: strip it and the quarter earned about $1.05 GAAP, and TTM EPS falls from $4.86 to roughly $3.34. Any trailing P/E you see quoted for WDAY this quarter is about a third too low. The effective tax rate of 2.57% on the statistics page is the same artefact.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Restructuring.</strong> Three rounds of layoffs — 3% in early 2023, 8.5% (about 1,750 roles) announced February 2025, and roughly 2% in February 2026 — carried severance charges that GAAP absorbs and non-GAAP excludes. The 31.1% non-GAAP operating margin is a post-restructuring run-rate; the 11.8% GAAP margin has paid for it.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The GAAP-to-non-GAAP gap.</strong> Q2 non-GAAP operating income of $824M versus GAAP $313M means <strong>$511M of quarterly add-backs</strong>, overwhelmingly stock-based compensation plus amortisation of acquired intangibles (Sana, Evisort, Paradox, HiredScore). Annualised that is roughly $2B a year, or about 19% of revenue. The buyback — $1.3B in Q2, shares down 4.32% YoY — is more than offsetting the dilution, which is why per-share numbers are improving faster than the business, and why "how much of the story is buyback plus margin" has a concrete answer: <strong>most of the EPS growth, and none of the revenue growth</strong>.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Takeover premium in the price.</strong> The stock closed at $175.29 on August 12 and $206.45 on August 13 after the Silver Lake report. Roughly $30 of the current $195.79 — about 15% — is arguably deal speculation rather than fundamentals. If talks end without a deal, that is the size of the air pocket.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">42 analysts (stockanalysis.com / S&amp;P Global, August 2026). But 19 of the 42 sit at Hold and 3 at Sell — the label is "Buy" and the room is split.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$207.10</div><div class="card-note">+5.8% versus the $195.79 close. Median $215 (+9.8%). The stock has effectively arrived at its target — via a takeover rumour, not via earnings.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$92 – $275</div><div class="card-note">−53.0% to +40.5%. A 3× spread from low to high is the widest kind of disagreement — it is about whether the business model survives, not about next quarter.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">20 / 19 / 3</div><div class="card-note">15 Strong Buy + 5 Buy, 19 Hold, 2 Sell + 1 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:15;background:var(--green);"></div>
+    <div style="flex:5;background:#4ade80;"></div>
+    <div style="flex:19;background:var(--amber);"></div>
+    <div style="flex:2;background:var(--red);"></div>
+    <div style="flex:1;background:#b91c1c;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 15</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 19</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#b91c1c;"></span> Strong Sell — 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Wells Fargo</strong> — Michael Turrin, <strong>Overweight</strong>, price target raised $185 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$215</span> (Aug 12, 2026 — the day before the Silver Lake report). Rationale: more than 200% year-over-year growth in new agentic-AI annual contract value.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>J.P. Morgan</strong> — <strong>Buy</strong> maintained, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$225</span> (August 2026, per stockanalysis.com forecast page).</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Citi</strong> — <strong>Hold</strong> maintained, price target <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$201</span> (August 2026). Target now sits above the close only because of the Sep 4 drop.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Goldman Sachs</strong> — <strong>Hold</strong> maintained, price target revised to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$164</span> (August 2026). A neutral rating with a target 16% below the price is a polite way of saying the takeover premium is not deserved on fundamentals.</div></div>
+    <div class="risk-item"><span style="color:var(--red);">●</span><div><strong>Morgan Stanley</strong> — <strong>Underweight</strong>, price target <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$145</span> (Jul 21, 2026). Rationale: "AI-driven growth is arriving slower than the valuation assumes." The clearest articulation of the bear case on the Street.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">The Wells Fargo and Morgan Stanley calls were read from a Vantage Markets daily note dated Aug 14, 2026; the J.P. Morgan, Citi and Goldman calls from the stockanalysis.com forecast page. Guggenheim's September 2025 upgrade to Buy with a $285 target (the day after Elliott's stake was disclosed) is a year old and is referenced in Section 07 for context only. MarketBeat could not be fetched, so analyst names for the JPM/Citi/Goldman calls are not shown.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Aug 13, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Reuters: Silver Lake in talks to take Workday private — stock +17.8%</div>
+        <div class="tl-desc">Best single day in a decade; market cap jumped from roughly $43B to $51B. No agreement has been announced and no price has been reported. Silver Lake's Egon Durban and Bhusri are described as having long-standing ties; Silver Lake's software history includes Dell, VMware and Qualtrics, and it was part of the ~$55B Electronic Arts buyout. Comparable 2026 software take-privates: Dayforce ($12.3B, February) and OneStream ($6.4B, April). At Workday's size this would be among the largest software buyouts ever.</div>
+        <div class="tl-impact up">Reaction already happened — talks unconfirmed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 FY27 results: subscription +13.9%, cRPO +14.2%, non-GAAP margin 31.1%</div>
+        <div class="tl-desc">Revenue $2,649M (+12.8%), subscription $2,471M, 12-month backlog $9,034M (+14.2%), total backlog $27.4B (+8.0%), non-GAAP operating margin 31.1%, non-GAAP EPS $2.75, FCF $460M. FY27 subscription guide $9.940–9.950B (+13%) with a 31.0% non-GAAP margin; Q3 guide $2.515B (+12%) at 30.0%. New $4.0B buyback authorisation on top of $1.3B repurchased in the quarter. Stock rose 1.5% on the day and 5.8% the next.</div>
+        <div class="tl-impact up">Beat and modest raise — reaction already happened</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Stock falls 5.4% to $195.79</div>
+        <div class="tl-desc">The Sep 4 decline from $206.92 was not explained by any source fetched for this report. With ~15% of the price attributable to deal speculation, day-to-day headlines on the Silver Lake talks — or the broader software tape — are now the dominant driver of the stock, and this move is consistent with either.</div>
+        <div class="tl-impact down">Cause not verified</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 12–15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Workday Rising — annual customer conference</div>
+        <div class="tl-desc">The venue for the Illuminate and Agent System of Record roadmap. Watch for agent pricing and packaging disclosure: a move to consumption or outcome pricing would be the first concrete answer to the seat-erosion bear case. Also the natural stage for Bhusri's first full-year strategy as returning CEO.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY27 earnings — the 12% quarter</div>
+        <div class="tl-desc">Date not yet posted on sources fetched. Guidance calls for subscription revenue of $2.515B (+12%) and a 30.0% non-GAAP margin. The number that matters is the 12-month backlog: if cRPO growth holds above 13% against a 12% revenue print, the deceleration is bottoming; if cRPO falls toward 10%, FY28's 11.7% consensus revenue growth is at risk.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Silver Lake outcome, Elliott's position, $4B buyback execution</div>
+        <div class="tl-desc">Three interlocking capital events. A confirmed take-private would set a floor; talks ending would remove roughly $30/share of premium. Elliott's $2B stake (Sep 2025) was framed as supportive of the plan but gives the company a sophisticated holder who will have a view on any bid price. Meanwhile the $4.0B authorisation is 8.5% of the market cap — at the current run-rate the company is retiring 4%+ of shares a year, which is by itself most of the EPS growth investors are paying for.</div>
+        <div class="tl-impact neutral">Binary — direction unknown</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">WDAY — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted; Sep 2026 = Sep 4 close, partial month)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#4DA3FF;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$289.98</strong> to <strong>$195.79</strong> today, WDAY has returned <strong>−32.5%</strong> over five years — roughly <strong>−7.6% a year</strong>, with no dividend, over a period in which the NASDAQ-100 and the S&amp;P 500 both roughly doubled (index total-return figures for the exact window were not verified from sources fetched, so no precise relative number is stated). The shape is a double top and a collapse: a 52% drawdown from October 2021 to $139.58 in June 2022 as rates repriced software; a full recovery to a monthly-close high of <strong>$294.66 in February 2024</strong>; eighteen months of grinding between $211 and $263 while growth decelerated; then a <strong>58.5% fall from the February 2024 peak to $122.40 in April 2026</strong> as the AI-disruption narrative took hold and the CEO changed. The stock has since rallied <strong>60%</strong> off that low in five months — but almost half of that rally was two days in August (the Silver Lake report and the post-earnings move). A shareholder who bought this stock at any point between March 2021 and February 2025 is under water.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$289.98 — zero-rate software peak</div><div class="tl-desc">Workday traded at roughly 14× forward sales with revenue growing 19–20%. Starting point of the 5-year window.</div><div class="tl-impact neutral">Starting point</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">$139.58 — rate-shock trough, −51.9%</div><div class="tl-desc">FY23 (Jan 2023) would show a $367M GAAP net loss on $6.22B revenue. The first round of layoffs (3%) followed in early 2023 shortly after Eschenbach became co-CEO.</div><div class="tl-impact down">Multiple compression</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2024</div><div class="tl-content"><div class="tl-title">$294.66 — all-time monthly-close high</div><div class="tl-desc">FY24 delivered the first meaningful GAAP operating profit ($183M) and $1.38B of net income (itself inflated by a tax valuation-allowance release). Eschenbach became sole CEO in January 2024. Peak of the "profitable growth" re-rating.</div><div class="tl-impact up">Margin thesis priced</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2025</div><div class="tl-content"><div class="tl-title">$263.34 — 8.5% workforce reduction announced</div><div class="tl-desc">About 1,750 roles cut in February 2025, explicitly to fund AI investment and expand margins. The stock held up initially; the deceleration to 12.6% subscription growth over the following quarters did the damage.</div><div class="tl-impact neutral">Margin lever pulled</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2025</div><div class="tl-content"><div class="tl-title">$240.73 — Elliott discloses $2B stake; Sana acquisition announced</div><div class="tl-desc">Elliott's Sept 16 disclosure and Guggenheim's upgrade (Buy, $285) lifted the stock briefly. Sana, an AI knowledge and learning company, was announced the same week. The stock then fell for the next seven months.</div><div class="tl-impact neutral">Activist arrives — rally faded</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">$133.76 — Bhusri returns as CEO (Feb 9); AI-disruption selloff</div><div class="tl-desc">Eschenbach stepped down as CEO and director; a further ~2% layoff round hit the same week. The monthly close fell 24% in February alone as the "AI eats seat-based SaaS" trade hit application software across the board.</div><div class="tl-impact down">Leadership reset, narrative break</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2026</div><div class="tl-content"><div class="tl-title">$122.40 — five-year low, −58.5% from Feb 2024</div><div class="tl-desc">At this price the stock traded at roughly 10–11× trailing free cash flow with a buyback yield above 6%. The intraday 52-week low of $110.36 was set in this window. June retested it at $122.42.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">$197.45 — Silver Lake report (+17.8% on Aug 13) and Q2 beat</div><div class="tl-desc">From $175.29 on Aug 12 to $206.45 on Aug 13 on the Reuters take-private report, then $204.72 on Aug 28 after earnings. The monthly RSI swung from oversold to above 60 in two months.</div><div class="tl-impact up">Deal premium, not re-rating</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Cheap or broken — the arithmetic.</strong> Start with what the public market is paying. Market cap <strong>$47.19B</strong>; net debt about $0.37B; enterprise value roughly <strong>$47.6B</strong>. Against TTM revenue of $10.16B that is <strong>4.7× EV/sales</strong> (the statistics page shows 4.95× on the higher Sep 3 close), for a business growing 13% with a 76% gross margin and a 31% non-GAAP operating margin. Against TTM free cash flow of <strong>$2.84B</strong>, it is <strong>16.7× EV/FCF, a 6.0% FCF yield</strong>. For context, at the April low the same FCF yield was above 9%. Application-software peers with 13% growth have historically traded at 6–9× sales and 25–35× FCF; on those historical norms, yes, <strong>WDAY is cheap</strong>. The trailing GAAP P/E of 40× looks expensive but is mostly a denominator problem — stock comp and amortisation — and even the honest ~59× ex-tax-benefit figure is on earnings that FCF exceeds by more than two to one.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>How much of the story is buyback plus margin?</strong> Almost all of the per-share story. Revenue is guided to grow 13% this year and consensus has it at 11.7% next year. Non-GAAP EPS consensus goes from $9.23 (FY27) to $11.06 (FY28), or +19.9%. Decompose that: roughly 12% from revenue, another 3–4 points from the margin walking from 31% toward the low-to-mid 30s, and about 4 points from the share count shrinking (−4.32% YoY; 9.8M shares retired in Q2 alone, with a fresh $4.0B authorisation equal to 8.5% of the market cap). So of the ~20% EPS growth investors are paying 17.7× for, <strong>roughly 40% is financial engineering in the neutral sense — margin and buyback — and 60% is the business</strong>. That is a perfectly respectable mix for a maturing franchise. It is a poor mix for a company whose bull case is that it is about to re-accelerate on AI.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>What "broken" would actually look like — and whether it does.</strong> The bear case says AI agents shrink the seat count Workday bills on. The verifiable leading indicators are: (1) 12-month backlog growth — <strong>14.2%, still above revenue growth</strong>, which is not what erosion looks like; (2) total backlog growth — <strong>8.0%</strong>, which is soft and suggests shorter or smaller renewal commitments, which <em>is</em> consistent with customers hedging; (3) AI attach — <strong>&gt;25% of new ACV, 5,500+ customers on agents, +35% QoQ</strong>, which is real adoption but with no revenue disclosure; (4) professional services flat, which says new implementations are steady rather than accelerating. The honest reading is <strong>"decelerating, not broken" — with one yellow flag in total backlog</strong>. The seat-erosion thesis is a forecast, not yet a data point; the deceleration from 19% to 12% is a data point.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The Silver Lake overlay.</strong> Private equity's view of this asset is straightforward: a 6% FCF yield growing 13% with a 92% subscription mix and $27B of contracted backlog is a leveraged-buyout textbook case, which is why Dayforce ($12.3B) and OneStream ($6.4B) were taken out earlier this year. The report that Silver Lake is in talks is the market's second opinion that the stock is cheap — but it also means about $30 of the current price is a probability-weighted bid rather than a discounted cash flow. If a deal is struck, historical software take-private premiums suggest a price above the pre-report level, but not necessarily far above where the stock already sits. If talks end, the stock likely revisits the $165–180 area where the fundamentals alone were pricing it in early August, which is still a 7% FCF yield.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A system of record with $27.4B of contracted backlog, 12-month backlog growing 14.2%, a 31% non-GAAP margin still expanding, and $2.84B of free cash flow trades at 4.7× sales and a 6.0% FCF yield — multiples last seen in 2022's rate shock. Management is retiring 4%+ of the share count a year with a new $4B authorisation, a $2B activist is on the register, and a top-tier software buyer is reportedly at the table. AI is already more than a quarter of new bookings; if agent pricing decouples revenue from seats, growth re-accelerates from a base the market has priced for decline. Returning founder-CEO Bhusri gives the AI pivot credibility with customers.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Subscription growth has fallen every year from 19% to 13.9% and is guided to 12% next quarter; total backlog is growing just 8%. The margin has been bought with three rounds of layoffs, and per-share growth is 40% buyback-and-margin. GAAP earnings are 12% of revenue after ~$2B a year of stock comp and amortisation, and the headline trailing P/E is flattered by a $374M tax accounting benefit. Roughly 15% of the price is a take-private rumour that may not close. Two CEO changes in four years, a founder with super-voting control who will decide any sale, and Microsoft, SAP and Oracle all pushing AI agents into the same workflows. Morgan Stanley's $145 target is 26% below the price.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Deal talks collapse.</strong> The Aug 13 report added roughly $8B of market value in a day. No price, structure or timetable has been reported, and Silver Lake's history includes walking away. A "talks ended" headline likely returns the stock to the $165–180 range within a session, independent of any change in the business.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Seat erosion shows up in backlog.</strong> The 8.0% total-backlog growth is the first soft number in an otherwise clean set. If 12-month backlog growth falls below revenue growth at the Q3 print in late November, the "decelerating not broken" verdict flips, FY28 consensus of 11.7% growth is at risk, and the 4.7× sales multiple will have been the right price rather than a cheap one.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Margin lever exhausted.</strong> Non-GAAP margin has gone from ~19% in FY22 to 31% largely through headcount and services outsourcing. The company is guiding 31.0% for FY27 — flat with Q2 — while promising the biggest product cycle in its history. If AI investment (R&amp;D, GPU compute, acquisitions like Sana) has to be funded from margin, the buyback-plus-margin half of the EPS story stalls exactly when the revenue half is slowing.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Seat-Based SaaS Repricing</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Application software de-rated sharply in the first half of 2026 on a single thesis: if AI agents do knowledge work, companies need fewer people, and software priced per person needs fewer seats. Workday — whose entire revenue base is priced on employees under management — became the purest expression of the trade, falling 58.5% peak-to-trough while short interest climbed to 10.4% of float. The thesis has not yet appeared in Workday's 12-month backlog (+14.2%), but it has arguably appeared in total backlog (+8.0%). The industry's response — Workday's "Agent System of Record," ServiceNow's and Salesforce's agent platforms, consumption-based pricing pilots — is a race to reprice before the seat count actually moves. Whoever proves that agent revenue exceeds seat leakage first gets the multiple back.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Growth Bought With Headcount, Not Bookings</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Across large-cap SaaS the 2023–2026 playbook has been identical: cut 5–10% of staff, redirect the savings to "AI investment" and margin, and buy back stock. Workday ran it three times (3% in 2023, 8.5% in Feb 2025, ~2% in Feb 2026) and lifted non-GAAP operating margin from ~19% to 31%, while revenue growth slid from 19% to 13%. The result across the group is EPS growth in the high teens on revenue growth in the low teens — and a market that increasingly refuses to pay a growth multiple for it. The activist wave (Elliott at Workday, and similar positions elsewhere in the sector) and the private-equity wave (Dayforce, OneStream, now possibly Workday) are the two natural endpoints when public investors stop paying for margin-driven EPS.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Private-Equity Put Is Back</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">After a quiet 2025, software buyouts returned in 2026 at scale: Dayforce for $12.3B in February, OneStream for $6.4B in April, and a reported approach for Workday that would be among the largest software buyouts on record. The mechanism is simple — when a franchise with 92% recurring revenue and a 28% FCF margin trades at a 6–9% FCF yield, it can be levered and taken private at a premium and still clear a PE return hurdle. <strong>Bull framing:</strong> the floor under Workday and its peers is no longer the public market's opinion of AI risk but the private market's cost of capital, which is a higher floor. <strong>Bear framing:</strong> Cantor's David Siffringer called it "the PE put is back" with visible scepticism — a sector that is only cheap enough for a buyer who can lever it is, by definition, a sector public investors have stopped wanting to own, and puts expire.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (Friday close, 4:00 PM EDT). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, daily change, market cap, 52-week range, sector/industry, valuation statistics, annual and quarterly financials, revenue breakdown and analyst consensus from stockanalysis.com (WDAY overview at https://stockanalysis.com/stocks/wday/, plus statistics, financials, financials/metrics, forecast and history pages, retrieved Sep 4, 2026; the statistics page still reflected the Sep 3 close of $206.92 and ratios were recomputed at $195.79 where stated); 60 monthly unadjusted "Real Price" closes from digrin.com WDAY price history, cross-checked against stockanalysis.com daily closes for Jun 30, Jul 31 and Aug 31, 2026 (all exact matches) — the September 2026 point is the Sep 4 close, a partial month; Q2 FY27 operating results, guidance, backlog, buyback, tax item and executive names from Workday's Aug 27, 2026 results release (newsroom.workday.com); CEO transition from Workday's Feb 9, 2026 release and diginomica coverage; Silver Lake report, market-cap moves and analyst quotes from Yahoo Finance / Insider Monkey and Vantage Markets (Aug 13–14, 2026); Elliott stake, Guggenheim call and Sana announcement from Nasdaq.com (Sep 2025); global market-cap rank from companiesmarketcap.com (#507 on the Sep 3 close).</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations: the US and NASDAQ market-cap rank pills, the next earnings date, the ~$30/share "deal premium" (difference between the Aug 12 and Aug 13 closes), the ~$2B annualised GAAP/non-GAAP add-back, the EPS-growth decomposition, and the historical peer multiple ranges cited in Section 08. Industry-average and NASDAQ-100 comparison columns in Section 04 are shown as "—" because no verified figures were fetched. Items marked <strong>n/d</strong> are not disclosed by the company: HCM/Financials revenue split, market share, AI revenue in dollars, the Sana purchase price, and competitor segment revenues. No chart months were reconstructed. The Sep 4 price decline was not explained by any source fetched. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com; Sep 2026 = Sep 4, 2026 close) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [289.98,274.23,273.18,253.01,229.05,239.46,206.70,156.30,139.58,155.10,164.56,152.22,155.82,167.90,167.33,181.43,185.47,206.54,186.14,211.99,225.89,237.13,244.50,214.85,211.71,270.72,276.06,291.07,294.66,272.75,244.73,211.45,223.56,227.12,263.19,244.41,233.85,249.99,258.03,262.06,263.34,233.53,245.00,247.71,240.00,229.38,230.82,240.73,239.92,215.62,214.78,175.63,133.76,129.92,122.40,146.19,122.42,160.34,197.45,195.79];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — zero-rate software peak $289.98',            color: '#94a3b8' },
+  { idx: 8,  label: 'Jun 2022 — rate-shock trough $139.58 (−51.9%)',          color: '#ef4444' },
+  { idx: 28, label: 'Feb 2024 — all-time monthly-close high $294.66',         color: '#22c55e' },
+  { idx: 40, label: 'Feb 2025 — 8.5% workforce reduction announced',          color: '#f59e0b' },
+  { idx: 47, label: 'Sep 2025 — Elliott $2B stake; Sana acquisition',         color: '#a78bfa' },
+  { idx: 52, label: 'Feb 2026 — Bhusri returns as CEO; AI selloff',           color: '#ef4444' },
+  { idx: 54, label: 'Apr 2026 — five-year low $122.40 (−58.5%)',              color: '#ef4444' },
+  { idx: 58, label: 'Aug 2026 — Silver Lake report (+17.8% on Aug 13)',       color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(77,163,255,0.22)');
+grad.addColorStop(1, 'rgba(77,163,255,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4DA3FF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4DA3FF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
