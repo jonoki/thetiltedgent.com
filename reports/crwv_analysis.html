@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRWV — CoreWeave, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #7C8CFF;
+  --accent-dim: #7C8CFF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">CRWV</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software – Infrastructure</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $49.29B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #517</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#95 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">CoreWeave, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$89.36</div>
+      <div class="price-change" style="color:var(--green);">+$4.80 (+5.68%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $89.07 (−0.32%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Livingston, New Jersey</div>
+    <div class="meta-item"><span>Employees:</span> 2,189</div>
+    <div class="meta-item"><span>Founded:</span> 2017 (IPO Mar 28, 2025 at $40)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Mid-November 2026 (est. — Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">CoreWeave rents Nvidia GPU compute at industrial scale to AI labs, hyperscalers and enterprises — a "neocloud," meaning a cloud built for one workload (AI training and inference) rather than the general-purpose clouds of Amazon, Microsoft and Google. FY2025 revenue was <strong>$5.13B, up 167.9%</strong> from $1.92B in FY2024, and the trailing-twelve-month figure through June 2026 is <strong>$7.59B, up 115.3%</strong>. It runs 51 data centers with <strong>1.5 gigawatts of active power</strong> and 4.2 GW under contract, ranks roughly <strong>#517 globally by market cap</strong> at $49.29B, and was added to the Nasdaq-100 in 2026. It is eighteen months old as a public company.</p>
+  <p class="prose" style="margin-top:16px;">The debate on this page is a race between two clocks. On one side is a <strong>$104.2B revenue backlog</strong> — contracts already signed, mostly with a handful of counterparties — that is roughly <strong>14 times trailing revenue</strong>. On the other is <strong>~$35B of balance-sheet debt</strong> (about $51.6B including lease obligations) borrowed at high-single-digit rates to buy the GPUs that serve those contracts, with interest expense now consuming <strong>a quarter of every revenue dollar</strong>. The contracts are long; the hardware ages fast; the money is expensive. Whether the backlog outlives the depreciation schedule and the coupon is the whole investment case, and Sections 04 and 08 work through it with the company's own numbers.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Michael Intrator</div>
+      <div class="card-note">Co-founder, President, CEO and Chairman (verified on stockanalysis.com company profile). Former commodities trader who pivoted the firm from Ethereum mining to GPU cloud in 2019. Holds Class B shares carrying 38.7% of total voting power per the April 2026 proxy.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Nitin Agrawal</div>
+      <div class="card-note">CFO and Treasurer (verified). Architect of the layered financing stack — the DDTL facilities backed by customer contracts, 2030/2031 senior notes, converts, the inaugural Eurobond — and of the "adjusted operating income" framing the company guides on. Works alongside a separately titled "Chief Architect of Strategic Financing," which tells you how central the debt is.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Investors &amp; Control</div>
+      <div class="card-value" style="font-size:20px;">Founders 72.3% of votes</div>
+      <div class="card-note">Per the April 2026 proxy: Class B (10 votes/share, ~98.0M shares) gives the three co-founders 72.32% of voting power. Largest Class A holders: <strong>Magnetar</strong> funds 17.07%, <strong>Nvidia</strong> 10.66% (added $2B at $87.20/share in January 2026), <strong>Jane Street</strong> 6.53% ($1B strategic investment, 1H 2026). Institutional ownership 54.33%, insider ownership 19.38%.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">CoreWeave reports a <strong>single operating segment</strong>: GPU cloud infrastructure sold on committed multi-year contracts. It does not publish revenue by product line. The most economically meaningful disaggregation it does disclose is <strong>customer concentration</strong> — and it is extreme. The bar below is the verified FY2025 split from the 10-K; the cards that follow describe the customer cohorts and the software layer, with shares marked as not disclosed wherever the company has not stated them.</p>
+  <div class="seg-bar">
+    <div style="flex:67;background:#7C8CFF;">Microsoft 67%</div>
+    <div style="flex:33;background:#3b82f6;color:#fff;">All other customers 33%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#7C8CFF;"></span> Microsoft — 67% of FY2025 revenue (~$3.4B implied)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Everyone else — 33% (~$1.7B implied): OpenAI, Nvidia, Meta, enterprises</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note: the Microsoft share was 71% in Q2 2025 and 67% for FY2025. The company has not disclosed the Q2 2026 figure on the pages fetched; the OpenAI, Meta and Nvidia contracts signed in 2025 are designed to dilute it through 2026.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #7C8CFF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Hyperscaler Capacity — Microsoft</div>
+        <span class="biz-badge dominant">67% OF FY2025 REVENUE — ONE CUSTOMER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$3.4B</div><div class="biz-stat-label">FY25 Rev (implied)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">67%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Microsoft rents CoreWeave clusters largely to serve OpenAI workloads it could not build fast enough for itself — which means CoreWeave's largest customer is, in effect, an intermediary for its second-largest. The economics are take-or-pay: Microsoft commits to capacity for a term, and CoreWeave finances the GPUs against that commitment. The margin profile is the company's blended one — <strong>59% adjusted EBITDA margin</strong> in Q2 2026 — because CoreWeave does not disclose per-customer margins. The risk is obvious and the company states it plainly in its 10-K as "heavy customer concentration." The mitigation is the OpenAI and Meta direct contracts below; the concern is that Microsoft, having built its own capacity, becomes a renewal question rather than a growth engine after the current terms run off.</p>
+    <div class="biz-tam"><strong>Category size:</strong> global AI infrastructure / GPU cloud spend is not disclosed by the company; third-party TAM figures were not verified from sources fetched and are omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Microsoft Azure / AWS / Google Cloud (in-house)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">AI capacity share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Oracle Cloud Infrastructure</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Frontier AI Labs — OpenAI and Meta Direct Contracts</div>
+        <span class="biz-badge growth">~$36.6B OF CONTRACTED VALUE THROUGH 2031</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$22.4B</div><div class="biz-stat-label">OpenAI total (to May 2031)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$14.2B</div><div class="biz-stat-label">Meta (through 2031)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The diversification story. The <strong>OpenAI</strong> relationship was built in three pieces — an $11.4B initial agreement, a $4B expansion and a $6.5B expansion — totalling <strong>$22.4B running to May 2031</strong>. <strong>Meta</strong> signed a <strong>$14.2B</strong> agreement through 2031 in late 2025. Contract figures here are from a secondary analytical source (io-fund.com) and were not cross-checked against the underlying 8-K filings on this pass; treat them as reported, not audited. What the company does verify directly is that <strong>48-month-plus contracts rose from 10% to 21% of backlog</strong> between Q2 2025 and Q2 2026, and the 10-K puts weighted-average contract duration at <strong>about five years</strong>. Both customers are themselves heavy borrowers or heavy spenders on their own capacity, which is the crux of the counterparty question in Section 03.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> the "$25B+ of net new commitments in early Q3 2026" management cited — counterparties not named on the sources fetched. If they are the same three or four names, concentration is being rotated, not reduced.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Nebius Group (NBIS)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$62.05B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$1.36B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+506.9%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">IREN Ltd (IREN)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$17.61B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$707M</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+41.1%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Nvidia — Supplier, Shareholder, and Customer of Last Resort</div>
+        <span class="biz-badge emerging">$6.3B CAPACITY BACKSTOP THROUGH APRIL 2032</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6.3B</div><div class="biz-stat-label">Backstop order</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.66%</div><div class="biz-stat-label">Of Class A owned</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~17%</div><div class="biz-stat-label">Of supplier spend (per proxy summary)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Nvidia sits on all three sides of CoreWeave's table. It sells CoreWeave the GPUs (it is the dominant supplier, and CoreWeave was the first cloud to validate the Vera Rubin NVL72 platform in Q2 2026). It owns <strong>10.66% of the Class A shares</strong>, having put in a further <strong>$2B at $87.20 per share in January 2026</strong> — a price almost exactly where the stock closed today. And it has agreed to buy any <strong>unsold capacity up to $6.3B through April 2032</strong>, a backstop that converts idle GPUs into revenue and makes the lenders comfortable. Bulls read this as the world's most important AI company underwriting its favourite distribution channel. Bears read it as vendor financing by another name: the supplier funds the buyer's purchases and guarantees the buyer's revenue so that the buyer keeps buying. Both readings are true simultaneously; which dominates depends on whether end demand from labs and enterprises stays ahead of supply.</p>
+    <div class="biz-tam"><strong>Ownership context:</strong> 447.6M Class A + 98.0M Class B shares (Apr 30, 2026). Shares outstanding grew 75.6% year over year — dilution is a financing tool here, not a footnote.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Other Nvidia-backed neoclouds (Lambda, Crusoe, private)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Enterprise, Platform &amp; Software — Weights &amp; Biases and Bolt-ons</div>
+        <span class="biz-badge growth">SHARE NOT DISCLOSED — STRATEGIC, NOT YET MATERIAL</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4</div><div class="biz-stat-label">Acquisitions in 2025</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">51</div><div class="biz-stat-label">Active data centers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Above the raw GPUs sits a software stack — Kubernetes services, fleet management (SUNK, "Slurm on Kubernetes"), the CoreWeave Interconnect, and developer tooling from the 2025 acquisition of <strong>Weights &amp; Biases</strong>, followed by <strong>OpenPipe</strong> (Sep 2025), <strong>Marimo</strong> (Oct 2025) and <strong>Monolith AI</strong> (Nov 2025). The Q2 2026 release names new enterprise logos — Bentley Systems, Caterpillar, Grammarly, Isomorphic Labs, Sunday Robotics — and expansions at Cognition, Databricks, Hudson River Trading and Runway. None of this is broken out as revenue. Its purpose is strategic: software is the only layer where CoreWeave can differentiate from a competitor who buys the same Nvidia racks, and enterprise logos are the only route to a customer base that does not fit on one hand. The margin profile is presumably software-like but undisclosed.</p>
+    <div class="biz-tam"><strong>Not disclosed:</strong> software revenue, enterprise revenue, or any product-line split. No estimate is made here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Databricks / Hugging Face / hyperscaler ML platforms</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose"><strong>Sources of Moat</strong></p>
+  <div class="moat-list">
+    <span class="moat-pill">NVIDIA PRIORITY ALLOCATION</span>
+    <span class="moat-pill">4.2 GW CONTRACTED POWER</span>
+    <span class="moat-pill">$104B TAKE-OR-PAY BACKLOG</span>
+    <span class="moat-pill">CONTRACT-BACKED DEBT (DDTL)</span>
+    <span class="moat-pill">TIME-TO-DEPLOY SPEED</span>
+    <span class="moat-pill">MLPERF PERFORMANCE RECORDS</span>
+    <span class="moat-pill">SOFTWARE STACK (W&amp;B, SUNK)</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>access and speed, not technology</strong>. Anyone can, in principle, buy Nvidia GPUs and rent them out. Almost nobody can get them first, get the power to run them, and get the money to pay for them — simultaneously, at gigawatt scale, on a timeline a frontier lab will sign for. CoreWeave has all three: an allocation relationship with Nvidia that includes an equity stake and a revenue backstop; <strong>4.2 GW of contracted power</strong> across 51 sites when grid interconnection is the binding constraint on the whole industry; and a financing machine — the delayed-draw term loan (DDTL) structure, where lenders advance money against specific signed customer contracts — that let it raise roughly <strong>$16.7B of net debt proceeds in the first half of 2026 alone</strong>. Adjusted EBITDA margin of <strong>59%</strong> says the operating business, before financing and depreciation, is a good one. What it is not is a moat against its own customers: Microsoft, Meta and OpenAI are all building or buying their own capacity, and the moat lasts exactly as long as they cannot build fast enough.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>GPU depreciation versus contract length.</strong> The central technical debate. A GPU cluster is depreciated over a set useful life — the company's specific assumption was not visible on the pages fetched for this report, so no number is asserted here — and the bear argument is that Nvidia's annual product cadence (Hopper → Blackwell → Vera Rubin) makes hardware economically obsolete faster than the accounting schedule, so that reported "adjusted" profits overstate true earnings. The counter-argument is that a five-year take-or-pay contract signed against a specific cluster makes the depreciation schedule irrelevant: the customer has agreed to pay for that hardware regardless of what ships next. That defence holds for the first contract on each cluster. It does not answer what a four-year-old GPU rents for when the contract rolls off — and with <strong>D&amp;A of $1,393M in Q2 2026 alone, 54% of revenue</strong>, small changes to that answer swing the whole model.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Customer concentration and counterparty quality.</strong> One customer was 67% of FY2025 revenue. The diversification into OpenAI and Meta helps the concentration ratio, but OpenAI is a private company whose own spending commitments across the industry dwarf its revenue, and the contracts in the backlog are only as good as the payer. The company's 10-K names "heavy customer concentration" as a principal risk in its own words.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Financing cost and refinancing risk.</strong> Senior notes carry <strong>9.0–9.25% coupons</strong>; <strong>net interest expense was $640M in Q2 2026 — 24.9% of revenue</strong>, up from $267M a year earlier, and guided to <strong>$860–940M in Q3</strong>. <strong>$6.2B of recourse debt is current</strong> (due within twelve months) against $5.5B of cash. A current ratio of 0.46 and an Altman Z-score of 0.29 both sit in territory that normally signals distress; here they reflect a business that is designed to be refinanced continuously. That design works until credit markets close.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Power and execution.</strong> Only 1.5 GW of 4.2 GW contracted power is active. Every quarter of delay in energising a site is a quarter of revenue the backlog promised and a quarter of interest paid on hardware that is not yet earning. The FY2026 active-power target is "more than 1.85 GW"; the 2030 ambition is 8 GW.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Ticker column from stockanalysis.com statistics as of the September 4, 2026 close, cross-checked against the Q2 2026 earnings release. <strong>Industry Avg and NASDAQ-100 columns are left as "—" wherever a verified figure was not fetched</strong>; nothing in those columns has been estimated silently.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>CRWV</th><th>Software–Infra Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--text-dim);">n/a (loss)</td><td>—</td><td>—</td><td>No trailing P/E exists: TTM <span class="tip" title="Earnings Per Share">EPS</span> is −$3.70. The stock is valued on revenue, backlog and adjusted EBITDA instead.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--text-dim);">n/a (loss)</td><td>—</td><td>—</td><td>2026 consensus EPS is −$3.93 — a wider loss than TTM. Consensus does not expect GAAP profit in the forecast window shown. Forward P/S is 2.52× on $12.90B 2026 revenue.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td><td>Not meaningful with negative earnings. The closest analogue is EV/EBITDA of 25.2× against 3-year forecast revenue growth of ~102%/yr.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--red);">−$3.70</td><td>—</td><td>—</td><td>GAAP. Net loss of $1.93B TTM. Q2 2026 alone: −$1.14 (net loss $626M), versus −$0.60 a year earlier — the loss per share nearly doubled while revenue doubled.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+115.3%</td><td>—</td><td>—</td><td>TTM. Q2 2026: +112.4% YoY, +24% sequential. FY2026 guide of $12.4–13.2B implies +142–157% for the year.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">67.42%</td><td>—</td><td>—</td><td>TTM. Note that cost of revenue here excludes most depreciation — the GPU cost shows up below the gross-margin line, which is why gross margin flatters this business relative to a software peer.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--red);">−25.40%</td><td>—</td><td>—</td><td>TTM. Q2 2026 net margin −24%, identical to Q2 2025's −24%: revenue doubled and the loss ratio did not improve, because interest expense grew 140%.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>—</td><td>—</td><td>No dividend and no buyback. The company is a net issuer: shares outstanding +75.6% YoY, $2.98B of private-placement common stock raised in 1H 2026.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--red);">10.67% of shares<br>17.96% of float</td><td>—</td><td>—</td><td>58.86M shares short. Float is only 327.68M of 551.54M shares because of insider and strategic holdings, so short interest as a share of float is high and the daily moves are correspondingly violent (see the ±19–21% single days in Section 07).</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--red);">10.27</td><td>—</td><td>—</td><td>$51.61B total debt incl. leases (stockanalysis) vs. book equity of ~$5.0B. Balance-sheet debt excluding leases was ~$35.1B at June 30: $31.4B recourse + $3.7B non-recourse.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--red);">0.46</td><td>—</td><td>—</td><td>Quick ratio 0.39. $6.2B of recourse debt and $1.3B of non-recourse debt are current, against $5.5B cash plus $1.4B restricted cash. Structurally dependent on refinancing.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--red);">−$13.66B</td><td>—</td><td>—</td><td>TTM: operating cash flow +$6.91B, capex −$20.57B. Operating cash flow is genuinely positive and large; the company then spends three times that on GPUs. FY2026 capex guide: $35–39B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--red);">−43.60%</td><td>—</td><td>—</td><td>Negative earnings on a thin equity base. Not meaningful as a quality signal yet.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--red);">−0.34%</td><td>—</td><td>—</td><td>Operating margin was −2.66% TTM, so ROIC rounds to zero. The bull case requires this to climb into the teens as sites energise; the debt costs ~9%, so anything below that destroys value.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--text-dim);">n/a</td><td>—</td><td>—</td><td>Not published by the source — the listing is too young for a standard 5-year beta. Realised volatility is extreme: nine single-day moves of more than ±10% between July 1 and August 18, 2026 alone.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$60.55 – $153.20</td><td>—</td><td>—</td><td>Current $89.36 sits 31% of the way up the range. 52-week price change −0.58%: a full round-trip in twelve months during which revenue more than doubled.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">Almost nothing in these numbers is "one-off" in the sense of being non-recurring. The distortions are structural, and they matter more than any single item.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The GAAP-to-adjusted bridge.</strong> Q2 2026 GAAP operating loss was $(49)M; adjusted operating income was <strong>$128M</strong>; adjusted EBITDA was <strong>$1,510M</strong>. The gap between the first two is largely stock-based compensation of <strong>$165M</strong> plus acquisition costs. The gap between the second and third is <strong>$1,393M of depreciation and amortisation</strong> — the GPUs wearing out. Adjusted EBITDA margin was 59%; adjusted operating margin was 5%; GAAP net margin was −24%. Which of those three numbers you think is "the margin" is the entire disagreement about this stock.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Cash capex versus total capex.</strong> The earnings release reports <strong>$6,422M of cash capex</strong> in Q2 2026; the investor slides cite <strong>$9.4B</strong> for the quarter and $16.1B for the half. The difference is equipment acquired through financing arrangements (OEM and vendor financing, leases) that never passes through the cash-flow statement as capex. Both are real spending; only one appears in free cash flow. Use the higher figure when judging the pace of investment and the lower when judging cash burn.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Net-loss definitions.</strong> The FY2025 net loss is reported as <strong>$(1,167)M</strong> in the company's release and <strong>$(1,196)M</strong> on stockanalysis.com; FY2024 is shown as $(863)M in the 10-K summary and $(937)M on stockanalysis.com. The differences appear to reflect net loss versus net loss attributable to common stockholders (preferred-stock adjustments before the IPO). This page uses the stockanalysis.com series for consistency with the TTM figures.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Equity issuance.</strong> $2,982M of net private-placement proceeds in 1H 2026 (Nvidia's $2B at $87.20 in January; Jane Street's $1B) plus 2025 converts of ~$2.6B. Weighted shares grew 75.6% year over year. Per-share metrics are being diluted faster than almost any large-cap in the index.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Core Scientific.</strong> The <strong>$9B all-stock acquisition</strong> of Core Scientific — which would have brought owned data-center power in-house — was <strong>terminated on October 30, 2025</strong> after CORZ shareholders voted it down, largely because CRWV's stock had fallen and the fixed exchange ratio no longer looked attractive to them. No break fee or write-off of note appears in the figures; the companies continue as landlord and tenant under their existing hosting agreements. The practical consequence is that CoreWeave leases more of its power than it would have owned, which shows up in the lease-inclusive debt figure.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">38 analysts (stockanalysis.com). 26 of 38 at Buy or Strong Buy, but 10 Holds and 2 Sells is more dissent than most Nasdaq-100 names carry.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$144.46</div><div class="card-note">+61.7% versus the $89.36 close. Median target $150 (+67.9%). The average sits above the entire trading range of the last ten months.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$39 – $317</div><div class="card-note">−56% to +255%. An eight-fold spread between low and high — the widest dispersion you will see on a $49B company, and a fair summary of the depreciation-versus-backlog argument.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">26 / 10 / 2</div><div class="card-note">21 Strong Buy + 5 Buy, 10 Hold, 1 Sell + 1 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:21;background:var(--green);"></div>
+    <div style="flex:5;background:#4ade80;"></div>
+    <div style="flex:10;background:var(--amber);"></div>
+    <div style="flex:2;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 21</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 10</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell / Strong Sell — 2</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Truist Financial</strong> — Arvind Ramnani, <strong>Buy</strong>, price target raised $155 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$165</span> (Aug 24, 2026). Raised two weeks after the Q2 print and after the stock had already given back its post-earnings pop.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Goldman Sachs</strong> — Gabriela Borges, <strong>Hold</strong>, target raised $121 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$139</span> (Aug 21, 2026). A neutral rating with a target 56% above the current price — the analyst's way of saying the backlog is real but the financing risk is unpriceable.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Cantor Fitzgerald</strong> — Brett Knoblauch, <strong>Buy</strong>, target raised $167 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$176</span> (Aug 12, 2026). The day of the +19% post-earnings move.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Barclays</strong> — Raimo Lenschow, <strong>Hold</strong>, target raised $90 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$105</span> (Aug 13, 2026). The most conservative of the post-print revisions and the only one near the current price.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Roth MKM</strong> — Rohit Kulkarni, <strong>Buy</strong>, target <em>cut</em> $150 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$145</span> (Aug 13, 2026). The lone reduction in the batch, and a reminder that a bigger capex guide is not universally welcomed.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read off the fetched stockanalysis.com ratings page, which also listed Argus Research (Jim Kelleher, Buy, $130 → $150, Aug 13), Northland (Nehal Chokshi, Buy, $165 reiterated, Aug 12) and Wolfe Research (Arsenije Matovic, Buy, $150 reiterated, Aug 12). Every action in August was a reiteration or maintenance — no upgrades and no downgrades.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Aug 11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — revenue doubles, backlog $104.2B, loss doubles too</div>
+        <div class="tl-desc">Revenue $2,575M (+112%), adjusted EBITDA $1,510M (59%), adjusted operating income $128M, net loss $(626)M, interest expense $640M. Backlog up 246% YoY to $104.2B with $25B+ more signed in early Q3; FY2026 capex guided to $35–39B. The stock rose 19.3% the next day to $107.73 — then fell 12.1% on August 18 and drifted back to $84.89 by month-end. The market bought the backlog and then re-read the capex line.</div>
+        <div class="tl-impact neutral">Mixed — +19% then fully reversed within three weeks</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Goldman Sachs Communacopia + Technology conference</div>
+        <div class="tl-desc">Management presenting the week of September 4; the stock's +5.7% move today came alongside a broad neocloud rally (Nebius, IREN also up). Watch for any colour on the counterparties behind the $25B of early-Q3 commitments and the Q3 financing pipeline.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Guidance: revenue $3.45–3.6B, adj. op income $200–260M, interest $860–940M, capex $11.5–13.5B</div>
+        <div class="tl-desc">The revenue midpoint of $3.53B implies +37% sequential growth — the steepest quarterly ramp yet. The interest-expense midpoint of $900M is 25.5% of that revenue. Adjusted operating margin implied at 5.7–7.5%, with management pointing to "low teens" by Q4. The test is whether operating leverage finally shows up in the adjusted number while the GAAP loss keeps widening.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mid-Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings and the FY2026 exit-ARR check</div>
+        <div class="tl-desc">Exact date not confirmed on the sources fetched. FY2026 targets: revenue $12.4–13.2B, adjusted operating income $960M–1.15B, exit annualised run-rate revenue $18.5–19.5B, active power above 1.85 GW. Every one of these depends on sites energising on schedule in the second half.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Vera Rubin NVL72 deployments and the depreciation question, live</div>
+        <div class="tl-desc">CoreWeave was the first cloud to validate Nvidia's Vera Rubin platform in Q2 2026 and expects to be among the first to deploy it. Each new generation is a potential upside catalyst (new contracts price on the new chips) and a reminder that the Hopper fleet bought in 2023–24 is now two generations old. What Hopper-era capacity re-prices at when its first contracts roll off is the most important number nobody has yet.</div>
+        <div class="tl-impact up">Potential upside catalyst — with a long tail</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Refinancing calendar, dilution and insider selling</div>
+        <div class="tl-desc">$6.2B of recourse debt is current. The IPO lockup expired in the second half of 2025 (the source fetched places it in September 2025); a Rule 10b5-1 selling plan for co-founder Brannin McBee was adopted in March 2026, though specific insider transactions were not verified on the pages fetched for this report and none are asserted. Shares outstanding grew 75.6% in twelve months.</div>
+        <div class="tl-impact down">Ongoing headwind — structural</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <p class="prose" style="margin-bottom:8px;"><strong>Note on history:</strong> CoreWeave listed on March 28, 2025, so a five-year chart is not possible. The chart uses <strong>every real month-end close available — 18 months, March 2025 through August 2026 — plus the September 4, 2026 close as the final (partial-month) point</strong>. No months have been reconstructed or interpolated. Moving averages and RSI are computed on these monthly points and are therefore short-sample.</p>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">CRWV — 18 MONTH-END CLOSES, MAR 2025 → AUG 2026, PLUS SEP 4, 2026 (unadjusted; no splits or dividends)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#7C8CFF;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal — and on only 19 monthly points it is a rough one.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Trajectory since listing.</strong> From the $40 IPO price to today's <strong>$89.36</strong>, CRWV has returned <strong>+123%</strong> in about seventeen months; from the first month-end close of <strong>$37.08</strong> it is up <strong>+141%</strong>. That headline hides a market that has changed its mind about the company roughly every quarter. The stock quadrupled from the March 2025 close to <strong>$163.06 at the end of June 2025</strong>, then fell <strong>56%</strong> to <strong>$71.61 by December 2025</strong> as the lockup expired, the Core Scientific deal collapsed and the debt load became the story. It rebounded 56% to $111.60 by April 2026, sank to a <strong>52-week intraday low of $60.55 on July 29, 2026</strong>, and has since bounced 48%. The 52-week price change is <strong>−0.58%</strong>: a full round trip while revenue doubled. A like-for-like NASDAQ-100 or S&amp;P 500 total-return comparison over this exact window was not fetched and is not asserted; directionally, the indices spent the period near record highs while CRWV went nowhere, so the stock has lagged both since its June 2025 peak despite outgrowing every constituent on revenue.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Mar 28, 2025</div><div class="tl-content"><div class="tl-title">IPO at $40 — downsized and priced below range</div><div class="tl-desc">The deal was cut in size and price; the stock closed its first month at $37.08, below the offer. The debt load and Microsoft concentration were the stated concerns then, and they still are.</div><div class="tl-impact down">Cold reception</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">$163.06 — the four-bagger peak</div><div class="tl-desc">OpenAI expansions and the first wave of neocloud enthusiasm took the stock up 340% from its March close in three months. Monthly RSI was pinned near its ceiling.</div><div class="tl-impact up">Maximum enthusiasm</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2025</div><div class="tl-content"><div class="tl-title">$114.13 → $103.04 — Core Scientific bid and lockup</div><div class="tl-desc">The $9B all-stock offer for Core Scientific (announced July 2025) was read as dilutive; the IPO lockup expiry in the second half of 2025 added supply. The stock fell 37% from the June peak in two months.</div><div class="tl-impact down">Supply meets scepticism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep–Oct 2025</div><div class="tl-content"><div class="tl-title">$136.85 → $133.71 — Meta and Nvidia contracts; Core Scientific deal dies</div><div class="tl-desc">The Meta ($14.2B) and Nvidia ($6.3B backstop) agreements pushed the stock back up; on October 30 CORZ shareholders rejected the acquisition. The stock held its October level, then broke.</div><div class="tl-impact neutral">Backlog up, M&amp;A down</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov–Dec 2025</div><div class="tl-content"><div class="tl-title">$73.12 → $71.61 — the debt drawdown</div><div class="tl-desc">A 46% fall in November alone as the "AI capex bubble" debate centred on CoreWeave's leverage and the circularity of Nvidia-backed demand. FY2025 interest expense would ultimately total $1.23B on $5.13B of revenue.</div><div class="tl-impact down">Leverage repriced</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">$93.19 — Nvidia buys $2B more at $87.20</div><div class="tl-desc">The supplier-shareholder added roughly 23M shares. The stock rose 30% in the month; the print was a vote of confidence and a reminder of who holds the pen on CoreWeave's cost of capital.</div><div class="tl-impact up">Sponsor support</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 29, 2026</div><div class="tl-content"><div class="tl-title">$60.55 intraday — 52-week low, then +21.5% the next day</div><div class="tl-desc">July 2026 was the most violent month on record for the name: −13.9% on July 1, −11.4% on July 24, −9.6% on July 29 to the low, +21.5% on July 30, +19.5% on August 3. A stock with 18% of its float short trades like this.</div><div class="tl-impact down">Capitulation and squeeze</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug–Sep 2026</div><div class="tl-content"><div class="tl-title">$107.73 → $84.89 → $89.36 — Q2 pop reversed, then a conference bounce</div><div class="tl-desc">+19.3% on the Q2 print (Aug 12), −12.1% six days later, month-end $84.89. Today's +5.7% came with a sector-wide rally into the Goldman conference. The 50-day ($85.62) and 200-day ($91.47) averages bracket the current price.</div><div class="tl-impact neutral">Range-bound between the averages</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Start with what is signed.</strong> Revenue backlog at June 30, 2026 was <strong>$104.2B</strong>, of which <strong>$103.7B is RPO</strong> (remaining performance obligations — the accounting term for contracted revenue not yet delivered) and $0.5B is other estimated future revenue under committed contracts. That is up from $30.1B a year earlier and $66.8B at the end of 2025, and management says a further <strong>$25B-plus</strong> was signed in the first weeks of Q3. Against trailing revenue of $7.59B, the backlog is <strong>13.7 years of current revenue</strong>; against the FY2026 guide midpoint of $12.8B it is roughly eight years. The 10-K's weighted-average contract duration is about five years, and contracts of four years or longer grew from 10% to 21% of the mix in twelve months. This is the strongest revenue visibility of any company its size in the index. It is also, by construction, revenue that has not been earned yet, from counterparties who can be counted on one hand.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Now the debt.</strong> At June 30, 2026 the balance sheet carried <strong>$31.4B of recourse debt</strong> ($6.2B current) and <strong>$3.7B of non-recourse debt</strong> — about <strong>$35.1B</strong> — plus lease obligations that take stockanalysis.com's total to <strong>$51.6B</strong>. Cash was $5.5B, restricted cash $1.4B. Net cash is <strong>−$46.0B</strong>, or −$83.46 per share on an $89.36 stock: the enterprise value of $95.3B is almost half debt. The senior notes carry 9.0–9.25% coupons; the DDTL facilities (delayed-draw term loans, where lenders advance against specific signed customer contracts and the GPUs that serve them) are the cheaper, secured layer. First-half 2026 net debt proceeds were <strong>$16.7B</strong>, including a $3.1B DDTL described as the first publicly syndicated HPC-infrastructure-backed facility and more than $10B of unsecured notes and converts including a debut Eurobond.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>What the debt costs.</strong> Net interest expense was <strong>$640M in Q2 2026 — 24.9% of revenue</strong> — up from $267M (22.0% of revenue) a year earlier. FY2025 interest was <strong>$1,229M on $5,131M of revenue: 24.0%</strong>. Q3 guidance of $860–940M against revenue of $3.45–3.6B is <strong>25.5% at the midpoints</strong>. The ratio is not falling as the company scales; it is drifting up, because each incremental gigawatt is financed before it earns. Annualising Q2 interest gives roughly $2.6B on an average balance in the low-$30Bs — an implied blended cost in the high single digits, consistent with the 9%-area notes offset by cheaper secured paper. For context, adjusted operating income — the company's own preferred profit measure, after depreciation but before interest — was <strong>$128M</strong> in the same quarter the interest bill was $640M. Interest is five times the operating profit that is supposed to service it.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Capex versus cash generation.</strong> Operating cash flow is genuinely large: <strong>$3,663M in the first half of 2026</strong> and $6.91B TTM, helped by customer prepayments. Cash capex was <strong>$14,117M in the first half</strong> ($20.57B TTM), and total capex including financed equipment was $16.1B for the half. FY2026 capex is guided to <strong>$35–39B</strong> — nearly three times guided revenue, and five to six times TTM operating cash flow. Free cash flow is <strong>−$13.66B</strong> TTM. Every dollar of that gap is bridged by new debt or new shares. The bull argument is that this is the correct behaviour for a company with $104B of signed demand and a cost of capital below its contracted return; the bear argument is that a business that cannot fund its own growth is entirely dependent on the credit window staying open, and the credit window is not something management controls.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The depreciation debate, stated fairly.</strong> D&amp;A was <strong>$1,393M in Q2 2026 — 54% of revenue</strong> — and $2.54B for the half. If GPUs are economically useful for as long as the accounting schedule assumes, adjusted EBITDA of $1.51B a quarter is a reasonable proxy for the cash the fleet throws off, and the debt is covered roughly 2.4× by EBITDA on a quarterly basis. If Nvidia's annual cadence shortens the economic life below the book life, then depreciation is understated, adjusted operating income of $128M is overstated, and GAAP — which already shows a $626M quarterly loss — is the more honest number. The company's exact useful-life assumption was not visible on the pages fetched for this report, so none is claimed. What can be said is that the contracts, at about five years weighted average, are long enough to cover the first life of each cluster; the open question is the residual value of a cluster at renewal, and the market has not seen a CoreWeave renewal cycle yet.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The Nvidia triangle.</strong> Nvidia supplies the GPUs, owns 10.66% of the Class A shares after adding $2B in January 2026 at $87.20, and has committed to buy up to $6.3B of unsold capacity through April 2032. The backstop is why lenders will fund GPUs against contracts: in the worst case, the supplier rents them back. That is either the most credible put option in the industry or the definition of circular demand, and reasonable analysts hold each view. Note the price: Nvidia's last purchase was within 2.5% of today's close. The most informed buyer in the ecosystem paid roughly what the stock trades for now.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation — on what base?</strong> There is no P/E, trailing or forward, because there are no earnings: TTM EPS is −$3.70 and 2026 consensus is −$3.93. The multiples that exist: <strong>6.5× trailing sales, 2.5× 2026 consensus sales of $12.90B, 12.6× EV/sales, 25.2× EV/EBITDA, 9.8× book</strong>. On the FY2026 exit-ARR target of $18.5–19.5B, the enterprise value is about 5× forward run-rate revenue. The only framework that makes the stock cheap is the backlog: $95B of enterprise value against $104B-plus of contracted revenue over roughly five years, at a 59% adjusted EBITDA margin, is a business that "pays for itself" if every contract is honoured, every site energises on time, and the hardware is worth something at the end. The only framework that makes it expensive is GAAP: a company losing $1.9B a year, paying a quarter of revenue in interest, with a 0.46 current ratio and shares outstanding up 76%. Both frameworks use the same numbers. The 8× spread in analyst price targets is what it looks like when a market cannot agree which one applies.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>$104B of signed, take-or-pay revenue at 59% adjusted EBITDA margins, growing 246% a year, with the world's most important AI supplier as a 10.7% shareholder and buyer of last resort. Operating cash flow is already $6.9B TTM and adjusted operating margin is guided to the low teens by Q4 2026 as 1.5 GW becomes 1.85 GW-plus. The customer roster (Microsoft, OpenAI, Meta, Nvidia) is the best in the industry; the financing stack is contract-backed and has been refinanced repeatedly at scale. At 2.5× 2026 sales and roughly 5× exit ARR, with a $144 average target, the stock discounts a funding accident that has not happened.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Interest expense is 25% of revenue and rising; adjusted operating income is one-fifth of the interest bill; free cash flow is −$13.7B and FY2026 capex of $35–39B is three times revenue. The current ratio is 0.46 with $6.2B of recourse debt due within a year, and the Altman Z-score is 0.29. One customer was 67% of 2025 revenue; the diversification is into a private company with its own funding needs. D&amp;A is already 54% of revenue and the fleet has never been through a renewal cycle. Shares outstanding rose 76% in a year, 18% of the float is short, and the stock has round-tripped to flat over twelve months while revenue doubled — because the market has already worked out that doubling revenue doubles the debt.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Refinancing and cost of capital.</strong> With ~$35B of debt, $6.2B current, 9%-area unsecured coupons and a $35–39B capex programme funded almost entirely externally, CoreWeave's viability is a function of credit-market access. A widening in high-yield spreads or a single failed syndication would force a choice between slowing the build (breaking the backlog delivery schedule) and diluting at whatever price the market offers.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Counterparty and concentration risk.</strong> The backlog is only worth its face value if Microsoft, OpenAI and Meta pay on schedule for five years. Microsoft is building its own capacity; OpenAI is a private company with commitments across the industry far larger than its revenue; Meta can cancel projects when the return case changes. A renegotiation by any one of them would hit both revenue and the collateral value backing the DDTL facilities at once.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Hardware obsolescence outrunning depreciation.</strong> Vera Rubin ships while Hopper-era clusters are still on the books. If renewal pricing on older GPUs comes in far below original contract rates, the residual-value assumption embedded in adjusted EBITDA breaks, the true cost of the fleet is higher than reported, and the equity — already only $9.12 of book value per share against $83 of net debt per share — absorbs the difference first.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Power Is the Bottleneck, Not Chips</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">CoreWeave has 4.2 GW under contract and 1.5 GW live. The gap is grid interconnection, transformers, cooling and permits — none of which Nvidia can ship. This is why the company tried to buy Core Scientific outright for $9B in 2025 (owned power instead of leased) and why the deal's failure in October 2025 matters more than a normal broken merger: it left CoreWeave a tenant in a landlord's market. The whole neocloud sector — Nebius at $62B, IREN at $17.6B — is now valued on contracted megawatts as much as on revenue, and the entrant with power wins the contract regardless of software.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Circular-Financing Question Has Not Gone Away</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Nvidia invests in CoreWeave, CoreWeave buys Nvidia GPUs with borrowed money, Nvidia guarantees to rent back what CoreWeave cannot sell, and Microsoft rents CoreWeave capacity to serve OpenAI, in which Microsoft is itself a major investor. Every link in that chain is a legitimate commercial arrangement; the concern is that the chain as a whole manufactures demand signals that would not exist independently. The November 2025 drawdown (−46% in a month) was this concern being priced. It will resurface every time an AI-lab funding round wobbles, and CoreWeave, as the most levered public node in the chain, will move most.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Inference Demand and Contract Duration Are Lengthening</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">The shift from training runs to always-on inference favours committed, multi-year capacity over spot GPU rental — and CoreWeave's mix of 48-month-plus contracts doubled from 10% to 21% of backlog in a year, with weighted duration near five years. Longer contracts are the single best defence against the depreciation critique, because they push the residual-value question further out and make the DDTL collateral sturdier. <strong>Bull framing:</strong> if contracts keep lengthening and inference keeps growing, the fleet is paid for before it ages and today's 25× EV/EBITDA compresses fast. <strong>Bear framing:</strong> longer contracts with the same four counterparties deepen concentration rather than curing it, and a five-year commitment from a customer who cannot afford it is a longer default, not a safer one.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($89.36 close, Sep 4, 2026), daily change, market cap, 52-week range, statistics, financials, forecast and analyst-rating data from stockanalysis.com (https://stockanalysis.com/stocks/crwv/ and its statistics, financials, forecast, ratings and company pages, retrieved Sep 4–5, 2026); 18 unadjusted month-end closes (Mar 2025–Aug 2026) from digrin.com CRWV price history, cross-checked against stockanalysis.com daily history for Jun, Jul and Aug 2026 (exact matches); Q2 2026 results, balance sheet, cash flow, backlog and financing detail from CoreWeave's Q2 2026 earnings release as filed with the SEC (Aug 11, 2026) and Investing.com's summary of the Q2 investor slides; Q3/FY2026 guidance from the Q2 2026 earnings-call transcript (Yahoo Finance); FY2025 results from CoreWeave investor relations; FY2025 customer concentration, RPO and contract duration from a StockTitan summary of the FY2025 Form 10-K; ownership and voting data from an aifundingtracker.com summary of the April 2026 proxy; OpenAI/Meta/Nvidia contract values, senior-note coupons and lockup timing from io-fund.com (secondary source, not cross-checked to 8-Ks on this pass); Core Scientific termination from CoreWeave's Oct 30, 2025 statement; global market-cap rank from companiesmarketcap.com; Nebius and IREN peer figures from stockanalysis.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations: the U.S. and NASDAQ market-cap rank pills and the next earnings date. Items marked <strong>n/d</strong> are not disclosed by the company. The Industry Avg and NASDAQ-100 comparison columns in Section 04 are deliberately left blank rather than estimated. The company's GPU useful-life assumption, Q2 2026 customer-concentration percentages, specific insider sales, and the counterparties to the $25B of early-Q3 commitments were not verified from the sources fetched and are not stated. The chart contains no reconstructed months; it is shorter than five years because the company listed in March 2025, and its final point is the Sep 4, 2026 close rather than a month-end. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 18 month-end closes Mar 2025 → Aug 2026 (digrin.com, unadjusted) + Sep 4, 2026 close (stockanalysis.com) =====
+const labels = ['Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 4 26'];
+const prices = [37.08,41.30,111.31,163.06,114.13,103.04,136.85,133.71,73.12,71.61,93.19,79.56,77.47,111.60,109.53,99.54,71.77,84.89,89.36];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Mar 2025 — IPO at $40, first month-end $37.08',        color: '#94a3b8' },
+  { idx: 3,  label: 'Jun 2025 — peak $163.06 (+340% off March close)',       color: '#22c55e' },
+  { idx: 5,  label: 'Aug 2025 — Core Scientific bid + lockup expiry',        color: '#f59e0b' },
+  { idx: 7,  label: 'Oct 2025 — CORZ holders reject $9B deal (Oct 30)',      color: '#3b82f6' },
+  { idx: 9,  label: 'Dec 2025 — debt drawdown trough $71.61 (−56%)',         color: '#ef4444' },
+  { idx: 10, label: 'Jan 2026 — Nvidia buys $2B at $87.20',                  color: '#a78bfa' },
+  { idx: 16, label: 'Jul 2026 — 52-wk low $60.55 intraday (Jul 29)',         color: '#ef4444' },
+  { idx: 18, label: 'Sep 4, 2026 — $89.36 after Q2 pop reversed',            color: '#7C8CFF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(124,140,255,0.22)');
+grad.addColorStop(1, 'rgba(124,140,255,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#7C8CFF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 2; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#7C8CFF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 19 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
