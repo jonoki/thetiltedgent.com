@@ -40,6 +40,8 @@ The previous palette (black, gold, crimson; Sep 3–4 2026) is archived at `asse
 
 The three "chrome pages" are `index.html`, `reports/index.html`, `reports/view.html`.
 
+**Mobile nav**: `index.html` and `brand.html` carry a toggle + drawer below 820px (`.navtoggle` button, `.navlinks#navmenu` panel). A one-line script in `<head>` adds `js` to `<html>` before paint so the drawer starts closed; without JS the links degrade to a plain stacked list instead of disappearing. `.navrow` sets its own horizontal padding (28px, 18px on the reports index) because it shares an element with `.wrap` and would otherwise override it.
+
 ## Building or fixing report pages
 
 - Re-fetch the current price yourself; the header price must equal the final chart value.
