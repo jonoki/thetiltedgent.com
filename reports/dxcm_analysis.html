@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DXCM — DexCom, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #35C4D6;
+  --accent-dim: #35C4D633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">DXCM</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Medical Devices</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $33.17B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #749</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#330 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#125 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">DexCom, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$87.90</div>
+      <div class="price-change">−$1.81 (−2.02%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> San Diego, California</div>
+    <div class="meta-item"><span>Employees:</span> 11,100</div>
+    <div class="meta-item"><span>Listed:</span> Nasdaq IPO April 2005 (4-for-1 split June 2022)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Late October 2026 (est. — Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">DexCom makes continuous glucose monitors (CGM — a small wearable sensor that reads glucose in the fluid just under the skin every few minutes and streams it to a phone or an insulin pump, replacing fingerstick blood tests). Its flagship is the G7 platform; alongside it sit <strong>Stelo</strong>, an over-the-counter biosensor sold without a prescription, and <strong>Dexcom Smart Basal</strong> for people on long-acting insulin only. FY2025 revenue was <strong>$4.662B, up 15.6%</strong> from $4.033B, and the trailing-twelve-month figure through June 2026 is <strong>$4.969B, up 15.5%</strong>. The company ranks roughly <strong>#749 globally by market capitalisation</strong> at $33.17B, and a third-party industry estimate puts it at <strong>33.9% of the 2025 CGM market</strong> against Abbott's 52.8%.</p>
+  <p class="prose" style="margin-top:16px;">This was, for a decade, one of the great compounders in medical devices — and then it broke. In <strong>July 2024 the stock fell 40% in a single month</strong> (from a $113.38 June close to $67.82) when US revenue growth disappointed and the multi-year growth narrative reset. Two years on, the debate has narrowed to a specific question: is DexCom losing share to Abbott's FreeStyle Libre in the insulin-using core, or is the whole category expanding fast enough — via Stelo, via basal and type 2 reimbursement, via GLP-1 users buying a sensor to watch what food does to them — that both companies grow? The numbers on this page argue that the second thing is happening while the first thing is also true: DexCom is growing 11–16% into a category growing faster than that, and it is winning the argument on <em>margin</em> rather than on share.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jake Leach</div>
+      <div class="card-note"><strong>Verified — the premise that Kevin Sayer is CEO is out of date.</strong> Leach became President and CEO effective <strong>January 1, 2026</strong>, having assumed the duties early in <strong>September 2025</strong> when Sayer took a leave of absence. Leach is a long-time insider, previously Chief Operating Officer and before that Chief Technology Officer — he ran the G7 and 15-day sensor programmes he is now selling. Sayer led the company for roughly a decade, taking revenue from about $250M to over $4.6B.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Jereme Sylvain</div>
+      <div class="card-note">Verified from the Q2 2026 earnings call coverage. Owns the guidance architecture the company now leads with — revenue, non-GAAP gross margin, non-GAAP operating margin and adjusted EBITDA margin, all four raised at the Q2 2026 print. He is also the source of the single most useful forward-looking caveat on this page: that gross margin <em>peaks in Q3 2026</em> and then steps down as the Ireland factory starts production.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership / Holders</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note"><strong>377.36M shares outstanding</strong>, single share class, no dual-class structure. The stockanalysis.com institutional-holders page returned a 404 on the fetch attempt, so <strong>no top-holder names or stakes are listed here</strong> rather than being estimated. What is verifiable: short interest is <strong>4.38% of shares outstanding</strong>, and the company repurchased roughly <strong>$600M of stock in Q2 2026 alone</strong> — about 1.8% of the current market cap in one quarter.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">DexCom reports as a <strong>single operating segment</strong>. The only revenue disaggregation it publishes is geographic — United States versus International — so that is what the bar below shows, using verified FY2025 figures. Product-line revenue (G7 versus G6 versus Stelo versus pump-channel) is <strong>not disclosed</strong> and nothing here estimates it.</p>
+  <div class="seg-bar">
+    <div style="flex:71.5;background:#35C4D6;">U.S. 71.5%</div>
+    <div style="flex:28.5;background:#a78bfa;">INTERNATIONAL 28.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#35C4D6;"></span> United States — $3,335M (FY2025), +15% <span class="tip" title="Year-over-year — this year versus the same period last year.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> International — $1,327M (FY2025), +16% YoY (+15% organic)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The mix barely moved in Q2 2026: US $933.4M (71.4%), International $375.0M (28.6%). The growth <em>rates</em> did diverge, and that divergence is the single most important operating fact in this report — see the two cards below.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #35C4D6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">United States — the contested core</div>
+        <span class="biz-badge dominant">71.5% OF REVENUE · SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,335M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+15%</div><div class="biz-stat-label">FY2025 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">71.4%</div><div class="biz-stat-label">Q2'26 Rev Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is where the 2024 break happened and where the recovery has to be proved. US revenue grew <strong>15% in FY2025</strong> but only <strong>11% in both Q4 2025 ($891.5M) and Q2 2026 ($933.4M)</strong> — a deceleration in the largest and highest-margin geography, at a time when total company revenue is still compounding in the low teens. Management's counter is volume, not price: Q2 2026 <strong>new patient starts were in line with the record set in Q1, with a sequential uptick in the US</strong>, and were described as broad-based across <strong>type 1, type 2 insulin-intensive, basal, and non-insulin</strong> cohorts. Read those two facts together and the arithmetic points at revenue per patient falling — more patients, less revenue growth — which is what you would expect from a mix shifting toward lower-priced basal and non-insulin users and toward the pharmacy channel. That is not the same problem as losing patients, but it is not free either. Coverage is the offset: DexCom now has <strong>coverage for all people with diabetes across the four largest commercial PBMs</strong> (pharmacy benefit managers — the intermediaries that decide which products a health plan pays for), opening access to <strong>over 7 million US type 2 non-insulin patients</strong>.</p>
+    <div class="biz-tam"><strong>Category size (third-party est.):</strong> global CGM market ≈ <strong>$15.77B in 2026</strong>, growing at an estimated <strong>15.1% CAGR to $31.83B by 2031</strong> (Mordor Intelligence — an outside estimate, not a company figure).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Abbott (ABT) — FreeStyle Libre</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">52.83%</div><div class="comp-bubble-label">CGM share 2025 (est.)</div></div>
+          <div><div class="comp-bubble-val">$187.45B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">+8.1%</div><div class="comp-bubble-label">Total Rev YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Medtronic (MDT)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">10.10%</div><div class="comp-bubble-label">CGM share 2025 (est.)</div></div>
+          <div><div class="comp-bubble-val">$120.46B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">+9.8%</div><div class="comp-bubble-label">Total Rev TTM YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Senseonics (SENS)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$48.6M</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+90.6%</div><div class="comp-bubble-label">Rev YoY</div></div>
+          <div><div class="comp-bubble-val">$526M</div><div class="comp-bubble-label">Mkt Cap</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International — the faster half</div>
+        <span class="biz-badge growth">28.5% OF REVENUE · GROWING ~1.7× THE US RATE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,327M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16%</div><div class="biz-stat-label">FY2025 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+19%</div><div class="biz-stat-label">Q2'26 YoY (16% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.6%</div><div class="biz-stat-label">Q2'26 Rev Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">International is the part of DexCom that still behaves like the old growth story: <strong>+19% reported and +16% organic in Q2 2026</strong>, against +11% in the US. The driver is reimbursement expansion market by market — the company said it is still "working through insulin-intensive coverage in several top OUS markets," and FY2025 included a Quebec coverage expansion for type 2 patients. Two honest caveats sit against it. First, <strong>international new patient starts declined sequentially in Q2 2026</strong>, which management attributed partly to <strong>tender timing</strong> — outside the US a lot of volume moves through lumpy government tenders, so a quarter's patient adds is a noisier signal there than in the US. Second, currency: the company flagged a <strong>$15M foreign-exchange headwind to international revenue in the second half of 2026</strong>, which is the whole gap between the 19% reported and 16% organic growth rates persisting into the back half. Margin profile: international carries lower average selling prices than the US, so a mix shift toward it is dilutive to revenue per patient even as it is accretive to growth.</p>
+    <div class="biz-tam"><strong>Note:</strong> DexCom does not disclose international revenue by country or by product. No country-level split is estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Abbott — Libre ex-US</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Libre rev not verified</div></div>
+          <div><div class="comp-bubble-val">$46.59B</div><div class="comp-bubble-label">ABT Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+8.1%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Medtronic Diabetes</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">CGM rev not broken out</div></div>
+          <div><div class="comp-bubble-val">$37.54B</div><div class="comp-bubble-label">MDT Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+9.8%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--blue);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Stelo — the over-the-counter biosensor</div>
+        <span class="biz-badge emerging">CATEGORY EXPANSION · REVENUE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Users</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15-day</div><div class="biz-stat-label">Wear (first 15-day product)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">&gt;7M</div><div class="biz-stat-label">US T2 non-insulin addressable</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Stelo is sold without a prescription and without reimbursement — cash, direct to the consumer. It matters for two reasons that have nothing to do with its current revenue. First, it was DexCom's <strong>first 15-day product</strong>, the proving ground for the sensor chemistry now migrating into the prescription G7 line. Second, it is the answer to the reimbursement gap: management positions it as "an immediate option" for type 2 non-insulin patients who have no coverage today, while it waits on a <strong>CMS decision expected mid-2027</strong>. In Q2 2026 the company launched a <strong>fully reimagined Stelo app</strong> with AI-driven insights and macronutrient logging, and received <strong>FDA clearance to market Stelo for children</strong>. This is also the natural landing zone for GLP-1 users — people on weight-loss and diabetes drugs who want to see what specific foods do to their glucose. <strong>DexCom discloses no Stelo revenue, no unit volume and no user count</strong>, so the size of this business is currently unknowable from public filings, and nothing here is estimated.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> the CONNECT trial read out a <strong>0.9% A1c improvement</strong> versus routine care in type 2 non-insulin patients, with <strong>97% median CGM usage</strong>. That is the clinical evidence base for the mid-2027 CMS decision — the single largest binary on the whole thesis.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Abbott Lingo / Libre Rio</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">OTC rev not disclosed</div></div>
+          <div><div class="comp-bubble-val">52.83%</div><div class="comp-bubble-label">Overall CGM share (est.)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pump-partner channel — integrated CGM</div>
+        <span class="biz-badge emerging">NOT SEPARATELY DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Channel Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Share of sensors</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">3+</div><div class="biz-stat-label">Named AID partners</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Rev Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">DexCom's sensors feed the automated insulin delivery (AID — a "closed loop" system where the CGM tells the pump how much insulin to give, without the patient doing the arithmetic) systems sold by Tandem, Insulet and Beta Bionics. This is a genuine structural advantage over Abbott in the insulin-intensive core, because a patient locked into a pump ecosystem does not casually switch sensor brands. It also imports someone else's problems: <strong>Insulet's market cap is down 57.7% over the past year</strong> even as its revenue grew 30.7% to $3.05B TTM, following Omnipod product corrections and cut FY2026 growth guidance — a partner under that kind of pressure sells fewer new pumps, and each pump not sold is a DexCom sensor subscription not started. <strong>Tandem</strong> is the smaller and slower partner at $1.04B TTM revenue growing 4.0%. Beta Bionics is the newest and smallest. DexCom does not disclose what share of its sensors ship through this channel.</p>
+    <div class="biz-tam"><strong>Note:</strong> partner figures are company-level, from stockanalysis.com quote pages; none of them isolate DexCom-attached volume.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Insulet (PODD)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$10.23B</div><div class="comp-bubble-label">Mkt Cap (−57.7% 1yr)</div></div>
+          <div><div class="comp-bubble-val">$3.05B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+29.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Tandem Diabetes (TNDM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$1.38B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$1.04B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+4.0%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Beta Bionics</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">CLINICAL ACCURACY DATA</span>
+    <span class="moat-pill">AID PUMP INTEGRATIONS</span>
+    <span class="moat-pill">CONSUMABLE SUBSCRIPTION MODEL</span>
+    <span class="moat-pill">PBM &amp; MEDICARE COVERAGE</span>
+    <span class="moat-pill">FDA CLEARANCE STACK</span>
+    <span class="moat-pill">PRESCRIBER RELATIONSHIPS</span>
+    <span class="moat-pill">OWN-MANUFACTURING SCALE</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is that DexCom does not sell a device — it sells a <strong>subscription to a consumable</strong>. A sensor lasts 10 days, or now 15, and then the patient buys another one, forever. That converts a one-time hardware sale into an annuity with roughly 24–36 reorders a year, which is why a business with $4.97B of revenue throws off <strong>$1.41B of free cash flow</strong> and a <strong>44.5% <span class="tip" title="Return on invested capital — profit generated per dollar of total capital (debt plus equity) put into the business.">ROIC</span></strong>. The switching cost that protects the annuity is not the sensor itself but everything wrapped around it: a prescription, a PBM coverage decision, a pump that only speaks to one sensor, and a patient who has learned to read one particular app. That is a real moat — and it is narrower than it was in 2021, because Abbott has now cleared most of the same regulatory and reimbursement hurdles at a lower price point.</p>
+  <p class="prose" style="margin-top:24px;font-weight:700;color:var(--text);">Key Vulnerabilities</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Abbott is bigger in CGM and can subsidise from a $46.6B revenue base.</strong> A third-party estimate puts Abbott at <strong>52.83% of the 2025 CGM market against DexCom's 33.89%</strong> — Abbott is roughly 1.6× DexCom's size in DexCom's only business, while CGM is a modest slice of Abbott's total. Abbott can price Libre aggressively in a tender or a PBM negotiation and absorb it; DexCom cannot, because CGM is 100% of what it sells. The 11% US growth rate is where that asymmetry shows up.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Quality-system regulation, and an open FDA warning letter.</strong> The FDA issued DexCom a warning letter dated <strong>March 4, 2025</strong> following 2024 inspections of the <strong>San Diego and Mesa</strong> facilities, citing deficiencies in manufacturing processes and quality management systems and in the company's responses to prior observations. Critically, it <strong>does not restrict manufacture, marketing or distribution and required no recall</strong>, and the company has been submitting corrective actions since. <strong>No public close-out of the letter was verified from the sources fetched</strong> — so as of this snapshot it should be treated as open. Comparable remediation programmes at other device makers have run in the mid-eight figures annually.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Single-product concentration with a reimbursement single point of failure.</strong> Every dollar of revenue depends on someone else agreeing to pay for a glucose sensor. The largest growth pool — 7M+ US type 2 non-insulin patients — is gated on a <strong>CMS decision not expected until mid-2027</strong>. Between now and then, that cohort can only be reached through cash-pay Stelo, at a much lower revenue per patient.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Gross margin is at a cyclical peak by management's own admission.</strong> The 400 basis point year-over-year margin expansion in Q2 2026 came from manufacturing efficiencies and the G7 15-day transition. Management has said margin <strong>peaks in Q3 2026 and then steps down as the Ireland factory begins production</strong>. Anyone extrapolating the Q2 margin trend into 2027 is extrapolating against explicit guidance.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>DXCM</th><th>Industry Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings — price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past profit.">Trailing P/E</span></td><td style="color:var(--amber);">34.66</td><td>—</td><td>—</td><td>$87.90 ÷ $2.54 <span class="tip" title="Trailing twelve months — the most recent four reported quarters.">TTM</span> EPS = 34.6×, consistent. Fetched peers for scale: Abbott 35.05, Medtronic n/a on the page fetched, Insulet 27.84.</td></tr>
+      <tr><td>Forward P/E</td><td style="color:var(--amber);">31.26</td><td>—</td><td>—</td><td>On the $2.66 consensus 2026 <span class="tip" title="Earnings per share — net profit divided by shares outstanding.">EPS</span>. The narrow gap to trailing says the market expects earnings growth in the high-20s percent, not a step change.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth — the P/E divided by the expected earnings growth rate. Below 1 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td style="color:var(--amber);">1.48</td><td>—</td><td>—</td><td>Above 1, so you are paying a premium to the growth rate. For a former 25%-grower now compounding at 15%, this is the number that says the re-rating already happened.</td></tr>
+      <tr><td>EPS (TTM)</td><td>$2.54</td><td>—</td><td>—</td><td>Up from $2.09 in FY2025 and $1.42 in FY2024 — <span class="tip" title="Generally Accepted Accounting Principles — the standard US accounting rules; the audited numbers rather than company-adjusted ones.">GAAP</span> earnings have grown 79% in two years while revenue grew 23%.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year — this period versus the same period last year.">YoY</span>)</td><td style="color:var(--amber);">+15.5%</td><td>—</td><td>—</td><td>TTM. But the quarterly path is decelerating: +21.6% (Q3'25) → +13.1% (Q4'25) → +15.1% (Q1'26) → +13.1% (Q2'26). Guidance implies 11–13% for FY2026.</td></tr>
+      <tr><td><span class="tip" title="Gross margin — revenue minus the direct cost of making the product, as a percentage of revenue. What is left to cover R&D, sales and overhead.">Gross Margin</span></td><td style="color:var(--green);">62.47%</td><td>—</td><td>—</td><td>TTM. Recovering hard: 56.85% in Q1'25 → <strong>63.44% in Q2'26</strong>. Causes below the table. Management guides ~64% non-GAAP for FY2026 and says it peaks in Q3'26.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin — bottom-line profit as a percentage of revenue, after every cost including tax and interest.">Net Profit Margin</span></td><td style="color:var(--green);">20.12%</td><td>—</td><td>—</td><td>$999.7M of net income on $4.97B. A 20% net margin on a consumable medical device is genuinely strong, and it is the strongest part of the current case.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield — annual dividends per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>—</td><td>—</td><td>DexCom pays no dividend. It returns capital through buybacks instead — roughly $600M repurchased in Q2 2026.</td></tr>
+      <tr><td><span class="tip" title="Short interest — the number of shares sold short (borrowed and sold, betting the price falls) as a percentage of shares outstanding.">Short Interest</span> / Float %</td><td style="color:var(--amber);">4.38%</td><td>—</td><td>—</td><td>Of shares outstanding. Elevated but not a crowded short — consistent with a genuine two-sided debate rather than a consensus bear case.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-equity — total borrowings divided by shareholders' equity. A leverage gauge; lower is more conservative.">Debt-to-Equity</span></td><td style="color:var(--green);">0.53</td><td>—</td><td>—</td><td>$1.40B of debt (largely convertible notes) against $1.95B of cash — DexCom is <strong>net cash</strong>. Enterprise value $32.62B sits below the $33.17B market cap for exactly that reason.</td></tr>
+      <tr><td><span class="tip" title="Current ratio — current assets divided by current liabilities. Above 1 means near-term assets cover near-term bills.">Current Ratio</span></td><td style="color:var(--green);">1.73</td><td>—</td><td>—</td><td>Comfortable. No near-term liquidity question, and the revolving credit facility was undrawn at FY2025 year-end.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow — cash from operations minus capital spending. The cash actually available to owners after keeping the business running.">Free Cash Flow</span></td><td style="color:var(--green);">$1.41B</td><td>—</td><td>—</td><td>28.4% of revenue converts to free cash. At $33.17B market cap that is a 4.3% free-cash yield — the valuation looks materially less demanding on cash than on the 34.7× P/E.</td></tr>
+      <tr><td><span class="tip" title="Return on equity — net profit divided by shareholders' equity. How hard the owners' capital is working.">ROE</span></td><td style="color:var(--green);">38.49%</td><td>—</td><td>—</td><td>Flattered somewhat by the convertible-note leverage, but still a high-return business by any medical-device standard.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital — operating profit after tax divided by all capital employed (debt plus equity). The cleanest measure of business quality.">ROIC</span></td><td style="color:var(--green);">44.49%</td><td>—</td><td>—</td><td>The single best number on this page. A 44% ROIC says the consumable-subscription model works; the debate is about growth, not quality.</td></tr>
+      <tr><td><span class="tip" title="Beta — how much the stock moves relative to the overall market. Above 1 means it swings harder than the index.">Beta</span></td><td style="color:var(--amber);">1.42</td><td>—</td><td>—</td><td>Consistent with a −40% single month in July 2024 and a −62.6% peak-to-trough drawdown. This is not a defensive healthcare name.</td></tr>
+      <tr><td>52-Week Range</td><td>$54.11 – $92.59</td><td>—</td><td>—</td><td>The $87.90 close sits in the top 20% of the range. 52-week price change +11.38%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:20px;font-size:13px;"><strong>On the two empty columns.</strong> No sourced Medical Devices industry average or NASDAQ-100 aggregate for these metrics was obtained from the pages fetched, and this report does not estimate them silently — so both columns read "—". Colour-coding in the DXCM column is therefore <em>absolute</em> rather than relative: green marks metrics strong on their own terms (margins, returns, balance sheet), amber marks metrics that carry a real caveat (valuation multiples, decelerating growth, beta, short interest). Verified peer P/Es from fetched quote pages, for whatever cross-reading they are worth: Abbott 35.05, Insulet 27.84.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Notable one-off items — and the gross margin story in full.</strong> Gross margin is the most important line in this report, so here is the whole arc with the causes attached. GAAP gross margin ran <strong>68.63% in FY2021</strong>, then fell every single year: <strong>64.72% (FY2022) → 63.19% (FY2023) → 60.46% (FY2024) → 60.10% (FY2025)</strong> — an 850 basis point decline over four years. The company's stated explanation across FY2025 was that "significantly expanded access" and operating leverage were <strong>partially offset by manufacturing investments</strong>; on a non-GAAP basis FY2025 gross margin actually <em>fell</em> to 60.8% from 61.8%. In plain terms: DexCom was building capacity (Malaysia, then Ireland) ahead of the volume, selling into lower-priced pharmacy and international channels, and carrying the cost of running two sensor platforms at once. The reversal since has been violent and is largely a product-cycle effect: <strong>56.85% (Q1'25) → 59.53% → 60.48% → 62.93% → 62.95% → 63.44% (Q2'26)</strong>, non-GAAP 64.1% versus 60.1% a year earlier, a <strong>400 basis point</strong> improvement management attributes to <strong>manufacturing efficiencies and the G7 15-day system transition</strong>. The 15-day sensor is the key: one sensor covering 15 days instead of 10 means roughly a third fewer sensors manufactured, shipped and disposed of per patient-year at a similar revenue per patient-year. That is a pure cost-of-goods win. It is also finite — and management has told investors it <strong>peaks in Q3 2026 and steps down as Ireland comes online</strong>. There were no large non-recurring charges disclosed in the fetched Q2 2026 or FY2025 releases; GAAP and non-GAAP EPS were identical at $2.09 for FY2025, which is unusually clean. The FY2026 non-GAAP guide is ~64% gross margin, 23.5–24% operating margin, 31.5–32% adjusted EBITDA margin.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Strong Buy</div>
+      <div class="card-note">28 analysts (S&amp;P Global, via stockanalysis.com). MarketBeat's separate 27-analyst panel scores it "Moderate Buy" — the two aggregators disagree on label, not on direction.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$94.12</div>
+      <div class="card-note"><strong>+7.08%</strong> above the $87.90 close. MarketBeat's average is lower at <strong>$88.71</strong> — essentially zero upside. Two credible aggregators, 6 percentage points apart, is itself a useful signal about how tight the range has become.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$79 – $115</div>
+      <div class="card-note">Low $79 (−10.1%), high $115 (+30.8%), per stockanalysis.com. MarketBeat's panel spans a wider $64 to $105. Note that the low end of both ranges is <em>below</em> today's price — no one on the panel is calling for a collapse, but the floor is not far down.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">22 / 3 / 3 / 0</div>
+      <div class="card-note">Strong Buy 22 · Buy 3 · Hold 3 · Sell 0. Not a single sell rating on a stock that fell 40% in a month two years ago and is still 44% below its 2021 peak.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:22;background:#22c55e;"></div>
+    <div style="flex:3;background:#4ade80;"></div>
+    <div style="flex:3;background:#f59e0b;"></div>
+    <div style="flex:0.001;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Strong Buy 22</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 3</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold 3</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell 0</div>
+  </div>
+
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong>Argus — Steve Silver</strong> · Aug 4, 2026 · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Buy, PT raised $86 → $96</span>. Target lifted after the Q2 beat and the raised full-year guidance across all four guided metrics.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong>Canaccord Genuity — William Plovanic</strong> · Aug 3, 2026 · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Buy, PT raised $82 → $90</span>. A $90 target against a $87.90 price is a Buy rating with almost no room in it — the pattern across this panel is targets chasing the price up rather than leading it.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong>Piper Sandler — Matt O'Brien</strong> · Jul 31, 2026 · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Overweight, PT raised $88 → $95</span>. Raised the morning after the print.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong>Robert W. Baird</strong> · Jul 31, 2026 · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">PT $105</span> — the high end of the MarketBeat panel. Also on Jul 31: <strong>Raymond James</strong> reiterated <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Strong Buy, PT $94</span>, and <strong>TD Cowen — Joshua Jennings</strong> reiterated <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Buy</span>. <strong>BTIG</strong> maintained <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">Buy</span>, calling it a "clean, high-quality beat with margin outperformance" and citing broad-based US strength and international reimbursement.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read from a fetched MarketBeat price-target page and a fetched trade-press earnings recap. Note the shape: <strong>every raise listed came in the four days after the July 30 print</strong>, and the stock has since run past several of them. A panel that raises targets into a rally and lands with an $88.71 average against an $87.90 price is telling you the easy re-rating is done.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 beat and full-year raise — already reacted</div>
+        <div class="tl-desc">Revenue $1.308B (+13%) against a ~$1.29B consensus; adjusted EPS $0.70 versus $0.61 expected. Non-GAAP gross margin 64.1% (+400bps) and non-GAAP operating margin 25.1% (+590bps) were the outperformance. FY2026 revenue guidance raised to $5.18–$5.25B, with gross margin, operating margin and EBITDA margin guidance all raised alongside it.</div>
+        <div class="tl-impact up">Reaction already happened — stock +51% off the Oct 2025 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — the guided margin peak</div>
+        <div class="tl-desc">Exact date not confirmed on the sources fetched. This is the quarter management has explicitly framed as the <strong>gross margin peak</strong>, after which Ireland production starts and margin steps down. It is also the checkpoint on the "convert nearly 50% of the US customer base to G7 15 Day by year-end" target.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">By Dec 31, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">G7 15 Day — 50% US base conversion target</div>
+        <div class="tl-desc">Management said the goal of converting nearly half the US customer base to the 15-day sensor by year-end is on track. Every converted patient lowers cost of goods per patient-year at broadly unchanged revenue, so this is the mechanical driver behind the margin expansion. A miss would mean the 2027 margin base is lower than the guide implies.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">FDA warning letter (Mar 4, 2025) — remediation, not resolution</div>
+        <div class="tl-desc">Issued after 2024 inspections of the San Diego and Mesa facilities, citing manufacturing-process and quality-system deficiencies. It does <strong>not</strong> restrict manufacturing, marketing or distribution and required no recall; DexCom has submitted responses and is implementing corrective actions. <strong>No close-out letter was verified from the sources fetched</strong>, so treat it as open. Notably, the FDA then issued <strong>Abbott</strong> its own warning letter dated <strong>January 23, 2026</strong> over FreeStyle Libre release testing — the regulator is auditing the whole category, not one company.</div>
+        <div class="tl-impact neutral">Ongoing overhang, no operating restriction</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mid-2027</div>
+      <div class="tl-content">
+        <div class="tl-title">CMS decision on type 2 non-insulin coverage</div>
+        <div class="tl-desc">The largest single binary in the story. The CONNECT trial delivered a 0.9% A1c improvement over routine care with 97% median CGM usage — the evidence package supporting Medicare coverage for type 2 patients not on insulin. DexCom already has commercial coverage across the four largest PBMs, reaching 7M+ US type 2 non-insulin patients; CMS would add the Medicare population on top. Until then, that cohort is served only by cash-pay Stelo.</div>
+        <div class="tl-impact up">Potential upside catalyst — but 9+ months away</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FX headwind and international tender timing</div>
+        <div class="tl-desc">The company flagged a <strong>$15M foreign-exchange headwind to international revenue in the second half of 2026</strong>. International new patient starts already declined sequentially in Q2 on tender timing. International has been the growth engine at +19%; two quarters of currency drag plus lumpy tenders is the most likely source of a guidance wobble.</div>
+        <div class="tl-impact down">Known headwind, quantified</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">DXCM — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (split-adjusted for the 4-for-1 split of June 2022)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#35C4D6;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$155.80</strong> (split-adjusted) to the September 4, 2026 close of <strong>$87.90</strong>, DXCM has returned <strong>−43.6%</strong> over the window — roughly <strong>−11% a year</strong>, with no dividend. That is a brutal number for a company whose revenue grew from $2.45B (FY2021) to $4.97B TTM over the same period, more than doubling, while GAAP EPS went from $0.53 to $2.54 — nearly a five-fold increase. <strong>The entire loss is multiple compression.</strong> A business earning $0.53 was worth $155.80 (294× trailing); the same business earning $2.54 is worth $87.90 (34.7×). Nothing about that path is an earnings story; it is a repricing of what a 15%-grower in a duopoly is worth versus what a 25%-grower in a monopoly narrative was worth.</p>
+  <p class="prose" style="margin-top:20px;">The violence is concentrated in two months. <strong>July 2024: −40.2% in a single month</strong>, from a $113.38 June close to $67.82, when US revenue growth disappointed and FY2024 growth landed at 11.3% against 24.5% the prior year. <em>The specific causes cited at the time — a salesforce restructuring and durable-medical-equipment channel rebate dynamics — could not be re-verified from the sources fetched for this report, so they are named here as the market's contemporaneous account rather than as confirmed fact. What is verified is the growth deceleration and the price move.</em> <strong>March 2025: −22.7%</strong>, from $88.37 to $68.29, the month the FDA warning letter was issued. The stock then ground lower to a monthly-close trough of <strong>$58.22 in October 2025</strong> — a <strong>−62.6% drawdown from the October 2021 peak</strong>, with a 52-week intraday low of $54.11. From there it has rallied <strong>+51.0%</strong> to today, driven almost entirely by the margin recovery documented in Section 04 rather than by any acceleration in revenue.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A precise NASDAQ-100 and S&amp;P 500 total-return comparison over this identical window could not be verified from the sources fetched and is therefore not stated numerically. What can be said with the verified data on this page: DXCM's 52-week price change is <strong>+11.38%</strong>, and its beta of <strong>1.42</strong> is consistent with a name that fell 40% in a month. Against the sector, the fetched peer set gives the shape — Abbott's market cap is up modestly, Medtronic's up 0.6% over the past year, while <strong>Insulet's market cap is down 57.7%</strong>. Diabetes technology as a group has not been a safe place to sit; DXCM's +11.38% year makes it one of the better performers in its own neighbourhood while remaining 44% below its 2021 level.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$155.80 — the peak (split-adjusted)</div><div class="tl-desc">The high monthly close of the five-year window, at roughly 294× trailing GAAP earnings of $0.53. Zero rates, a growth-at-any-price market, and a CGM category that still looked like DexCom's alone.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">4-for-1 stock split</div><div class="tl-desc">Executed in June 2022 at a pre-split price near $300. All prices on this chart are split-adjusted, so the June 2022 close appears as $74.53 rather than the $297.94 unadjusted print of the prior month.</div><div class="tl-impact neutral">Mechanical — no economic effect</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">$138.70 — the post-2022 recovery high</div><div class="tl-desc">The stock had climbed 86% off the September 2022 low of $80.54 as FY2023 revenue grew 24.5% to $3.62B. This was the last month the market paid a growth multiple for DexCom.</div><div class="tl-impact up">+72% off the 2022 trough</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2024</div><div class="tl-content"><div class="tl-title">$67.82 — the break, −40.2% in one month</div><div class="tl-desc">The month that ended the compounder narrative. FY2024 revenue growth landed at 11.3%, less than half FY2023's 24.5%, and gross margin fell to 60.46% from 63.19%. The multiple never recovered. Everything since has been a story about margin and coverage rather than about growth.</div><div class="tl-impact down">Thesis break</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2025</div><div class="tl-content"><div class="tl-title">$68.29 — FDA warning letter month, −22.7%</div><div class="tl-desc">The March 4, 2025 warning letter cited manufacturing and quality-system deficiencies at San Diego and Mesa. It imposed no restriction on sales and required no recall, but it landed on a stock that had already lost the benefit of the doubt.</div><div class="tl-impact down">Regulatory overhang added</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">$58.22 — cycle low, −62.6% from Oct 2021</div><div class="tl-desc">Maximum pessimism, one month after Kevin Sayer's leave of absence and Jake Leach's assumption of the CEO duties. The 52-week intraday low of $54.11 sits just below. At this price the market was valuing a 15%-growing, 20%-net-margin, 44%-ROIC business at roughly 26× trailing earnings.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">$83.45 — the Q2 beat and the margin re-rating</div><div class="tl-desc">The July 30 print delivered 400bps of gross margin expansion and 590bps of operating margin expansion, and all four guided FY2026 metrics were raised. Six brokers raised or set targets within four days. The stock added another 9% in August.</div><div class="tl-impact up">Margin story validated</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2026</div><div class="tl-content"><div class="tl-title">$87.90 — +51.0% off the October 2025 low</div><div class="tl-desc">Down 3.5% from the August close of $91.06 and sitting in the top 20% of the 52-week range, against a $94.12 average target (+7.1%) and a MarketBeat average of $88.71 (+0.9%). The recovery has caught up with the panel.</div><div class="tl-impact neutral">Priced for the margin guide to hold</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>The stack, in order.</strong> Start with patients. DexCom does not disclose absolute new patient adds, but it said Q2 2026 starts were <strong>in line with the record set in Q1, with a sequential uptick in the US</strong>, broad-based across type 1, type 2 insulin-intensive, basal and non-insulin cohorts. Multiply patients by revenue per patient and you get revenue: <strong>$1,308M in Q2 2026, +13.1%</strong>, split <strong>US $933.4M (+11%)</strong> and <strong>International $375.0M (+19% reported, +16% organic)</strong>. Apply gross margin — <strong>63.44% GAAP, 64.1% non-GAAP, up 400 basis points</strong> — and you get gross profit growing far faster than revenue. Apply operating leverage and you get <strong>operating margin of 24.3% GAAP against 18.4% a year earlier, +590 basis points</strong>. The result is <strong>net income of $249.1M and GAAP EPS of $0.64, up 42% on 13% revenue growth</strong>. That is a textbook operating-leverage quarter.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>And here is the part that decides the next two years: almost all of it is a product cycle, and management has dated its end.</strong> The G7 15 Day sensor replaces a 10-day consumable with a 15-day one. Same patient, same approximate revenue per patient-year, roughly a third fewer sensors manufactured and shipped. That is why gross margin went from 56.85% in Q1 2025 to 63.44% in Q2 2026 while revenue growth <em>decelerated</em>. The company targets converting <strong>nearly 50% of the US customer base by year-end 2026</strong> — and separately, its own CFO has told investors margin <strong>peaks in Q3 2026 and then steps down as the Ireland factory begins production</strong>. So the mechanism driving the 51% rally off the October 2025 low is explicitly guided to stop working within one quarter. After that, earnings growth has to come from revenue growth, and revenue growth is guided to <strong>11–13%</strong>.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 1 — is DexCom losing to Abbott, or is the category expanding?</strong> Both, and the ratio matters. A third-party estimate puts 2025 CGM share at <strong>Abbott 52.83%, DexCom 33.89%, Medtronic 10.10%</strong> — about 97% of the market in three hands. The same source sizes the market at <strong>$15.77B in 2026 growing at a 15.1% CAGR</strong>. DexCom's guided FY2026 growth of 11–13% is <em>below</em> that category rate, which is the arithmetic definition of share loss. But note where it is losing: US +11%, international +19%. The pressure is domestic and it is concentrated in the segment where Abbott competes hardest on price. Meanwhile the category expansion is real and it is arriving through channels that barely existed three years ago — Stelo sold over the counter for cash, basal-only users via Dexcom Smart Basal, and 7M+ type 2 non-insulin patients now covered by the four largest PBMs. The honest framing: DexCom is trading a shrinking share of a fast-growing pie for a much better margin on the slice it keeps.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 2 — the regulatory picture is not what the bear case assumes.</strong> DexCom's March 4, 2025 FDA warning letter is real, it followed 2024 inspections at San Diego and Mesa, it cites quality-system deficiencies, and no close-out was verifiable from the sources fetched here — so assume it is open. But it never restricted manufacturing, marketing or distribution and never required a recall, and the stock has risen 51% since the October 2025 low with it outstanding. More to the point, on <strong>January 23, 2026 the FDA issued Abbott its own warning letter</strong> over FreeStyle Libre, after an October 2025 inspection, for releasing finished sensors without post-assembly accuracy testing and for failing to transfer accuracy requirements to third-party manufacturers. That is arguably a more severe finding than DexCom's, and it lands on the market-share leader. Anyone modelling a regulatory penalty box for DexCom alone is modelling half the picture.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 3 — what you are actually paying for.</strong> Three denominators, three answers. On <strong>trailing GAAP EPS of $2.54, DXCM trades at 34.7×</strong>. On <strong>2026 consensus EPS of $2.66, 33.0×</strong> (the reported forward P/E of 31.26 implies a slightly later or higher base). On <strong>trailing free cash flow of $1.41B, about 23.5× — a 4.3% free-cash yield</strong>, and on enterprise value of $32.62B, roughly 23.1×. The gap between the earnings and cash multiples is not an accounting trick here; GAAP and non-GAAP EPS were <em>identical</em> at $2.09 in FY2025, which is a rare and creditable thing in this sector. The <strong>PEG of 1.48</strong> is the tidiest summary: you are paying about a 50% premium to the growth rate for a business with a 44.5% ROIC, a 20.1% net margin, net cash, and a management team that just told you its margin tailwind ends in one quarter. That is neither cheap nor absurd. It is a fair price for a good business whose growth rate has permanently reset — which is exactly what a 34.7× multiple on a 15%-grower is supposed to mean.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The margin structure has genuinely inverted: gross margin from 56.85% (Q1'25) to 63.44% (Q2'26), operating margin +590bps, GAAP EPS +42% on 13% revenue growth, and all four FY2026 guided metrics raised at the July print. The business earns a 44.5% ROIC and 20.1% net margin on $1.41B of free cash flow, holds net cash, bought back ~$600M in a quarter, and pays nothing for the two largest option values it owns: a mid-2027 CMS decision that would open Medicare to 7M+ type 2 non-insulin patients, and Stelo, an over-the-counter cash-pay product with zero disclosed revenue and a natural GLP-1 tailwind. International is compounding at 19%. And the regulator has now put Abbott under a warning letter too, levelling a playing field the bears assumed was tilted.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Guided FY2026 revenue growth of 11–13% is below the ~15% category growth rate — that is share loss, arithmetically, and it is concentrated in the 71%-of-revenue US business growing 11%. The margin expansion driving the entire 51% rally is a one-time product-cycle effect that the company's own CFO says peaks in Q3 2026 before stepping down for Ireland. Abbott is 1.6× DexCom's CGM size and can subsidise from a $46.6B revenue base against a company with one product line. The March 2025 FDA warning letter has no verified close-out. The biggest growth pool is gated on a CMS decision that is still nine months away. And at $87.90 the stock sits above MarketBeat's $88.71 average target by a rounding error, with the panel's raises all crowded into four days after the print.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The margin peak arrives on schedule and nothing replaces it.</strong> Management has guided gross margin to peak in Q3 2026 and step down as Ireland starts production. If that happens while revenue growth stays at 11–13%, earnings growth decelerates sharply in 2027 and a 34.7× trailing multiple has no support. This is the risk the company has told you about, which makes it the one least likely to be mispriced — and the one most likely to be underweighted anyway.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>US growth stays at 11% while the category grows 15%.</strong> Two more quarters of 11% US growth would confirm structural share loss to Libre rather than a timing artefact, and would put the FY2027 revenue base below where consensus sits. The tell to watch is the relationship between record new patient starts and decelerating revenue: if patients keep hitting records while US revenue growth stays in the low teens, revenue per patient is falling, and the mix shift toward basal, non-insulin and pharmacy is more dilutive than the margin story admits.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>A regulatory escalation on an already-open warning letter.</strong> The March 2025 letter carries no operating restriction today and no close-out was verified. A subsequent inspection finding, a consent decree, or a product-accuracy issue at either DexCom or Abbott would hit a single-product company far harder than a diversified one — and DexCom's manufacturing footprint is simultaneously being expanded into Ireland, which adds new sites and new validation work to a quality system the FDA has already criticised.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">A Duopoly Where One Side Has a Day Job</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Third-party estimates put 2025 CGM share at Abbott 52.83%, DexCom 33.89% and Medtronic 10.10% — roughly 97% of the market in three hands, which sounds like a comfortable oligopoly until you look at the balance sheets behind it. CGM is <strong>100% of DexCom's $4.97B</strong> and a fraction of Abbott's <strong>$46.59B</strong>. In any PBM negotiation, government tender or price war, Abbott can accept a margin it would not tolerate elsewhere, and DexCom cannot. This is the structural reason US revenue grows 11% while international grows 19%: the US is where the two collide most directly on price and formulary placement. It is also why DexCom's competitive answer has to be product cycles and clinical differentiation rather than price — the 15-day sensor and the AID pump integrations are exactly that answer.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The FDA Is Auditing the Whole Category</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Within eleven months the FDA issued warning letters to <strong>both</strong> CGM leaders: DexCom on <strong>March 4, 2025</strong> (San Diego and Mesa, manufacturing and quality-system deficiencies) and Abbott on <strong>January 23, 2026</strong>, after an October 2025 inspection, for releasing finished FreeStyle Libre sensors without accuracy testing after assembly, sterilisation and programming, and for failing to transfer accuracy requirements to third-party manufacturers. Neither letter restricted sales. Read together they say something about the industry rather than either company: CGM devices have scaled from niche to mass-market volumes faster than the quality systems around them, and the regulator is now catching up. Expect remediation cost, expect it to be a cost of doing business rather than an existential event — and expect it not to be a differentiator between the two, which is itself a change from the 2025 narrative.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Reimbursement Is the Whole Growth Curve</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">CGM demand is not really demand — it is coverage. Every leg of growth in this industry has come from a payer decision: type 1, then insulin-intensive type 2, then basal-only, and now the frontier of type 2 non-insulin, where the CONNECT trial showed a <strong>0.9% A1c improvement with 97% median usage</strong> and the CMS decision is expected <strong>mid-2027</strong>. DexCom already has commercial coverage across the four largest PBMs, reaching <strong>7M+ US type 2 non-insulin patients</strong>, and it has Stelo as a cash-pay bridge for everyone else — including the GLP-1 population buying a sensor to see what food does to them. <strong>Bull framing:</strong> a favourable CMS decision converts the largest patient pool in the category from cash-pay to reimbursed overnight, and DexCom already has the product, the trial data and the manufacturing capacity in place. <strong>Bear framing:</strong> that is nine-plus months out, the market is expanding at ~15% while DexCom guides to 11–13%, and the near-term earnings engine — a 15-day product cycle — is guided to peak this quarter. You are paying 34.7× today for a decision in mid-2027.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, market cap, valuation, statistics, annual and quarterly financials, and forecast data from stockanalysis.com — price source URL <strong>https://stockanalysis.com/stocks/dxcm/</strong> ($87.90 close, −$1.81 / −2.02%, September 4, 2026), plus the /statistics/, /financials/, /financials/?p=quarterly and /forecast/ pages. Sixty monthly closing prices from digrin.com DXCM price history ("Real Price", unadjusted), <strong>split-adjusted by this report</strong>: the nine months from October 2021 through May 2022 were divided by four to account for the 4-for-1 split of June 2022; June 2022 onward are unadjusted as published. The final chart value ($87.90) is the September 4, 2026 close and matches the header price exactly; it was independently cross-checked against MarketBeat, which also showed $87.90. No chart months were reconstructed or interpolated — all 60 points are real month-end closes except the last, which is the September 4, 2026 close (a partial month, labelled Sep 26*). Segment revenue, margins, guidance and product commentary from Dexcom's Q2 2026 results release (Business Wire, July 30, 2026), its Q4/FY2025 results release (Business Wire, February 12, 2026), the January 7, 2026 CEO-transition release, and Q2 2026 earnings-call coverage. FDA warning letter detail from Nasdaq/Zacks coverage of the March 4, 2025 letter and MedTech Dive; Abbott's January 23, 2026 warning letter from MedTech Dive (published February 3, 2026). CGM market size and share estimates from Mordor Intelligence. Analyst price targets and named calls from MarketBeat's DXCM price-target page and drugdeliverybusiness.com. Peer figures for Abbott, Medtronic, Insulet, Tandem and Senseonics from stockanalysis.com quote pages. Global market-cap rank from companiesmarketcap.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source — this includes the US and NASDAQ market-cap rank pills and the estimated late-October 2026 Q3 earnings date. <strong>All CGM market-share and market-size figures are third-party estimates (Mordor Intelligence), not company disclosures.</strong> The entire Industry Avg and NASDAQ-100 columns in Section 04 read "—" because no sourced values were obtained; they have deliberately not been estimated. Items marked <strong>n/d</strong> are not disclosed by the company: DexCom does not publish product-line revenue, Stelo revenue or unit volumes, absolute new patient adds, pump-channel revenue, or country-level international revenue, and none of those have been estimated here. Abbott does not separately disclose FreeStyle Libre revenue on any page fetched, so Libre's scale is quantified only through the third-party share estimate. Top institutional holders are not listed because the stockanalysis.com holders page returned a 404. A precise NASDAQ-100 and S&amp;P 500 total-return comparison over the identical five-year window could not be verified and is omitted rather than approximated. <strong>Corrections to the brief:</strong> Kevin Sayer is no longer CEO — Jake Leach became President and CEO effective January 1, 2026, having assumed the duties in September 2025; the FDA warning letter has no verified close-out and should be treated as open; and Abbott received its own FDA warning letter on January 23, 2026. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 4 2026 =====
+// Source: digrin.com DXCM "Real Price" (unadjusted). Oct 2021–May 2022 divided by 4 for the June 2022 4-for-1 split.
+// Final point is the Sep 4, 2026 close ($87.90) — a partial month — and equals the header price.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26*'];
+const prices = [155.80,140.65,134.24,107.62,103.48,127.90,102.15,74.49,74.53,82.08,82.21,80.54,120.78,116.28,113.24,107.09,111.01,116.18,121.34,117.26,128.51,124.56,100.98,93.30,88.83,115.52,124.09,121.35,115.07,138.70,127.39,118.77,113.38,67.82,69.34,67.04,70.48,77.99,77.77,86.83,88.37,68.29,71.38,85.80,87.29,80.77,75.34,67.29,58.22,63.47,66.37,73.04,73.43,62.80,59.55,73.74,67.35,83.45,91.06,87.90];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — peak $155.80 (split-adj), ~294x earnings', color: '#94a3b8' },
+  { idx: 8,  label: 'Jun 2022 — 4-for-1 split executed',                    color: '#a78bfa' },
+  { idx: 29, label: 'Mar 2024 — recovery high $138.70',                     color: '#22c55e' },
+  { idx: 33, label: 'Jul 2024 — $67.82, -40.2% in one month',               color: '#ef4444' },
+  { idx: 41, label: 'Mar 2025 — FDA warning letter month, -22.7%',          color: '#ef4444' },
+  { idx: 48, label: 'Oct 2025 — cycle low $58.22 (-62.6% from peak)',       color: '#ef4444' },
+  { idx: 57, label: 'Jul 2026 — Q2 beat, margin +400bps',                   color: '#22c55e' },
+  { idx: 59, label: 'Sep 4 2026 — $87.90, +51.0% off the low',              color: '#35C4D6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(53,196,214,0.22)');
+grad.addColorStop(1, 'rgba(53,196,214,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#35C4D6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#35C4D6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
