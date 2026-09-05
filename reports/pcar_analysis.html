@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PCAR — PACCAR Inc | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #5B9BFF;
+  --accent-dim: #5B9BFF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">PCAR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Farm &amp; Heavy Construction Machinery</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $65.64B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #392</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#170 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#55 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">PACCAR Inc</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$124.70</div>
+      <div class="price-change" style="color:var(--green);">+$0.19 (+0.15%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $124.64 (−$0.06, −0.05%) at 4:11 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Bellevue, Washington</div>
+    <div class="meta-item"><span>Employees:</span> 25,900</div>
+    <div class="meta-item"><span>Founded:</span> 1905</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 20, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">PACCAR designs, builds and finances heavy- and medium-duty commercial trucks under three nameplates — <strong>Kenworth</strong> and <strong>Peterbilt</strong> in North America and <strong>DAF</strong> in Europe — and runs a parts distribution business and a captive finance arm alongside them. Kenworth and Peterbilt together held a <strong>30% retail share of the U.S./Canada Class 8 market in 2025</strong> (Class 8 = the heaviest highway trucks, over 33,000 lb gross vehicle weight — the tractors that pull 53-foot trailers). FY2025 revenue was <strong>$28.44B, down 15.5%</strong> from $33.66B, and net income was <strong>$2.38B ($4.51 per share), down 43%</strong> — the company's 87th consecutive year of profit, but a trough year by any measure. It ranks <strong>#392 globally by market capitalisation</strong> at $65.64B.</p>
+  <p class="prose" style="margin-top:16px;">This is a cycle stock, and the whole page turns on one question: <strong>where in the cycle is 2026?</strong> The bull reading is that 2025 was the bottom — deliveries have already climbed from 32,900 in Q4 2025 to 38,700 in Q2 2026 with roughly 42,000 guided for Q3, gross margin has recovered from 12.0% to 14.4%, and a friendlier EPA 2027 emissions regime gives the industry a strong 2027 without a boom-bust pre-buy. The bear reading is that 2026's order strength <em>is</em> the pre-buy — the ACT Research figures show August Class 8 orders down 35% month-over-month as surcharge-free 2026 build slots filled — and that once 2027-model trucks carrying $6,000–12,000 of emissions cost start shipping into a freight market that is only just recovering, demand air-pockets. The stock at 26× trailing and 18.8× forward earnings is priced somewhere between those two outcomes.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">R. Preston Feight</div>
+      <div class="card-note">CEO. Verified as the CEO speaker on the Q4 2025 (Jan 27, 2026) and Q2 2026 (Jul 28, 2026) earnings calls and in PACCAR's FY2025 results release. Former DAF president; Mark Pigott remains Executive Chairman.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Brice J. Poplawski</div>
+      <div class="card-note">Senior VP &amp; CFO. Verified as CFO in the Jul 28, 2026 release and Q2 2026 call. Note the transition: the Q1 2025 release (Apr 29, 2025) still quoted Harrie Schippers as CFO, so Poplawski is a relatively new holder of the seat.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">526.36M shares outstanding, 515.99M float (stockanalysis.com). Specific institutional holders and the Pigott family stake were not verified from the sources fetched and are therefore not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">PACCAR reports three segments: <strong>Truck</strong>, <strong>Parts</strong> and <strong>Financial Services</strong>. Parts and Financial Services revenue and pretax income are disclosed directly in the results releases; the Truck figure below is the <strong>residual</strong> of total FY2025 revenue ($28.44B) after Parts ($6.87B) and Financial Services ($2.21B), so it includes the small "Other" line and is labelled derived.</p>
+  <div class="seg-bar">
+    <div style="flex:68.1;background:#5B9BFF;">TRUCK &amp; OTHER 68.1%</div>
+    <div style="flex:24.2;background:#22c55e;">PARTS 24.2%</div>
+    <div style="flex:7.8;background:#a78bfa;">PFS 7.8%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#5B9BFF;"></span> Truck &amp; Other — ~$19.36B (FY2025, derived residual)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> PACCAR Parts — $6.87B (FY2025)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Financial Services — $2.21B (FY2025)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The revenue mix understates how the profit is split. In FY2025, Parts earned <strong>$1.67B of pretax income</strong> and Financial Services <strong>$485M</strong> — together roughly <strong>$2.16B against total operating income of about $3.07B</strong> (stockanalysis.com). The Truck segment, two-thirds of revenue, generated on the order of <strong>$0.9B of pretax profit (derived)</strong> in a trough year, and that figure absorbed the European litigation charge. Parts is the annuity; Truck is the cycle.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #5B9BFF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Truck — Kenworth, Peterbilt, DAF</div>
+        <span class="biz-badge dominant">30% US/CANADA CLASS 8 RETAIL SHARE (2025)</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$19.4B</div><div class="biz-stat-label">FY25 Rev (derived)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−15.5%</div><div class="biz-stat-label">Total Rev YoY (FY25)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30%</div><div class="biz-stat-label">US/CAN Class 8 Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">68.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">PACCAR delivered <strong>144,200 trucks worldwide in 2025</strong>, then <strong>33,000 in Q1 2026</strong> and <strong>38,700 in Q2 2026</strong>, with <strong>roughly 42,000 guided for Q3</strong> as build rates rise against seasonal European summer shutdowns. Kenworth and Peterbilt are premium North American brands that consistently command higher resale values; DAF is a top-tier European heavy-truck maker and was named Motor Trader's U.K. "Truck Manufacturer of the Year" in 2026. Margin profile: this is the low-margin, high-leverage engine. Company-wide Truck, Parts &amp; Other gross margin was <strong>12.0% in Q4 2025, 13.1% in Q1 2026, 14.4% in Q2 2026</strong>, with 14.5% guided for Q3 and further expansion expected in Q4. Back out Parts (29.8% gross margin on $1.75B) and the implied gross margin on the roughly $5.25B of Q2 Truck &amp; Other revenue is only <strong>~9% (derived estimate)</strong>. That is what a truck cycle looks like at the bottom — and why every point of volume recovery matters so much. Management's 2026 industry forecast: <strong>U.S./Canada Class 8 retail sales of 230,000–270,000</strong> (105,000 in the first half, ~145,000 implied for the second half), <strong>Europe &gt;16-tonne ~310,000</strong>, <strong>South America 100,000–110,000</strong>. 2026 build slots were "nearly 90% full" at the end of July, with the remainder expected to sell out within one to two months.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> U.S./Canada Class 8 retail sales were 233,000 units in 2025 and are forecast at 230,000–270,000 in 2026 (PACCAR). Europe &gt;16t registrations were 298,000 in 2025. Dollar TAM not disclosed; not estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Daimler Truck (Freightliner, Western Star, Mercedes-Benz)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share (not fetched)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Traton (International / Navistar, Scania, MAN)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share (not fetched)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Volvo Group (Volvo Trucks, Mack)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share (not fetched)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="prose" style="margin-top:12px;font-size:13px;">Competitor figures were not fetched within the research budget and are deliberately left as n/d rather than estimated. Daimler Truck North America and Traton's International were identified (Transport Topics, Feb 2026) as the largest suppliers of Mexico-built Class 8 trucks.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">PACCAR Parts</div>
+        <span class="biz-badge growth">RECORD QUARTERLY REVENUE — 29.8% GROSS MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6.87B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.0%</div><div class="biz-stat-label">YoY (FY25)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The annuity. Parts sells replacement components, TRP all-makes parts and fleet services through 21 distribution centres (4 million+ square feet) supporting 2,000+ dealer locations and 350+ TRP stores. It grew <strong>3.0% in FY2025 to $6.87B</strong> while truck revenue fell by double digits, and posted a <strong>record $1.75B in Q2 2026</strong> (up from $1.72B) with <strong>$417.0M of pretax income — a 23.8% pretax margin</strong> against a <strong>29.8% gross margin</strong> (29.5% in Q4 2025). Quantify it against Truck: Parts is under a quarter of revenue but generated <strong>$1.67B of FY2025 pretax income, roughly 54% of company operating income</strong>, and in Q2 2026 its ~$521M of gross profit was about <strong>half of the ~$1.0B of Truck, Parts &amp; Other gross profit</strong> (derived from the 14.4% blended margin). The installed base of PACCAR trucks in service grows regardless of the new-truck cycle, and fleet-services revenue grew 8% in Q2. Management guides <strong>3–5% Parts growth for 2026</strong>, helped by an improving North American freight market that raises truck utilisation and therefore wear. Pretax income was slightly down in the first half ($819M vs $843M) — the one soft spot, reflecting mix and cost inflation.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not disclosed; independent aftermarket TAM not verified from sources fetched and not estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">OEM captive parts (Daimler, Volvo, Traton) &amp; independents</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">PACCAR Financial Services (PFS) &amp; PacLease</div>
+        <span class="biz-badge emerging">$22.3B ASSETS · 222,000 UNITS FINANCED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2.21B</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5.2%</div><div class="biz-stat-label">YoY (FY25)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The captive lender. PFS finances Kenworth, Peterbilt and DAF trucks for customers and dealers and runs the PacLease full-service leasing fleet of 37,000 vehicles. FY2025 revenue was <strong>$2.21B (+5.2%)</strong> and pretax income <strong>$485.4M (+11.4%)</strong> — the one segment that grew profit through the downturn, on a portfolio of 226,000 trucks and trailers and $22.8B of assets at year-end (222,000 units, $22.3B in Q2 2026). Q2 2026 pretax was <strong>$124.1M on $549.7M of revenue</strong>, a 22.6% pretax margin, supported by "steady finance margins and an improving used truck market" — used truck values were up about 4% year-over-year per the Q4 call. PFS issued $1.38B of medium-term notes in the first half of 2026 and carries A+/A1 credit ratings. Margin profile: PFS is why headline debt-to-equity (0.73) looks worse than the industrial balance sheet actually is — most of PACCAR's $14.82B of debt funds this finance book, matched against receivables.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> credit losses and used-truck residuals are the tail risk in a captive finance book. Management reported no credit-quality issues on the calls fetched; a renewed freight recession would show up here first.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Daimler Truck Financial, Volvo Financial, banks</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose"><strong>Sources of Moat</strong></p>
+  <div class="moat-list">
+    <span class="moat-pill">PREMIUM BRANDS &amp; RESALE VALUES</span>
+    <span class="moat-pill">DEALER NETWORK DENSITY</span>
+    <span class="moat-pill">PARTS ANNUITY ON INSTALLED BASE</span>
+    <span class="moat-pill">CAPTIVE FINANCE (A+/A1)</span>
+    <span class="moat-pill">LOCAL-FOR-LOCAL FOOTPRINT</span>
+    <span class="moat-pill">IN-HOUSE MX ENGINES</span>
+    <span class="moat-pill">87 YEARS OF UNBROKEN PROFIT</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>a premium-brand truck wrapped in two service businesses that make money regardless of whether the truck sells</strong>. Kenworth and Peterbilt hold a 30% share of a market where the buyer is a professional fleet manager who tracks total cost of ownership to the penny: fuel economy, uptime, driver retention (a comfortable cab is a recruiting tool) and, critically, resale value. High resale values feed PFS's residuals and lower the effective lease cost, which supports pricing on the new truck, which supports the brand. Around that sits the dealer network and Parts — a growing installed base of trucks that will need components for a decade — and the finance arm that keeps the customer in the family. The result is a truck OEM that has stayed profitable through every downturn since 1938, including a 2025 trough in which revenue fell 15.5% and the company still earned a 9.0% net margin and paid $2.72 per share in dividends. What the moat does <em>not</em> do is insulate volume: PACCAR builds to order, and orders are a function of freight rates, interest rates and regulation.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The cycle is the business.</strong> FY2023 revenue $35.13B and EPS $8.76; FY2025 revenue $28.44B and EPS $4.51. That is a 49% earnings decline from peak to trough in a business with 30% share and no competitive loss. Truck &amp; Other gross margin compressed to roughly 9% (derived) in Q2 2026 even as the recovery began. Anyone paying 26× trailing earnings is implicitly underwriting a recovery to something between the trough and the 2023 peak.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>EPA 2027 NOx rule (NOx = nitrogen oxides; the 2027 standard cuts the limit to 35 milligrams per horsepower-hour).</strong> The EPA affirmed the 35 mg limit but proposed letting fleets keep buying current engines while paying a nonconformance penalty (NCP) that management estimates at <strong>$6,000–7,000 per truck</strong>, versus an <strong>$8,000–12,000 OEM upcharge</strong> for fully compliant engines (industry sources). The bull says this smooths the cycle; the bear says August 2026 orders falling 35% month-over-month (ACT) as surcharge-free 2026 slots filled is the pre-buy ending in real time.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Section 232 truck tariffs and the Mexico footprint.</strong> A <strong>25% Section 232 tariff on imported medium- and heavy-duty trucks and parts took effect November 1, 2025</strong>. PACCAR builds Peterbilts in Mexicali, Mexico, as well as in Texas, Ohio and Canada. Management's line is that "local-for-local manufacturing" has created "advantages to PACCAR" and "a stable tariff operating environment," with tariff surcharges removed for 2026 and a price-cost benefit that "will carry forward in Q3." The vulnerability is the opposite side of that sentence: the benefit depends on competitors (Daimler and Traton are the largest Mexico-built Class 8 suppliers) being hurt more than PACCAR, and on the USMCA treatment of Mexicali output staying as it is. Neither is in PACCAR's control.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>European litigation overhang.</strong> PACCAR booked a <strong>$264.5M after-tax non-recurring charge in Q1 2025 for civil litigation in Europe</strong>, with management saying it was "making good progress on substantially resolving the EU civil litigation." The sources fetched do not identify the underlying case; note that the task brief's reference to "DOJ/EU emissions matters" was <em>not</em> verified — what the filings actually disclose is a European civil litigation charge, not an emissions action. Whether further charges follow is unknown.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">PCAR column from stockanalysis.com statistics as of the September 4, 2026 close. <strong>Industry Avg and NASDAQ-100 comparison columns could not be sourced from a fetched page within the research budget and are left as "—" rather than estimated</strong>; the PCAR column is therefore shown uncoloured, and the Context column carries the comparison against PACCAR's own history instead.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>PCAR</th><th>Industry Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td>26.2</td><td>—</td><td>—</td><td>$124.70 ÷ $4.75 TTM EPS = 26.3×. High for PACCAR because the E is at a cyclical trough: on FY2023 peak EPS of $8.76 the same price is 14.2×.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td>18.8</td><td>—</td><td>—</td><td>Consensus FY2026 EPS $5.93 (+18.5%). Forward multiple assumes the recovery in Section 02 continues through Q4.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td>0.93</td><td>—</td><td>—</td><td>Below 1.0 — but the growth rate is a cyclical rebound off a trough, not a secular rate. PEG flatters cyclicals at the bottom and punishes them at the top.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td>$4.75</td><td>—</td><td>—</td><td>GAAP, through Jun 2026. Quarterly EPS: $1.12 → $1.06 → $1.15 → $1.43 — the trough was Q4 2025.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td>−10.6%</td><td>—</td><td>—</td><td>TTM. But Q2 2026 was +0.5% YoY — the first positive comparison in eight quarters. The trailing number lags the turn.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td>13.71%</td><td>—</td><td>—</td><td>TTM, consolidated. Quarterly: 12.6% (Q4'25) → 13.8% (Q1'26) → 15.0% (Q2'26). Q3 2024 was 16.8%. Truck OEMs are structurally thin-margin; Parts at 29.8% is the exception.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td>9.00%</td><td>—</td><td>—</td><td>TTM. Was 13.1% in FY2023. Still positive at the trough — the 87-year record.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td>2.25%</td><td>—</td><td>—</td><td>$2.80 TTM per share, 58.1% payout. Includes PACCAR's customary year-end extra dividend; FY2025 declared $2.72 total vs. $1.32 regular — the ~$1.40 gap is the extra (derived). Ex-dividend Aug 12, 2026.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td>1.97% of shares<br>2.01% of float</td><td>—</td><td>—</td><td>10.39M shares short. Low. Nobody is pressing the bear case aggressively.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td>0.73</td><td>—</td><td>—</td><td>$14.82B total debt vs. $8.67B cash. Misleading for PACCAR: the debt largely funds the $22.3B PFS finance book. The industrial business is net cash.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td>5.52</td><td>—</td><td>—</td><td>Very high, again inflated by finance receivables classified as current. Liquidity is not the question here.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td>$2.96B</td><td>—</td><td>—</td><td>TTM; operating cash flow $4.34B less $1.38B capex. FCF exceeds net income ($2.50B) — 10.65% FCF margin, 22.2× P/FCF.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td>12.76%</td><td>—</td><td>—</td><td>Trough-year return on a 3.23× book. Peak-cycle ROE was materially higher in 2023.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td>8.60%</td><td>—</td><td>—</td><td>Depressed by both trough earnings and the capital tied up in the finance book. Look at this across a full cycle, not a single year.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td>0.97</td><td>—</td><td>—</td><td>5-year. Market-like volatility despite a deeply cyclical earnings stream — the stock has been steadier than the business.</td></tr>
+      <tr><td>52-Week Range</td><td>$92.25 – $139.24</td><td>—</td><td>—</td><td>Current $124.70 sits 69% of the way up the range. 52-week price change +29.6%; 50-day MA $127.80, 200-day MA $119.83.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;"><strong>European civil litigation charge, $264.5M after-tax, Q1 2025.</strong> This is the single biggest distortion in the trailing-five-quarter numbers. It took Q1 2025 net income to $505.1M ($0.96) from an adjusted $769.6M ($1.46), and FY2025 GAAP net income of $2.38B ($4.51) compares with adjusted $2.64B ($5.01). It has now rolled out of the TTM window (which runs Q3 2025 – Q2 2026), so the $4.75 TTM EPS above is clean. It matters for the YoY comparisons, though: Q1 2026's headline "+20% net income" versus Q1 2025 is really a <em>decline</em> against the adjusted base ($605.3M vs $769.6M).</p>
+  <p class="prose" style="margin-top:12px;"><strong>Tariff surcharge and price-cost.</strong> PACCAR applied tariff surcharges in 2025 and removed them for 2026; management described a positive price-cost effect in Q1 and a tariff benefit in Q2 that "will carry forward in Q3." This is a favourable one-off in the sense that it depends on a policy regime (the Nov 1, 2025 Section 232 tariff) that could change with a signature.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Supplier constraints in Q2 2026</strong> left "several hundred trucks" undelivered in the U.S./Canada — a small timing shift that flatters Q3 relative to Q2.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Extra dividend.</strong> FY2025 dividends declared were $2.72 per share ($1.43B), of which roughly $1.40 (derived) was the December extra dividend. The TTM yield of 2.25% therefore depends on the extra being repeated; the regular quarterly rate alone would yield roughly 1.1% (derived). PACCAR has paid an extra dividend in most years but it is discretionary and sized to the cycle. No share repurchase programme was mentioned in the releases fetched — PACCAR returns capital as dividends, not buybacks.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">19 analysts polled by S&amp;P Global (stockanalysis.com forecast page). Note the label is generous: 13 of the 19 are Hold.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$141.03</div><div class="card-note">+13.1% versus the $124.70 close (forecast page). The overview/statistics pages showed $143.07; the two figures were retrieved from the same site on the same day and the discrepancy is noted rather than resolved.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$110.47 – $164</div><div class="card-note">−11.4% to +31.5%. Median $139.50. The low target sits below the 200-day MA; the high is JPMorgan's.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">6 / 13 / 0</div><div class="card-note">5 Strong Buy + 1 Buy, 13 Hold, 0 Sell, 0 Strong Sell (as of Aug 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:5;background:var(--green);"></div>
+    <div style="flex:1;background:#4ade80;"></div>
+    <div style="flex:13;background:var(--amber);"></div>
+    <div style="flex:0.01;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 1</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 13</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 0</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Bernstein</strong> — Chad Dillard, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$148</span> (Sep 1, 2026). The most recent rated call on the tape, +18.7% from the close.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Morgan Stanley</strong> — rating not captured, price target raised $119 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$125</span> (Sep 4, 2026). Raised to essentially the current price — a "fairly valued" call in all but name.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Citi</strong> — Kyle Menges, <strong>Hold</strong>, price target raised $125 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$140</span> (Jul 30, 2026). A 12% target increase on the Q2 print with the rating left neutral.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>BofA</strong> — rating not captured, price target raised $131.50 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$150</span> (late Jul 2026, post-Q2).</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>JPMorgan</strong> — rating not captured, price target raised $155 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$164</span> (late Jul 2026). The Street-high target, +31.5%.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read off fetched stockanalysis.com pages (news feed and forecast page). The forecast page also listed a $157 Hold attributed to "Jerry Revich (Wells Fargo)"; because that analyst is generally associated with a different firm and the attribution could not be reconciled, the call is excluded rather than reported. The pattern across the post-Q2 actions is consistent: targets up 5–14%, ratings mostly unchanged at Hold — the Street believes the cycle has turned but thinks the stock already says so.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — EPS $1.43 vs $1.35 consensus, revenue slightly light</div>
+        <div class="tl-desc">Revenue $7.55B (+0.5% YoY, the first positive comp in two years), net income $752M (+24% sequentially, +3.9% YoY), record Parts revenue $1.75B, deliveries 38,700 (from 33,000 in Q1), gross margin 14.4% (from 13.1%). Guided Q3 deliveries to ~42,000 and gross margin to 14.5% with more expansion in Q4. The stock closed July at $132.68, its highest monthly close of the five-year window, then gave back 6.4% in August.</div>
+        <div class="tl-impact up">Beat on EPS — cycle-turn confirmation</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2–3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">August Class 8 orders: 16,800 (ACT, −35% MoM) / 18,200 (FTR, −19% MoM)</div>
+        <div class="tl-desc">Still up 31–42% year-over-year, and the 2026 order season (Sep 2025–Aug 2026) closed up 39% at 350,677 units. But FTR called August "the effective end of the EPA 2027 NOx pre-buy," with surcharge-free 2026 build slots now likely full and 2026 backlogs oversubscribed by ~35,000 units. ACT's counter: "weak orders do not necessarily mean weak demand" when capacity is the constraint. September opens MY2027 ordering — the first real read on whether fleets will pay for 2027 engines.</div>
+        <div class="tl-impact neutral">Key near-term event — pre-buy or trough?</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep–Oct 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">MY2027 order book opens; EPA NCP framework finalisation</div>
+        <div class="tl-desc">The EPA affirmed the 35 mg NOx limit but proposed letting fleets keep buying current engines under nonconformance penalties management pegs at $6,000–7,000 per truck. PACCAR plans to keep "selling the current product" while phasing in 35 mg engines through 2027. Feight: the approach "bodes well for a good 2027 operating condition" and avoids "a huge prebuy." If MY2027 orders hold up at NCP pricing, the bull case is largely proven.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 20, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings</div>
+        <div class="tl-desc">The bar: ~42,000 deliveries, 14.5% Truck/Parts/Other gross margin, Parts growth within the 3–5% full-year guide, and the tariff price-cost benefit carrying forward. Watch the Q4 delivery and margin guide most — it is the first that will incorporate real MY2027 order data. Consensus FY2026 EPS is $5.93; first-half EPS was $2.57, so the second half needs roughly $3.36, or ~$1.68 per quarter versus $1.43 in Q2.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Extra dividend declaration</div>
+        <div class="tl-desc">PACCAR customarily declares a year-end extra dividend sized to the year's cash generation; FY2025's total declared was $2.72 vs. a $1.32 regular rate. With TTM free cash flow of $2.96B against roughly $1.5B of trailing dividends, there is room. The size will be read as management's own signal on where the cycle is.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Section 232 truck tariffs (25%, since Nov 1, 2025) and European litigation</div>
+        <div class="tl-desc">Tariffs are currently a relative tailwind for PACCAR's U.S. footprint, but policy can move quickly; Mexicali output and USMCA treatment are the exposure. Separately, the $264.5M European civil litigation charge in Q1 2025 was described as "substantially resolving" the matter — any further charge would be a negative surprise. No DOJ or emissions-related action was found in the sources fetched.</div>
+        <div class="tl-impact neutral">Ongoing — two-sided</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">PCAR — 61 MONTHLY CLOSES, SEP 2021 → SEP 4, 2026 (split-adjusted for the 3-for-2 split of Feb 8, 2023)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#5B9BFF;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From a split-adjusted September 2021 close of <strong>$52.61</strong> to <strong>$124.70</strong> on September 4, 2026, PCAR is up <strong>137% in price</strong> — a compound annual rate of roughly <strong>18.8%</strong> before dividends, and PACCAR has paid a regular dividend plus a year-end extra throughout, so total return is higher still. The shape is unusual for a cyclical: the stock <em>rose</em> through the 2022 rate shock (it never closed a month below $54.89), then nearly doubled from $68.78 in May 2023 to $123.89 in March 2024 as the 2023 earnings peak was reported. It then spent <strong>two full years — March 2024 to January 2026 — going nowhere</strong>, oscillating between $90 and $117 while FY2025 earnings fell 43%. That is the market looking through the trough. The breakout came in January 2026 ($122.91) on the order surge, the stock made its highest monthly close of the window at <strong>$132.68 in July 2026</strong> after the Q2 print, and it has since drifted back to $124.70 as the August order data raised the pre-buy question. A precise NASDAQ-100 and S&amp;P 500 total-return comparison over the identical window could not be verified from the sources fetched and is not stated; directionally, a 137% five-year price gain with a 0.97 beta means PACCAR has kept pace with a strong index period while offering a fraction of the volatility of the growth names in it. The 52-week gain of <strong>+29.6%</strong> has come almost entirely since December.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2021</div><div class="tl-content"><div class="tl-title">$52.61 — supply-chain constrained</div><div class="tl-desc">FY2021 revenue $23.5B, EPS $3.57 (split-adjusted). Trucks were sold out but semiconductors and components capped builds; the stock sat well below where the order book said it should be.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">$54.89 — the rate-shock low</div><div class="tl-desc">The lowest monthly close of the window came at the bottom of the 2022 bear market. FY2022 EPS went on to grow 61% to $5.75 — the stock bottomed while earnings were accelerating.</div><div class="tl-impact down">Macro low, fundamental strength</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2023</div><div class="tl-content"><div class="tl-title">3-for-2 stock split (Feb 8, 2023)</div><div class="tl-desc">The 1.5:1 forward split — the only split in the window; pre-February 2023 prices here are divided by 1.5. Note for the task brief: the split was in 2023, not 2021.</div><div class="tl-impact neutral">Corporate action</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2023 → Mar 2024</div><div class="tl-content"><div class="tl-title">$68.78 → $123.89 — the peak-earnings run</div><div class="tl-desc">FY2023 revenue $35.1B (+21.9%) and EPS $8.76 (+52%) were reported in January 2024; the stock rose 80% in ten months and set the window's high monthly close to that point.</div><div class="tl-impact up">Peak-cycle re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2024 → Apr 2025</div><div class="tl-content"><div class="tl-title">$106.11 → $90.21 — the freight recession bites</div><div class="tl-desc">Class 8 orders faded, FY2024 EPS fell 10% and FY2025 fell 43%. The April 2025 low coincided with the tariff shock and the $264.5M European litigation charge in Q1 2025. Drawdown from the March 2024 close: −27%.</div><div class="tl-impact down">Trough of the cycle</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025</div><div class="tl-content"><div class="tl-title">$105.42 — Section 232 tariffs take effect (Nov 1)</div><div class="tl-desc">The 25% import tariff on medium- and heavy-duty trucks landed as a relative positive for PACCAR's U.S. footprint; the stock rose 7% in the month and Class 8 orders began surging into year-end.</div><div class="tl-impact up">Policy tailwind</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">$122.91 — breakout on FY2025 results and order surge</div><div class="tl-desc">FY2025 results on Jan 27 confirmed the trough (EPS $4.51) alongside "strong order intake in December/January." The stock cleared its two-year range for the first time.</div><div class="tl-impact up">Range breakout</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul → Sep 2026</div><div class="tl-content"><div class="tl-title">$132.68 → $124.70 — post-Q2 high, then the pre-buy question</div><div class="tl-desc">The Q2 beat on Jul 28 produced the window's highest monthly close; August's −35% MoM order print (ACT) and a wave of "raise target, keep Hold" analyst actions have since pulled the stock 6% off the high. Monthly RSI has cooled from the overbought zone.</div><div class="tl-impact neutral">Consolidation near highs</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Start with the units, because everything else follows from them.</strong> PACCAR delivered 32,900 trucks in Q4 2025, 33,000 in Q1 2026, 38,700 in Q2, and guides ~42,000 for Q3. Company-wide Truck, Parts &amp; Other gross margin moved 12.0% → 13.1% → 14.4% over the same three quarters and is guided to 14.5% with "further expansion" in Q4. Net income moved $557M → $605M → $752M. This is what an operating-leverage recovery looks like at a build-to-order manufacturer: every incremental truck over the break-even level carries a gross margin far above the average, so a 17% sequential volume gain (Q1→Q2) produced a 24% profit gain. The second-half math in management's own forecast — 145,000 U.S./Canada Class 8 retail sales versus 105,000 in the first half — implies the fourth quarter is the strongest of the year.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Then separate what is cyclical from what is not.</strong> Parts did $1.67B of pretax income in FY2025 and PFS $485M; together that is roughly $2.16B of the company's ~$3.07B of operating income — about <strong>70% of trough-year profit from the two segments that are not the truck cycle</strong> (derived). Parts' gross margin of 29.8% versus a Truck &amp; Other gross margin of about 9% (derived) is a three-to-one spread, and Parts revenue grew 3% in a year when truck revenue fell by mid-teens. This is why PACCAR earned a 9% net margin at the bottom and why the stock never traded below $90 during the downturn. Valued on its own, the Parts and PFS stream could plausibly support a substantial share of today's $65.6B market cap; the market is paying for the truck recovery on top.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The EPA 2027 question, stated precisely.</strong> Historically a tightening emissions standard produces a pre-buy (fleets rush to buy cheaper current-generation trucks) followed by a post-buy hangover. The 2027 NOx rule adds an estimated $8,000–12,000 per compliant truck. The EPA's proposal to permit continued sales of current engines under nonconformance penalties of roughly $6,000–7,000 per truck narrows that gap and, in PACCAR's view, converts a spike-and-crash into "a continued improved cycle through the balance of the year with a stronger 2027." The evidence against: August Class 8 orders fell 35% month-over-month (ACT) and FTR explicitly called it the end of the pre-buy. The evidence for: the 12-month order total of 350,677 units against a 2026 retail forecast of 230,000–270,000 means <strong>the backlog is oversubscribed by roughly 35,000 units</strong> — orders can fall sharply for months while builds keep rising. The tiebreaker arrives in the September–October MY2027 order data and in the Q4 guide on October 20.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Tariffs, honestly.</strong> The Section 232 tariff of 25% on imported medium- and heavy-duty trucks has, so far, been a net positive for PACCAR: surcharges came off for 2026 and management reports a price-cost benefit persisting into Q3. This rests on PACCAR's Texas, Ohio and Canadian plants versus competitors' heavier Mexican footprints — Daimler Truck and Traton's International are the largest Mexico-built Class 8 suppliers. PACCAR's own Mexicali plant means the exposure is not zero, and the specific USMCA treatment of its Mexican output was not verified from the sources fetched. A "benefit" that depends on trade policy staying exactly where it is should be discounted accordingly.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation.</strong> At $124.70 the stock trades at <strong>26.3× trailing EPS of $4.75</strong>, <strong>18.8× forward</strong> on consensus FY2026 EPS of $5.93, <strong>22.2× trailing free cash flow</strong>, and yields 2.25% including the extra dividend. The trailing multiple is meaningless on its own for a cyclical — the same price is 14.2× the FY2023 peak EPS of $8.76. The honest framing is mid-cycle: if FY2027 earnings land midway between the trough ($4.51) and the peak ($8.76), roughly $6.60, the stock is at about 19× — a full but not extreme multiple for a business with a 30% share, a 30%-margin parts annuity and 87 consecutive years of profit. If 2027 is a post-pre-buy hangover and earnings stall near $6, the multiple is 21× on flat growth and the stock has little support above the $110 low target. The Street's 13-of-19 Hold count says most analysts see exactly this: a good business, correctly priced.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The trough is behind: deliveries up 17% sequentially, gross margin up 240 bps in two quarters, EPS at $1.43 and rising, 2026 build slots 90% full, backlog oversubscribed by ~35,000 units. The EPA's NCP framework removes the boom-bust pre-buy and sets up a stronger 2027. Tariffs are a relative advantage for PACCAR's U.S. footprint. Parts ($1.67B pretax, 29.8% gross margin) and PFS ($485M) already cover most of the dividend and a large share of the market cap on their own. At 18.8× forward earnings with a PEG under 1 and a 0.97 beta, the stock offers cyclical upside with defensive characteristics.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>2026's order surge was the pre-buy, and it just ended: ACT's August orders fell 35% month-over-month as surcharge-free slots filled. 2027-model trucks carry $6,000–12,000 of incremental emissions cost into a freight market that has only just stabilised. The Truck segment's gross margin is still only ~9% (derived), so a volume stall in 2027 flows straight to earnings. Tariff benefits reverse the day the policy does. Trailing revenue is still down 10.6% and TTM EPS is 46% below the 2023 peak; a 26× trailing multiple leaves no room for the recovery to pause, and the extra dividend that gets the yield to 2.25% is discretionary.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>A 2027 post-pre-buy air pocket.</strong> If fleets front-loaded 2026 purchases and balk at MY2027 pricing, deliveries could fall from the Q3/Q4 2026 run-rate even as the industry forecast says otherwise. The September–October order data and the October 20 Q4 guide are the first tests; a Q4 delivery guide below Q3's ~42,000 would be the tell.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Tariff regime change.</strong> PACCAR's current price-cost advantage is a function of a 25% Section 232 tariff that penalises competitors' Mexican output more than its own Mexicali plant. A renegotiation, exemption, or USMCA carve-out would remove the tailwind — and a broadening of tariffs to inputs PACCAR imports would turn it into a headwind.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Freight recession relapse hitting PFS and Parts together.</strong> The two "non-cyclical" segments are less cyclical, not acyclical. A renewed downturn would lower truck utilisation (fewer Parts sales), push used-truck values down (PFS residuals and credit losses on a $22.3B book), and compress the ~$2.2B of pretax income that currently makes the trough tolerable. Parts pretax income was already slightly down in the first half of 2026.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">EPA 2027: Pre-Buy or Smoothed Cycle?</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">The 2027 NOx standard (35 mg/hp-hr) is the single largest variable in the North American Class 8 market for the next 18 months. Compliant engines carry an estimated $8,000–12,000 OEM upcharge; the EPA's proposed nonconformance-penalty path lets current engines keep selling at roughly $6,000–7,000 per truck. The 2026 order season closed up 39% at 350,677 units (FTR), far above the 230,000–270,000 retail forecast — a backlog oversubscribed by ~35,000 units. August orders then fell 35% month-over-month (ACT) as surcharge-free slots filled. FTR reads that as the pre-buy ending; ACT reads it as a capacity constraint. Every truck OEM's 2027 depends on which is right.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Section 232 Truck Tariffs Redraw the North American Map</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Since November 1, 2025, imported medium- and heavy-duty trucks and parts face a 25% tariff. Mexico is the largest source: Daimler Truck (Saltillo, Santiago Tianguistenco), Traton's International (Escobedo) and PACCAR's Peterbilt (Mexicali) all build there, and Transport Topics reported in February 2026 that OEMs were largely maintaining Mexican output regardless. The net effect so far has been higher industry pricing and a relative advantage for the OEM with the most U.S. capacity — PACCAR — but the tariff is a headwind for the industry's cost base and for the fleets that buy from it, and it is a policy lever that can be pulled in either direction without warning.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Freight Rates Have Turned — and Europe Is Quietly Recovering</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Management attributes the order recovery to "improved freight rates" as "constrained industry freight capacity" finally tightens after a multi-year trucking recession — carriers deferred replacement for years and are now returning to normal cycles. Used-truck values are up ~4% YoY, which lowers the effective cost of a new truck and de-risks PFS residuals. In Europe, PACCAR raised its 2026 &gt;16-tonne forecast from 280,000–320,000 to ~310,000 during the year, DAF is picking up awards, and Q2 European deliveries were described as strong. <strong>Bull framing:</strong> a synchronised North American and European upcycle with a parts annuity underneath, at 18.8× forward earnings. <strong>Bear framing:</strong> freight rate improvement that is driven by capacity exiting, not demand growing, is fragile — and every recovery in this industry has ended with an emissions rule change or a tariff. This one has both scheduled for 2027.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close, 4:00 PM EDT). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($124.70 close, Sep 4, 2026), daily change, market cap, 52-week range, sector/industry labels, valuation statistics, financial statements, analyst consensus and news headlines from stockanalysis.com (https://stockanalysis.com/stocks/pcar/ and its statistics, financials, forecast and history sub-pages, retrieved Sep 4, 2026); monthly closes Sep 2021 – May 2026 from digrin.com PCAR price history ("Real Price" column, unadjusted, then divided by 1.5 for months before the Feb 8, 2023 3-for-2 split); Jun 30, Jul 31 and Aug 31, 2026 month-end closes and the Sep 4 close from the stockanalysis.com daily history page; segment results, deliveries, guidance, industry forecasts and executive names from PACCAR / DAF results releases (Apr 29, 2025; Jan 27, 2026; Apr 28, 2026; Jul 28, 2026) and Motley Fool transcripts of the Q4 2025 and Q2 2026 earnings calls; EPA 2027 commentary from Trucking Dive (Jul 30, 2026); August Class 8 order data (ACT Research, FTR) from Trucks, Parts &amp; Service (Sep 2026); Section 232 tariff detail and Mexico plant footprint from Transport Topics (Feb 13, 2026); global market-cap rank from companiesmarketcap.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Chart note: the 61 monthly points are real closes, not reconstructed. The digrin.com monthly rows are dated the 1st of each month and may not correspond exactly to the last trading day's close (its June 2026 value of $121.68 differed from the verified Jun 30 close of $120.12, which is used instead); the Sep 2021 – May 2026 interior points should therefore be read as monthly closes to within a few percent. The final point is the Sep 4, 2026 close, matching the header. Items marked <strong>(derived)</strong> are arithmetic on disclosed figures (Truck segment revenue and margin as residuals; extra-dividend size; regular-only yield); items marked <strong>(est.)</strong> — the US and NASDAQ market-cap rank pills and the December extra-dividend timing — are approximations. Industry-average and NASDAQ-100 comparison columns, competitor revenue/share figures, dollar TAM figures, DAF's European market share, institutional holders, and a same-window index total-return comparison could not be verified from the sources fetched and are shown as "—" or n/d rather than estimated. The task brief's references to "DOJ/EU emissions matters" and a "2021-era split" were not borne out by the sources: the disclosed legal item is a $264.5M after-tax European civil litigation charge (Q1 2025) and the only split in the window was the 3-for-2 split of Feb 8, 2023. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 61 monthly closes, Sep 2021 → Sep 4, 2026 (split-adjusted; digrin.com + stockanalysis.com) =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [52.61,59.75,55.61,58.84,61.99,61.21,58.71,55.37,57.89,54.89,61.01,58.34,55.79,64.55,70.61,65.98,72.87,72.20,73.20,74.69,68.78,83.65,86.13,82.29,85.02,82.53,91.82,97.65,100.39,110.89,123.89,106.11,107.50,102.94,98.66,96.18,98.68,104.28,117.00,104.02,110.88,107.24,97.37,90.21,93.85,95.06,98.76,99.98,98.32,98.40,105.42,109.51,122.91,126.09,115.50,118.80,110.37,120.12,132.68,124.13,124.70];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Sep 2021 — window start $52.61 (split-adj.)',         color: '#94a3b8' },
+  { idx: 9,  label: 'Jun 2022 — rate-shock low $54.89',                      color: '#ef4444' },
+  { idx: 17, label: 'Feb 2023 — 3-for-2 stock split (Feb 8)',                color: '#94a3b8' },
+  { idx: 30, label: 'Mar 2024 — peak-earnings high $123.89',                 color: '#22c55e' },
+  { idx: 43, label: 'Apr 2025 — cycle trough $90.21; tariffs + EU charge',   color: '#ef4444' },
+  { idx: 50, label: 'Nov 2025 — Section 232 truck tariffs effective Nov 1',  color: '#f59e0b' },
+  { idx: 52, label: 'Jan 2026 — breakout on FY25 results / order surge',     color: '#3b82f6' },
+  { idx: 58, label: 'Jul 2026 — post-Q2 high $132.68',                       color: '#22c55e' },
+  { idx: 60, label: 'Sep 4, 2026 — $124.70',                                 color: '#5B9BFF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(91,155,255,0.22)');
+grad.addColorStop(1, 'rgba(91,155,255,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#5B9BFF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#5B9BFF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
