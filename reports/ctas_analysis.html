@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTAS — Cintas Corporation | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4F8EF7;
+  --accent-dim: #4F8EF733;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">CTAS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Specialty Business Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $80.22B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #306</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#150 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#55 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Cintas Corporation</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$200.47</div>
+      <div class="price-change">−$0.58 (−0.29%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours: $200.47 (0.00%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Mason (Cincinnati), Ohio</div>
+    <div class="meta-item"><span>Employees:</span> 48,100</div>
+    <div class="meta-item"><span>Founded:</span> 1968 (IPO 1983)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Sep 23, 2026 (fiscal Q1 2027)</div>
+    <div class="meta-item"><span>Fiscal Year:</span> Ends May 31</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Cintas rents, launders and delivers work uniforms to roughly a million business locations across North America, and has bolted onto that route network a set of things that ride along on the same truck: floor mats, restroom supplies, first-aid cabinets, fire-extinguisher inspections and safety training. It is the largest uniform-rental company in the world by a wide margin. Fiscal 2026 (ended May 31, 2026) revenue was <strong>$11.26B, up 8.9%</strong> (8.3% organic), on a <strong>50.7% gross margin</strong> — an all-time high — and diluted <span class="tip" title="Earnings Per Share: net income divided by diluted shares outstanding">EPS</span> of <strong>$4.91, up 11.6%</strong>. It ranks roughly <strong>#306 globally</strong> by market capitalisation at $80.22B.</p>
+  <p class="prose" style="margin-top:16px;">The debate here is not about the business. Nobody argues Cintas is badly run — gross margin has expanded every year for five years, <span class="tip" title="Return on Invested Capital: after-tax operating profit divided by debt plus equity employed in the business">ROIC</span> is 27.8%, and the dividend has been raised every year since the 1983 IPO. The debate is about the <strong>price of certainty</strong>. At <strong>41× trailing earnings</strong> and <strong>36.6× forward</strong>, the market is paying a software-style multiple for a company that drives laundry around in trucks and grows revenue at 8%. This report tries to put a number on what that multiple is actually buying — and then to ask what happens to it if the one thing Cintas cannot control, U.S. employment, turns.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Todd M. Schneider</div>
+      <div class="card-note">President and CEO (verified on the July 15, 2026 fiscal Q4 release). A Cintas lifer who came up through the rental operations side; has run the company since 2021 and is now steering it through its largest-ever acquisition, UniFirst.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Scott A. Garula</div>
+      <div class="card-note">Executive Vice President and CFO (verified on the July 15, 2026 release, where he is the named financial contact). Owner of the FY2027 guide — $12.10–12.25B revenue and $5.36–5.50 adjusted EPS — which deliberately excludes any UniFirst contribution.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">Specific institutional holders and stake sizes were not shown on the sources fetched for this report and are therefore not listed. The company has a founding-family (Farmer) heritage; current family holdings were likewise not verified here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Cintas reports three segments: <strong>Uniform Rental &amp; Facility Services</strong>, <strong>First Aid &amp; Safety Services</strong>, and <strong>All Other</strong> (which bundles Fire Protection Services with the Uniform Direct Sale business). The bar below is the verified FY2026 revenue split. Market shares are not disclosed by the company and are not estimated here.</p>
+  <div class="seg-bar">
+    <div style="flex:76.5;background:#4F8EF7;">Uniform Rental &amp; Facility Services 76.5%</div>
+    <div style="flex:12.4;background:#22c55e;">First Aid 12.4%</div>
+    <div style="flex:11.1;background:#a78bfa;">All Other 11.1%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4F8EF7;"></span> Uniform Rental &amp; Facility Services — $8,621.6M (FY2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> First Aid &amp; Safety Services — $1,391.9M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> All Other (Fire Protection + Uniform Direct Sale) — $1,251.3M</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #4F8EF7;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Uniform Rental &amp; Facility Services</div>
+        <span class="biz-badge dominant">CORE ENGINE — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$8.62B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+8.1%</div><div class="biz-stat-label">YoY (7.9% organic Q4)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">76.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The route business. A customer signs a multi-year contract; every week a Cintas truck drops off clean garments and picks up dirty ones, along with entrance mats, mops, towels, restroom and hygiene supplies. Revenue is essentially <strong>wearers × price per wearer per week</strong>, plus the facility-services add-ons. Q4 FY2026 revenue was <strong>$2,197.7M, up 8.2%</strong> (7.9% organic), and the segment's gross margin reached <strong>50.2%, up 120 basis points</strong> year over year. Management said on the Q4 call that pricing is "right at historical levels and maybe slightly elevated, but immaterial" — meaning the 8% growth is volume and penetration, not price-gouging. About <strong>two-thirds of new customers</strong> come from businesses that previously ran no program at all (buying their own shirts, washing them at home), which is the real competitive set: not UniFirst, but the laundromat. Retention is described as at or near all-time highs. Healthcare, hospitality, education and state/local government verticals are all growing faster than the company average.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not disclosed by the company; third-party TAM estimates were not verified from sources fetched and are omitted. The company's own framing is that most of the addressable market still runs no program.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">UniFirst (UNF) — being acquired</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$155 + 0.772 CTAS</div><div class="comp-bubble-label">Per UNF share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue (not fetched)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Vestis (VSTS, ex-Aramark Uniform)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue (not fetched)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">"No-programmers" (self-managed)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">~2/3</div><div class="comp-bubble-label">Of new CTAS wins</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Size</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">First Aid &amp; Safety Services</div>
+        <span class="biz-badge growth">FASTEST GROWER — 57.9% GROSS MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.39B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+14.3%</div><div class="biz-stat-label">YoY (13.2% organic Q4)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Van-based restocking of first-aid cabinets, plus AEDs (automated external defibrillators), eyewash stations, PPE (personal protective equipment) and safety training. Q4 FY2026 revenue was <strong>$368.1M, up 13.5%</strong> (13.2% organic), with gross margin of <strong>57.9%, up 110 basis points</strong> — the highest-margin segment in the company. The economics are the same as uniforms (a recurring route, a captive customer, consumables that must be replenished) but with a lighter asset base: no industrial laundries, no garment inventory to amortise. It is also the segment most exposed to <em>regulatory</em> demand — OSHA (Occupational Safety and Health Administration) rules create the need for stocked cabinets and eyewash stations whether the economy is good or bad, which makes this the least cyclical line Cintas has. At 14% organic growth against 8% for the group, it is slowly lifting the blended margin.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not disclosed; not estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Zee Medical / regional van operators</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Fragmented — mostly private</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">All Other — Fire Protection Services &amp; Uniform Direct Sale</div>
+        <span class="biz-badge emerging">FIRE: 10.7% ORGANIC · DIRECT SALE: 4.0%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.25B</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+9.2%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two very different businesses share this line. <strong>Fire Protection</strong> is inspection, testing and maintenance of extinguishers, sprinklers, alarms and emergency lighting — code-mandated, recurring, and growing <strong>10.7% organically</strong> in Q4 with gross margin at an all-time high of <strong>50.8%</strong>. It is the company's most acquisition-driven segment (the $164.5M of FY2026 acquisition spend is mostly small fire and first-aid tuck-ins) and the one about to absorb an SAP system implementation in FY2027 that management flagged as roughly a <strong>100-basis-point annual headwind</strong> to that segment while it runs. <strong>Uniform Direct Sale</strong> is the low-margin (about 42% gross), lumpy business of selling — not renting — branded garments to large accounts; it grew just <strong>4.0%</strong> organically in Q4. Segment-level revenue for the two lines separately is not broken out in the release, so the $1.25B is shown combined.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not disclosed; not estimated here. Fire protection is highly fragmented — the growth model is roll-up plus route density.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Regional fire-protection contractors</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Fragmented — private</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Aramark (ARMK) — direct-sale programs</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">ROUTE DENSITY</span>
+    <span class="moat-pill">MULTI-YEAR CONTRACTS</span>
+    <span class="moat-pill">CROSS-SELL ON ONE TRUCK</span>
+    <span class="moat-pill">LAUNDRY SCALE ECONOMICS</span>
+    <span class="moat-pill">SMARTTRUCK ROUTING</span>
+    <span class="moat-pill">COMPLIANCE-DRIVEN DEMAND</span>
+    <span class="moat-pill">TUCK-IN ACQUISITION MACHINE</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>route density</strong>, and it is worth being precise about why. A uniform route has a large fixed cost — a truck, a driver (Cintas calls them Service Sales Representatives, and they sell as well as deliver), fuel, and the industrial laundry behind it — and a near-zero marginal cost per additional stop on that route. If Cintas serves 40 businesses on an industrial-park loop and a competitor serves 8, Cintas earns dramatically more gross profit per truck-hour and can price any individual account at a level the competitor cannot match while still earning a 50% gross margin. Every incremental customer on an existing route raises the margin on every existing customer, which is why gross margin has climbed from <strong>46.2% (FY2022) to 50.7% (FY2026)</strong> without meaningful price increases: management said on the Q4 call that pricing is at historical levels and that they prioritise "operational efficiency over price increases". SmartTruck — the routing and scheduling software — is the digital version of the same idea, squeezing more stops into each truck-day. Layered on top: multi-year contracts, the ability to sell first aid, fire and facility services to a customer the truck already visits, and the fact that a third of the customer base is bound by OSHA or fire-code requirements to buy <em>something</em> from <em>someone</em>. Then there is the UniFirst deal itself, which is at heart a density purchase — the overlapping routes are the synergy.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Employment sensitivity.</strong> Rental revenue is a function of the number of people wearing uniforms. When a manufacturer, hotel or hospital cuts headcount, the number of garments in rotation falls the same week — the contract survives, but the invoice shrinks. The whole 8% organic growth story is happening against a backdrop of steady U.S. employment; Cintas has no lever to pull if payrolls contract. Its two most cyclical customer bases, manufacturing and hospitality, are also two of its largest. This is the risk the 41× multiple is least prepared for.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Antitrust on UniFirst.</strong> The FTC issued a "second request" on June 11, 2026 — a formal demand for more information that extends the HSR (Hart-Scott-Rodino) waiting period and signals genuine scrutiny of a combination of the #1 and (by most accounts) #3 players in the industry. Management still guides to a second-half-2026 close, but divestitures, a delay, or an outright block are all live outcomes. Meanwhile the company is already paying bridge-loan financing costs ($105M net interest guided for FY2027, up from $101.2M) for a deal that has not closed.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Integration and system risk.</strong> Cintas has never digested anything the size of UniFirst. It is simultaneously running a SAP implementation in the Fire segment (guided as a ~100bp segment headwind in FY2027). Two large operational projects at once, in a business whose entire margin advantage is operational precision, is more risk than the company usually takes.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Wage and fuel inflation with limited pricing.</strong> The company chooses not to push price, which keeps retention high but means labour and diesel inflation must be absorbed by efficiency. If input costs rise faster than SmartTruck-style gains can offset, the annual margin-expansion streak — the thing the multiple is built on — would break.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Ticker column from stockanalysis.com statistics as of the Sep 4, 2026 close and the company's FY2026 release. <strong>Industry-average and NASDAQ-100 comparison figures were not available from a verified source and are shown as "—" rather than estimated.</strong> Colour coding therefore reflects the metric against Cintas's own history and the conventional read described in the Context column, not a peer comparison.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>CTAS</th><th>Industry Avg</th><th>NASDAQ-100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">40.95</td><td>—</td><td>—</td><td>$200.47 ÷ $4.91 = 40.8×; source page shows 40.95 on unrounded EPS. This is the whole argument in one number.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next fiscal year, based on analyst consensus.">P/E</span></td><td style="color:var(--red);">36.61</td><td>—</td><td>—</td><td>On FY2027 consensus adjusted EPS of $5.49 (+11.2%). Company guides $5.36–5.50, so consensus sits at the top of the range.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally cheap; above 2.0 is conventionally expensive.">PEG</span> Ratio</td><td style="color:var(--red);">3.15</td><td>—</td><td>—</td><td>A PEG above 3 means you are paying roughly three years of P/E for every point of growth. Expensive by any conventional reading.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$4.91</td><td>—</td><td>—</td><td>FY2026 diluted GAAP; $4.94 adjusted for $0.03 of UniFirst deal costs. Five-year path: $2.91 → $3.25 → $3.79 → $4.40 → $4.91.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--amber);">+8.9%</td><td>—</td><td>—</td><td>FY2026; 8.3% organic. FY2027 guide implies 7.4–8.7% including one extra workday (~40bp). Mid/high single digits, exactly as billed.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue (here: cost of rental and other services), as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">50.67%</td><td>—</td><td>—</td><td>All-time high. Up every year: 46.2% → 47.3% → 48.8% → 50.0% → 50.7%.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">17.75%</td><td>—</td><td>—</td><td>$1,994M on $11,265M. Operating margin 23.3%. Very high for a labour-and-truck business.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">1.04%</td><td>—</td><td>—</td><td>$2.08 annualised ($0.52 quarterly; ex-div Aug 14, 2026). FY2026 paid $1.80, up 15.4%. Payout ratio 38%.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of shares outstanding — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--green);">2.59% of shares</td><td>—</td><td>—</td><td>10.36M shares short. Percentage of float not shown on source. Nobody is pressing a short here.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--green);">0.53</td><td>—</td><td>—</td><td>$2.71B total debt per stockanalysis ($2.43B per the May 31 balance sheet) against $289M cash. Pre-UniFirst; leverage will step up materially at close.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--amber);">1.43</td><td>—</td><td>—</td><td>Adequate. Quick ratio 0.69 reflects the garment and mat inventory that a rental business must carry.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--green);">$1.88B</td><td>—</td><td>—</td><td>Operating cash flow $2.28B less capex $395M (3.5% of revenue). FCF is 94% of net income — the earnings are real cash. EV/FCF 43.8×.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">40.71%</td><td>—</td><td>—</td><td>Flattered by buybacks shrinking the equity base ($952M repurchased in FY2026), but genuinely elite.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--green);">27.76%</td><td>—</td><td>—</td><td>"ROIC in the 20s" is confirmed — and this is the pre-UniFirst number. Paying a premium for UNF will dilute it.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Below 1.0 means it moves less than the market.">Beta</span></td><td style="color:var(--green);">0.91</td><td>—</td><td>—</td><td>Low-volatility compounder profile, though the 52-week range below shows it is not immune to drawdowns.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$161.16 – $219.17</td><td>—</td><td>—</td><td>Current $200.47 sits 68% of the way up the range. 52-week price change: −2.75%. 50-day MA $197.27, 200-day MA $186.84.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">The FY2026 numbers are unusually clean. The only flagged non-recurring item is <strong>$15.1M of UniFirst transaction expense</strong> for the year ($14.0M of it in Q4), worth $0.03 of EPS — hence adjusted EPS of $4.94 versus GAAP $4.91. The effective tax rate was 20.2% for the year (21.2% in Q4 versus 22.1% a year earlier, both affected by stock-compensation discrete items). Capital returned to shareholders was <strong>$1.65B</strong> — $701.5M of dividends and $952.1M of buybacks — against $1.88B of free cash flow, so the company is returning nearly everything it generates while still carrying only modest debt. Note that this changes at UniFirst close: the deal is part-cash ($155 per UNF share) and is being bridge-financed, so FY2027 will carry higher interest, integration costs and transaction charges that the current guidance explicitly excludes.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">20 analysts (stockanalysis.com). MarketBeat shows "Moderate Buy" across a 15-analyst panel.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$216.31</div><div class="card-note">+7.90% versus the $200.47 close. MarketBeat's panel averages $212.31 (+5.90%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$175 – $250</div><div class="card-note">−12.7% to +24.7%. A tight range for a large-cap — the Street agrees on the business and disagrees mildly on the multiple.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">10 / 9 / 1</div><div class="card-note">8 Strong Buy + 2 Buy, 9 Hold, 0 Sell, 1 Strong Sell (stockanalysis.com, Aug 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:8;background:var(--green);"></div>
+    <div style="flex:2;background:#4ade80;"></div>
+    <div style="flex:9;background:var(--amber);"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 8</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 9</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Strong Sell — 1</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Nearly half the panel is on Hold. That is the tell: analysts are not worried about execution, they are worried about paying 41× for it. The one Sell is Citi, which has been publicly bearish on the multiple all year.</p>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Wells Fargo</strong> — Jason Haas, <strong>Overweight</strong>, target raised $245 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$250</span> (Jul 16, 2026). The Street-high target, set the morning after the fiscal Q4 print; implies +24.7%.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Bank of America</strong> — Curtis Nagle, upgraded <strong>Neutral → Buy</strong>, target raised $200 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$230</span> (Jul 16, 2026). The most meaningful post-earnings change of view: an upgrade rather than a target nudge.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>UBS</strong> — Joshua Chan, <strong>Buy</strong>, target raised $228 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$230</span> (Jul 16, 2026). Also Goldman Sachs reiterated Buy at $231 on Jul 15, and Baird (Andrew Wittmann, Outperform) raised $200 → $214.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>RBC Capital Markets</strong> — Ashish Sabadra, <strong>Sector Perform</strong>, target <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$206</span> (Jul 16, 2026). Representative of the large Hold camp: target essentially at the price.</div></div>
+    <div class="risk-item"><span style="color:var(--red);">●</span><div><strong>Citigroup</strong> — Leo Carrington, <strong>Sell</strong>, target cut $181 → <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$160</span> (Mar 31, 2026); stockanalysis.com now lists the Citi target at $175. The lone bear, and the only firm explicitly arguing the multiple should compress.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read from fetched MarketBeat and stockanalysis.com pages. Truist (Jasper Bibb, Buy) cut its target $255 → $225 on Jun 15, 2026, and Argus upgraded to Strong Buy on Jul 17, 2026 (no target shown).</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q4 2026 results — organic growth 8.4%, EPS +15.6%</div>
+        <div class="tl-desc">Revenue $2.91B (+8.9%), gross margin 51.0% (+130bp), operating margin 23.2%, net income $511.0M (+14.0%), diluted EPS $1.26 (+15.6%; $1.29 adjusted). First Aid grew 13.2% organically, Fire 10.7%, Rental 7.9%. The stock rose from $184.33 (Jul 14) to $206.25 (Jul 16), a two-day gain of about 12%, and went on to a July close of $204.63 versus $170.08 at the end of June.</div>
+        <div class="tl-impact up">Beat — stock +20% in the month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q1 2027 earnings</div>
+        <div class="tl-desc">First quarter under the FY2027 guide of $12.10–12.25B revenue and $5.36–5.50 adjusted EPS (which excludes UniFirst). Watch three things: whether organic growth holds near 8% as the extra-workday benefit is small (~40bp for the year); whether the Fire segment's SAP headwind shows up as guided; and any update on the FTC timeline.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H CY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">UniFirst close — or FTC intervention</div>
+        <div class="tl-desc">Definitive agreement signed March 10, 2026: $155.00 cash plus 0.7720 Cintas shares per UniFirst share (about $310 per UNF share at today's CTAS price). UniFirst shareholders approved on June 11, 2026 with over 99% of votes cast in favour. The FTC issued a second request the same day. Management still expects a second-half-2026 close. A clean close is a density win for the core segment; a consent decree with divestitures or a challenge would be the largest negative surprise available.</div>
+        <div class="tl-impact neutral">Binary regulatory event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Fire Protection SAP implementation</div>
+        <div class="tl-desc">Management guided the system cutover as roughly a 100-basis-point annual headwind to the Fire segment while it is under way. Small at group level (Fire sits inside the 11% "All Other" line) but the first time in years the company has pre-announced a self-inflicted margin drag.</div>
+        <div class="tl-impact neutral">Watch item — margin streak at risk in one segment</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend growth and buyback</div>
+        <div class="tl-desc">Quarterly dividend raised to $0.52 (ex-dividend Aug 14, 2026), from $0.45 — a 15.6% increase, extending an every-year increase streak that runs back to the 1983 IPO (streak length per company history; not re-verified on the pages fetched). $952M of buybacks in FY2026 reduced the share count about 1% YoY. Expect buyback intensity to fall while UniFirst debt is digested.</div>
+        <div class="tl-impact up">Steady capital return</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Monthly</div>
+      <div class="tl-content">
+        <div class="tl-title">U.S. payroll and ISM manufacturing data</div>
+        <div class="tl-desc">Not a company event, but for a business whose revenue is wearer counts, the monthly jobs report is effectively a leading indicator of the rental segment. A sustained decline in manufacturing and hospitality employment would hit organic growth within a quarter or two.</div>
+        <div class="tl-impact neutral">Macro sensitivity</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">CTAS — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (split-adjusted for the 4-for-1 split of Sep 12, 2024; final point = Sep 4, 2026 close)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#4F8EF7;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 month-end of <strong>$108.28</strong> (split-adjusted) to the September 4, 2026 close of <strong>$200.47</strong>, CTAS returned <strong>+85.1%</strong> in price, a compound annual rate of about <strong>13.3%</strong>, plus a dividend yield that has run roughly 1% a year — call it roughly 14% a year total (est.). The shape matters more than the endpoint. The stock did almost nothing for the first year (the June 2022 low of $93.38 was −13.8% from the start), then rose <strong>140%</strong> in 35 months to the May 2025 monthly-close peak of <strong>$223.79</strong> as the market steadily re-rated a business it had previously valued at a "boring industrial" multiple. Since that peak it has gone sideways-to-down for sixteen months: <strong>−10.4%</strong> to today, and −2.75% over the trailing 52 weeks, despite EPS growing 11.6% in the interim. In other words, the last year and a half has been the multiple compressing from roughly 50× to 41× while earnings kept rising — the market has already begun the de-rating this report worries about, just slowly. A precise NASDAQ-100 and S&amp;P 500 total-return comparison over the identical window was not verified from the sources fetched and is not stated; directionally, a 13% annualised price return over a five-year period that included the 2022 bear market is a strong absolute result, and the 0.91 beta says it was earned with less volatility than the index.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">$93.38 — five-year low</div><div class="tl-desc">The 2022 rate shock hit every high-multiple name. Cintas fell less than most: −13.8% from the October 2021 start against a roughly 30% drawdown in the NASDAQ-100 over the same stretch (index figure from general market history, not fetched). This is the defensive character of the stock in action.</div><div class="tl-impact down">Cycle low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2023 – Mar 2024</div><div class="tl-content"><div class="tl-title">$126.78 → $171.76 — the re-rating begins</div><div class="tl-desc">Five straight up months and +35% as FY2024 delivered 16.6% EPS growth and gross margin crossed 48%. The market started treating margin expansion as a repeatable feature rather than a cyclical bonus.</div><div class="tl-impact up">Multiple expansion</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 12, 2024</div><div class="tl-content"><div class="tl-title">4-for-1 stock split</div><div class="tl-desc">Shares went from about $805 (August 2024 close) to about $201. The chart is adjusted so this appears as continuity, not a cliff. Splits change nothing economically, but this one coincided with the stock's first sustained run above $200.</div><div class="tl-impact neutral">Cosmetic — no economic change</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov–Dec 2024</div><div class="tl-content"><div class="tl-title">$222.26 → $179.84 — the −19% month</div><div class="tl-desc">The sharpest single-month drawdown in the window, around the mid-December fiscal Q2 report. The stock had run to a peak multiple into the print; the reaction was the first sign that at 50×, "good" was no longer good enough.</div><div class="tl-impact down">Valuation air-pocket</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2025</div><div class="tl-content"><div class="tl-title">First UniFirst approach — $275 per share in cash, rebuffed</div><div class="tl-desc">Cintas publicly proposed to acquire UniFirst for $275.00 per share in cash (Business Wire, January 2025). UniFirst declined and the approach lapsed later that year. Fourteen months on, Cintas came back with a cash-and-stock deal worth materially more.</div><div class="tl-impact neutral">Strategic intent revealed</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">$223.79 — five-year monthly-close high</div><div class="tl-desc">Peak multiple. From here the stock has spent sixteen months digesting its valuation while earnings kept growing at double digits.</div><div class="tl-impact neutral">Top of the range</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">$200.06 → $168.24 — UniFirst agreement (Mar 10) and a −16% month</div><div class="tl-desc">The definitive agreement ($155 cash + 0.7720 CTAS shares per UNF share) was announced March 10; Baird upgraded to Outperform the next day, but Stifel cut its target to $190 (Mar 26) and Citi cut to $160 with a Sell (Mar 31) around the late-March fiscal Q3 report. The market's first read was that Cintas was paying up, taking on debt, and inviting antitrust review — all at once.</div><div class="tl-impact down">Deal skepticism + multiple compression</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">$169.64 → $204.10 — Q4 print, +20% month</div><div class="tl-desc">The July 15 fiscal Q4 report (EPS +15.6%, record gross margin, clean FY2027 guide) triggered a two-day 12% jump and a wave of target raises. The stock touched $216.53 on July 29, just under the 52-week high of $219.17, before settling back to around $200.</div><div class="tl-impact up">Earnings-driven recovery</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>What 41× is paying for — the arithmetic.</strong> Start with what is verifiable. Over five fiscal years, revenue compounded from $7.85B to $11.26B (about 9.4% a year), operating margin rose every single year from 20.2% to 23.3%, and diluted EPS went from $2.91 to $4.91 — a <strong>14.0% compound rate</strong>. ROIC is 27.8%, free cash flow is 94% of net income, and $1.65B was returned to shareholders last year. That is the compounder résumé, and it is real.</p>
+
+  <p class="prose" style="margin-top:20px;">Now run it forward. Consensus has FY2027 EPS at $5.49 (+11.2%), inside the company's $5.36–5.50 guide. Assume Cintas keeps compounding EPS at <strong>11% a year for ten years</strong> — which requires margin expansion to continue and employment never to seriously wobble — and you get roughly <strong>$13.90 of EPS in FY2036</strong>. What you earn depends entirely on the multiple you sell at: at <strong>25×</strong> (a normal multiple for a very good industrial) the stock is about $348, a <strong>5.7% annual price return</strong> plus about 1% of yield; at <strong>30×</strong>, about $418 and roughly 7.6% plus yield; only if the market <em>still</em> pays <strong>41×</strong> in 2036 do you earn the full 11% plus yield. Put differently: <strong>a decade of near-flawless execution, with a modest and entirely reasonable de-rating at the end, produces a high-single-digit total return</strong>. That is not a bad outcome. It is just not a 41× outcome — and it assumes nothing goes wrong. The PEG of 3.15 is the compressed version of this paragraph.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The margin streak is the load-bearing wall.</strong> Every year for five years, gross margin rose (46.2% → 50.7%) and operating margin rose (20.2% → 23.3%). The FY2027 guide implies 30–32% incremental margins — each incremental dollar of revenue carrying about 31 cents of operating profit against a 23% average — so management intends to extend the streak. The mechanism is density plus routing technology, not price (pricing is "immaterial" per the COO). The bear's honest question is not whether the mechanism works — it plainly does — but how many more years of 100-basis-point gains are left before a truck route is simply full. First Aid at 58% gross margin and Fire at 51% show where the group can go, but they are 23% of revenue combined.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Employment is the variable nobody can hedge.</strong> Rental revenue is wearers times rate. Cintas cannot grow wearers at customers who are shrinking, and a third of its base — manufacturing and hospitality above all — is where U.S. payroll cuts land first in a downturn. The last serious test of this was the 2008–09 recession, when the company's rental revenue contracted (from historical context; the exact figures were not re-verified for this report). The stock's 0.91 beta and low short interest suggest the market is treating it as defensive. It is defensive in <em>volatility</em>; it is not defensive in <em>fundamentals</em>. That distinction matters most at 41×, because a year of flat organic growth does not need to produce a loss to produce a 25% drawdown — it only needs to break the "margin expansion every year" narrative for one fiscal year.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>UniFirst — the deal that is not failed, but not done.</strong> The brief for this report described the UniFirst approach as failed. That was true of the <strong>January 2025 $275-per-share cash proposal</strong>, which UniFirst rejected. It is not true today: a <strong>definitive agreement was signed March 10, 2026</strong> at <strong>$155.00 cash plus 0.7720 Cintas shares per UniFirst share</strong> (roughly $310 at today's CTAS price — about 13% more than the 2025 offer, half of it in stock), UniFirst holders approved it on June 11 with over 99% support, and the <strong>FTC has issued a second request</strong>. Strategically the deal is a pure density play — UniFirst's routes overlap Cintas's, and the synergy is fewer trucks serving the same stops — which is precisely why the FTC is looking. The FY2027 guide excludes UniFirst entirely, and the $105M interest guide already carries bridge-loan amortisation. Three outcomes: clean close (density accretion, ROIC dilution, leverage up); close with divestitures (less accretion, same debt); or a block, which would leave Cintas with sunk deal costs and a strategic question about how else to keep the margin streak alive once organic density gains plateau.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>This is one of the few genuine compounders in industrials: 8–9% organic growth for years, gross margin at an all-time-high 50.7% and still rising, ROIC of 27.8%, free cash flow of $1.88B nearly matching net income, and a dividend raised every year since 1983 — the latest by 15.6%. Two-thirds of new customers come from businesses running no program, so the runway is not share-taking from rivals but conversion of a huge untapped base. First Aid (13% organic, 58% gross margin) and Fire (11% organic) are lifting the mix. UniFirst adds route density on top, and the 30–32% incremental-margin guide says the operating-leverage machine has more to give. Pay up for quality; the multiple has been "too high" for a decade and the stock has compounded at 13% regardless.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>At 41× trailing, 36.6× forward and a PEG of 3.15, the stock discounts a decade of flawless execution and still only offers a high-single-digit return if the multiple normalises to 25–30×. The market has already begun the de-rating — the share price is down 10% from its May 2025 peak while EPS rose 11.6%. Revenue is a direct function of U.S. employment in cyclical sectors, which the company cannot control and which a 0.91 beta does not protect against. UniFirst brings leverage, integration risk, ROIC dilution and an active FTC second request — on top of a self-inflicted SAP headwind in Fire. If organic growth slips to 5% and margins plateau for a single fiscal year, there is no valuation support until the mid-20s multiple, roughly 35–40% below today.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Valuation compression without an operating miss.</strong> The stock does not need bad news to fall — it needs the market to decide 41× is too much for 8% growth. This has already been happening for sixteen months. Every quarter that growth is "only" 8% and margins expand "only" 50 basis points is a quarter in which the Hold camp (nearly half the Street) gets more comfortable not chasing.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Employment downturn in manufacturing and hospitality.</strong> Wearer counts fall the week a customer cuts staff. A U.S. payroll contraction would turn 8% organic growth into low-single-digits or negative within two quarters, and would break the margin-expansion streak that the multiple is built on.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>UniFirst — FTC block or a costly consent decree.</strong> The second request (June 11, 2026) is real scrutiny of a #1-buys-#3 combination. A block wastes deal costs and the bridge-loan carry; a consent decree with route divestitures strips out the density synergy that justifies paying roughly $310 per UNF share. Either way, FY2027 is being guided as if the deal does not exist, so all the downside is un-modelled and all the upside is un-guided.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Antitrust Has Arrived in Uniform Rental</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Uniform rental spent decades consolidating quietly — Cintas, Aramark (now Vestis), UniFirst and G&amp;K (acquired by Cintas in 2017) — without regulators paying much attention, because the industry's own framing was that the real competitor is the customer washing shirts at home. The FTC's second request on Cintas–UniFirst (June 11, 2026) is the first serious test of that framing. If the agency defines the market as "outsourced uniform rental" rather than "workwear", the top-two combination looks very different. The outcome will set the ceiling on M&amp;A-driven density for the whole sector: a clean close means the roll-up model continues; a block means the industry's biggest player has to grow the slow way from here.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Route Businesses Live and Die by Payrolls</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Every route-based service company — uniforms, first aid, pest control, water coolers — bills per location and per person served, so the sector's organic growth is a levered function of business formation and employment. Cintas's 8.3% organic growth in FY2026 was achieved with U.S. employment broadly stable; the company's own guidance (7.4–8.7% for FY2027) explicitly carves out "significant economic disruptions". Manufacturing and hospitality — the two most headcount-sensitive verticals — are core to the rental base. The sector trades as defensive because its revenue is recurring and contracted; but a contract that bills per wearer is only as recurring as the wearers. The next U.S. employment downturn will reveal how much of the multiple was defensiveness and how much was momentum.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Compliance-Driven Services Are the Structural Growth Engine</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">The fastest-growing and highest-margin parts of Cintas — First Aid &amp; Safety (13.2% organic, 57.9% gross margin) and Fire Protection (10.7% organic, 50.8% gross margin) — share a feature the uniform business lacks: demand is created by regulation, not by headcount. OSHA first-aid rules, AED mandates and fire-code inspection cycles do not pause in a recession. As these lines grow from 23% of revenue toward a third, the group's cyclicality falls and its margin rises. <strong>Bull framing:</strong> this mix shift is what justifies a premium multiple — Cintas is slowly becoming a compliance-services company that happens to also rent uniforms, and compliance services deserve a higher multiple than laundry. <strong>Bear framing:</strong> at 23% of revenue, the mix shift is a decade-long project, and in the meantime 77% of the business is still wearers times rate. The stock is priced today as if the transition were already complete.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, daily change, market cap, 52-week range, sector/industry, valuation statistics, annual financials and analyst consensus from stockanalysis.com (https://stockanalysis.com/stocks/ctas/ and its statistics, financials and forecast pages, retrieved Sep 4, 2026); fiscal Q4 and full-year 2026 results, segment revenue, guidance, executive names and capital-return figures from the Cintas Corporation July 15, 2026 earnings release (cintas.com newsroom and the Exhibit 99 PDF) and the Q4 FY2026 earnings-call transcript (fool.com, July 22, 2026); UniFirst merger terms, vote results and FTC second-request status from Cintas and UniFirst 8-K filings (via stocktitan.net) and the Business Wire January 2025 proposal headline; global market-cap rank from companiesmarketcap.com; named analyst calls from MarketBeat (marketbeat.com CTAS forecast page) and stockanalysis.com.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Chart data: 60 monthly closes, October 2021 through September 2026, from digrin.com CTAS price history (its "Real price" column, which for older months is dividend-adjusted and therefore sits slightly below the raw close — on the order of 0.3% for mid-2026 and up to a few percent for 2021–22). Months before September 2024 are divided by 4 for the 4-for-1 split of September 12, 2024. The July and August 2026 values were cross-checked against stockanalysis.com daily history (adj. close $204.10 and $201.79, exact matches); the final point is the September 4, 2026 close of $200.47 from stockanalysis.com, representing September month-to-date. No interior months were reconstructed or interpolated. Items marked <strong>(est.)</strong> are approximations: the U.S. and NASDAQ market-cap rank pills, the approximate total return including dividends, the NASDAQ-100 2022 drawdown reference, and the implied UniFirst per-share value (which moves with the CTAS share price). Items marked <strong>n/d</strong> are not disclosed by the company or not fetched: market shares, segment TAMs, competitor revenues, institutional holders, and the Fire/Direct Sale split within All Other. The Industry Avg and NASDAQ-100 columns in Section 04 are deliberately left blank rather than estimated. The 1983-to-date dividend-increase streak and the 2008–09 revenue contraction are stated from general company history and were not re-verified on the pages fetched. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (split-adjusted; digrin.com, final point stockanalysis.com Sep 4, 2026 close) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [108.28,105.55,110.79,97.88,93.83,106.35,99.31,99.58,93.38,106.37,101.71,97.05,106.89,115.44,112.91,110.94,109.62,115.67,113.94,118.03,124.27,125.51,126.04,120.25,126.78,138.31,150.66,151.14,157.15,171.76,164.59,169.49,175.06,190.99,201.28,202.30,202.23,222.26,179.84,197.43,204.64,202.70,208.77,223.79,220.20,219.89,207.94,203.22,181.45,184.61,186.64,189.94,200.06,168.24,173.78,170.82,169.64,204.10,201.79,200.47];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 8,  label: 'Jun 2022 — five-year low $93.38',                        color: '#ef4444' },
+  { idx: 29, label: 'Mar 2024 — re-rating run, $171.76',                      color: '#22c55e' },
+  { idx: 35, label: 'Sep 2024 — 4-for-1 split (Sep 12)',                      color: '#94a3b8' },
+  { idx: 38, label: 'Dec 2024 — −19% month, $179.84',                         color: '#ef4444' },
+  { idx: 39, label: 'Jan 2025 — $275 cash bid for UniFirst rebuffed',         color: '#f59e0b' },
+  { idx: 43, label: 'May 2025 — five-year monthly-close high $223.79',        color: '#94a3b8' },
+  { idx: 53, label: 'Mar 2026 — UniFirst definitive agreement; −16% month',   color: '#ef4444' },
+  { idx: 57, label: 'Jul 2026 — fiscal Q4 print, +20% month',                 color: '#22c55e' },
+  { idx: 59, label: 'Sep 4, 2026 — $200.47',                                  color: '#4F8EF7' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(79,142,247,0.22)');
+grad.addColorStop(1, 'rgba(79,142,247,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4F8EF7', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4F8EF7'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
