@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AJG — Arthur J. Gallagher &amp; Co. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #5AA9E6;
+  --accent-dim: #5AA9E633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">AJG</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Insurance Brokers</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $67.34B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: ~#310 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#150 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#80 (est.)</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px;font-family:'JetBrains Mono',monospace;">Ranks are approximations only — companiesmarketcap.com returned 404 on the pages fetched, so no ranking source was verified.</div>
+      <div class="company-name" style="margin-top:14px;">Arthur J. Gallagher &amp; Co.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$262.69</div>
+      <div class="price-change">−$3.97 (−1.49%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · last completed market close</div>
+      <div class="price-date" style="color:var(--green);">After-hours: $266.79 (+$4.10, +1.56%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Rolling Meadows, Illinois</div>
+    <div class="meta-item"><span>Employees:</span> 72,000</div>
+    <div class="meta-item"><span>Founded:</span> 1927</div>
+    <div class="meta-item"><span>Last Reported:</span> Q2 2026 on July 30, 2026</div>
+    <div class="meta-item"><span>Next Earnings:</span> Late Oct 2026 (est. — Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Arthur J. Gallagher is an insurance <strong>broker</strong>, not an insurer. That distinction is the single most important thing to understand before reading another line of this page. Gallagher does not write policies, does not hold reserves against claims, and does not carry underwriting risk — so there is <strong>no combined ratio here</strong>, and none of the catastrophe math that drives an insurer's earnings applies. It sells advice and placement: it sits between a client that needs coverage and a carrier that will write it, and it earns a commission or a fee on the premium that changes hands. It also runs a large third-party claims administration business, Gallagher Bassett, under the Risk Management segment. FY2025 revenue was <strong>$13.01B, up 19.0%</strong> from $10.93B; the trailing-twelve-month figure through June 2026 is <strong>$15.11B, up 30.8%</strong> — and that acceleration is almost entirely acquired, not organic.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is what an owner is actually buying at <strong>43.6× trailing earnings</strong>. Two things are happening at once and they point in opposite directions. On one side, Gallagher closed the <strong>$13.45B acquisition of AssuredPartners on August 18, 2025</strong> — the largest deal in its history, roughly a fifth of its own market value — funded with equity and debt that raised the share count <strong>6.6% year over year</strong> and left <strong>$14.11B of total debt</strong> on the balance sheet. On the other side, the underlying business is decelerating for a reason that has nothing to do with execution: property-casualty pricing has turned, with <strong>property renewal premiums down 10%</strong> in Q2 2026. A broker's revenue is a slice of premium. When premium falls, the slice falls with it. The question is whether the roll-up machine can out-run the pricing cycle, and what happens to the multiple if it can't.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">J. Patrick Gallagher Jr.</div>
+      <div class="card-note">Chairman and CEO. Verified from the stockanalysis.com company profile and from the Q2 2026 earnings call coverage fetched. Third-generation family leadership of a firm founded by his grandfather in 1927 — an unusually long tenure for an S&amp;P 500 CEO, and the cultural anchor of the acquisition strategy, which is explicitly sold to sellers as joining a family firm rather than a private-equity roll-up.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Douglas K. Howell</div>
+      <div class="card-note">CFO, referred to as "Doug Howell" throughout the Q2 2026 call coverage fetched. Author of the adjusted-EBITDAC framing the company leads with, and of the guidance cadence (organic growth by segment plus margin expansion in basis points). On the Q2 call he flagged roughly <strong>$10B of capital deployment capacity over the next two years</strong> and warned of "comparability noise" in the year-over-year numbers that resolves by Q4 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">85.5% institutional</div>
+      <div class="card-note">Largest reported holders by value (MarketBeat): <strong>Vanguard $8.12B</strong>, <strong>JPMorgan Chase $5.26B</strong>, <strong>FMR (Fidelity) $3.39B</strong>, Capital World Investors $3.26B, State Street $2.83B, Morgan Stanley $2.01B, Norges Bank $1.93B. Note stockanalysis.com reports institutional ownership at 94.29% on a different basis; both are cited as found. Single share class — no dual-class structure.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Gallagher reports two operating segments plus Corporate. The split below is <strong>Q2 2026 revenue before reimbursements</strong> as disclosed in the quarterly release — the most recent verified segment disaggregation. Brokerage dominates; Risk Management is the smaller, steadier, fee-based sibling.</p>
+  <div class="seg-bar">
+    <div style="flex:88.5;background:#5AA9E6;">BROKERAGE 88.5%</div>
+    <div style="flex:11.5;background:#f59e0b;">RISK MGMT 11.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#5AA9E6;"></span> Brokerage — $3,502M (Q2 2026, vs $2,787M Q2 2025)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Risk Management — $453M (Q2 2026, vs $392M Q2 2025)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Total Q2 2026 revenue before reimbursements: <strong>$3,955M</strong> vs $3,179M a year earlier, <strong>+24.4%</strong>. Combined segment organic growth was <strong>6%</strong> — so roughly eighteen of those twenty-four points came from acquisitions. That gap is the whole company in one number.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #5AA9E6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Brokerage — Retail P&amp;C, Employee Benefits, Wholesale &amp; Gallagher Re</div>
+        <span class="biz-badge dominant">CORE ENGINE — GLOBAL SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,502M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.6%</div><div class="biz-stat-label">Adj. EBITDAC Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">88.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>How a broker actually gets paid, plainly.</strong> A client — a trucking fleet, a hospital system, a mid-market manufacturer — needs insurance. Gallagher assesses the risk, goes to the carriers, negotiates terms, and places the policy. For that it takes a commission, typically a percentage of the premium, or a negotiated fee. It never touches the claim payment. The consequence is that <strong>Gallagher's revenue is a derivative of premium levels, not of loss experience</strong>. When the property-casualty market is "hard" — capacity scarce, rates rising — the same client, the same policy, the same work generates more revenue every year with no extra effort. When the market turns "soft," the reverse happens automatically. That is why organic growth of 5% in Q2 2026 is not a sign of a broken business: <strong>property renewal premiums fell 10%</strong> in the quarter while casualty firmed 3% and professional lines were up 1%. Excluding property, average renewal premiums rose 3%. Management calls it a "pricing reset after several years of a very strong hard market" and notes clients are redeploying the savings into higher limits — which softens, but does not eliminate, the revenue drag. Within Brokerage, <strong>Americas Retail P&amp;C grew 5% organically</strong> and <strong>Gallagher Re — the reinsurance broking arm — grew 9%</strong>, the fastest sub-unit, even as property catastrophe reinsurance pricing moved lower on abundant capacity. The <strong>AssuredPartners</strong> business contributed <strong>$701M of Q2 revenue at a 32% adjusted EBITDAC margin</strong> — a higher margin than the segment average — while growing only <strong>~4% organically</strong>. Margin profile: this is a people business with high incremental margins; underlying margins expanded <strong>50 basis points</strong> in the quarter.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> a credible global insurance-brokerage TAM figure was not verified from the sources fetched and is therefore omitted rather than estimated. What is verifiable: the four listed peers below plus AJG carry a combined market capitalisation of roughly <strong>$279B</strong> on combined trailing revenue of about <strong>$77B</strong>.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Marsh &amp; McLennan (MRSH)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$88.64B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$27.95B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.7×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Aon plc (AON)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$68.54B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$17.58B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">17.8×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">WTW (Willis Towers Watson)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$31.09B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$10.10B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">20.6×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Brown &amp; Brown (BRO)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$23.90B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$6.66B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.5×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:14px;font-size:13px;">Per-competitor organic growth rates and market shares were not verified from the sources fetched and are omitted rather than estimated. Note the ticker: Marsh &amp; McLennan trades as <strong>MRSH</strong>, verified on the stockanalysis.com comparison page fetched.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">AssuredPartners — the acquisition that redefined the balance sheet</div>
+        <span class="biz-badge growth">CLOSED AUG 18, 2025 — $13.45B</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$13.45B</div><div class="biz-stat-label">Purchase Price (cash)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$12.45B</div><div class="biz-stat-label">Net of Deferred Tax Asset</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$2.9B</div><div class="biz-stat-label">AP Adj. Revenue (pre-deal)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10,900</div><div class="biz-stat-label">Employees Acquired</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Announced <strong>December 2024</strong> and closed <strong>August 18, 2025</strong>, this is the deal that matters. Orlando-based AssuredPartners was the No. 5 independent property-casualty agency in the United States by Insurance Journal's 2024 ranking and 14th globally by AM Best, carrying roughly <strong>$2.9 billion of adjusted revenue</strong> for the twelve months to September 30 before the deal. Gallagher paid <strong>$13.45B in cash</strong>, or about <strong>$12.45B net of a deferred tax asset</strong> — against its own market capitalisation of $67.34B today, that is roughly a fifth of the company bought in a single transaction. <strong>Financing:</strong> Gallagher's own closing release and the trade coverage fetched both describe it only as "previously disclosed equity and debt financing" without breaking out the split, so <em>the exact size of the equity offering and the debt issued could not be verified from the sources fetched and is not stated here.</em> What is verifiable from the numbers is the effect: <strong>shares outstanding are 256.34M, up 6.59% year over year</strong> — stockanalysis.com reports a buyback yield of <strong>−6.59%</strong>, meaning net issuance, not repurchase — and <strong>total debt stands at $14.11B against $1.39B of cash, for net debt of $12.72B</strong>. Set against an annualised Q2 adjusted EBITDAC run-rate of roughly $4.8B, that implies leverage in the region of <strong>2.6×</strong> (author's computation from the two verified figures, not a company-disclosed ratio). The dilution is visible in the earnings line: <strong>FY2025 diluted EPS fell to $5.74 from $6.50 in FY2024 even though net income rose</strong> from $1,463M to $1,494M. More shares, same profit, lower per-share result. On the other side of the ledger, integration is running ahead of plan: run-rate synergies were <strong>raised to ~$160M by end-2026 and ~$325M by early 2028</strong>, and the acquired business runs at a <strong>32% adjusted EBITDAC margin</strong>, above the segment average.</p>
+    <div class="biz-tam"><strong>The trade in one line:</strong> Gallagher swapped a clean balance sheet and 6.6% of its equity for $2.9B of revenue growing ~4% organically, at a margin above its own. Whether that was a good trade depends entirely on whether the $325M of synergies actually lands.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Risk Management — Gallagher Bassett (claims administration)</div>
+        <span class="biz-badge growth">FASTEST ORGANIC GROWTH — 12%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$453M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+12%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.3%</div><div class="biz-stat-label">Adj. EBITDAC Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Gallagher Bassett is a <strong>TPA</strong> (third-party administrator): when a large employer or a self-insured entity has a workers' compensation or liability claim, Bassett investigates, manages and settles it on that client's behalf for a fee. This is the part of Gallagher that is <em>not</em> premium-linked. Its revenue scales with claim volume, headcount covered and contract wins — not with the P&amp;C rate cycle — which makes it a genuine, if small, counterweight to the softening property market. It is currently the better-performing segment on both axes: <strong>12% organic growth</strong> against Brokerage's 5%, and margin expansion of <strong>140 basis points</strong> to 22.3%, against Brokerage's 50 bp of underlying expansion. Reported revenue rose from $392M to $453M, <strong>+15.6%</strong>. Full-year 2026 guidance sits at <strong>9% organic</strong> for this segment against 5.5% for Brokerage, so management expects the gap to persist but narrow. At 11.5% of revenue it cannot rescue the consolidated growth rate, but it does mean the "broker exposed to soft pricing" story is not the whole company.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TPA market sizing was not verified from the sources fetched and is omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Sedgwick (private)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Crawford &amp; Co. / CorVel</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not Fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Corporate — fiduciary &amp; interest income, tax attributes</div>
+        <span class="biz-badge emerging">RATE-SENSITIVE — AND CURRENTLY NOISY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$144M</div><div class="biz-stat-label">Q2'25 Interest Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$0.42</div><div class="biz-stat-label">Per Share (Q2'25)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$3.4B</div><div class="biz-stat-label">Future Tax Savings (co. est.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~10%</div><div class="biz-stat-label">Cash Tax Rate of EBITA</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">A broker holds client premium in trust between collecting it and remitting it to the carrier — <strong>fiduciary assets</strong> — and earns interest on that float. It is real, recurring, and entirely a function of short-term rates: a rate-cutting cycle takes a bite out of it with no operational cause. Right now that line is tangled with something else. Gallagher raised the AssuredPartners financing well ahead of the August 2025 close and parked the proceeds, earning <strong>$144M of interest income in Q2 2025 alone, worth $0.42 per share</strong>. That is a one-time artefact of a deal, not an ongoing earnings stream, and it makes every year-over-year comparison through 2026 flatter than the underlying business. CFO Doug Howell said explicitly that this "comparability noise" resolves by <strong>Q4 2026</strong>, once the financing is fully deployed. On tax: management points to roughly <strong>$3.4B of future tax savings</strong> from tax credits and deductible intangible amortisation, holding the cash tax rate near <strong>10% of EBITA</strong> — a genuine cash-flow advantage that GAAP earnings understate. <em>On clean-energy tax-credit investments specifically: no mention was found in any source fetched for 2026. This item may have run off, but that could not be confirmed either way, so nothing is asserted.</em></p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">NO UNDERWRITING RISK</span>
+    <span class="moat-pill">CLIENT RETENTION / STICKY RENEWALS</span>
+    <span class="moat-pill">SERIAL ACQUIRER AT 9–11× EBITDAC</span>
+    <span class="moat-pill">FAMILY-FIRM SELLER APPEAL</span>
+    <span class="moat-pill">CARRIER PANEL ACCESS</span>
+    <span class="moat-pill">GALLAGHER BASSETT DATA SCALE</span>
+    <span class="moat-pill">CAPITAL-LIGHT, HIGH FCF CONVERSION</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is structural and boring, which is usually the good kind. Insurance placement is an annually renewing, relationship-priced service with very high retention: the incumbent broker knows the client's risk profile, holds the claims history, and is the party the client calls at two in the morning. Switching brokers is disruptive and rarely worth it for a few basis points of commission. Layered on top is the acquisition machine — Gallagher has bought hundreds of independent agencies over decades, and in Q2 2026 alone completed <strong>seven tuck-ins adding $63M of annualised revenue at a weighted-average 11.3× EBITDAC</strong>, with a pipeline of <strong>30-plus signed or in-preparation term sheets representing roughly $500M of annualised revenue</strong>. Crucially, valuations have reset in Gallagher's favour: management said deals at 15–17× EBITDAC are "largely a thing of the past," with recent valuations closer to <strong>9×</strong>. A buyer that acquires at 9–11× EBITDAC while trading at a substantially higher multiple on its own earnings creates value arithmetically — and Gallagher's pitch to family-owned sellers, that they are joining a 99-year-old family firm rather than a private-equity flip, is a real and hard-to-copy sourcing edge. Add the capital-light model — <strong>$2.29B of free cash flow</strong> on $15.11B of revenue, with no reserves to fund — and you get the machine.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The commission model cuts both ways.</strong> Revenue is a percentage of premium, so a softening property-casualty market is a direct, mechanical headwind regardless of how well the business is run. Property renewal premiums fell <strong>10%</strong> in Q2 2026 and reinsurance catastrophe pricing moved lower again at mid-year on abundant capacity. Brokerage organic growth of 5% is the visible result. If the soft market deepens or broadens beyond property into casualty — which is currently still firming at +3% — the organic line compresses further with no offsetting lever.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Integration and leverage concentration in one deal.</strong> AssuredPartners is not a tuck-in; it is a fifth of the company. It carries $14.11B of total debt behind it, it diluted shareholders by 6.6%, and it grows organically at ~4% — <em>below</em> Gallagher's own 6%. The synergy targets ($160M by end-2026, $325M by early 2028) are the justification for the price paid. They are also, conveniently, unverifiable from outside until they either show up in margin or don't.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Rate sensitivity in fiduciary and interest income.</strong> Interest on premiums held in trust is high-margin income that arrives without effort — and leaves the same way. Falling short rates reduce it directly. The $144M of Q2 2025 interest income on parked acquisition financing makes the trajectory harder to read for another two quarters, which is itself a disclosure risk: investors dislike lines they cannot model.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Valuation carries no margin for error.</strong> At 43.6× trailing earnings against a peer median near 21.5× and the S&amp;P 500 at 26.1×, AJG is priced at roughly double its own industry. Part of that gap is a genuine artefact — GAAP earnings are depressed by amortisation of acquired intangibles, and the forward multiple of 18.6× tells a very different story. But a multiple that depends on the market accepting the adjusted number is a multiple that can compress quickly if the adjusted number disappoints.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Note on sector convention: the template would normally lead an insurance name with the <span class="tip" title="Losses plus expenses divided by premiums earned — below 100% means an underwriter made money on the policies it wrote.">combined ratio</span>. <strong>That metric does not exist for AJG</strong>, because Gallagher never takes underwriting risk. The equivalents that matter here are organic revenue growth, <span class="tip" title="Adjusted earnings before interest, taxes, depreciation, amortisation and the change in estimated acquisition earnout payables — the broker industry's preferred profitability measure.">adjusted EBITDAC</span> margin, and the multiple paid on tuck-in acquisitions. Those sit in Section 02; the table below is the standard set.</p>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>AJG</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings — share price divided by the last twelve months of earnings per share. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">43.59</td><td>21.5</td><td>26.11</td><td>Worse than both. Peer median from the four brokers on this page; index proxied by SPY. GAAP earnings are heavily suppressed by AssuredPartners intangible amortisation.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by expected earnings per share over the next twelve months.">P/E</span></td><td style="color:var(--green);">18.63</td><td>—</td><td>—</td><td>Less than half the trailing figure. The entire bull case for the multiple lives in this one row: consensus expects FY2026 <span class="tip" title="Earnings per share">EPS</span> of $13.18 (+23.3%).</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — the P/E divided by the expected earnings growth rate. Below 1.0 is traditionally considered cheap for the growth on offer.">PEG</span> Ratio</td><td style="color:var(--text-dim);">1.25</td><td>—</td><td>—</td><td>Modestly above 1.0. Reasonable for a low-beta compounder, but note the growth in the denominator is substantially acquired.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months, on a GAAP basis.">EPS</span> (<span class="tip" title="Trailing twelve months — the most recent four reported quarters.">TTM</span>)</td><td>$6.03</td><td>—</td><td>—</td><td>$262.69 ÷ $6.03 = 43.6×, consistent with the P/E above. FY2025 GAAP EPS was $5.74, <em>down</em> from $6.50 in FY2024 on the acquisition-related share issuance.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year over year — compared with the same period one year earlier.">YoY</span>)</td><td style="color:var(--green);">+30.8%</td><td>—</td><td>—</td><td>TTM. Flattering: combined segment <strong>organic</strong> growth was only <strong>6%</strong> in Q2 2026. The other ~18 points of the quarter's 24% were acquired.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus direct cost of delivering the service, as a percentage of revenue.">Gross Margin</span></td><td style="color:var(--text-dim);">43.19%</td><td>—</td><td>—</td><td>Gross margin is a weak lens for a people-based service business; adjusted EBITDAC margin (25.6% Brokerage, 22.3% Risk Management) is the number management and analysts actually use.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td style="color:var(--text-dim);">10.38%</td><td>—</td><td>—</td><td>Depressed versus the adjusted picture: Q2 2026 GAAP net earnings were $324M against $734M of adjusted net earnings. The wedge is amortisation and integration cost.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--green);">1.07%</td><td>—</td><td>0.98%</td><td>$2.80 annual dividend, payout ratio 46.5%, ex-dividend Sep 8, 2026. Marginally above the index proxy. Not an income stock.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of shares available to trade — a gauge of how much capital is betting against the stock.">Short Interest</span> / Float</td><td style="color:var(--green);">2.28%</td><td>—</td><td>—</td><td>5.85M shares short. Low — this is not a battleground name, it is a quality-compounder debate about price.</td></tr>
+      <tr><td><span class="tip" title="Total borrowings divided by shareholders' equity — a leverage gauge.">Debt-to-Equity</span></td><td style="color:var(--amber);">0.59</td><td>—</td><td>—</td><td>Looks tame, but equity is inflated by the goodwill created in the AssuredPartners purchase. Absolute figures: $14.11B total debt, $1.39B cash, $12.72B net debt.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity gauge.">Current Ratio</span></td><td style="color:var(--amber);">1.05</td><td>—</td><td>—</td><td>Thin on its face, but distorted for a broker: fiduciary assets and matching fiduciary liabilities sit on both sides of this ratio and are not the company's own money.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow — cash from operations minus capital expenditure. The cash actually available to pay dividends, buy companies or repay debt.">Free Cash Flow</span></td><td style="color:var(--green);">$2.29B</td><td>—</td><td>—</td><td>Consensus models $3.32B for FY2026. This is the number that funds the roll-up; management cites ~$10B of deployment capacity over two years.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--red);">6.72%</td><td>—</td><td>—</td><td>Poor at face value and misleading: the AssuredPartners goodwill massively enlarged the equity denominator while GAAP earnings are suppressed by the amortisation of the same assets.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by the debt and equity employed in the business.">ROIC</span></td><td style="color:var(--red);">6.60%</td><td>—</td><td>—</td><td>Same distortion, and the more important one: 6.6% is close to a plausible cost of capital. Whether this recovers as synergies land is the acquisition's report card.</td></tr>
+      <tr><td><span class="tip" title="A measure of how much a stock moves relative to the overall market. 1.0 means it moves in line; below 1.0 means less volatile.">Beta</span> (5Y)</td><td style="color:var(--green);">0.51</td><td>—</td><td>1.01</td><td>Half the market's volatility. Consistent with a fee-and-commission business with no catastrophe exposure — the defensive quality investors pay the premium multiple for.</td></tr>
+      <tr><td>52-Week Range</td><td>$190.75 – $313.55</td><td>—</td><td>—</td><td>Price of $262.69 sits in the upper half but <strong>−13.5% over 52 weeks</strong>. The stock has had a full round trip through a de-rating and a recovery.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items.</strong> This is an unusually distorted set of financials and the distortions all run the same direction. First, <strong>acquisition accounting</strong>: Q2 2026 GAAP net earnings of $324M versus adjusted net earnings of $734M ($2.84 per diluted share) — a gap of more than two to one, driven by amortisation of AssuredPartners intangibles, integration costs and changes in estimated earnout payables. Trailing GAAP P/E, ROE and ROIC are all mechanically depressed by this and should not be read as operating deterioration. Second, <strong>the financing interest income</strong>: $144M in Q2 2025 alone ($0.42 per share) earned on acquisition proceeds held before the August 2025 close — a prior-year benefit that makes 2026 year-over-year comparisons look worse than the business is. Management says this resolves by Q4 2026. Third, <strong>share issuance</strong>: shares outstanding rose 6.59% year over year, which is why FY2025 EPS fell to $5.74 from $6.50 despite net income rising. Fourth, <strong>seasonality</strong>: Q1 is structurally Gallagher's strongest quarter (Q1 2026 revenue $4,630M, net income $822M) and Q4 the weakest (Q4 2025 net income $151M) — comparing sequential quarters here is meaningless. Industry-average and index columns are left blank wherever a sourced figure was not obtained; the two that are filled are computed from data on this page and labelled as such.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">22 analysts polled by S&amp;P Global via stockanalysis.com. No sell ratings of any kind.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$291.56</div>
+      <div class="card-note"><span style="color:var(--green);">+10.99% upside</span> from $262.69. Median target $288.50 (+9.8%).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$250 – $388</div>
+      <div class="card-note">Low implies −4.8%, high implies +47.7%. A 55% spread between bull and bear targets on a 0.51-beta stock is a wide disagreement about the acquisition, not about the market.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">12 / 4 / 6 / 0</div>
+      <div class="card-note">Strong Buy 12 · Buy 4 · Hold 6 · Sell 0 · Strong Sell 0 (August 2026).</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:12;background:#22c55e;"></div>
+    <div style="flex:4;background:#4ade80;"></div>
+    <div style="flex:6;background:#f59e0b;"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+    <span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;margin-right:6px;"></span>Strong Buy 12</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#4ade80;border-radius:2px;margin-right:6px;"></span>Buy 4</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:6px;"></span>Hold 6</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span>Sell 0</span>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;text-transform:uppercase;">Key Recent Analyst Calls</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Morgan Stanley</strong> — Bob Huang, <strong>Overweight</strong>, target raised $270 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$290</span> (Aug 19, 2026). The most recent action captured, and a post-Q2 raise into a stock that sold off on the print.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Argus Research</strong> — Kevin Heal, <strong>Buy</strong>, target raised $267 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$300</span> (Aug 17, 2026). A 12% target increase, the largest percentage raise in the recent set.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Citigroup</strong> — Matthew Heimermann, <strong>Buy</strong>, target raised $250 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$285</span> (Aug 4, 2026). Note the starting point: Citi's prior target of $250 was <em>below</em> where the stock trades now.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>UBS</strong> — Brian Meredith, <strong>Buy</strong>, target raised $291 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$299</span> (Aug 3, 2026).</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Wells Fargo</strong> — Elyse Greenspan, <strong>Overweight</strong>, target <em>cut</em> $299 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$296</span> (Aug 3, 2026). The lone reduction in the recent set, and a small one — the rating was maintained.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Jul 31, 2026 cluster</strong> (day after earnings): Piper Sandler Overweight $276 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$287</span>; RBC Outperform $300 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$310</span>; Mizuho Outperform $287 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$300</span>.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read off a fetched MarketBeat price-target page. The pattern is worth naming: <strong>eight raises and one small cut in the three weeks after a quarter the stock sold off on</strong>. The sell-side is more constructive than the tape. Analyst names are reported exactly as MarketBeat listed them.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — EPS beat, revenue miss, shares fell</div>
+        <div class="tl-desc">Adjusted EPS of $2.84 versus $2.82 consensus — a two-cent beat — on revenue of $3.95B against a $4.00B forecast. Adjusted EBITDAC of $1,199M versus $1,006M; adjusted net earnings $734M versus $604M. Combined organic growth 6%, Brokerage margin 25.6%, Risk Management margin 22.3% (+140 bp). The market focused on the revenue shortfall and the 10% property rate decline behind it.</div>
+        <div class="tl-impact down">Reaction already happened — shares fell on the print</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — the organic growth test</div>
+        <div class="tl-desc">The exact date was not confirmed on the sources fetched. Full-year guidance is 6% combined organic (5.5% Brokerage, 9% Risk Management) and was maintained at Q2. Q3 is the quarter that either confirms the 5.5% Brokerage run-rate holds against continued property softening, or forces a cut. It is also the first quarter that laps a partial AssuredPartners base, so headline growth steps down mechanically.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Comparability noise resolves; ~$160M of AssuredPartners synergies due</div>
+        <div class="tl-desc">Two dated, falsifiable claims land in the same quarter. CFO Doug Howell said the interest-income distortion from parked acquisition financing washes out by Q4 2026, which means Q4 is the first quarter that shows the combined company cleanly. Separately, management targets annualised run-rate synergies of approximately $160M by the end of 2026, on the way to ~$325M by early 2028.</div>
+        <div class="tl-impact up">Potential upside catalyst — first clean look at the merged business</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">January 1 reinsurance renewals — the pricing cycle's next reading</div>
+        <div class="tl-desc">Mid-2026 renewals already showed property catastrophe pricing moving lower on abundant capacity, while casualty stayed disciplined. The 1/1 renewal is the industry's largest single pricing event and the clearest read on whether the soft market broadens. Gallagher Re grew 9% organically in Q2 — the fastest sub-unit — so a further leg down in cat pricing hits the best-performing part of Brokerage.</div>
+        <div class="tl-impact neutral">Key near-term event — cuts both ways</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">The tuck-in pipeline: 30+ term sheets, ~$500M of annualised revenue</div>
+        <div class="tl-desc">Seven tuck-ins closed in Q2 2026 adding $63M of annualised revenue at a weighted-average 11.3× EBITDAC. Management describes valuations resetting toward ~9× and says deals at 15–17× are "largely a thing of the past," with ~$10B of deployment capacity over two years. This is the compounding engine running in the background of every quarter — and the reason revenue growth can stay elevated even while organic growth softens.</div>
+        <div class="tl-impact up">Structural tailwind — cheaper acquisitions</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026–2029</div>
+      <div class="tl-content">
+        <div class="tl-title">AI programme: 1,000 projects targeting 400–600 bp of margin</div>
+        <div class="tl-desc">Management disclosed roughly 1,000 AI projects underway aimed at 400 to 600 basis points of margin expansion over three to five years, with implementation costs described as "de minimis" because the underlying data-centralisation investment is already complete. Treat the range as an aspiration rather than guidance — but on a ~25% margin base, 500 bp would be a fifth of the margin, which is not a rounding error if it lands.</div>
+        <div class="tl-impact up">Potential upside catalyst — unproven</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date</div>
+        <div class="tl-desc">Annual dividend $2.80 per share, 1.07% yield, payout ratio 46.5%. Modest, consistently paid, and not the reason anyone owns this stock — but the payout ratio leaves ample room for both the dividend and the acquisition programme.</div>
+        <div class="tl-impact neutral">Routine</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">AJG — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted "real price")</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#5AA9E6;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$167.67</strong> to <strong>$262.69</strong> on September 4, 2026, AJG returned <strong>+56.7%</strong> in price terms — a compound annual rate of about <strong>9.4%</strong> before dividends, which added roughly a further point a year. That is a respectable but unspectacular five years, and the shape matters more than the total. The stock climbed almost uninterrupted for three and a half years, from $167.67 to a monthly-close peak of <strong>$347.44 in May 2025</strong> — a gain of <strong>107%</strong> — riding the hardest property-casualty market in two decades. Then it broke. From that May 2025 peak to the <strong>May 2026 close of $201.11</strong>, AJG fell <strong>42.1%</strong>, an extraordinary drawdown for a 0.51-beta name that did not miss a payment, lose a segment or restate anything. Two things did it: the property rate cycle turned, taking organic growth down with it, and the market re-underwrote a company that had just levered up and diluted 6.6% to buy a fifth of itself. Since May 2026 the stock has recovered <strong>+30.6%</strong> in four months. It remains <strong>−13.5% over 52 weeks</strong> and <strong>−24.4% below its May 2025 peak</strong>.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A precise total-return comparison against the S&amp;P 500 and the NASDAQ-100 over this exact window could not be verified from the sources fetched and is therefore not stated as a number. What can be said from the data on this page: AJG's beta of <strong>0.51</strong> against the SPY proxy's 1.01 means the stock is structurally half as volatile as the index, and yet it delivered a 42% peak-to-trough drawdown in a period the broad market did not experience one of that scale. Low beta is a statement about average co-movement, not about idiosyncratic risk — and the AssuredPartners financing plus the pricing cycle were both idiosyncratic. Against its own industry, the market's verdict is unambiguous in the multiples: AJG trades at 43.6× trailing earnings versus 17.8× for Aon, 20.6× for WTW, 22.5× for Brown &amp; Brown and 22.7× for Marsh &amp; McLennan (MRSH). Even allowing generously for the amortisation distortion, the market is still paying up for Gallagher relative to every listed peer — after a 13.5% year.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$167.67 — start of the five-year window</div><div class="tl-desc">Early in the hard-market run. FY2021 revenue was $7.97B; it would be $15.11B on a trailing basis five years later, nearly a double.</div><div class="tl-impact neutral">Starting point</div></div></div>
+    <div class="tl-item"><div class="tl-date">2022–2024</div><div class="tl-content"><div class="tl-title">$167.67 → $283.85 — the hard-market compounding years</div><div class="tl-desc">Revenue went from $7.97B (FY2021) to $10.93B (FY2024) and diluted EPS from $4.37 to $6.50. Rising premiums lifted commission revenue with no incremental effort; tuck-in acquisitions added the rest. The stock roughly doubled with very few drawdowns worth naming.</div><div class="tl-impact up">Steady re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024</div><div class="tl-content"><div class="tl-title">$283.85 — AssuredPartners announced, $13.45B in cash</div><div class="tl-desc">The largest deal in Gallagher's history, funded with equity and debt. The stock kept rising for five more months, so the initial reaction was not negative — the market gave management the benefit of the doubt on integration and synergies.</div><div class="tl-impact neutral">Transformational M&amp;A announced</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">$347.44 — all-time monthly-close peak</div><div class="tl-desc">Peak hard-market enthusiasm, peak deal optimism. The subsequent sixteen months were a one-way de-rating. Anyone who bought here is down 24% today.</div><div class="tl-impact up">Cycle high</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2025</div><div class="tl-content"><div class="tl-title">$302.75 — AssuredPartners closes August 18</div><div class="tl-desc">$13.45B paid in cash ($12.45B net of a deferred tax asset), 10,900 employees and ~$2.9B of adjusted revenue acquired. Total debt subsequently sits at $14.11B and shares outstanding rise 6.59% year over year. The stock had already given back 13% from the May peak by the close date.</div><div class="tl-impact neutral">Deal completed — leverage and dilution arrive</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">$249.49 — a −19.5% month, the single worst in the window</div><div class="tl-desc">From $309.74 in September to $249.49 in October, a fifth of the market value gone in one month. This is where the de-rating turned violent: the first full quarter of combined-company reporting, against a property market that had begun to soften in earnest.</div><div class="tl-impact down">Sharpest single-month decline of the five years</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">$201.11 — drawdown trough, −42.1% from the May 2025 peak</div><div class="tl-desc">The 52-week low of $190.75 was set in this vicinity. At this level the market was pricing AJG close to peer multiples on adjusted earnings — i.e. the compounder premium had been largely removed.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2026</div><div class="tl-content"><div class="tl-title">$262.69 — +30.6% off the low, still −13.5% on the year</div><div class="tl-desc">The recovery has been driven by margin expansion (Brokerage +50 bp underlying, Risk Management +140 bp), raised synergy targets, and a sell-side that raised targets eight times in three weeks after the Q2 print. Organic growth has not improved — the property market is still down 10%.</div><div class="tl-impact neutral">Current price</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A capital-light, no-underwriting-risk business with 0.51 beta, $2.29B of free cash flow and a 99-year-old sourcing advantage is buying agencies at ~9–11× EBITDAC while its own earnings are capitalised far higher — value creation by arithmetic, with 30-plus term sheets and ~$10B of capacity queued behind it. The GAAP numbers understate the business badly: forward P/E of 18.6× against trailing 43.6×, consensus FY2026 EPS of $13.18 (+23%), and a ~10% cash tax rate on $3.4B of tax attributes. AssuredPartners is integrating ahead of plan with synergies raised to $325M by early 2028 at a 32% margin, Gallagher Bassett is compounding at 12% organic with 140 bp of margin expansion, and the comparability noise clears in Q4 2026. Buy the de-rated compounder while the pricing cycle is the reason it is cheap.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying 43.6× trailing earnings — double the peer median — for a business whose organic growth is 6% and falling, whose largest-ever acquisition grows slower than it does (~4%), and whose revenue is mechanically tied to a property-casualty rate cycle that has just turned down 10%. The balance sheet that used to be a strength now carries $14.11B of debt and $12.72B net, ROIC has fallen to 6.6% — arguably at or below cost of capital — and shareholders were diluted 6.6% to fund it. The reported profitability rests on adjustments: $324M GAAP versus $734M adjusted in a single quarter. Fiduciary and interest income falls with rates. The entire equity story now depends on synergy delivery and an AI margin programme that is, so far, a slide.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The soft market broadens beyond property.</strong> Property renewal premiums are already −10%; casualty (+3%) and professional lines (+1%) are the only things holding average renewal pricing positive. If casualty follows property down, Brokerage organic growth goes below 5% and the 5.5% full-year guide breaks — with no operational fix available, because the revenue is a percentage of a shrinking number.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>AssuredPartners synergies underdeliver.</strong> The $160M-by-2026 and $325M-by-2028 targets are the justification for $13.45B, 6.6% dilution and $14.11B of debt. A shortfall would not just miss earnings; it would call into question the multiple-arbitrage logic that underwrites the whole roll-up strategy, at a moment when ROIC is already only 6.6%.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Multiple compression on any adjusted-earnings disappointment.</strong> At double the peer P/E and a $250-to-$388 spread in analyst targets, the market is paying for a quality premium that has already survived a 42% drawdown once. The stock fell on a two-cent EPS beat in July because revenue missed by $50M. That is what a demanding multiple looks like: the good news has to be perfect.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div class="card-label" style="color:var(--red);">Critical Constraint</div>
+      <div class="card-value" style="font-size:18px;">The property-casualty market has turned soft</div>
+      <div class="card-note">After several years of the hardest P&amp;C market in two decades, <strong>property renewal premiums fell 10%</strong> in Q2 2026 and property catastrophe reinsurance pricing "moved lower again" at the mid-year renewals on abundant capacity. Casualty is still firming (+3%) and professional lines are flat-to-up (+1%), so excluding property, renewals are +3%. For a broker this is not a demand problem — clients still need coverage — it is a <em>price</em> problem: the same policy generates less commission. Management frames it as clients redeploying savings into higher limits, which recaptures some of the lost revenue. The direct evidence of the drag is in the number that matters: Brokerage organic growth of 5%, against Risk Management's 12% in a segment that is fee-based and not premium-linked.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div class="card-label" style="color:var(--green);">Emerging Tailwind</div>
+      <div class="card-value" style="font-size:18px;">Acquisition multiples have reset in the buyer's favour</div>
+      <div class="card-note">The same cheap-capital era that inflated agency valuations has ended. Management stated on the Q2 call that deals at <strong>15 to 17× EBITDA are "largely a thing of the past,"</strong> with current valuations closer to <strong>9×</strong>; Gallagher's own seven Q2 tuck-ins were done at a weighted-average <strong>11.3× EBITDAC</strong> for $63M of annualised revenue. The pipeline is <strong>30-plus term sheets worth roughly $500M of annualised revenue</strong> against approximately <strong>$10B of deployment capacity</strong> over two years. For a serial acquirer, a soft market for agencies is worth more than a hard market for premiums — this is the single most underappreciated offset to the pricing headwind.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div class="card-label" style="color:var(--amber);">Ongoing Headwind — and the bull/bear frame</div>
+      <div class="card-value" style="font-size:18px;">Rate-sensitive float, and a stock priced for perfection</div>
+      <div class="card-note">Brokers earn interest on premiums held in trust between collection and remittance — high-margin income that shrinks as short rates fall, with no operational cause and no management lever. That line is currently unreadable because of the <strong>$144M</strong> earned in Q2 2025 on parked AssuredPartners financing (worth $0.42 per share), which the CFO says washes out by Q4 2026. <strong>The bull frame:</strong> a defensive, 0.51-beta compounder is being handed a soft agency market to buy into while its own de-rating has already happened — the forward multiple of 18.6× is not demanding for 23% expected EPS growth. <strong>The bear frame:</strong> organic growth is decelerating for structural reasons, ROIC has fallen to 6.6%, leverage is at a record, GAAP earnings are less than half the adjusted number, and at 43.6× trailing the market has priced in the synergies before they arrive. Both frames use the same facts. The tiebreaker is Q4 2026, when the noise clears and the combined company reports cleanly for the first time.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of September 4, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Price, market cap, 52-week range, sector/industry labels, statistics, annual and quarterly financials, analyst consensus and peer comparison from <strong>stockanalysis.com</strong> — price source: <strong>https://stockanalysis.com/stocks/ajg/</strong> ($262.69 close, September 4, 2026). Monthly price history from <strong>digrin.com</strong> (unadjusted "Real Price" column) — 60 month-end closes, October 2021 through August 2026, with the final point being the September 4, 2026 close rather than a month-end; no interior months were reconstructed or invented. Q2 2026 segment results, organic growth, adjusted EBITDAC margins, synergy targets, tuck-in multiples, renewal pricing and executive commentary from fetched Investing.com Q2 2026 slide and transcript coverage, BigGo Finance reproductions of the Q2 2026 earnings release and call, and The Motley Fool transcript. AssuredPartners closing date, price and operating detail from Gallagher's own investor-relations closing release, Agency Checklists and Insurance Journal. Named analyst calls from a fetched MarketBeat price-target page. S&amp;P 500 comparison figures are proxied by the SPY ETF page on stockanalysis.com. <strong>Estimated or unverified items, flagged explicitly:</strong> market-capitalisation rankings are approximations only — companiesmarketcap.com returned 404 on the pages fetched, so no ranking source was verified; the peer-median P/E of 21.5× is the author's computation from the four peer P/Es on this page; the net-debt-to-EBITDAC figure of ~2.6× is the author's computation, not a company disclosure; the equity/debt split of the AssuredPartners financing could not be verified and is not stated; clean-energy tax-credit investments were not found in any 2026 source fetched and no claim is made about them; the Q3 2026 earnings date is an estimate; industry-average and index columns in Section 04 are left blank wherever no figure was sourced; TAM and per-competitor share, revenue and growth figures were not verified and are omitted rather than estimated.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making investment decisions.</p>
+</div>
+
+</div>
+
+<script>
+const labels = ['Oct 2021','Nov 2021','Dec 2021','Jan 2022','Feb 2022','Mar 2022','Apr 2022','May 2022','Jun 2022','Jul 2022','Aug 2022','Sep 2022','Oct 2022','Nov 2022','Dec 2022','Jan 2023','Feb 2023','Mar 2023','Apr 2023','May 2023','Jun 2023','Jul 2023','Aug 2023','Sep 2023','Oct 2023','Nov 2023','Dec 2023','Jan 2024','Feb 2024','Mar 2024','Apr 2024','May 2024','Jun 2024','Jul 2024','Aug 2024','Sep 2024','Oct 2024','Nov 2024','Dec 2024','Jan 2025','Feb 2025','Mar 2025','Apr 2025','May 2025','Jun 2025','Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026','May 2026','Jun 2026','Jul 2026','Aug 2026','Sep 2026'];
+const prices = [167.67,162.90,169.67,157.94,158.19,174.60,168.49,161.94,163.04,178.99,181.57,171.22,187.08,199.11,188.54,195.72,187.35,191.31,208.06,200.33,219.57,214.80,230.48,227.93,235.49,249.00,224.88,232.16,243.93,250.04,234.69,253.33,259.31,283.49,292.57,281.37,281.20,312.24,283.85,301.82,337.74,345.24,320.69,347.44,320.12,287.25,302.75,309.74,249.49,247.62,258.79,249.37,228.20,216.58,206.40,201.11,229.57,249.42,262.15,262.69];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — start of window $167.67',                 color: '#94a3b8' },
+  { idx: 38, label: 'Dec 2024 — AssuredPartners announced ($13.45B)',      color: '#f59e0b' },
+  { idx: 43, label: 'May 2025 — peak monthly close $347.44',               color: '#22c55e' },
+  { idx: 46, label: 'Aug 2025 — AssuredPartners closes (Aug 18)',          color: '#3b82f6' },
+  { idx: 48, label: 'Oct 2025 — −19.5% month, worst of the window',        color: '#ef4444' },
+  { idx: 55, label: 'May 2026 — trough $201.11 (−42.1% from peak)',        color: '#ef4444' },
+  { idx: 59, label: 'Sep 4, 2026 — $262.69, +30.6% off the low',           color: '#5AA9E6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(90,169,230,0.20)');
+grad.addColorStop(1, 'rgba(90,169,230,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#5AA9E6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#5AA9E6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
