@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECL — Ecolab Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3FA9F5;
+  --accent-dim: #3FA9F533;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">ECL</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Materials / Specialty Chemicals</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $78.29B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #316</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#155 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#75 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Ecolab Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$279.28</div>
+      <div class="price-change" style="color:var(--green);">+$0.31 (+0.11%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> St. Paul, Minnesota</div>
+    <div class="meta-item"><span>Employees:</span> 48,000</div>
+    <div class="meta-item"><span>Founded:</span> 1923</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 27, 2026 (Q3 2026)</div>
+    <div class="meta-item"><span>Dividend:</span> $0.73/qtr · 89 consecutive years of payments</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Ecolab sells cleaning, sanitation, food-safety and water-treatment chemistry — but the chemistry is the smaller half of what the customer actually buys. It arrives bundled with a field technician who walks the plant, a dosing system that meters the product, and a measurement layer that tells the customer how much water, energy and labour the programme saved. FY2025 revenue was <strong>$16,081M, up 2.16%</strong> on FY2024's $15,741M; the trailing-twelve-month figure through June 2026 is <strong>$16,843M, up 7.11%</strong>, with the acceleration coming from acquisitions. The company ranks <strong>#316 globally by market capitalisation</strong> at $78.29B, and has paid a dividend for <strong>89 consecutive years</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The debate on this page is not whether the business is good. It plainly is: <strong>gross margin has climbed from 38.25% in FY2022 to 44.21% on a trailing basis</strong>, and Q2 2026 organic growth of 5% was made of <strong>4% price and 1% volume</strong> — a mix almost no industrial can print without losing customers. The debate is the price. ECL trades at <strong>37.5× trailing</strong> and <strong>32.3× forward</strong> earnings on mid-single-digit organic growth, with a <span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> of 2.41. And the company has just levered up <strong>$4.75B</strong> to buy a data-centre liquid-cooling manufacturer, which changes both the growth story and the balance sheet. Whether margin expansion and a water-scarcity secular narrative carry a low-to-mid-30s multiple — and what happens to that 4% pricing if raw materials reflate — is the whole question.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman, President &amp; CEO</div>
+      <div class="card-value" style="font-size:20px;">Christophe Beck</div>
+      <div class="card-note">Verified as Chairman, President and CEO on the July 28, 2026 Q2 news release and again on the August 25, 2026 investor-day announcement. Author of the pivot from "chemicals company" to "water, hygiene and high-tech" — and of the $4.75B CoolIT deal, which is the single biggest capital-allocation call of his tenure.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Scott Kirkland</div>
+      <div class="card-note">Verified from the August 25, 2026 release announcing that Beck and Kirkland would present at the SC26 Supercomputing Conference investor day. Owns the 20% operating-margin target for 2027 and the deleveraging path from roughly 3× net debt/<span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortization">EBITDA</span> at CoolIT close back to 2×.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">74.9% inst.</div>
+      <div class="card-note">Institutional ownership 74.91%. Largest disclosed holders (MarketBeat, as of May 2026): <strong>Aristotle Capital Management</strong> 3.71M shares (1.32%), <strong>Royal Bank of Canada</strong> 3.50M (1.24%), <strong>Amundi</strong> 2.41M (0.86%), <strong>Arrowstreet Capital</strong> 2.24M (0.80%). Note these are filer-level rows, not index-fund aggregates; no single strategic holder appears in the sources fetched.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose"><strong>A correction to the segment map before anything else.</strong> The four reportable segments named in the Q2 2026 news release are <strong>Global Water</strong>, <strong>Global Institutional &amp; Specialty</strong>, <strong>Global Pest Elimination</strong> and <strong>Global Life Sciences</strong> — they sum to $4,415.4M against reported Q2 sales of $4,415M, and the implied prior-year figures also reconcile, so the comparatives are restated on the same basis. This is <em>not</em> the "Global Industrial / Global Healthcare &amp; Life Sciences" structure that older write-ups use. The Q1 2026 Form 10-Q still named the fourth segment "Global Healthcare and Life Sciences"; the Q2 release names it "Global Life Sciences." <strong>Where the Healthcare business landed in the restated structure could not be verified from the sources fetched and is not guessed at here.</strong> The mix bar below is Q2 2026 reported segment sales, not a full year — FY2025 was reported on the prior structure and is not comparable.</p>
+  <div class="seg-bar">
+    <div style="flex:50.4;background:#3FA9F5;">WATER 50.4%</div>
+    <div style="flex:36.7;background:#a78bfa;">INST &amp; SPECIALTY 36.7%</div>
+    <div style="flex:8.0;background:#f59e0b;">PEST 8.0%</div>
+    <div style="flex:5.0;background:#22c55e;">LIFE SCI 5.0%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3FA9F5;"></span> Global Water — $2,223.4M (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Global Institutional &amp; Specialty — $1,620.8M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Global Pest Elimination — $351.1M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Global Life Sciences — $220.1M</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3FA9F5;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Water</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,223.4M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+12% / +4% org</div><div class="biz-stat-label">Reported / Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.7%</div><div class="biz-stat-label">Op. Margin (−50bps)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">50.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Industrial water treatment: boiler and cooling-tower chemistry, membrane and filtration programmes, and the process chemistry that runs alongside them in food and beverage, mining, power, refining and — increasingly — microelectronics fabs and data centres. This is where the razor/razorblade description is most literal: the customer installs Ecolab dosing and monitoring equipment on their loop, an Ecolab engineer specifies the treatment programme against that loop's water chemistry, and the consumable is bought against a service relationship rather than a spec sheet. Note the margin: <strong>15.7%, the lowest of the four segments and down 50 basis points</strong> — the acquired hardware and equipment revenue coming in through <strong>Ovivo Electronics</strong> and now <strong>CoolIT</strong> dilutes segment margin even as it accelerates growth. The 12% reported versus 4% organic gap is almost entirely M&amp;A. Within this segment, <strong>Food &amp; Beverage grew 7%</strong> and the <strong>Global High-Tech vertical grew 29% organically</strong>.</p>
+    <div class="biz-tam"><strong>Stated opportunity:</strong> Ecolab said the CoolIT deal <strong>doubles its Global High-Tech market opportunity from $5B to $10B</strong> — company figure, not independently verified.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Solenis (incl. Diversey)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private (PE-owned)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Kurita Water Industries</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">TSE-listed</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Veolia Water Technologies</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Division of Veolia</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Institutional &amp; Specialty</div>
+        <span class="biz-badge growth">HIGHEST MARGIN AT SCALE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,620.8M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5% / +4% org</div><div class="biz-stat-label">Reported / Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.1%</div><div class="biz-stat-label">Op. Margin (+50bps)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">36.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Warewashing, laundry, housekeeping and food-safety programmes for restaurants, hotels, schools, hospitals and long-term care, plus the "Specialty" businesses selling into quick-service restaurant chains and food retail. This is the segment that most obviously proves the moat thesis: <strong>24.1% operating margin, up 50 basis points, on only 4% organic growth</strong>. The dispenser sitting above a dishwasher is Ecolab's, the chemistry is metered by that dispenser, and the operator's alternative to Ecolab is not a cheaper drum of detergent — it is renegotiating a service contract, retraining staff, and accepting audit risk on food safety. Reported growth of 5% against 4% organic means this segment is essentially all-organic; there is no acquisition flattering it. It also carries almost no equipment-revenue dilution, which is why its margin is nine points above Global Water's.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed by the company; third-party TAM estimates were not verified from sources fetched and are omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Diversey (Solenis)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private since 2023</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Regional / private-label chemistry</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Fragmented</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Pest Elimination</div>
+        <span class="biz-badge growth">FASTEST-GROWING CORE SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$351.1M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11% / +7% org</div><div class="biz-stat-label">Reported / Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.1–20.4%</div><div class="biz-stat-label">Op. Margin (+90bps)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Commercial pest prevention — the recurring-route business that sits closest to Rentokil's model. It is the purest service annuity Ecolab owns: no chemistry cycle, no raw-material passthrough argument, just a technician on a schedule and a compliance record the customer needs for its own audits. <strong>7% organic growth with 90 basis points of margin expansion</strong> is the best combination of the four segments on a same-store basis. It is also the smallest at 8% of sales, so it cannot move the consolidated number much. Two operating-margin figures appear across the sources fetched — 20.1% in the news release and 20.4% in the slide summary — and both are shown here rather than picking one.</p>
+    <div class="biz-tam"><strong>Note:</strong> the closest listed comparable is Rentokil Initial; no Rentokil financials were verified from the sources fetched, so no share or growth comparison is given.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Rentokil Initial</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">LSE / NYSE ADR</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Rollins (Orkin)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">NYSE: ROL</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Life Sciences</div>
+        <span class="biz-badge emerging">SMALLEST, FASTEST, MOST OPERATIONALLY LEVERED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$220.1M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+18% / +15% org</div><div class="biz-stat-label">Reported / Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">26.5%</div><div class="biz-stat-label">Op. Margin (+550bps)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">5.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Contamination control, cleaning and validation for pharmaceutical and biotech manufacturing, plus the bioprocessing chromatography and ion-exchange resin business acquired with <strong>Purolite</strong> in 2021. This is the highest-margin segment Ecolab reports and the one with the most violent operating leverage: <strong>15% organic sales growth produced a 53% increase in operating income and 550 basis points of margin expansion in a single quarter</strong>, on "very strong new business wins" in bioprocessing. That ratio — roughly 3.5× profit growth per unit of sales growth — is what a fixed-cost manufacturing base looks like when volume finally shows up.</p>
+    <div class="biz-tam"><strong>On Purolite specifically:</strong> no post-acquisition Purolite revenue, growth or return figure was disclosed in any source fetched. The segment's 15% organic growth and 26.5% margin are the only observable evidence on how that 2021 deal is performing, and they are supportive — but Ecolab does not break Purolite out, so the deal cannot be scored directly.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Cytiva / Danaher</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Bioprocessing</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Sartorius / Merck KGaA</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Resins &amp; consumables</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Competitor cells are marked <strong>n/d</strong> throughout because no competitor financials were verified from the sources fetched in this session. Solenis (which acquired Diversey in 2023) is private; Veolia Water Technologies is a division and is not separately reported; Kurita and Rentokil are listed abroad and were not fetched. No share, revenue or growth figure has been estimated for any of them.</p>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">ON-SITE SERVICE TECHNICIANS</span>
+    <span class="moat-pill">INSTALLED DOSING EQUIPMENT</span>
+    <span class="moat-pill">FOOD-SAFETY AUDIT RISK</span>
+    <span class="moat-pill">PROCESS-SPECIFIC FORMULATION</span>
+    <span class="moat-pill">48,000-PERSON FIELD FORCE</span>
+    <span class="moat-pill">DIGITAL MONITORING LAYER</span>
+    <span class="moat-pill">89-YEAR DIVIDEND RECORD</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>the service relationship, not the molecule</strong>. Most of what Ecolab sells could be reverse-engineered by a competent formulator; almost none of it could be delivered by one. What the customer actually contracts for is a technician who knows that specific cooling tower, that specific dishmachine, that specific fermentation suite — who sets the dose, tunes it as feedwater chemistry drifts, and produces the documentation the customer's own auditors want. Switching means re-specifying the programme, swapping installed dispensing hardware, retraining staff, and absorbing food-safety or process-upset risk during the changeover, all to save a few percent on a line item that is a rounding error against the customer's labour and energy bill. That asymmetry is why the pricing shows up where it does.</p>
+  <p class="prose" style="margin-top:16px;"><strong>And the pricing is the proof, not the claim.</strong> Q2 2026 organic growth of 5% decomposes into <strong>4% price and 1% volume</strong> — and management guided pricing to <strong>5–6% in the second half</strong>. A business without switching costs cannot raise price 4–6% while volumes are roughly flat and keep the customer. The margin record says the same thing over a full cycle: gross margin bottomed at <strong>38.25% in FY2022</strong>, the peak of the post-pandemic raw-material and energy shock, and has since expanded to <strong>44.51% in FY2025 and 44.21% trailing</strong> — <strong>+596 basis points off the trough</strong>. Operating margin over the same window went <strong>13.03% → 18.44%</strong>, with a stated <strong>20% target for 2027</strong>. That is the signature of a company that priced through an input-cost spike, then did not give the price back when inputs normalised. Ecolab's internal framing for this — the "eROI" value-selling model, which quantifies the customer's water, energy and labour savings so the conversation is about total value delivered rather than price per gallon — is the mechanism management credits; <em>no eROI-specific figures were disclosed in any source fetched, so it is described here as a selling model and not scored</em>. The observable output is the price line.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The pricing gift can be taken back.</strong> The +596bp gross-margin expansion since FY2022 is partly genuine mix and productivity and partly the arithmetic of holding price while input costs fell. If raw materials reflate, Ecolab's history says it can re-price — but with a lag, and the guided 5–6% second-half pricing is already an unusually high ask. Management explicitly framed Q2 as "accelerating pricing offset higher commodity costs," which is an admission that costs are moving up again. A reflation that outruns the price lag compresses the very margin line the multiple is built on.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Roughly 15% of sales is shrinking.</strong> Management disclosed on the Q2 call that underperforming businesses representing about <strong>15% of sales are in low-single-digit decline</strong>. That is a large drag hiding inside a 5% organic number, and it means the healthy 85% is growing meaningfully faster than the headline — which is flattering — while also meaning a sixth of the portfolio is being managed rather than grown.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The balance sheet just changed character.</strong> Total debt was <strong>$8,187M at March 31, 2026</strong>. The trailing statistics now show <strong>$13.92B of total debt</strong> against $5.14B of cash, <span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">debt-to-equity</span> of 1.38, and management guided pro-forma net debt/<span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortization">EBITDA</span> to roughly <strong>3× at CoolIT close</strong>, returning to 2× by the end of year two. A company whose appeal is a 89-year dividend record and predictable compounding has taken on cycle risk to buy an AI-adjacent hardware business.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Hardware dilutes the service moat's margin.</strong> The acquisitions driving reported growth — Ovivo Electronics, now CoolIT — sell engineered equipment, not metered consumables. Global Water's operating margin fell 50 basis points to 15.7% even as its reported sales rose 12%. Equipment revenue is lumpier, carries lower gross margin, and does not come with the same switching cost. The more of it Ecolab buys, the less the razor/razorblade description fits the consolidated business.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Ticker column from stockanalysis.com statistics as of the September 4, 2026 close. <strong>The Specialty Chemicals Avg and S&amp;P 500 columns are shown as "—" because no single verified source for them was fetched in this session</strong>; per the no-fabrication rule they are left blank rather than estimated. Colour-coding in the ECL column therefore reflects the metric against Ecolab's own recent history and against the plain reading of the figure, not against a fetched benchmark.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>ECL</th><th>Specialty Chem Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">37.47</td><td>—</td><td>—</td><td>$279.28 ÷ $7.45 <span class="tip" title="Earnings Per Share">EPS</span> = 37.5×. A software-adjacent multiple on a specialty-chemicals cash flow stream. This is the number the whole page argues about.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--amber);">32.29</td><td>—</td><td>—</td><td>On 2026 consensus <span class="tip" title="Earnings Per Share">EPS</span> of $8.17 the multiple is 34.2×; on the guidance midpoint of $8.15 it is 34.3×. The 32.29 figure implies a blended next-twelve-month base closer to $8.65.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--red);">2.41</td><td>—</td><td>—</td><td>Above 2 on any reading. You are not being paid for growth here — you are paying for durability and margin trajectory.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$7.45</td><td>—</td><td>—</td><td><span class="tip" title="Generally Accepted Accounting Principles — the standard US reporting basis, before any company-defined adjustments">GAAP</span> diluted. FY2025 was $7.28; adjusted 2026 guidance is $8.05–$8.25.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--amber);">+7.11%</td><td>—</td><td>—</td><td><span class="tip" title="Trailing Twelve Months">TTM</span>. But organic was only <strong>+5% in Q2 2026</strong>. The gap is Ovivo Electronics and other M&amp;A. FY2025 organic-era growth was +2.16%.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">44.21%</td><td>—</td><td>—</td><td>The single most important row. From 38.25% (FY2022) to 44.51% (FY2025) — <strong>+626bps</strong> — with Q2 2026 reported at 44.1% and organic gross margin at 44.9%, up 10bps YoY.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">12.57%</td><td>—</td><td>—</td><td>Operating margin 18.44% trailing, up from 13.03% in FY2022. Management targets <strong>20% in 2027</strong>, with ~19% guided for 2H 2026.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">1.05%</td><td>—</td><td>—</td><td>$2.92 annualised ($0.73/quarter), payout ratio 39.18%. Thin yield, but <strong>89 consecutive years of payments</strong> — the record is the point, not the rate.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--green);">1.24% of float</td><td>—</td><td>—</td><td>3.48M shares. Essentially nobody is short this. Nobody is arguing the business is broken; the argument is entirely about price.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--amber);">1.38</td><td>—</td><td>—</td><td>$13.92B total debt vs $5.14B cash. Was $8,187M at March 31, 2026 — the step-up is the <strong>$4.75B CoolIT</strong> term loan. Guided ~3× net debt/EBITDA at close, back to 2× within two years.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--green);">1.84</td><td>—</td><td>—</td><td>Quick ratio 1.50. Comfortable. Short-term liquidity is not where the leverage question sits.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure. Cash generated after maintaining the asset base.">Free Cash Flow</span></td><td style="color:var(--amber);">$1.87B</td><td>—</td><td>—</td><td>Operating cash flow $3.06B, so capex is running ~$1.19B. FCF is <strong>0.88× net income</strong> — this is a capital-intensive business that has to keep installing equipment at customer sites.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">21.96%</td><td>—</td><td>—</td><td>Strong, and flattered by the 1.38 leverage ratio. The unlevered read is ROIC below.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital employed in the business">ROIC</span></td><td style="color:var(--green);">13.38%</td><td>—</td><td>—</td><td><span class="tip" title="Return on Assets">ROA</span> 7.23%. Comfortably above any plausible cost of capital — genuinely value-creating. The CoolIT purchase at 29× next-twelve-month EBITDA is the test of whether that continues.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--green);">0.89</td><td>—</td><td>—</td><td>Below 1.0. This has traded as a defensive compounder, and Section 07 shows the price path is consistent with that — until February 2026.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$243.15 – $309.27</td><td>—</td><td>—</td><td>$279.28 sits 54.6% of the way up the range. 52-week price change: <strong>+2.21%</strong> — the stock has gone essentially nowhere in a year while earnings grew.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;"><strong>CoolIT Systems, $4.75B, announced March 19, 2026, closed July 2, 2026 — ahead of schedule.</strong> This is the item that distorts everything forward of Q2. Cash consideration funded with new transaction debt; Ecolab disclosed the price as <strong>29× estimated next-twelve-month and 24× 2027 adjusted EBITDA</strong>, against CoolIT revenue of roughly <strong>$550M expected over the next twelve months</strong>. It closed the day after Q2 2026 ended, so <em>nothing in the Q2 segment figures on this page includes it</em> — but the debt, the interest expense and the intangible amortisation all land in Q3 onward. Management said the deal is <strong>accretive to adjusted EPS only in 2028</strong>, "building significantly thereafter," and flagged "short-term impacts from non-cash amortization and financing costs" in 2026 guidance. Expected contribution: +2% to Global Water organic growth and +1% to total company organic growth.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Ovivo Electronics.</strong> Acquired earlier and described by management as "performing well" with expected mid-teens growth. It is the principal reason reported revenue growth (+9.7% in Q2, +10.0% in Q1) runs roughly double organic growth (+5%, and +4% in Global Water). Purchase price and close date were not verified from the sources fetched.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Middle East disruption.</strong> Management quantified an approximately <strong>1-point headwind to Q2 volume growth</strong> from Middle East disruptions, saying underlying volume growth strengthened underneath it. On a reported 1% volume figure, that is the difference between flat and roughly 2% — material to how you read the volume/price split.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Segment restatement.</strong> As noted in Section 02, the Q2 2026 release reports four segments including "Global Life Sciences," while the Q1 2026 10-Q named the fourth segment "Global Healthcare and Life Sciences." Prior-year comparatives appear restated. The disposition of the Healthcare business could not be verified and no figure has been estimated for it. There was an earlier divestiture — the <strong>Global Surgical Solutions business, closed August 1, 2024</strong> — which is a separate, completed transaction.</p>
+  <p class="prose" style="margin-top:12px;"><strong>No other non-recurring items were identified from the sources fetched.</strong></p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">24 analysts polled by S&amp;P Global via stockanalysis.com. MarketBeat's 21-analyst panel shows "Moderate Buy."</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$324.95</div><div class="card-note">+16.35% versus the $279.28 close. Median target $330.00 (+18.16%). MarketBeat's panel averages $327.56.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$295 – $360</div><div class="card-note">+5.63% to +28.90%. <strong>The low target is above the current price.</strong> Not one analyst in the panel models downside — which is itself a risk signal about positioning.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">20 / 4 / 0</div><div class="card-note">15 Strong Buy + 5 Buy, 4 Hold, 0 Sell, 0 Strong Sell (stockanalysis.com, as of August 2026). MarketBeat's separate 21-analyst panel shows 1 Strong Buy / 17 Buy / 2 Hold / 1 Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:15;background:var(--green);"></div>
+    <div style="flex:5;background:#4ade80;"></div>
+    <div style="flex:4;background:var(--amber);"></div>
+    <div style="flex:0.01;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 15</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 4</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 0</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>BMO Capital Markets</strong> — John McNulty, <strong>Outperform</strong>, target boosted to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$360</span> (Jul 29, 2026). The high print on the Street, set the day after the Q2 release.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>UBS Group</strong> — Joshua Spector, <strong>Buy</strong> reiterated, <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$342</span> (Jul 29, 2026). Second-highest target in the panel.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Mizuho</strong> — John Roberts, <strong>Outperform</strong>, target boosted to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$327</span> (Jul 29, 2026). Sits almost exactly on the consensus average.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>JPMorgan Chase</strong> — Jeffrey Zekauskas, <strong>Overweight</strong>, target boosted to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$305</span> (Jul 29, 2026). Bullish rating, but a target only 9% above the current price.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Wells Fargo</strong> — Jason Haas, <strong>Equal Weight</strong>, target boosted to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$295</span> (Jul 30, 2026). The shape worth noticing: target raised, rating held neutral. Respects the execution, not the multiple — and $295 is the low end of the whole range.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were read off a fetched MarketBeat price-target page. A Robert W. Baird target of $305 (Andrew Wittmann, Jul 29, 2026) also appears on that page but with no rating attached, so it is noted rather than listed. The clustering is striking: six of seven actions landed on July 29–30, immediately after the Q2 print, and every one of them was a target increase.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Mar 19, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CoolIT Systems announced — $4.75B, all cash, debt-funded</div>
+        <div class="tl-desc">Ecolab agreed to buy the Calgary-based liquid-cooling manufacturer (coolant distribution units, cold plates, direct-to-chip cooling) serving hyperscale and colocation data-centre operators. Price equated to 29× next-twelve-month and 24× 2027 adjusted EBITDA on roughly $550M of forward revenue. Ecolab said the deal doubles its Global High-Tech market opportunity from $5B to $10B. The stock closed March at $266.02 against a February close of $308.35.</div>
+        <div class="tl-impact down">Reaction already happened — −13.7% Feb close to Mar close</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CoolIT closes ahead of schedule</div>
+        <div class="tl-desc">Completion came earlier than the guided Q3 2026 timeline. Because it closed one day after the quarter ended, none of the Q2 segment figures include CoolIT — but the term loan, interest expense and intangible amortisation all begin hitting from Q3. Management expects the deal to be accretive to adjusted EPS in 2028.</div>
+        <div class="tl-impact neutral">Structural — full effect first visible in Q3</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 — organic growth accelerates to 5%, guidance raised</div>
+        <div class="tl-desc">Sales $4,415M (+10% reported, +5% organic), adjusted diluted EPS $2.09 (+11%), reported diluted EPS $1.90. Pricing improved to 4% with volume +1% against an approximately 1-point Middle East headwind. Global High-Tech +29% organic, Ecolab Digital +27%, Life Sciences +15%. Full-year adjusted EPS guidance raised to $8.05–$8.25 (+7–10%).</div>
+        <div class="tl-impact up">Beat and raise — six target increases in 48 hours</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 25, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Investor day at the SC26 Supercomputing Conference</div>
+        <div class="tl-desc">Beck and Kirkland presenting on technology investments, Global High-Tech growth and Ecolab's role in AI infrastructure. The venue is the message: a 103-year-old sanitation company holding its investor day at a supercomputing conference is a deliberate attempt to change the comparison set it is valued against.</div>
+        <div class="tl-impact neutral">Narrative repositioning — watch the multiple</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Guided acceleration: 6–7% organic growth, ~19% adjusted operating margin</div>
+        <div class="tl-desc">Management guided second-half organic sales growth to 6–7% — a step up from 5% in Q2 — with pricing expected to reach 5–6% and adjusted operating margin around 19%. That pricing guide is the single most testable claim in the story: it assumes customers absorb another 100–200 basis points of price increase while volumes stay positive.</div>
+        <div class="tl-impact up">Potential upside catalyst — and the key falsifiable claim</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — first quarter with CoolIT inside</div>
+        <div class="tl-desc">The first print that carries CoolIT's revenue, its margin profile, its intangible amortisation and the interest cost of $4.75B of new debt in the same set of numbers. Watch Global Water's operating margin specifically: it was already down 50bps to 15.7% before CoolIT arrived. Ex-dividend date September 15, 2026.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027 / 2030</div>
+      <div class="tl-content">
+        <div class="tl-title">The two stated targets: 20% operating margin, $4B High-Tech</div>
+        <div class="tl-desc">Management has committed to a <strong>20% operating margin in 2027</strong> (from 18.44% trailing) and to growing Global High-Tech — currently approaching $1.5B annualised — to <strong>$4B of sales by 2030 at 25% operating margins</strong>. The first is an extension of a five-year trend and looks achievable. The second requires roughly tripling a business in four years and is where most of the multiple's justification is now parked.</div>
+        <div class="tl-impact up">The bull case in two numbers</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">ECL — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#3FA9F5;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$222.22</strong> to the September 4, 2026 close of <strong>$279.28</strong>, ECL returned <strong>+25.7%</strong> in price over five years — a compound annual rate of about <strong>4.7%</strong>, plus roughly one point a year of dividend. That is a modest outcome for a business whose gross margin expanded 600 basis points over the same window, and it tells you where the value went: <strong>into multiple compression and then re-expansion, not into a straight line.</strong> The path had three acts. Act one was the 2022 input-cost shock: the stock fell <strong>35.0%</strong> from October 2021 to the September 2022 close of <strong>$144.42</strong>, as raw-material and energy inflation crushed gross margin to 38.25% and the market questioned whether the pricing model would hold. Act two was the repricing of that question — a <strong>113.5% advance</strong> from $144.42 to the February 2026 high monthly close of <strong>$308.35</strong> as margin recovered every single year. Act three is the last seven months: <strong>−9.4% from the February peak</strong>, with the whole drawdown dating from the CoolIT announcement.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A precise total-return comparison against the S&amp;P 500 and the NASDAQ-100 over the identical five-year window could not be verified from the sources fetched and is deliberately not stated. What can be said from verified data on this page: ECL's <span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">beta</span> is <strong>0.89</strong> and its 52-week price change is <strong>+2.21%</strong> — over a period in which the company grew adjusted EPS at a double-digit rate and raised guidance twice. A stock that goes nowhere for a year while earnings compound is, mechanically, a stock whose multiple is contracting. That is the market quietly answering the question this page opened with, and it argues the low-30s forward multiple is being defended rather than expanded.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$222.22 — start of the window</div><div class="tl-desc">Pre-shock. Gross margin was on its way down to the FY2022 trough; the market had not yet tested whether Ecolab could price through an input-cost spike.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">$144.42 — cycle low, −35.0% from Oct 2021</div><div class="tl-desc">FY2022 gross margin bottomed at <strong>38.25%</strong> and operating margin at <strong>13.03%</strong> as caustic soda, surfactant and energy costs spiked. EPS actually fell 2.56% that year. This is the only period in the five years when the pricing-power thesis was genuinely in doubt — and it is the reference case for what "raw materials reflate" looks like.</div><div class="tl-impact down">Maximum doubt about pricing power</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2023</div><div class="tl-content"><div class="tl-title">$198.35 — margin recovery confirmed</div><div class="tl-desc">FY2023 gross margin recovered to 40.39% and EPS grew 25.72%. The stock rose 37.3% from the September 2022 low as the market accepted that the price increases would stick after input costs fell.</div><div class="tl-impact up">Thesis restored</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024</div><div class="tl-content"><div class="tl-title">$234.32 — the earnings step-change year</div><div class="tl-desc">FY2024 diluted EPS jumped <strong>53.86% to $7.37</strong> with gross margin at 43.50% and operating margin at 16.96%. Revenue grew only 2.75% — this was almost entirely a margin year, which is exactly what the bull case says the model does.</div><div class="tl-impact up">Margin, not volume, drove the earnings</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">$308.35 — five-year monthly-close high</div><div class="tl-desc">Within a dollar of the $309.27 52-week intraday high. At this point the market was paying roughly 42× trailing FY2025 EPS of $7.28 for a business growing organic sales at 2–4%. The multiple, not the operations, was the stretched thing.</div><div class="tl-impact up">Peak multiple</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">$266.02 — CoolIT announced Mar 19, −13.7% in a month</div><div class="tl-desc">A $4.75B all-cash, debt-funded acquisition at 29× forward EBITDA, accretive only in 2028, taking pro-forma leverage to roughly 3× net debt/EBITDA. The market's verdict was immediate and negative. This is the sharpest single-month move in the five-year series and it is a capital-allocation reaction, not an operating one.</div><div class="tl-impact down">Deal rejected on announcement</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">$277.63 — CoolIT closes Jul 2, Q2 beat-and-raise Jul 28</div><div class="tl-desc">Organic growth accelerated to 5% with pricing at 4%, adjusted EPS +11%, guidance raised, and six analyst target increases inside 48 hours. The stock recovered but did not reclaim the February high — the operating beat repaired the sentiment, not the multiple.</div><div class="tl-impact up">Operations vindicated, valuation unchanged</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2026</div><div class="tl-content"><div class="tl-title">$279.28 — flat year, 54.6% of the 52-week range</div><div class="tl-desc">+2.21% over twelve months. Consensus average target $324.95 with a low target of $295, above spot. Monthly RSI is mid-range, neither stretched nor washed out.</div><div class="tl-impact neutral">Waiting on Q3 and the CoolIT numbers</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Start with the price/volume split, because it is the whole argument.</strong> Q2 2026 organic sales grew 5%, made of <strong>4% price and 1% volume</strong> — and management guided pricing to <strong>5–6% in the second half</strong> against a total organic guide of 6–7%, which implies volume stays roughly flat to slightly positive. Strip the roughly 1-point Middle East volume headwind management called out, and underlying volume is nearer 2%. So the honest characterisation of Ecolab's growth today is: <strong>a low-single-digit volume business with an extraordinary ability to raise price.</strong> That is not a criticism. It is precisely what a razor/razorblade model with a service moat should look like, and it is far more valuable than the reverse. But it does mean the growth is not coming from taking share or from expanding units — it is coming from charging existing customers more, every year, and having them stay.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The margin expansion is real and it is the bull case's entire load-bearing wall.</strong> Gross margin: <strong>38.25% (FY2022) → 40.39% → 43.50% → 44.51% (FY2025) → 44.21% trailing.</strong> Operating margin: <strong>13.03% → 14.27% → 16.96% → 18.35% → 18.44% trailing</strong>, against a stated <strong>20% target for 2027</strong>. On roughly $17.9B of 2026 consensus revenue, each additional point of operating margin is about $179M of operating income — so closing the remaining 156 basis points to the 2027 target is worth roughly <strong>$280M</strong>, or about 9% of trailing operating income, without a single extra dollar of sales. That is the mechanism by which 5% organic growth becomes 7–10% EPS growth, and it has worked for four consecutive years.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>What happens if raw materials reflate?</strong> This is the sharpest question on the page, and there is a clean historical answer sitting in the data: <strong>FY2022</strong>. In that year input costs spiked, gross margin fell 268 basis points to 38.25%, EPS <em>declined</em> 2.56%, and the stock fell 35% from its October 2021 level. Ecolab did re-price — it just did so with a lag of roughly four to six quarters, and shareholders wore the gap. Management's Q2 2026 language, "accelerating pricing offset higher commodity costs," says input costs are already rising again. The difference this time is that Ecolab is entering the cycle with pricing already at 4% and guided to 5–6%, not at zero. There is less headroom in the price line before customers push back, and the 15% of the portfolio management says is in low-single-digit decline is the part where that pushback would show up first. <strong>A reflation of the FY2022 magnitude would not break the business; on the evidence it would cost roughly two years of earnings growth and a third of the share price.</strong> At 37.5× trailing, that is a lot of downside to carry for a mid-single-digit grower.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The data-centre story — what is actually disclosed, versus the narrative.</strong> Be precise here, because the narrative has run well ahead of the disclosure. What Ecolab has actually put a number on: <strong>Global High-Tech grew 29% organically in Q2 2026</strong> and is "approaching <strong>$1.5 billion annualised sales</strong>"; <strong>Ecolab Digital grew 27%</strong>; the CoolIT purchase is said to <strong>double the Global High-Tech market opportunity from $5B to $10B</strong>; and the target is <strong>$4B of High-Tech sales by 2030 at 25% operating margins</strong>. What is <em>not</em> disclosed: any standalone data-centre revenue line, any split between microelectronics fabs and data centres inside High-Tech, any customer concentration, any backlog. High-Tech is not a reportable segment — it sits inside Global Water, whose overall organic growth was 4% and whose operating margin <em>fell</em> 50 basis points. So: at ~$1.5B annualised, High-Tech is roughly <strong>8–9% of company sales</strong>. Growing it to $4B by 2030 requires a ~28% compound rate for four years, and Ecolab just paid <strong>29× forward EBITDA</strong> to buy the hardware needed to try. The opportunity is genuine; the disclosure is thin; and the market has already been asked to fund the ambition with $4.75B of debt.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation — pinning it down.</strong> (i) On <strong>trailing GAAP EPS of $7.45, ECL trades at 37.5×</strong>. (ii) On the <strong>2026 adjusted guidance midpoint of $8.15, at 34.3×</strong>; on 2026 consensus of $8.17, 34.2×. (iii) On <strong>2027 consensus EPS of $9.42, at 29.6×</strong> — and note that 2027 is the first year the 20% operating-margin target is supposed to land, while CoolIT is still dilutive until 2028. (iv) On <strong>trailing free cash flow of $1.87B against a $78.29B market cap, roughly 42×</strong> — and on enterprise value of $87.07B, about 46× FCF. That last figure is the uncomfortable one: this is a capital-intensive business where capex runs about $1.19B against $3.06B of operating cash flow, so FCF conversion is only <strong>0.88× net income</strong>. EV/EBITDA of 21.05 is the cleanest cross-cycle read. <strong>The defensible conclusion is that ECL is priced for the 2027 margin target to be hit and for High-Tech to compound at something close to the 2030 plan.</strong> Hit both and 29.6× 2027 earnings on an accelerating business is defensible. Miss either — a raw-material reflation that eats the margin path, or a High-Tech ramp that stalls after a $4.75B outlay — and there is no growth rate underneath to catch the multiple. The PEG of 2.41 is the compressed version of that sentence.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The moat is verified by the price line, not asserted: 4% pricing on 1% volume, guided to 5–6%, with gross margin up 596 basis points from the FY2022 trough and operating margin up 541 to 18.44% against a 20% target for 2027. Life Sciences turned 15% organic growth into 53% operating-income growth and 550bps of margin expansion — proof of the operating leverage. Global High-Tech is compounding at 29% toward a $4B/2030 target with a $10B addressable opportunity after CoolIT, and Ecolab Digital is growing 27%. Add a 0.89 beta, 1.24% short interest, 13.38% ROIC, an 89-year dividend record and a Street where the <em>lowest</em> price target sits above spot, and you have a defensive compounder buying itself a growth vertical.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying 37.5× trailing and 34× guided earnings, with a PEG of 2.41, for 5% organic growth of which four-fifths is price. Roughly 15% of the portfolio is in low-single-digit decline. FY2022 is the live precedent for what an input-cost reflation does: margin down, EPS down, stock down 35% — and management has already flagged "higher commodity costs." The $4.75B CoolIT deal at 29× forward EBITDA took total debt from $8.2B to $13.9B and is dilutive until 2028; the stock fell 13.7% from the February close in the month it was announced and has not reclaimed that high. Free cash flow is only 0.88× net income, so this compounder converts less cash than its margin profile suggests. And the stock is up 2.21% in a year while earnings grew double digits — the multiple is already contracting.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Raw-material reflation outrunning the price lag.</strong> The FY2022 template is unambiguous: gross margin −268bps, EPS −2.56%, share price −35%. Ecolab re-prices, but with a four-to-six-quarter lag, and it is entering this cycle with pricing already at 4% and guided to 5–6%. There is less room before customer resistance shows up, and the 596 basis points of accumulated gross-margin expansion is the exact thing the current multiple capitalises.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>CoolIT integration and the leverage that came with it.</strong> $4.75B at 29× next-twelve-month EBITDA, funded with new debt, taking pro-forma net debt/EBITDA to roughly 3×, accretive to adjusted EPS only in 2028. It is a hardware business bolted onto a service-and-consumables model, and it lands inside the segment whose operating margin was already falling. If data-centre capex cools before 2028, Ecolab owns an expensive, levered, cyclically exposed asset and a diluted margin structure.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>The multiple with nothing underneath it.</strong> At 34× guided 2026 earnings on 5% organic growth, essentially all of the valuation rests on the 2027 margin target and the 2030 High-Tech ambition. Short interest is 1.24% and not a single analyst target sits below the current price, so positioning is one-sided. A single quarter in which pricing slips below 4%, or the 20% margin target is pushed out, would have to be absorbed by a multiple that has no growth cushion beneath it.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Input Costs Are Turning Again</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Specialty chemistry is a passthrough business with a lag, and the lag is where shareholder money is made or lost. Ecolab's own Q2 2026 framing — "accelerating pricing offset higher commodity costs" — is the tell that the input cycle has turned. The FY2022 precedent is the reference: gross margin fell to 38.25%, EPS declined 2.56%, and the stock lost 35% from its October 2021 level before the price increases caught up. The structural difference now is that Ecolab enters with pricing already running at 4% and guided to 5–6%, versus starting from near zero in 2021. That is a stronger starting position and a thinner remaining cushion at the same time. Watch the organic gross-margin line — 44.9% in Q2 2026, up only 10 basis points year over year — as the earliest indicator.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">AI Infrastructure Is Buying Water Chemistry</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Data centres consume water in two distinct ways — evaporative cooling and, increasingly, closed-loop direct-to-chip liquid cooling — and both require treated fluid, corrosion control, biological control and monitoring. Ecolab's claim is that it is "the only company with integrated solutions" spanning water production, powering and cooling for this infrastructure. The verified numbers: Global High-Tech +29% organic, approaching $1.5B annualised; Ecolab Digital +27%; the CoolIT acquisition doubling the stated market opportunity from $5B to $10B; a $4B-by-2030 sales target at 25% operating margins. The verified gaps: High-Tech is not a reportable segment, no standalone data-centre revenue is disclosed, and the segment it sits inside saw operating margin fall 50 basis points. The tailwind is real; the disclosure is not yet good enough to underwrite the 2030 number.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Consolidation Has Removed the Public Comparables</div>
+        <span class="biz-badge" style="background:var(--blue-dim);color:var(--blue);">STRUCTURAL SHIFT</span>
+      </div>
+      <div class="card-note">The competitive set has gone dark. Solenis absorbed Diversey in 2023 and is private-equity owned; Veolia Water Technologies is a division inside a much larger utility group; Kurita and Rentokil are listed outside the US. There is now no clean listed pure-play against which to mark Ecolab's margins, growth or multiple — which is precisely why the Industry Avg column in Section 04 is left blank here rather than estimated. <strong>Bull framing:</strong> scarcity value. If you want listed exposure to industrial water treatment with a service moat and a data-centre option, ECL is close to the only way to buy it, and scarcity supports a premium multiple indefinitely. <strong>Bear framing:</strong> the absence of comparables is also the absence of discipline. A 37.5× trailing multiple on a mid-single-digit organic grower is easier to sustain when nothing sits beside it to make the comparison uncomfortable — and premiums built on scarcity rather than on returns tend to re-rate abruptly when the operating story wobbles.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price ($279.28, +$0.31 / +0.11%, 4:00 PM EDT September 4, 2026), market cap, sector/industry labels, 52-week range, statistics, financials and forecast from <strong>stockanalysis.com/stocks/ecl/</strong> (overview, statistics, financials, quarterly financials and forecast pages, retrieved September 2026); 60 unadjusted monthly closing prices from <strong>digrin.com ECL price history</strong> ("Real Price" column), cross-checked against the stockanalysis.com June 30, 2026 close ($278.61, exact match) and the September 4, 2026 close ($279.28, exact match); Q2 2026 segment sales, organic growth, segment operating margins, pricing/volume split, gross margin and guidance from the <strong>Ecolab Q2 2026 news release (Businesswire, July 27–28, 2026)</strong>, the Investing.com summary of the Q2 2026 results slides, and Q2 2026 earnings-call highlights via Yahoo Finance; CoolIT Systems transaction terms from the <strong>Ecolab investor-relations news release of March 19, 2026</strong> and completion coverage dated July 2, 2026; Q1 2026 reportable-segment names, total debt and the CoolIT term-loan facility from the <strong>Q1 2026 Form 10-Q summary via stocktitan.net</strong>; CEO and CFO names verified independently on the July 28, 2026 Q2 release and the August 25, 2026 SC26 investor-day announcement; global market-cap rank #316 from <strong>companiesmarketcap.com</strong>; named analyst calls, consensus and institutional holders from <strong>marketbeat.com/stocks/NYSE/ECL/</strong>.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">No chart months were reconstructed — all 60 monthly closes are real reported month-end values, except the final point (September 4, 2026), which is the latest available close in a partial month and is labelled as such. Items marked <strong>(est.)</strong> are approximations: only the US and NYSE market-cap rank pills. Items marked <strong>n/d</strong> are not disclosed or were not verified. <strong>Specifically not verified and therefore not stated:</strong> any competitor revenue, market share or growth figure (Solenis/Diversey, Kurita, Veolia Water Technologies, Rentokil, Rollins, Cytiva, Sartorius); any TAM figure other than Ecolab's own $5B→$10B High-Tech opportunity statement; the Specialty Chemicals industry-average and S&amp;P 500 benchmark columns in Section 04, which are left blank rather than estimated; a five-year total-return comparison against the S&amp;P 500 or NASDAQ-100; any standalone Purolite revenue, growth or return figure; any eROI-specific quantification; and the Ovivo Electronics purchase price and close date. <strong>Two corrections to common framings:</strong> Ecolab's reported segments as of Q2 2026 are Global Water, Global Institutional &amp; Specialty, Global Pest Elimination and Global Life Sciences — not "Global Industrial" and "Global Healthcare &amp; Life Sciences"; and the disposition of the Healthcare business under the restated structure could not be verified from the sources fetched. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [222.22,221.47,234.59,189.45,176.26,176.56,169.34,163.91,153.76,165.17,163.83,144.42,157.07,149.83,145.56,154.83,159.37,165.53,167.84,165.05,186.69,183.14,183.81,169.40,167.74,191.73,198.35,198.22,224.84,230.90,226.15,232.20,238.00,230.69,253.18,255.33,245.73,248.77,234.32,250.19,269.01,253.52,251.43,265.62,269.44,261.76,277.04,273.86,256.40,275.16,262.52,281.99,308.35,266.02,260.60,256.00,278.61,277.63,283.20,279.28];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window opens $222.22',                     color: '#94a3b8' },
+  { idx: 11, label: 'Sep 2022 — cost-shock low $144.42 (−35.0%)',           color: '#ef4444' },
+  { idx: 26, label: 'Dec 2023 — margin recovery confirmed $198.35',         color: '#22c55e' },
+  { idx: 38, label: 'Dec 2024 — FY24 EPS +53.9% on margin $234.32',         color: '#22c55e' },
+  { idx: 52, label: 'Feb 2026 — 5-yr monthly high $308.35',                 color: '#3FA9F5' },
+  { idx: 53, label: 'Mar 2026 — CoolIT $4.75B announced, −13.7% $266.02',   color: '#ef4444' },
+  { idx: 57, label: 'Jul 2026 — CoolIT closes + Q2 beat/raise $277.63',     color: '#f59e0b' },
+  { idx: 59, label: 'Sep 4, 2026 — $279.28 (partial month)',                color: '#22c55e' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(63,169,245,0.22)');
+grad.addColorStop(1, 'rgba(63,169,245,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3FA9F5', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3FA9F5'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
