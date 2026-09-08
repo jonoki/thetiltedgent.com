@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSA — Public Storage | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #FF7A1A;
+  --accent-dim: #FF7A1A33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">PSA</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Real Estate / REIT — Industrial</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $58.64B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #455</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#160 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#80 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Public Storage</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$302.01</div>
+      <div class="price-change">−$3.72 (−1.22%)</div>
+      <div class="price-date">Close, Friday September 4, 2026 · 4:00 PM EDT</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Frisco, Texas</div>
+    <div class="meta-item"><span>Employees:</span> 5,770 (pre-NSA headcount as listed)</div>
+    <div class="meta-item"><span>Founded:</span> 1972</div>
+    <div class="meta-item"><span>Next Earnings:</span> Late October 2026 (est. — Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Public Storage is the largest owner and operator of self-storage in the United States and, after the July 2026 close of the National Storage Affiliates merger, operates a combined platform of <strong>over 4,500 locations and more than 327 million rentable square feet</strong>. FY2025 revenue was <strong>$4.83B, up 2.5%</strong> from $4.72B in FY2024; the trailing-twelve-month figure through June 2026 is <strong>$4.91B, up 3.2%</strong>. It ranks roughly <strong>#455 globally by market capitalisation</strong> at $58.64B. It also holds a <strong>35% common equity interest in Shurgard</strong>, the largest self-storage platform in Western Europe.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Why EPS is the wrong lens here.</strong> A REIT (Real Estate Investment Trust — a company that must distribute most of its taxable income to shareholders and pays little corporate tax in return) charges depreciation against buildings that in practice hold or gain value, so GAAP earnings systematically understate cash generation; that is exactly why the industry reports <span class="tip" title="Funds From Operations — net income plus real-estate depreciation and amortisation, less gains on property sales. The REIT industry's standard earnings proxy.">FFO</span> instead. In Q2 2026 Public Storage earned <strong>$2.55 of GAAP EPS</strong> and <strong>$4.17 of Core FFO per share</strong> — a 63% gap that is almost entirely depreciation on concrete boxes that have not depreciated.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is narrower than "is storage a good business." Storage leases are <strong>month-to-month</strong>, which means pricing resets in weeks rather than years — in both directions. From 2022 through 2025 that mechanism ran against the company: housing turnover collapsed, new-customer street rates fell, and same-store revenue rolled over. Q2 2026 is the first quarter in which the mechanism appears to be turning: <strong>move-in rents were up 1.6% year over year — the first time since 2021 that both new move-in rates and occupancy were up together</strong>. Whether that is an inflection or a bounce is the whole question, and it is decided by housing transactions, not by anything management controls.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Tom Boyle</div>
+      <div class="card-note"><strong>Correction to the brief:</strong> Joe Russell is <em>not</em> the sitting CEO. Tom Boyle is identified as Chief Executive Officer on the Q2 2026 earnings call (July 29, 2026) and is the executive quoted in the Q2 2026 results release. Boyle previously served as the company's CFO, so the current leadership is an internal finance-side succession rather than an outside hire.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Joe Fisher</div>
+      <div class="card-note">Identified as CFO on the Q2 2026 call and quoted in the results release on capital activity — "$5.9 billion of debt capital markets activity and $6.0 billion of common share and partnership unit issuance." He owns the Core FFO guidance framing and delivered the call's most falsifiable claim: revenue growth improving in Q3 and turning positive in Q4 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">194.15M shares</div>
+      <div class="card-note">Share count has expanded materially — roughly $6.0B of common share and OP-unit issuance funded the all-stock NSA merger (0.1400 PSA shares per NSA share) and the PS Canada deal (~$900M in OP units at $321.98). <strong>Specific institutional holdings were not verified from the sources fetched and are therefore not listed.</strong> The Hughes family's historic stake is well known but was not confirmed on a fetched page.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Public Storage is effectively a <strong>single-asset-class business</strong>, and it does not publish a revenue split by segment in the headline release. The disaggregation it <em>does</em> disclose is the one that matters analytically: same-store versus non-same-store facilities, plus ancillary operations. The bar below is derived by arithmetic from the Q2 2026 release — same-store revenue of $1,007M and ancillary revenue of roughly $91M against total revenue of $1,238M, with non-same-store self-storage as the residual. Shurgard Europe sits outside all of it as an unconsolidated 35% equity stake and contributes no revenue line at all.</p>
+  <div class="seg-bar">
+    <div style="flex:81.3;background:#FF7A1A;">SAME-STORE 81.3%</div>
+    <div style="flex:11.3;background:#3b82f6;color:#fff;">NON-SAME-STORE 11.3%</div>
+    <div style="flex:7.4;background:#a78bfa;">ANCILLARY 7.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#FF7A1A;"></span> Same-store self-storage — $1,007M (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Non-same-store self-storage — ~$140M (derived residual)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Ancillary — ~$91M (½ of $182.6M reported for 1H26)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note on method: only the $1,007M same-store figure and the $182.6M six-month ancillary figure are directly reported. The non-same-store slice is the residual against reported total revenue of $1,238M and is <strong>derived, not disclosed</strong>.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #FF7A1A;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Same-Store Self-Storage — 2,755 facilities, 192.1M sq ft</div>
+        <span class="biz-badge dominant">~83% OF U.S. PORTFOLIO — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,007M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−0.6%</div><div class="biz-stat-label">Rev YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−2.2%</div><div class="biz-stat-label">NOI YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">81.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the engine, and it is unusually legible. Four numbers describe it completely. <strong>Same-store revenue: $1,007M, down 0.6%.</strong> <strong>Same-store <span class="tip" title="Net Operating Income — property revenue less direct property operating costs, before interest, depreciation, tax and corporate overhead. The purest measure of what a portfolio of buildings earns.">NOI</span>: $746.4M, down 2.2%</strong>, with direct cost of operations up 4.3% to $227.7M — costs rising into flat revenue is what produces negative operating leverage in a fixed-cost business. <strong>Weighted average occupancy: 92.5%</strong>, up 20 basis points year over year and 92.4% at quarter end. <strong>Realised annual rent per occupied square foot: $21.89</strong>, down 0.8%. Read together they say something precise: the portfolio is <em>fuller</em> and <em>cheaper</em>. Management traded rate for occupancy through the downturn, and the NOI margin of 74.2% is what is left after doing so. The turn, if it is one, showed up in the leading indicator rather than the reported one — <strong>move-in rents rose 1.6% year over year in Q2 after falling 2.4% in Q1, with June alone at +4%</strong>, and move-out activity fell 8%.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed by the company; third-party U.S. self-storage TAM estimates were not verified from sources fetched and are omitted rather than guessed.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Extra Space Storage (EXR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$30.73B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$3.51B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+3.9%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CubeSmart (CUBE)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$8.93B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$1.14B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+3.9%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Nat'l Storage Affiliates</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">ACQUIRED</div><div class="comp-bubble-label">By PSA, Jul 22 '26</div></div>
+          <div><div class="comp-bubble-val">$10.5B</div><div class="comp-bubble-label">Deal Value</div></div>
+          <div><div class="comp-bubble-val">0.1400×</div><div class="comp-bubble-label">PSA shares/NSA sh</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Non-Same-Store, Development &amp; Acquisitions</div>
+        <span class="biz-badge emerging">441 FACILITIES · 39.3M SQ FT · LEASE-UP DRAG BY DESIGN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$343–357M</div><div class="biz-stat-label">FY26 Non-SS NOI Guide</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.0M sq ft</div><div class="biz-stat-label">Development Pipeline</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$691.7M</div><div class="biz-stat-label">Pipeline Cost</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~11.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The non-same-store pool is where the growth actually sits and where the reported same-store numbers get their bad reputation. <strong>441 facilities and 39.3M square feet</strong> — roughly 17% of the U.S. portfolio — sit outside the same-store pool because they are still leasing up, recently acquired, or recently built. Guidance calls for <strong>$343–357M of non-same-store NOI in FY2026</strong>, which is why Core FFO guidance was raised while same-store guidance stayed negative. The development pipeline is <strong>4.0 million square feet at an estimated $691.7 million</strong>, with 18–24 month completion timelines. Acquisitions ran <strong>20 facilities / 1.5M sq ft / $222.5M in Q2</strong> and <strong>44 facilities / 3.2M sq ft / $454.9M year to date</strong>. On top of that sit two structural deals: the <strong>$10.5B all-stock NSA merger</strong> (closed July 22, 2026; 1,100 stores and 575,000 units migrated onto Public Storage systems overnight; ~14,000 units to reactivate; $110–130M of run-rate synergies guided over three to four years) and <strong>PS Canada — 68 properties, 5.3M sq ft, $1.2B</strong>, funded with ~$900M of OP units at $321.98 plus $300M of Canadian debt priced more than 100bp below U.S. levels, with a $288M earn-out in units struck at $375. Management's argument for Canada is supply: per-capita storage supply of roughly 2.5 square feet versus far higher U.S. levels.</p>
+    <div class="biz-tam"><strong>Note:</strong> new supply and lease-up depress reported same-store growth by construction — a newly acquired facility only enters the same-store pool after it stabilises. Judging PSA on same-store alone systematically penalises the acquirer.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">EXR — Q2'26 activity</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">17</div><div class="comp-bubble-label">Facilities Bought</div></div>
+          <div><div class="comp-bubble-val">+67</div><div class="comp-bubble-label">3rd-Party Mgd Adds</div></div>
+          <div><div class="comp-bubble-val">4,410</div><div class="comp-bubble-label">Total Facilities</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CubeSmart — same-store pool</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">623</div><div class="comp-bubble-label">Locations</div></div>
+          <div><div class="comp-bubble-val">45.2M</div><div class="comp-bubble-label">Sq Ft</div></div>
+          <div><div class="comp-bubble-val">−0.8%</div><div class="comp-bubble-label">SS Rev YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Ancillary — Tenant Reinsurance &amp; Merchandise</div>
+        <span class="biz-badge growth">FASTEST-GROWING LINE — +12.2% YoY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$182.6M</div><div class="biz-stat-label">1H'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+12.2%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~7.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The quiet high-margin line. Tenant reinsurance is an insurance programme sold at move-in against goods stored, and merchandise is locks, boxes and packing supplies. <strong>$182.6M in the first half of 2026, up 12.2% from $162.6M</strong> — growing four times faster than the property business it attaches to, because it scales with <em>customer count</em> rather than with rent. Every incremental facility acquired, including 1,100 NSA stores, arrives with a captive base to cross-sell into. This is roughly 7% of revenue carrying a materially higher incremental margin than storage rent, and it is a meaningful part of why Core FFO can grow while same-store NOI shrinks.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; no third-party estimate verified.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Shurgard Europe — 35% Unconsolidated Stake</div>
+        <span class="biz-badge emerging">EQUITY METHOD — NO REVENUE CONSOLIDATED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">35%</div><div class="biz-stat-label">Common Equity Int.</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">335</div><div class="biz-stat-label">Facilities</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~19M sq ft</div><div class="biz-stat-label">Net Rentable</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$11.8M</div><div class="biz-stat-label">1H'26 Equity Earnings</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">A <strong>35% common equity interest in Shurgard Self Storage Limited</strong> — 335 facilities across seven Western European countries, roughly 19 million net rentable square feet. Because the stake is non-controlling it is accounted for on the equity method: none of Shurgard's revenue appears in Public Storage's $4.91B, and only <strong>$11.8M of equity in earnings</strong> flowed through in the first half of 2026. That is under 1% of first-half Core FFO. Two honest readings. The bull reading is that the stake is a cheap, unlevered call option on European storage penetration — a market with far lower per-capita supply than the U.S. — carried at an accounting value that says nothing about market value. The bear reading is simpler: at $11.8M of semi-annual earnings contribution it is a rounding error, and it does not move the thesis in either direction today. Notably, Shurgard did not come up at all on the Q2 2026 earnings call.</p>
+    <div class="biz-tam"><strong>Note:</strong> Shurgard's own market value, leverage and same-store metrics were not verified from sources fetched and are not stated.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">Largest U.S. Owner</span>
+    <span class="moat-pill">4,500+ Locations</span>
+    <span class="moat-pill">327M+ Sq Ft</span>
+    <span class="moat-pill">Brand Search Traffic</span>
+    <span class="moat-pill">Net Debt/EBITDA 2.9×</span>
+    <span class="moat-pill">$3.8B Liquidity</span>
+    <span class="moat-pill">3.3% Cost of Debt</span>
+    <span class="moat-pill">Irreplaceable Infill Sites</span>
+  </div>
+  <p class="prose" style="margin-top:20px;"><strong>The moat is the cost of capital, not the buildings.</strong> Self-storage is a commodity product — a concrete box with a roll-up door — and no operator has a durable product advantage. What Public Storage has is the ability to buy those boxes more cheaply than anyone else can. It carries <strong>net debt to <span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortisation — a rough proxy for cash operating profit.">EBITDA</span> of 2.9×</strong>, down from 3.1× a year earlier, against a REIT sector where 5–6× is unremarkable; its <strong>weighted average interest rate is 3.3%</strong>; and it has <strong>$3.8B of liquidity</strong> available. In a year when the industry's operating fundamentals were negative, it executed <strong>$5.9B of debt capital markets activity and $6.0B of share and unit issuance</strong> and bought a public competitor outright. That is what the balance sheet is <em>for</em>: a low-levered REIT does not out-earn its peers in good times, it out-buys them in bad ones. The second-order moat is demand aggregation — the brand captures a disproportionate share of unbranded "storage near me" search, which matters enormously for a product bought under time pressure by someone in the middle of moving house.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">→</span><div><strong>Month-to-month leases cut both ways.</strong> The feature that let storage reprice upward almost instantly in 2021 is the same feature that let it reprice downward almost instantly from 2023. There is no contractual lease term to hide behind, no rent escalator, no weighted average lease expiry. Realised rent per occupied square foot fell to <strong>$21.89 from $22.06</strong> and the portfolio has no mechanism to stop that other than demand returning.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong>Demand is downstream of housing turnover, which is depressed.</strong> Existing-home sales ran at a <strong>4.06 million seasonally adjusted annual rate in July 2026</strong>, down 1.7% month over month and up only 0.7% year over year. People rent storage when they move. Fewer moves, fewer new customers, and the ones already in place are the only pricing lever left. Public Storage does not control this variable at all.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong>Negative operating leverage in a fixed-cost box.</strong> Direct cost of operations rose <strong>4.3% against revenue down 0.6%</strong>, turning a small revenue decline into a 2.2% NOI decline. Property taxes, insurance and payroll do not fall when street rates do. A flat-revenue year is a down-NOI year by construction.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong>Low barriers to new supply.</strong> Storage is among the cheapest and fastest commercial property types to build, so any period of strong rents invites competing development in the same submarkets. The company's own answer is to be the developer — a 4.0M sq ft, $691.7M pipeline — but that is a defence against someone else's supply, not an elimination of it.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong>Integration and issuance risk.</strong> The NSA merger added 1,100 stores and 575,000 units at once, and roughly $6.0B of equity and units were issued in the period. Synergies of $110–130M are guided over three to four years — a slow payback against immediate dilution of the per-share numbers that FFO is measured in.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">REIT convention applies throughout. The table leads with <span class="tip" title="Funds From Operations — net income plus real-estate depreciation and amortisation, less gains on property sales.">FFO</span> and <span class="tip" title="Core FFO — FFO further adjusted for non-recurring items such as merger costs, foreign-exchange and preferred redemption charges. The measure management guides on.">Core FFO</span> rather than <span class="tip" title="Earnings Per Share — net income divided by diluted shares. For a REIT this is depressed by depreciation on buildings that typically appreciate.">EPS</span>, because depreciating appreciating real estate makes GAAP earnings a poor measure of what the business generates. Gross margin and current ratio are marked <strong>n/m</strong> — a landlord has no cost of goods sold, and a REIT deliberately runs minimal current assets because it funds itself in the capital markets, not from working capital.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>PSA</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Core FFO per share — the REIT equivalent of adjusted EPS. Management guides on this number.">Core FFO / Share</span> (Q2'26)</td><td style="color:var(--amber);">$4.17 (−2.6%)</td><td>—</td><td>—</td><td>EXR $2.15 (+4.9%), CUBE adj. FFO $0.63. PSA's decline vs EXR's growth is the peer gap in one line.</td></tr>
+      <tr><td>Core FFO / Share (1H'26)</td><td style="color:var(--amber);">$8.38</td><td>—</td><td>—</td><td>Versus $8.39 a year earlier — flat to the penny across six months.</td></tr>
+      <tr><td>Core FFO / Share (FY26 guide)</td><td style="color:var(--green);">$16.75–17.05</td><td>—</td><td>—</td><td>Raised from $16.35–17.00. Midpoint $16.90.</td></tr>
+      <tr><td><span class="tip" title="FFO per share — net income plus real-estate depreciation, before the Core adjustments.">FFO / Share</span> (Q2'26)</td><td style="color:var(--green);">$4.21 (+22.4%)</td><td>—</td><td>—</td><td>The 22% jump is an artefact of prior-year charges; Core FFO strips it out and shows −2.6%. Use Core.</td></tr>
+      <tr><td><span class="tip" title="Price divided by Funds From Operations per share — the REIT analogue of a P/E ratio.">P/FFO</span> (on FY26 Core guide midpoint)</td><td style="color:var(--red);">17.9×</td><td>~16.0× (est.)</td><td>—</td><td>$302.01 ÷ $16.90. Peer figures annualise a single quarter: EXR ≈16.2×, CUBE ≈15.7× (both est.). PSA trades at a premium into slower growth.</td></tr>
+      <tr><td>Net Debt / <span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortisation.">EBITDA</span></td><td style="color:var(--green);">2.9×</td><td>—</td><td>—</td><td>Down from 3.1×. Unusually low for any REIT; 5–6× is common in the sector. Including the $4.35B of preferred it is ≈4.2× (computed).</td></tr>
+      <tr><td>Payout Ratio (on Core FFO)</td><td style="color:var(--green);">71.0%</td><td>—</td><td>—</td><td>$12.00 ÷ $16.90 midpoint (computed). Comfortable. The GAAP payout ratio of 114.5% is the same dividend measured against the wrong denominator.</td></tr>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings — price divided by trailing twelve-month earnings per share. Depressed relevance for a REIT.">P/E</span></td><td style="color:var(--amber);">28.81</td><td>28.88 (est.)</td><td>—</td><td>$302.01 ÷ $10.48. In line with the EXR/CUBE average, but for a REIT this ratio mostly measures depreciation policy.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by expected next-twelve-month earnings per share.">P/E</span></td><td style="color:var(--red);">30.96</td><td>—</td><td>—</td><td>Higher than trailing because 2026 consensus adjusted EPS of $9.88 is forecast to <em>fall</em> 3.4%.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — P/E divided by the expected earnings growth rate. Above 2 is usually considered expensive.">PEG</span> Ratio</td><td style="color:var(--red);">6.87</td><td>—</td><td>—</td><td>Very high, but near-meaningless here: the denominator is a small forecast growth number, and PEG was never designed for landlords.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share on a trailing-twelve-month basis.">EPS</span> (<span class="tip" title="Trailing Twelve Months.">TTM</span>)</td><td>$10.48 (+14.3%)</td><td>—</td><td>—</td><td>Against $4.17 of quarterly Core FFO. The gap between GAAP EPS and FFO is real-estate depreciation.</td></tr>
+      <tr><td>Same-Store Revenue (<span class="tip" title="Year over Year — compared with the same period one year earlier.">YoY</span>)</td><td style="color:var(--red);">−0.6%</td><td>−0.8% CUBE / +2.4% EXR</td><td>—</td><td>The single most important operating number on the page. Guided to turn positive in Q4 2026.</td></tr>
+      <tr><td>Same-Store NOI (YoY)</td><td style="color:var(--red);">−2.2%</td><td>−0.7% CUBE / +3.5% EXR</td><td>—</td><td>Worse than revenue because direct costs rose 4.3%. PSA is the laggard of the three on this metric.</td></tr>
+      <tr><td>Same-Store Occupancy</td><td style="color:var(--amber);">92.5% (+0.2pt)</td><td>90.4% CUBE / 94.2% EXR</td><td>—</td><td>Between the two peers. Fuller than CubeSmart, emptier than Extra Space.</td></tr>
+      <tr><td>Realised Rent / Occ. Sq Ft</td><td style="color:var(--red);">$21.89 (−0.8%)</td><td>—</td><td>—</td><td>Rent per available square foot $20.18 (1H26) vs $20.23. The portfolio is fuller and cheaper.</td></tr>
+      <tr><td>Revenue Growth (YoY, TTM)</td><td style="color:var(--amber);">+3.2%</td><td>+3.9% (est.)</td><td>—</td><td>Total revenue grows on acquisitions while same-store shrinks — the whole argument in two lines.</td></tr>
+      <tr><td><span class="tip" title="Gross Margin — revenue less cost of goods sold, divided by revenue.">Gross Margin</span></td><td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td><td>Not meaningful: a landlord has no cost of goods sold. The relevant figure is the same-store NOI margin of 74.2%.</td></tr>
+      <tr><td><span class="tip" title="Net Profit Margin — net income divided by revenue.">Net Profit Margin</span></td><td style="color:var(--green);">41.63%</td><td>—</td><td>—</td><td>Operating margin 46.3%. High even after depreciation — storage has almost no variable cost per customer.</td></tr>
+      <tr><td><span class="tip" title="Dividend Yield — annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--amber);">3.97%</td><td>5.01% (est.)</td><td>—</td><td>$12.00 annualised ($3.00/quarter). Below both peers — investors are paying for the balance sheet, not the yield.</td></tr>
+      <tr><td><span class="tip" title="Short Interest — shares sold short as a percentage of shares outstanding.">Short Interest</span> / Float %</td><td style="color:var(--green);">2.75% (5.34M sh)</td><td>—</td><td>—</td><td>Low. Nobody is betting aggressively against this business; the debate is about price, not solvency.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity — total debt divided by shareholders' equity.">Debt-to-Equity</span></td><td style="color:var(--amber);">1.10</td><td>—</td><td>—</td><td>Looks levered on book equity because REIT book equity is depreciated cost, not market value. Net debt/EBITDA of 2.9× is the honest measure.</td></tr>
+      <tr><td><span class="tip" title="Current Ratio — current assets divided by current liabilities.">Current Ratio</span></td><td style="color:var(--text-dim);">n/m (0.22)</td><td>—</td><td>—</td><td>Not meaningful. REITs deliberately hold no working capital; liquidity is the $3.8B facility, not the balance sheet.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow less capital expenditure.">Free Cash Flow</span></td><td>$1.71B</td><td>—</td><td>—</td><td>Operating cash flow $3.17B less capex. Development spend is what stands between the two.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--green);">21.93%</td><td>—</td><td>—</td><td>Flattered by depreciated book equity, as with all REITs. Directionally strong, not comparable to an operating company.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by debt plus equity capital.">ROIC</span></td><td style="color:var(--green);">11.71%</td><td>—</td><td>—</td><td>Genuinely high for real estate, and the reason low leverage still produces good equity returns.</td></tr>
+      <tr><td><span class="tip" title="Beta — sensitivity to moves in the broad market. 1.0 moves with the index; below 1.0 is less volatile.">Beta</span></td><td style="color:var(--green);">0.94</td><td>—</td><td>—</td><td>Slightly less volatile than the S&amp;P 500 — but the volatility that matters here is interest-rate, not equity-market.</td></tr>
+      <tr><td>52-Week Range</td><td>$256.54 – $335.55</td><td>—</td><td>—</td><td>Current price sits at the 55th percentile of the range. 52-week change +3.51%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:20px;"><strong>Notable one-off items.</strong> Three distortions matter. <strong>(1) FFO versus Core FFO.</strong> Q2 FFO rose 22.4% while Core FFO fell 2.6%; the gap is prior-period items that Core strips out. Anyone quoting the 22% number is quoting noise. <strong>(2) The NSA merger closed on July 22, 2026</strong> — after quarter end. Q2's reported numbers therefore contain <em>none</em> of the 1,100 acquired stores but the share count and guidance already reflect the issuance. Q3 will be the first messy blended quarter, and year-over-year comparisons from Q3 2026 onward are not like-for-like. <strong>(3) GAAP net income per share of $2.55 versus $1.76 a year earlier (+45%)</strong> moved almost entirely for accounting reasons while the operating business declined — a clean illustration of why this page leads with FFO. The <strong>114.5% GAAP payout ratio</strong> is a fourth artefact: on Core FFO the payout is 71%.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">Hold</div>
+      <div class="card-note">22 analysts covering. A genuine Hold, not a euphemism — 16 of 22 sit on the fence.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$336.28</div>
+      <div class="card-note" style="color:var(--green);">+11.35% from $302.01. Median $339.50 (+12.41%).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$285 – $374</div>
+      <div class="card-note">Low −5.63%, high +23.84%. A 31% spread — narrow by equity standards, which is what you expect when the debate is about a cap rate rather than a business model.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">4 / 2 / 16 / 0</div>
+      <div class="card-note">Strong Buy 4 · Buy 2 · Hold 16 · Sell 0 · Strong Sell 0. Nobody is negative; almost nobody is enthusiastic.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:6;background:#22c55e;"></div>
+    <div style="flex:16;background:#f59e0b;"></div>
+    <div style="flex:0.001;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 6</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 16</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0</div>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:24px;">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Scotiabank</strong> — Nicholas Yulico, <strong>Sector Outperform</strong>, target <em>cut</em> $346 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$343</span> (Sep 2, 2026). The most constructive rating in the recent tape, and even it trimmed the target. Still implies roughly 14% upside.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Mizuho</strong> — Ravi Vaidya, <strong>Neutral</strong>, target raised $316 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$319</span> (Sep 2, 2026). A 5% implied upside with a neutral rating is the analytical equivalent of a shrug.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Wells Fargo</strong> — target set at <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$311</span> (Sep 1, 2026); rating not captured on the fetched page. Roughly 1% above the current price — effectively fair value.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Barclays</strong> — Brendan Lynch, <strong>Equal Weight</strong>, target raised $349 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$350</span> (Aug 19, 2026). The highest target among the recent calls, attached to a neutral rating — the familiar shape of an analyst who respects the asset and not the entry price.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>RBC Capital Markets</strong> — Brad Heffern, <strong>Sector Perform</strong>, target raised $305 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$318</span> (Jul 31, 2026), two days after the Q2 print and guidance raise. A 4% target increase on a quarter that raised full-year Core FFO guidance by $0.22.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were read off a fetched MarketBeat price-target page; the Scotiabank and Wells Fargo actions were independently visible on the stockanalysis.com forecast page. Note the pattern across every one of them: four of five raised or held targets while keeping a neutral rating. The Street believes the operating trough is behind the company and does not believe the current multiple pays you for it.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">National Storage Affiliates merger closes — $10.5B, all stock</div>
+        <div class="tl-desc">1,100 stores and 575,000 units migrated onto Public Storage systems overnight at 0.1400 PSA shares per NSA share. Management flagged ~14,000 units to reactivate and guided $110–130M of run-rate synergies over three to four years. The combined platform is over 4,500 locations and more than 327 million square feet. <strong>This removes NSA from the peer set entirely</strong> — the three-way public storage comparison is now a two-way one.</div>
+        <div class="tl-impact up">Completed — scale step-change</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — FFO missed, guidance raised</div>
+        <div class="tl-desc">Core FFO of $4.17 (−2.6%) came in below expectations while revenue beat, on same-store revenue −0.6% and same-store NOI −2.2%. Management nonetheless raised full-year guidance across the board: Core FFO to $16.75–17.05 (midpoint up $0.22), same-store revenue to −0.7%/+0.3% and same-store NOI to −2.0%/−0.3%. The raise came from non-same-store NOI and acquisitions, not from the core portfolio.</div>
+        <div class="tl-impact neutral">Mixed — miss on FFO, raise on guide</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">PS Canada closes — 68 properties, 5.3M sq ft, $1.2B</div>
+        <div class="tl-desc">Funded with roughly $900M of OP units at $321.98 plus $300M of Canadian debt priced more than 100 basis points below U.S. levels, with a $288M earn-out in units struck at $375. Management's case rests on supply scarcity — roughly 2.5 square feet of storage per capita in Canada. The unit strike prices are worth watching: issuing equity at $321.98 when the shares trade at $302.01 is accretive to the seller, not the buyer, if the stock does not recover.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">The dated claim: same-store revenue growth turns positive</div>
+        <div class="tl-desc">CFO Joe Fisher stated plainly that "we expect revenue growth to improve in the third quarter and turn positive in the fourth quarter." This is the most falsifiable statement in the story — a metric, a sign and a deadline. Confirmation validates the move-in-rate inflection; a slip says the +1.6% Q2 move-in print was seasonal noise.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Oct 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — first blended quarter with NSA</div>
+        <div class="tl-desc">The exact date was not confirmed on the sources fetched. Q3 is the first period to include the NSA portfolio, PS Canada is expected to land inside it, and reported growth rates will jump for reasons that have nothing to do with the underlying storage cycle. Watch the same-store pool, which excludes all of it, for the honest read.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">The dividend stays at $3.00 — fifteenth straight quarter</div>
+        <div class="tl-desc">A $3.00 per share quarterly dividend was declared on August 4, 2026, unchanged. Annual DPS has been $12.00 in 2023, 2024 and 2025, following the step up from $8.00 in 2023; consensus has FY2026 at $12.02, or +0.2%. On a 71% Core FFO payout the dividend is not at risk — but a REIT holding its distribution flat for three and a half years is telling shareholders that capital is better used buying assets than paying them out. Whether that is discipline or a signal depends entirely on the returns the acquisitions earn.</div>
+        <div class="tl-impact down">No dividend growth — structural</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Development pipeline and the housing cycle</div>
+        <div class="tl-desc">4.0 million square feet at $691.7M is in development with 18–24 month completion timelines, and $454.9M of acquisitions have closed year to date. Every one of those deliveries needs new customers, and new customers come from housing turnover. July 2026 existing-home sales ran at a 4.06M annual rate — up just 0.7% year over year, with 4.6 months of inventory and a $434,100 median price.</div>
+        <div class="tl-impact neutral">Ongoing headwind</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">PSA — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted "Real Price")</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#FF7A1A;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$332.18</strong> to the September 4, 2026 close of <strong>$302.01</strong>, PSA lost <strong>9.1% in price</strong> over five years. Add dividends — roughly <strong>$55 per share</strong> across the window, computed from reported annual DPS of $8.00 (2021, part), $8.00 (2022), $12.00 (2023, 2024, 2025) and $9.00 year-to-date 2026 — and the total return is approximately <strong>+7.5%, or about 1.5% a year (est., computed, not sourced)</strong>. That is the entire five-year outcome for the largest owner of self-storage in America: you were paid your dividend and gave back most of it in price. The path inside that flat line matters more than the line. The stock peaked at <strong>$390.28 in March 2022</strong>, at the top of the post-pandemic storage boom and just as the rate-hiking cycle began, then fell <strong>38.8% to $238.71 in October 2023</strong> as long rates peaked and street rates rolled over simultaneously — the double hit that defines a rate-sensitive business with month-to-month pricing. It rallied <strong>52.4% to $363.87 by September 2024</strong> on the first rate-cut expectations, then ground <strong>28.7% lower to $259.50 in December 2025</strong> as the operating trough deepened, and has recovered to $302.01 today.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A verified S&amp;P 500 and real-estate-sector total return over the identical five-year window could not be sourced from the pages fetched and is therefore not stated. What can be said from data on this page: PSA's 52-week price change is <strong>+3.51%</strong>, its beta is <strong>0.94</strong>, and a roughly 1.5% annualised five-year total return is a poor absolute outcome for a period in which the broad U.S. equity market rose substantially. Against its own sector, the read is clearer and less flattering — Extra Space grew same-store revenue 2.4% and same-store NOI 3.5% in Q2 2026 while Public Storage shrank both, and Extra Space grew Core FFO 4.9% while Public Storage's fell 2.6%. On the operating scoreboard, PSA is currently the laggard of the three big listed operators, and one of those three no longer exists independently because PSA bought it.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$332.18 — window opens mid-boom</div><div class="tl-desc">Pandemic-era household formation, remote-work relocations and record housing turnover had storage occupancy and street rates at all-time highs. Month-to-month leases repriced upward almost instantly.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2022</div><div class="tl-content"><div class="tl-title">$390.28 — the cycle peak</div><div class="tl-desc">The all-time monthly close in this window, set in the same month the Federal Reserve began raising rates. Two things broke at once from here: the discount rate applied to a bond-like income stream, and the housing turnover that feeds new-customer demand.</div><div class="tl-impact up">Peak — everything after is the reset</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">$238.71 — trough, −38.8% from March 2022</div><div class="tl-desc">Long-end yields peaked and mortgage rates froze the resale housing market. With no lease terms to cushion it, street rates fell straight through to reported revenue. This is what a month-to-month business looks like on the way down.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">$363.87 — +52.4% off the low on rate-cut hopes</div><div class="tl-desc">The market re-rated the income stream before the operating business improved at all. Same-store revenue growth was still negative through this rally — the move was almost entirely a discount-rate move, which is the honest description of most REIT rallies.</div><div class="tl-impact up">Multiple expansion, not earnings</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">$259.50 — −28.7% as the operating trough deepened</div><div class="tl-desc">FY2025 revenue growth slowed to 2.5% and EPS fell to $9.01 from $10.64. The rate-cut trade unwound and the fundamentals had not yet arrived to replace it. Monthly RSI bottomed in this stretch.</div><div class="tl-impact down">Trough of the drawdown</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">$324.17 — NSA merger closes July 22</div><div class="tl-desc">The month's close was the highest since late 2024, coinciding with the completion of a $10.5B all-stock acquisition of a listed competitor and with a Q2 print showing move-in rents positive for the first time since 2021. The stock has given back roughly 7% since.</div><div class="tl-impact up">Scale plus the first operating green shoot</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2026</div><div class="tl-content"><div class="tl-title">$302.01 — mid-range, mid-argument</div><div class="tl-desc">Sitting at the 55th percentile of the $256.54–$335.55 52-week range, 11.4% below the average analyst target, on 17.9× the midpoint of full-year Core FFO guidance. Same-store NOI is still shrinking; the leading indicators are not.</div><div class="tl-impact neutral">Fair-value standoff</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>The mechanism, stated plainly.</strong> Self-storage leases are <strong>month-to-month</strong>. There is no lease term, no escalator, no expiry schedule — a customer can leave at thirty days' notice and a new customer pays whatever the market clears at today. That single structural fact explains almost everything about this business. On the way up it is the best pricing model in real estate: in 2021 storage repriced upward within weeks while office and industrial landlords waited years for leases to roll. On the way down it is the worst: from 2023 onward there was nothing between falling street rates and reported revenue. Public Storage's realised annual rent per occupied square foot is <strong>$21.89, down 0.8%</strong>; occupancy is <strong>92.5%, up 0.2 points</strong>. The portfolio is fuller and cheaper, which is precisely what an operator does when it chooses volume over rate — and precisely what produces same-store revenue of <strong>−0.6%</strong> and same-store NOI of <strong>−2.2%</strong> when direct costs are simultaneously up 4.3%.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The gap that matters: street rates versus in-place rents.</strong> Two prices operate in a storage portfolio at once. The <em>street rate</em> is what a new customer pays today — highly visible, highly elastic, and the number that collapsed after 2022. The <em>in-place rent</em> is what the existing customer is paying, which drifts upward through periodic increases and is anchored by inertia: the cost of renting a truck and moving your possessions again generally exceeds a rent increase, so customers stay. For most of 2023–2025 in-place rents sat meaningfully <em>above</em> street rates, meaning the portfolio was defended by customers who would not pay today's asking price if they were shopping today. That is a fragile equilibrium — it holds until move-outs accelerate. The Q2 2026 data says it held and is now improving from both sides: <strong>move-in rents rose 1.6% year over year</strong> after falling 2.4% in Q1, <strong>June alone ran +4%</strong>, and <strong>move-out activity fell 8%</strong>. Fisher's framing was that this was "the first time since 2021 that both new move-in rates and occupancy were up on a year-over-year basis." The convergence of street rate and in-place rent is what has to happen before same-store revenue turns positive, and the company has put a date on it: <strong>Q4 2026</strong>.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Where the housing cycle actually sits.</strong> The demand driver is not the economy in general, it is transactions. People rent storage when they move — downsizing, divorcing, relocating, renovating, waiting between houses. Existing-home sales ran at a <strong>4.06 million seasonally adjusted annual rate in July 2026</strong>, down 1.7% from June and up only 0.7% year over year, with 4.6 months of inventory and a median price of $434,100. NAR's chief economist described sales as "remarkably stable, even amid the rising mortgage rate environment of the past few months" — stability at a depressed level is exactly the environment that produces flat storage revenue. Note what this means for the bull case: <strong>Public Storage's operating improvement in Q2 2026 came without help from housing turnover.</strong> The move-in rate inflection happened while transactions were roughly flat, which suggests supply absorption and pricing discipline rather than a demand recovery. If housing turnover ever normalises toward its pre-2022 pace, that is upside not currently in the numbers. If it does not, the recovery has to come entirely from the supply side.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The balance sheet is the strategy.</strong> Quantify it: <strong>net debt to EBITDA of 2.9×</strong> (down from 3.1×), <strong>total debt of $10.3B</strong> against a $58.64B market capitalisation and $68.56B enterprise value, a <strong>weighted average interest rate of 3.3%</strong>, only <strong>$650M — 6.3% of total debt — maturing in 2026</strong>, and <strong>$3.8B of available liquidity</strong>. Most equity REITs run 5–6× net debt to EBITDA; Public Storage runs roughly half that. Add the <strong>$4.35 billion of preferred equity</strong> outstanding — perpetual, non-amortising, senior to the common in the capital stack but junior to the debt — and total leverage including preferred is approximately <strong>4.2× EBITDA (computed)</strong>, still conservative. The preferred is the underappreciated piece: it is permanent capital that costs a fixed coupon and never matures, which is an excellent instrument to own when rates fall and an expensive one when they do not. What the balance sheet <em>bought</em> in this cycle is the point: while the operating numbers were negative, the company completed $5.9B of debt-market activity, issued $6.0B of shares and units, acquired a listed competitor for $10.5B, agreed a $1.2B Canadian platform, and closed $454.9M of individual assets. That is only possible from a position of underleverage.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The dividend has been held flat, and that is a choice.</strong> $3.00 per quarter, $12.00 per year, unchanged since the step-up from $8.00 in 2023 — three and a half years without an increase, with consensus forecasting FY2026 at $12.02 (+0.2%). On Core FFO the payout is <strong>71%</strong>, which is comfortable; the headline <strong>114.5% GAAP payout ratio</strong> is an artefact of measuring a cash distribution against a depreciation-laden earnings figure and should be ignored. The yield is <strong>3.97%</strong>, below CubeSmart's 5.37% and Extra Space's 4.65%. So the flat dividend is not a stress signal — it is a capital-allocation statement. Retained cash flow funded the development pipeline and part of the acquisition programme. The test is arithmetic: if $110–130M of NSA synergies, $343–357M of non-same-store NOI and a $691.7M development book compound faster than the ~4% a dividend investor gave up, holding it flat was correct. If they do not, shareholders financed empire-building out of their own distribution.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation.</strong> Be explicit about the denominator, because it changes the answer. On <strong>trailing GAAP EPS of $10.48 the stock trades at 28.8×</strong> — a number that charges the company for depreciating buildings that are not depreciating, and which no REIT investor uses. On <strong>the midpoint of full-year Core FFO guidance ($16.90), it trades at 17.9× P/FFO</strong>. That is the number that matters. Against peers — annualising a single quarter, so treat as estimates — Extra Space sits near <strong>16.2×</strong> and CubeSmart near <strong>15.7×</strong>. Public Storage therefore trades at roughly a <strong>10–14% premium to both</strong>, while posting the weakest same-store revenue, the weakest same-store NOI and the only declining Core FFO of the three. The premium is defensible only on balance sheet and scale: 2.9× leverage, 3.3% cost of debt, 4,500+ locations, and demonstrated ability to buy competitors at the bottom of a cycle. The bear's version is that you are paying a premium multiple for the slowest-growing asset in the sector and calling the balance sheet a moat. Both descriptions are of the same set of facts, and the analyst tape reflects that stalemate exactly: <strong>16 Holds out of 22, average target $336.28, nobody selling and almost nobody buying.</strong></p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The operating trough is behind it and the leading indicator already turned: move-in rents +1.6% year over year in Q2 (June +4%) after −2.4% in Q1, move-outs down 8%, and occupancy up — the first time since 2021 that rate and occupancy rose together. Management has guided same-store revenue to turn positive in Q4 2026 and raised full-year Core FFO guidance to $16.75–17.05. Meanwhile the balance sheet did what a 2.9×-levered balance sheet is supposed to do in a downturn: it bought National Storage Affiliates for $10.5B, added a $1.2B Canadian platform, and closed $454.9M of assets — all funded at a 3.3% weighted average cost of debt. Ancillary revenue is compounding at 12% on a customer base that just grew by 575,000 units. If housing turnover ever normalises from a 4.06M-unit annual pace, none of that upside is in today's numbers.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Same-store revenue is −0.6%, same-store NOI is −2.2%, realised rent per occupied square foot is falling, and Core FFO per share declined 2.6% while Extra Space grew 4.9% — yet PSA trades at 17.9× Core FFO versus roughly 16× for peers. The guidance raise came from acquisitions and lease-up, not from the core portfolio, and it was funded with $6.0B of newly issued shares and units, some struck at $321.98 against a $302.01 share price. The dividend has been flat for three and a half years at a 3.97% yield below both peers. The demand driver is housing turnover, which is stuck near a 4.06M annual rate, and the pricing model is month-to-month, so there is no contractual protection if street rates roll over again. Five years of ownership has delivered roughly 1.5% a year in total return.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The Q4 2026 revenue inflection does not happen.</strong> Management staked a dated, specific claim: same-store revenue growth improving in Q3 and turning positive in Q4. Everything in the current price assumes it. A miss would say the +1.6% move-in print was seasonal, would leave a 17.9× multiple attached to a shrinking core portfolio, and would arrive at the same moment NSA integration costs are running.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Housing turnover stays frozen.</strong> Storage demand is a derivative of moving, and existing-home sales at a 4.06M annual rate are running well below the pre-2022 norm with only +0.7% year-over-year growth. Public Storage has no lever on this variable. If mortgage rates stay elevated, the new-customer funnel stays narrow, and the month-to-month lease structure that makes the recovery fast also makes the stagnation immediate.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Issuance and integration dilute the per-share numbers faster than synergies arrive.</strong> Roughly $6.0B of common shares and OP units were issued, PS Canada units are struck at $321.98 with an earn-out at $375, and NSA synergies of $110–130M are guided over <em>three to four years</em>. FFO is a per-share measure. The share count moved immediately; the synergies have not.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Housing Turnover Is the Sector's Demand Curve</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Self-storage does not sell space, it sells a solution to a transition — moving, downsizing, renovating, splitting a household. That makes existing-home sales the sector's demand curve, and it is running at a <strong>4.06 million seasonally adjusted annual rate</strong> as of July 2026, down 1.7% month over month and up 0.7% year over year, with 4.6 months of inventory. Every operator in the industry — Public Storage at −0.6% same-store revenue, CubeSmart at −0.8%, Extra Space at +2.4% — is operating inside the same constraint, and the spread between them is execution and portfolio geography rather than demand. When transaction volumes normalise, storage revenue improves everywhere at once and no management team gets credit for it. Until then, the sector's growth has to be bought.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Consolidation Has Replaced Organic Growth</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">With same-store growth negative across most of the sector, scale is now being bought rather than earned. Public Storage acquired National Storage Affiliates outright for <strong>$10.5 billion in stock on July 22, 2026</strong>, taking the listed U.S. self-storage universe from four major names to three, and added a <strong>$1.2 billion Canadian platform</strong> on top. Extra Space is expanding through third-party management — 67 sites added in a single quarter — which buys share without buying assets. The strategic logic is sound: a fragmented industry with low barriers to construction rewards whoever has the cheapest capital during the downturn. The shareholder consequence is less comfortable — growth delivered through share issuance means the per-share numbers improve only if the synergies land, and Public Storage's are guided over three to four years.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Month-to-Month Pricing Turns First — In Both Directions</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">The absence of lease terms makes storage the fastest-reporting property type in real estate: the cycle shows up in street rates months before it shows up in reported revenue. That is why the most important number in Public Storage's Q2 2026 release is not the −0.6% same-store revenue but the <strong>+1.6% move-in rate</strong> — with June alone at +4%, after Q1 at −2.4% — and the 8% decline in move-outs. <strong>Bull framing:</strong> new-customer pricing is the leading indicator, it has inflected, existing customers are staying, and reported revenue follows with a lag measured in quarters — management says Q4 2026. At 17.9× Core FFO with 2.9× leverage, that is a reasonable entry into an inflection. <strong>Bear framing:</strong> the same mechanism means there is nothing underneath you if it reverses. One quarter of positive move-in rates in a market where housing transactions are still flat is a data point, not a trend, and you are paying a premium to slower-growing peers to find out which one it is.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 4, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, valuation, statistics, financials and forecast data from stockanalysis.com (PSA overview at <strong>https://stockanalysis.com/stocks/psa/</strong> — close $302.01, −$3.72/−1.22%, Sep 4, 2026 4:00 PM EDT — plus the statistics, financials, quarterly financials and forecast pages, retrieved Sep 8, 2026); 60 monthly unadjusted "Real Price" closes from digrin.com PSA price history, cross-checked against the stockanalysis.com monthly closes for Jun 2026 ($318.31), Jul 2026 ($324.17) and Aug 2026 ($306.99) — exact matches — and against the Sep 4, 2026 close of $302.01, which is the final value of the chart series. Q2 2026 operating detail, same-store metrics, guidance, development and acquisition pipeline, Shurgard stake, balance-sheet and preferred figures from the Public Storage Q2 2026 results release (Businesswire, July 29, 2026). Management commentary on move-in rates, existing-customer churn, the NSA merger and PS Canada from the Q2 2026 earnings call transcript (Investing.com). Peer results for Extra Space Storage, CubeSmart and National Storage Affiliates from Inside Self-Storage's Q2 2026 REIT results round-up and from stockanalysis.com EXR and CUBE overview pages. Analyst actions from a fetched MarketBeat PSA price-target page and the stockanalysis.com forecast page. Global market-cap rank from companiesmarketcap.com (#455). Existing-home sales data from the National Association of Realtors' July 2026 release.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> or <strong>computed</strong> are approximations derived by arithmetic from sourced figures and were not read verbatim from a single page — this includes the U.S. and NYSE market-cap rank pills, the peer P/FFO multiples (which annualise a single quarter), the "Industry Avg" column in Section 04 (a two-name EXR/CUBE average where both were available, "—" otherwise), the ~4.2× leverage-including-preferred figure, the non-same-store revenue slice in Section 02, the five-year total-return estimate, and the late-October 2026 next-earnings date. <strong>The S&amp;P 500 comparison column in Section 04 is "—" throughout because index-level metrics were not verified from any page fetched, and a five-year S&amp;P 500 total-return comparison is deliberately omitted for the same reason.</strong> Institutional holdings could not be retrieved and are not listed. <strong>No chart months were reconstructed</strong> — all 60 monthly closes are real reported values. <strong>Two corrections to the research premise:</strong> (1) the CEO is <strong>Tom Boyle</strong>, not Joe Russell, with <strong>Joe Fisher</strong> as CFO, both confirmed on the Q2 2026 earnings call and results release; (2) <strong>National Storage Affiliates no longer exists as an independent comparable</strong> — Public Storage completed its $10.5B all-stock acquisition on July 22, 2026. Employee count of 5,770 predates that merger. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com; final point = Sep 4, 2026 close) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [332.18,327.38,374.56,358.53,355.02,390.28,371.50,330.64,312.67,326.41,330.83,292.81,309.75,297.96,280.19,304.34,298.95,302.14,294.83,283.30,291.88,281.75,276.38,263.52,238.71,258.76,305.00,283.19,283.87,290.06,259.45,273.83,287.65,295.92,343.72,363.87,329.06,348.05,299.44,298.48,303.62,299.29,300.43,308.41,293.42,271.94,294.59,288.85,278.56,274.54,259.50,276.19,307.06,270.88,302.45,303.69,318.31,324.17,306.99,302.01];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window opens mid-boom $332.18',        color: '#94a3b8' },
+  { idx: 5,  label: 'Mar 2022 — cycle peak $390.28',                    color: '#22c55e' },
+  { idx: 24, label: 'Oct 2023 — trough $238.71 (−38.8%)',               color: '#ef4444' },
+  { idx: 35, label: 'Sep 2024 — rate-cut rally $363.87 (+52.4%)',       color: '#3b82f6' },
+  { idx: 50, label: 'Dec 2025 — operating trough $259.50',              color: '#ef4444' },
+  { idx: 57, label: 'Jul 2026 — NSA merger closes $324.17',             color: '#f59e0b' },
+  { idx: 59, label: 'Sep 4, 2026 — $302.01',                            color: '#FF7A1A' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255,122,26,0.20)');
+grad.addColorStop(1, 'rgba(255,122,26,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#FF7A1A', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#FF7A1A'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
