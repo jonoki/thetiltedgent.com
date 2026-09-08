@@ -23,19 +23,44 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
-### sess-2026-09-08-a · claimed 2026-09-08T00:50Z
-Ranks 205–240 by market cap, 25 names:
+### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
+Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
+
+VMC CNC RMD BIIB JBL CCI PCG ZTS CBOE WTW HAL EXR CFG RDDT IR AEE HPQ DG ON
+DTE ATO TDY CTSH VICI CASY
+
+Notes carried into this batch:
+- **FISV (rank 330) is NOT in this batch.** Fiserv is already live as
+  `reports/fi_analysis.html`. The constituent list now shows the ticker as FISV, so
+  this is a rename job — filename, `<title>`, ticker badge and the index card all need
+  the treatment MRSH got — not a new report. Logged, not claimed.
+- CFG is a regional bank: reuse the COF/USB/PNC metric handling (NIM, ROTCE, CET1,
+  efficiency ratio; mark gross margin and current ratio n/m).
+- CCI, EXR and VICI are REITs: lead with FFO/AFFO, same n/m marks.
+- WTW is a broker, not an underwriter — do not reach for the combined ratio.
+- PCG carries wildfire liability and a post-bankruptcy share count; check the history
+  before trusting any long-run per-share series.
+- Q (rank 357, Qnity Electronics) and VMRK (rank 232, Vivmark Residential) are both
+  unfamiliar recent entities. Whoever takes them: verify what they are and where they
+  came from before writing. Do not infer a history.
+
+## POOL — released, unclaimed, take freely
+
+Ranks 205–240 (released by sess-2026-09-08-a before any research was done):
 
 NUE PSA CTVA F MRNA CAH FIX KEYS DVN COHR SRE AME NDAQ GRMN STT DAL EW ETR
 VMRK BDX XYZ AMP CARR COIN AZO
 
-Notes carried into this batch:
 - COIN is the long-standing held report — no file exists. Needs digrin.com reachable
   for the monthly series, else a sourced alternative. Do not publish a 13-month chart
   under a five-year heading.
-- VMRK (Vivmark Residential, rank 232) is unfamiliar and recent. Verify what it is and
-  where it came from before writing; do not infer a history.
 - XYZ is Block, Inc. Filename `xyz_analysis.html`.
+
+Ranks 241–299, also unclaimed:
+
+HUM ROK WAB LHX VTR ARES EBAY CIEN VEEV FERG IQV CBRE A MSCI YUM ADM FLEX LYV
+WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
+HBAN RJF NTRS
 
 ## DONE
 
