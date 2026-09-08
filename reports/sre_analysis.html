@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRE — Sempra | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4AA8E8;
+  --accent-dim: #4AA8E833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<!-- ============ STATIC DATA BANNER ============ -->
+<div style="background:var(--amber-dim);border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container">
+    <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--amber);">⚠ Static data as of September 4, 2026 — prices, metrics, and analyst targets will not update automatically</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">SRE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Utilities / Utilities — Diversified</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $54.95B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #467</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#180 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#100 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Sempra</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$84.04</div>
+      <div class="price-change">−$0.53 (−0.63%)</div>
+      <div class="price-date">Close, Friday September 4, 2026, 4:00 PM EDT</div>
+      <div class="price-date">After hours: $84.13 (+0.11%)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 488 8th Avenue, San Diego, California</div>
+    <div class="meta-item"><span>Employees:</span> 28,451</div>
+    <div class="meta-item"><span>Founded:</span> 1998</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 2026 — early November 2026 (est., date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Sempra is a San Diego–based energy holding company that owns three structurally different businesses: <strong>Sempra California</strong> (San Diego Gas &amp; Electric and SoCalGas — roughly 3.6 million electric and 3.3 million gas customers), <strong>Sempra Texas Utilities</strong> (its interest in Oncor, the largest transmission-and-distribution utility in Texas, with about 18,418 circuit miles of transmission line and more than 4.1 million delivery points), and <strong>Sempra Infrastructure</strong> (LNG liquefaction and export — Cameron LNG, ECA LNG and Port Arthur LNG). FY2025 revenue was <strong>$13.70B, up 3.9%</strong> from $13.19B; <span class="tip" title="Trailing twelve months — the most recent four reported quarters">TTM</span> revenue through June 2026 is <strong>$13.55B, up 1.6%</strong>. Market cap of $54.95B ranks the company roughly <strong>#467 globally</strong>.</p>
+  <p class="prose" style="margin-top:16px;">Revenue is close to meaningless here, and that is the first thing to internalise. A regulated utility earns an allowed return on the capital it has put in the ground — its <strong>rate base</strong> — so the number that drives the equity is the capital plan, not the top line. Sempra's plan is <strong>~$64.9B over 2026–2030</strong>, with <strong>59% at Oncor in Texas, 36% in California and just 5% at Infrastructure</strong>. And Sempra Texas contributes earnings but essentially no consolidated revenue, because Oncor is held as an equity-method interest — which is why $13.55B of revenue sits alongside a segment that produced <strong>$517M of first-half earnings</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page: Sempra is priced like a utility with a problem. It trades at <strong>24.3× trailing <span class="tip" title="Price-to-earnings — share price divided by earnings per share">P/E</span> on depressed GAAP earnings but 16.0× forward</strong>, at a discount to the peer group on forward numbers, with a 3.13% yield and a <strong>7–9% long-term EPS growth</strong> target. The discount exists because two of the three businesses carry risks that a normal regulated utility does not: <strong>California wildfire liability</strong>, which is an uncapped-looking tail on the SDG&amp;E side, and an <strong>LNG development arm</strong> that is capital-hungry, commodity-adjacent and not rate-regulated at all. The bull case is that Oncor's Texas load growth is now the dominant earnings driver and the market has not repriced for it. Both cases are examined below.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jeffrey W. Martin</div>
+      <div class="card-note">Chairman, President and CEO. Verified from Sempra's Q2 2026 earnings release (Aug 6, 2026), where he is quoted, and from the stockanalysis.com company profile. Has run the company through the Oncor acquisition era, the Sempra Infrastructure Partners formation and the 2026 KKR stake sale.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Sedgwick → Bird</div>
+      <div class="card-note"><strong>Karen Sedgwick</strong> is CFO as of this report's data date. Sempra announced on <strong>July 9, 2026</strong> that <strong>Justin Bird</strong> (previously Sempra Infrastructure) becomes EVP and CFO "on or around the closing" of the KKR transaction, expected Q3 2026, with Sedgwick moving to CEO and President of SoCalGas. Treat the CFO seat as mid-transition.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">Specific institutional holder names and stake sizes were <strong>not verified from the sources fetched</strong> and are therefore not listed. Shares outstanding: <strong>653.90M</strong>. Buyback yield is negative (−1.32% TTM), i.e. Sempra has been a net issuer of shares — relevant to the funding discussion in Section 03.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Because Oncor is an equity-method interest, a revenue-mix bar would misrepresent the company — it would show Texas at roughly zero. The proportional bar below therefore uses <strong>segment earnings attributable to common shares for the six months ended June 30, 2026</strong>, before the parent-and-other drag of −$193M. That is the disaggregation Sempra actually discloses, and it is the one that matters.</p>
+  <div class="seg-bar">
+    <div style="flex:50.2;background:#4AA8E8;">CALIFORNIA 50.2%</div>
+    <div style="flex:25.5;background:#f59e0b;">TEXAS 25.5%</div>
+    <div style="flex:24.3;background:#a78bfa;">INFRASTRUCTURE 24.3%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4AA8E8;"></span> Sempra California — $1,017M (6M 2026, vs $983M)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Sempra Texas Utilities — $517M (6M 2026, vs $354M)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Sempra Infrastructure — $492M (6M 2026, vs $218M)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The second quarter alone tells a different story from the half: <strong>Q2 2026 California $297M, Texas $346M, Infrastructure $230M</strong> — Texas was the largest segment in the quarter, and grew earnings <strong>+66% year over year</strong> against California's +15%. California dominates the half only because its rate-recovery seasonality front-loads Q1. Parent &amp; Other cost −$77M in Q2 and −$193M in the half.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4AA8E8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Sempra California — SDG&amp;E and SoCalGas</div>
+        <span class="biz-badge dominant">REGULATED · WILDFIRE-EXPOSED · 36% OF CAPEX</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,017M</div><div class="biz-stat-label">6M'26 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.5%</div><div class="biz-stat-label"><span class="tip" title="Year over year — same period one year earlier">YoY</span> (6M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$23.5B</div><div class="biz-stat-label">2026–30 Capex</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">50.2%</div><div class="biz-stat-label">Earnings Mix (6M)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">San Diego Gas &amp; Electric and Southern California Gas serve roughly <strong>3.6 million electric and 3.3 million gas customers</strong> across about 4,100 square miles. This is textbook regulated utility economics — capital is invested, the California Public Utilities Commission sets an allowed return, and earnings follow rate base. The problem is the growth rate. On the Q2 2026 call management put <strong>California rate-base growth at roughly 5%</strong>, against about <strong>11% for the utility platform overall</strong>. California earnings rose $24M year over year in the quarter. In a company targeting 7–9% EPS growth, the half that produces most of the earnings is growing at roughly half the corporate target, and the other half has to make up the gap. That is the structural tension in the equity.</p>
+    <p class="biz-desc">Set against that, California is where the tail risk lives. SDG&amp;E is an investor-owned utility operating in high fire-threat districts, and California's inverse-condemnation doctrine has historically exposed utilities to wildfire damages regardless of negligence. Sempra's balance sheet carried <strong>$235M of wildfire fund contributions at June 30, 2026</strong> (down from $246M at year-end 2025) — the asset side of its participation in the state wildfire fund. Management's public position on the Q2 call was that <strong>"the status quo doesn't work,"</strong> that the Governor and legislative leaders are actively working on a package, and that it was <strong>"premature to evaluate specific proposals without bill language."</strong> That is a company waiting on Sacramento.</p>
+    <div class="biz-tam"><strong>Regulatory note:</strong> California rate base growth ~5% per management commentary on the Q2 2026 call. Specific authorised ROE and rate-base dollar figures for SDG&amp;E and SoCalGas were <strong>not verified</strong> from the sources fetched and are not stated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Edison International (EIX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">PG&amp;E (PCG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Dominion Energy (D)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$57.91B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$18.12B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">22.87×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Sempra Texas Utilities — Oncor</div>
+        <span class="biz-badge growth">THE GROWTH ENGINE · 59% OF CAPEX</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$517M</div><div class="biz-stat-label">6M'26 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+46%</div><div class="biz-stat-label">YoY (6M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$38.2B</div><div class="biz-stat-label">2026–30 Capex</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.5%</div><div class="biz-stat-label">Earnings Mix (6M)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Oncor is the largest transmission-and-distribution (T&amp;D — the wires business; it delivers power but does not sell it or generate it) utility in Texas: about <strong>18,418 circuit miles of transmission</strong> and <strong>4.1 million-plus delivery points</strong>. Sempra Texas earnings rose from $208M to <strong>$346M in Q2 2026 (+66%)</strong> and from $354M to $517M across the half. Two things drove that. First, <strong>Oncor's new base rates took effect June 1, 2026</strong>, with an August 1 surcharge recovering the difference from the interim period — the rate case lifted the authorised ROE to <strong>9.75% on a 43.5% equity layer</strong>, narrowing the gap between earned and allowed returns. Second, volume: Texas load is growing in a way no other US service territory is.</p>
+    <p class="biz-desc">The numbers management put on the Q2 call are the bull case in a sentence. Oncor's <strong>"Batch Zero"</strong> screening identified <strong>44 GW of large-load interconnection requests</strong> in its territory that met eligibility requirements — against a current <strong>peak load of 31 GW</strong>, i.e. a potential <strong>140% increase</strong>. About <strong>8 GW is already ramping onto the system</strong>, which is the part that matters: this is not a queue of speculative letters of intent, it is connected and energising load. Management's framing: demand growth in Texas <strong>"is not just a projection, but is actively occurring."</strong> Oncor also submitted <strong>127 GW of substantiated large load</strong> into the 2026 regional transmission plan, and ERCOT has endorsed high-voltage transmission projects requiring <strong>more than $7B</strong>, most of which Oncor is expected to build.</p>
+    <p class="biz-desc">That converts into capital. Oncor's approved five-year base plan is <strong>$47.5B</strong>, with roughly <strong>$10B of incremental opportunity through 2030</strong> identified on top — a <strong>$57.5B total opportunity</strong>, comprising about $4B of Dallas–Fort Worth transmission upgrades, $3B of non-Permian reliability work and $3B of system resiliency. Note the arithmetic: Sempra's consolidated 2026–2030 plan assigns $38.2B to Sempra Texas, which is Sempra's share of Oncor's larger $47.5B programme, not the whole of it. Oncor funds itself and Sempra does not consolidate its revenue.</p>
+    <div class="biz-tam"><strong>Scale check:</strong> 44 GW of eligible large-load requests vs 31 GW current peak load; 8 GW connecting now; $57.5B total identified Oncor capital opportunity through 2030 (Q2 2026 call).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">American Electric Power (AEP)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$67.78B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$22.79B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">21.56×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Vistra / CenterPoint (ERCOT)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">NextEra Energy (NEE)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$174.03B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$28.70B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">18.75×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Sempra Infrastructure — LNG Export</div>
+        <span class="biz-badge emerging">NOT A UTILITY · 5% OF CAPEX · 45% SOLD TO KKR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$492M</div><div class="biz-stat-label">6M'26 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+126%</div><div class="biz-stat-label">YoY (6M)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$3.2B</div><div class="biz-stat-label">2026–30 Capex</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$22.2B</div><div class="biz-stat-label">Implied Equity Value</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the segment that makes Sempra un-comparable to NextEra, Duke, Southern, AEP, Dominion, Exelon or Xcel. Sempra Infrastructure develops and operates <strong>LNG (liquefied natural gas) liquefaction and export terminals</strong> — Cameron LNG in Louisiana, ECA LNG on Mexico's Pacific coast, and Port Arthur LNG in Texas. Earnings more than doubled in the half, from $218M to <strong>$492M</strong>, and from $72M to <strong>$230M in Q2</strong>. But this is development-stage infrastructure with construction risk, not a rate-regulated business with a guaranteed return, and the quarterly numbers include mark-to-market noise from interest-rate swaps.</p>
+    <p class="biz-desc"><strong>Port Arthur LNG Phases 1 and 2</strong> were reported <strong>"on time and on budget"</strong> as of July 2026, with combined nameplate capacity of <strong>26 Mtpa (million tonnes per annum)</strong> of new export capacity. Note what that phrasing implies and what it does not: the July 2026 and Q2 2026 disclosures treat Phase 2 as an under-construction asset, not a pending decision — but <strong>no Phase 2 FID date, project cost or financing structure was disclosed on any page fetched for this report</strong>, and none is asserted here. <strong>ECA LNG Phase 1</strong> (3.25 Mtpa, single train) shipped its <strong>first cargo in July 2026</strong> and then hit a problem: <strong>damage was discovered in the project's refrigeration compressors</strong>, pushing substantial completion to <strong>Q4 2026</strong> with commercial operations shortly after. That is the LNG business in miniature — long-dated contracted cash flows, and equipment that can slip a quarter without warning.</p>
+    <p class="biz-desc">The funding answer is the KKR transaction. Sempra agreed to sell a <strong>45% equity interest in Sempra Infrastructure Partners to KKR affiliates for roughly $10B</strong>, implying about <strong>$22.2B of equity value</strong> for the whole platform, with closing expected in <strong>Q3 2026</strong>. The capital plan explicitly assumes 70% SI Partners ownership through Q1 2026 and <strong>25% thereafter</strong>. On the call, management said the deal <strong>deconsolidates roughly $9B of debt</strong>, pays down parent debt, and supports the <strong>"displacement of the need for common equity in our current base capital plan"</strong> — that is the whole point. Sempra is selling a minority of the non-regulated business to avoid diluting shareholders while funding a $65B regulated build. Separately, the <strong>Ecogas México sale closed August 20, 2026 for about $500M</strong>. Management also expects a positive Moody's reassessment after close.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> the KKR close is the single most consequential near-term event. It is the funding mechanism for the capital plan; a delay reopens the equity-issuance question.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Cheniere Energy (LNG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Venture Global / NextDecade</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--red);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Parent &amp; Other</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">STRUCTURAL DRAG</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">−$193M</div><div class="biz-stat-label">6M'26 Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−$77M</div><div class="biz-stat-label">Q2'26</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−$188M</div><div class="biz-stat-label">6M'25 Comparable</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">flat</div><div class="biz-stat-label">YoY</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Holding-company interest, corporate costs and eliminations. It is stable and it is not small: roughly <strong>$190M of annual first-half drag</strong> against $2.0B of segment earnings, i.e. the holding structure consumes close to a tenth of what the businesses produce. This is the price of the conglomerate form, and it is the line item a sum-of-the-parts bull has to argue away.</p>
+    <div class="biz-tam"><strong>Post-KKR:</strong> management guided that transaction proceeds pay down parent debt, which should reduce this drag over time. Not yet visible in reported results.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">REGULATED MONOPOLY FRANCHISE</span>
+    <span class="moat-pill">ONCOR T&amp;D SCALE</span>
+    <span class="moat-pill">ERCOT LOAD-GROWTH POSITION</span>
+    <span class="moat-pill">RATE-BASE COMPOUNDING</span>
+    <span class="moat-pill">PERMITTED LNG SITES</span>
+    <span class="moat-pill">CONTRACTED LNG OFFTAKE</span>
+    <span class="moat-pill">CAPITAL-RECYCLING OPTIONALITY</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The genuine moat is the one every wires utility has and almost nothing else in the economy does: a legal monopoly on delivery within a service territory, with a regulator that sets prices to recover prudently incurred capital plus a return. What makes Sempra's version unusually good right now is <em>where</em> the wires are. Oncor sits in the middle of ERCOT, the one US market where large-load demand is growing at a rate that turns a wires monopoly from a bond substitute into a growth business — 44 GW of eligible interconnection requests against 31 GW of peak load is not an incremental number, and 8 GW of it is already energising. A regulated monopoly with a genuine volume problem is a rare object.</p>
+  <p class="prose" style="margin-top:16px;">The second, weaker moat is siting. Permitted, financed, under-construction LNG liquefaction on the US Gulf Coast is scarce — Port Arthur's 26 Mtpa across two phases is not something a competitor can replicate quickly. But it is a project moat, not a franchise moat: it depends on execution and on the counterparties honouring long-dated contracts, and ECA's compressor damage is a live reminder that the risk is real and mechanical.</p>
+  <div style="margin-top:28px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;">Key Vulnerabilities</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">California wildfire liability is the tail that eats the equity.</strong> SDG&amp;E operates in high fire-threat territory in a state whose liability doctrine has historically attached damages to utility equipment regardless of fault. Sempra carries $235M of wildfire fund contributions on the balance sheet at June 30, 2026 — a number that is small relative to what a catastrophic-fire scenario could cost. Management's own words on the Q2 2026 call were that "the status quo doesn't work" and that it is "premature to evaluate specific proposals without bill language." Until California legislates a durable liability framework, this risk is unquantifiable, and unquantifiable risk gets a valuation discount whether or not the fire ever happens.</div></div>
+      <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The best asset is the one Sempra does not fully own or consolidate.</strong> Oncor is the growth engine, but Sempra holds it as an equity-method interest and Oncor has its own regulator, its own balance sheet and minority owners. Sempra shareholders get a share of Oncor's earnings and none of its cash-flow control. If the thesis is "buy Sempra for Texas load growth," the honest version is "buy a levered, wildfire-exposed holding company for a partial claim on Texas load growth."</div></div>
+      <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Funding depends on selling pieces of the business.</strong> Free cash flow is <strong>−$5.24B</strong> TTM: operating cash flow of $5.42B against a capital programme that is far larger. The plan is funded by asset sales — 45% of Sempra Infrastructure to KKR for ~$10B, Ecogas for ~$500M — explicitly to displace the need for common equity. That works once. Buyback yield is already negative (−1.32%), meaning Sempra has been issuing shares. If the KKR close slips or the next $65B plan cannot be funded by selling another minority stake, the equity issuance returns and the growth rate is diluted.</div></div>
+      <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">California's rate base grows at half the corporate target.</strong> Management put California rate-base growth near 5% against ~11% for the utility platform. Half the earnings base compounds at roughly half the promised EPS growth rate, which means Texas and Infrastructure have to carry disproportionately. Any Texas regulatory disappointment — or a slower conversion of the interconnection queue into rate base — pressures the 7–9% target directly.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Data from stockanalysis.com as of the September 4, 2026 close (ratios sourced to S&amp;P Global Market Intelligence, last updated August 6, 2026). The <strong>Industry Avg</strong> column shows a <strong>median of seven large-cap regulated US utilities (NEE, DUK, SO, AEP, D, EXC, XEL)</strong> computed from the same source, and only for metrics that source actually published for all of them — everything else is left as "—" rather than estimated. The S&amp;P 500 column could not be sourced from the pages fetched and is left blank throughout.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>SRE</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Trailing <span class="tip" title="Price-to-earnings — share price divided by trailing twelve-month earnings per share">P/E</span></td>
+        <td style="color:var(--red)!important;">24.28×</td><td>20.76×</td><td>—</td>
+        <td>Expensive versus the utility peer median — but on GAAP earnings depressed by a weak FY2025. Not the number to anchor on.</td>
+      </tr>
+      <tr>
+        <td>Forward <span class="tip" title="Share price divided by expected forward-year earnings per share">P/E</span></td>
+        <td style="color:var(--green)!important;">16.02×</td><td>—</td><td>—</td>
+        <td>The forward multiple is the real story: 16× against a 7–9% growth target and a 3.1% yield. Peer forward multiples were not published on the pages fetched.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/earnings-to-growth — P/E divided by the expected earnings growth rate">PEG</span> Ratio</td>
+        <td style="color:var(--amber)!important;">1.92</td><td>—</td><td>—</td>
+        <td>Below 2 but not cheap. PEG is a blunt tool for a utility, where the growth is contractual rather than cyclical.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share over the trailing twelve months, GAAP basis">EPS (TTM)</span></td>
+        <td>$3.46</td><td>—</td><td>—</td>
+        <td>Down 16.2% YoY. Management guides <span class="tip" title="Adjusted for items management considers non-recurring; not a GAAP measure">adjusted</span> 2026 EPS of $4.80–$5.30 — the gap between $3.46 and $5+ is the entire valuation argument.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year over year — versus the same period a year earlier">YoY</span>)</td>
+        <td style="color:var(--text-dim)!important;">+1.6%</td><td>—</td><td>—</td>
+        <td>Dim by design: revenue is not the driver. Oncor contributes earnings but essentially no consolidated revenue, so top-line growth understates the business.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Revenue less cost of revenue, divided by revenue">Gross Margin</span></td>
+        <td style="color:var(--text-dim)!important;">43.99%</td><td>—</td><td>—</td>
+        <td>Largely an artefact of how purchased gas and power costs are classified in a pass-through rate structure. Low information content for a utility.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net income divided by revenue">Net Profit Margin</span></td>
+        <td style="color:var(--green)!important;">16.82%</td><td>—</td><td>—</td>
+        <td>Flattered by equity-method Oncor earnings landing in net income with no matching revenue. Read alongside ROE, not in isolation.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td>
+        <td style="color:var(--green)!important;">3.13%</td><td>—</td><td>—</td>
+        <td>$2.63 annualised, raised every year in the five-year record shown ($2.20 → $2.63). <span class="tip" title="Dividends as a share of earnings">Payout ratio</span> 75.97% on depressed TTM EPS — 89.5% on FY2025.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Shares sold short as a percentage of shares outstanding or float — a proxy for bearish positioning">Short Interest</span></td>
+        <td style="color:var(--green)!important;">1.71%</td><td>—</td><td>—</td>
+        <td>Negligible. Nobody is pressing a short case here; the de-rating has come from long-holder disappointment, not from an activist bear.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td>
+        <td style="color:var(--amber)!important;">0.85</td><td>—</td><td>—</td>
+        <td>$36.66B total debt, $48M cash, enterprise value $91.57B against a $54.95B market cap. Improved from 0.99 in FY2024. The KKR close deconsolidates roughly $9B more.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td>
+        <td style="color:var(--green)!important;">1.64</td><td>—</td><td>—</td>
+        <td>Jumped from 0.55 in FY2024 to 1.59 in FY2025 — a balance-sheet reclassification consistent with assets held for sale, not a liquidity improvement. Quick ratio is 0.09.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free cash flow — operating cash flow less capital expenditure">Free Cash Flow</span></td>
+        <td style="color:var(--red)!important;">−$5.24B</td><td>—</td><td>—</td>
+        <td>Operating cash flow $5.42B, consumed entirely and then some by the build. Deeply negative FCF is normal and even desirable mid-cycle for a utility growing rate base — but it is why funding is a first-order question here.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span></td>
+        <td style="color:var(--red)!important;">6.68%</td><td>—</td><td>—</td>
+        <td>Weak, and below Oncor's newly authorised 9.75%. FY2023 ROE was 11.50%; FY2025 was 5.19%. The recovery back toward allowed returns is the earnings thesis.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital — after-tax operating profit relative to all capital employed">ROIC</span></td>
+        <td style="color:var(--text-dim)!important;">3.60% (ROCE)</td><td>—</td><td>—</td>
+        <td>ROIC was not published on the pages fetched; <span class="tip" title="Return on capital employed">ROCE</span> of 3.60% is shown in its place and labelled as such. Low, as expected for an asset-heavy regulated balance sheet mid-build.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Sensitivity of the stock to broad market moves — 1.0 means it moves with the market">Beta</span></td>
+        <td style="color:var(--green)!important;">0.56</td><td>—</td><td>—</td>
+        <td>Classic defensive profile. Note the mismatch: a 0.56-beta stock carrying an uncapped wildfire tail and an LNG construction programme. Beta is not measuring the risk that matters here.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$78.97 – $101.04</td><td>—</td><td>—</td>
+        <td>At $84.04 the stock sits <strong>16.8% below the 52-week high</strong> and 6.4% above the low — near the bottom of its own year. 52-week change: +2.20%.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items.</strong> Three distortions matter. <strong>(1)</strong> FY2025 GAAP EPS of $2.75 (down 37.8%) and ROE of 5.19% are the depressed base that makes the trailing P/E of 24.3× look expensive; FY2024 EPS was $4.42 and FY2023 was $4.79. Reading the trailing multiple without that context gives the wrong answer in both directions. <strong>(2)</strong> Q2 2026 GAAP EPS of <strong>$1.21 exceeded adjusted EPS of $1.16</strong> — the adjustment removed a gain, and the Q2 release attributes swing items to <strong>net unrealised gains/losses on interest-rate swaps</strong> related to Port Arthur LNG Phase 1. GAAP earnings in this company carry mark-to-market noise from project hedging. <strong>(3)</strong> The current-ratio jump from 0.55 to 1.59 between FY2024 and FY2025 is a balance-sheet presentation change consistent with the pending asset sales, not an operating improvement. The Ecogas sale (~$500M, closed August 20, 2026) and the KKR transaction will both produce non-recurring items in H2 2026.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">19 analysts covering. No sell ratings on the book.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$102.71</div>
+      <div class="card-note"><span style="color:var(--green);">+22.22% upside</span> from $84.04.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$84 – $118</div>
+      <div class="card-note">Low target is <em>at</em> the current price; high is +40.4%. The bear case among covering analysts is "fairly valued," not "overvalued."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">12 / 3 / 4 / 0</div>
+      <div class="card-note">Strong Buy 12 · Buy 3 · Hold 4 · Sell 0.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:12;background:#22c55e;"></div>
+    <div style="flex:3;background:#4ade80;"></div>
+    <div style="flex:4;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Strong Buy (12)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy (3)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold (4)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell (0)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-top:32px;margin-bottom:12px;">Key Recent Analyst Calls</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Truist Financial — Richard Sunderland</strong> · Buy, PT cut <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$100 → $96</span> · Sep 3, 2026. Rating held, target trimmed — the pattern across the desk this week.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">JPMorgan — Aidan Kelly</strong> · Overweight, PT cut <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$113 → $102</span> · Sep 2, 2026. An 11-point cut while keeping the Overweight; the constructive view survived, the multiple assumption did not.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Jefferies — Julien Dumoulin-Smith</strong> · <strong>Upgrade Hold → Buy</strong>, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$101 → $97</span> · Sep 1, 2026. The most interesting call in the set: an upgrade accompanied by a <em>lower</em> target — i.e. a valuation call on a de-rated stock, not an estimate raise.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Mizuho — Anthony Crowdell</strong> · Neutral, PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$104 → $84</span> · Aug 31, 2026. A 20-point cut to essentially the market price. The bear seat is occupied.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Wells Fargo</strong> · Initiated Overweight, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$115</span> · Oct 27, 2025 — named Sempra a "Best Idea" in regulated utilities on the view that the <em>"Texas pivot is underappreciated, especially with improving regulatory constructs and ERCOT transmission expansion."</em> That thesis is now testable: Oncor's rates reset June 1, 2026 and the load numbers arrived. The stock is below where it stood when the call was made.</div></div>
+  </div>
+  <p class="prose" style="margin-top:20px;">Read the tape rather than the ratings. Between August 31 and September 3, 2026, four separate desks cut their targets — Mizuho by $20, JPMorgan by $11, Truist by $4, Jefferies by $4 — while ratings stayed constructive or improved. That is a group of analysts marking to market a stock that has fallen, not one revising down the business. The average target of $102.71 is still 22% above the price, and the <em>lowest</em> target on the board is the current price. There is no published bear case here; there is a valuation nobody wants to defend.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">KKR closes 45% purchase of Sempra Infrastructure Partners</div>
+        <div class="tl-desc">The ~$10B sale (implying ~$22.2B equity value for the platform) is expected to close this quarter. It deconsolidates roughly $9B of debt, pays down parent debt, and — in management's words — supports "displacement of the need for common equity in our current base capital plan." Management also expects a positive Moody's reassessment following close. The 2026–2030 capital plan already assumes 25% SI Partners ownership post-close.</div>
+        <div class="tl-impact up">Potential upside catalyst — the funding mechanism for the entire plan</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CFO transition: Karen Sedgwick → Justin Bird</div>
+        <div class="tl-desc">Announced July 9, 2026. Bird moves from Sempra Infrastructure to EVP and CFO on or around the KKR close, taking investor relations, treasury, financial planning, audit, insurance and tax. Sedgwick becomes CEO and President of SoCalGas. Bird retains board seats at both Sempra Infrastructure and Oncor — an unusually LNG-and-Texas-weighted CFO for a company arguing it is a regulated utility.</div>
+        <div class="tl-impact neutral">Key near-term event — guidance framing may change with the seat</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">ECA LNG Phase 1 substantial completion</div>
+        <div class="tl-desc">First cargo shipped July 2026, then damage was found in the project's refrigeration compressors during inspection. Substantial completion pushed to Q4 2026 with commercial operations "shortly thereafter." Nameplate 3.25 Mtpa on a single train. A clean completion removes an overhang; a further slip becomes a pattern.</div>
+        <div class="tl-impact neutral">Key near-term event — execution proof point</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">California wildfire liability legislation</div>
+        <div class="tl-desc">Management said on the Q2 2026 call that the Governor and legislative leaders are "actively working" with "solid progress expected," while declining to endorse specifics before bill language exists. The framing they used — wildfire reform as "public policy for livability, not a utility bailout" — signals a negotiation in which utilities may be asked to contribute. This is the single largest binary in the stock and it does not have a date.</div>
+        <div class="tl-impact neutral">Key near-term event — the biggest unpriced binary</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings</div>
+        <div class="tl-desc">Date not confirmed on the sources fetched. Watch three things: whether 2026 adjusted EPS guidance of $4.80–$5.30 holds after the KKR close changes the ownership arithmetic; whether Oncor's post-June-1 rate reset flows through as expected; and whether the 8 GW of connecting large load converts into an incremental capital number.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — strong quarter, weak stock (already happened)</div>
+        <div class="tl-desc">GAAP EPS $1.21 (vs $0.71), adjusted EPS $1.16 (vs $0.89, +30%). Sempra Texas earnings +66%, Infrastructure +219%. 2026 adjusted guidance of $4.80–$5.30 and 2027 guidance of $5.10–$5.70 both affirmed, along with 7–9% long-term growth and a record $64.9B capital plan. The stock closed August at $81.70, down 7.7% on the month and its worst month since February 2025.</div>
+        <div class="tl-impact down">Reaction already happened — good numbers, negative price response</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Oncor's new base rates take effect (already happened)</div>
+        <div class="tl-desc">The PUCT-approved rate case set an authorised ROE of 9.75% on a 43.5% equity layer, with an August 1 surcharge recovering the difference from the interim period. Oncor also filed its inaugural UTM (utility technology modernisation) filing covering $4.4B of transmission and distribution assets placed in service since January 2025 — a faster-recovery mechanism that shortens the lag between spending and earning.</div>
+        <div class="tl-impact up">Reaction already happened — structurally positive for Texas earnings</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SRE — 60 Monthly Closes, Oct 2021 → Sep 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 4, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">Split-adjusted for the 2-for-1 split effective August 2023 (pre-split month-end closes halved). Final point is the September 4, 2026 close, not a completed month.</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:20px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4AA8E8;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ AS OF SEPTEMBER 4, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;max-width:760px;">RSI compares the size of recent gains to the size of recent losses on a 0–100 scale. Above 70 the stock has been bought hard enough that buyers may be exhausted; below 30 the reverse. On monthly data it is a slow, coarse signal — it flags multi-month exhaustion, not entry points.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the October 2021 close of <strong>$63.82</strong> (split-adjusted) to <strong>$84.04</strong> today, the shares have returned <strong>+31.7% in price</strong>, roughly <strong>5.7% annualised</strong>, before dividends — which over the same period ran between 2.9% and 3.8% a year. Call it high-single-digit total return over five years for a business that has told investors it can compound EPS at 7–9%. The gap between those two numbers is the report.</p>
+  <p class="prose" style="margin-top:16px;">The shape of the chart matters more than the endpoints. There are three distinct regimes. From late 2021 into early 2022 the stock ran to <strong>$84.06 in March 2022</strong> on the energy shock — the same level as today, four and a half years ago. It then spent 2022–2023 grinding lower as rates rose and utility bond substitutes were repriced, bottoming at <strong>$68.03 in September 2023</strong>, a 19% drawdown from the 2022 peak. From there it rebuilt steadily to <strong>$93.67 in November 2024</strong> on the first wave of data-centre enthusiasm.</p>
+  <p class="prose" style="margin-top:16px;">Then February 2025. The stock fell from <strong>$82.93 to $71.57 in a single month — a 13.7% decline, the largest monthly drop in the entire five-year series</strong> and larger than anything the 2022 rate shock produced. Sempra's full-year guidance refresh was scheduled for that month; Barclays had written in December 2024 that it expected "a full guidance refresh in February 2025." What the price series shows unambiguously is a step-change in valuation at that point, from which the stock has never fully recovered: the pre-February-2025 high of $93.67 was not exceeded until February 2026, a full year later. <em>The specific contents of the February 2025 guidance revision were not verified from the sources fetched and are therefore not stated here — but the de-rating itself is visible in the data.</em></p>
+  <p class="prose" style="margin-top:16px;">The recovery through 2025 into early 2026 took the stock to a five-year closing high of <strong>$97.17 in March 2026</strong>, and it has given most of that back since: <strong>−13.5% from March to the September 4 close</strong>, including a 7.7% fall in August alone despite a Q2 that beat on both GAAP and adjusted EPS and affirmed every element of guidance. At $84.04 the shares sit 16.8% below the 52-week high of $101.04 and just 6.4% above the 52-week low. The monthly RSI has spent the summer sliding toward oversold without reaching it — a slow bleed, not a capitulation.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Mar 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Energy-shock peak — $84.06 (split-adjusted)</div>
+        <div class="tl-desc">The gas-price spike following the invasion of Ukraine made an LNG export developer look strategically valuable. The stock is trading at exactly this level today.</div>
+        <div class="tl-impact up">+31.7% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate-shock trough — $68.03, the five-year low</div>
+        <div class="tl-desc">Ten-year yields peaked and every high-payout, capital-intensive utility was marked down against them. Nothing company-specific; this was the discount rate.</div>
+        <div class="tl-impact down">−19.1% from the Mar 2022 peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Pre-reset high — $93.67</div>
+        <div class="tl-desc">The first data-centre re-rating carried the whole utility complex. Barclays raised its target to $99 on December 2, 2024, citing "potentially higher capex driven by Texas expansion opportunities," and flagged the February 2025 guidance refresh ahead.</div>
+        <div class="tl-impact up">+37.7% off the Sep 2023 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">The reset — $82.93 → $71.57 in one month</div>
+        <div class="tl-desc">The single worst month in the five-year series, coinciding with the scheduled full-year guidance refresh. The multiple compressed and stayed compressed; it took twelve months to reclaim the prior high.</div>
+        <div class="tl-impact down">−13.7% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Five-year closing high — $97.17</div>
+        <div class="tl-desc">The Texas thesis at maximum credibility: the Oncor rate case was landing, ERCOT transmission plans were expanding, and the KKR sale had removed the equity-issuance overhang.</div>
+        <div class="tl-impact up">+35.8% off the Feb 2025 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-Q2 de-rating — $81.70 month-end close</div>
+        <div class="tl-desc">Adjusted EPS +30%, guidance affirmed, record capital plan — and the stock fell 7.7% on the month. Four desks cut targets in the following week while keeping constructive ratings. The market is not disputing the earnings; it is repricing the risk around them.</div>
+        <div class="tl-impact down">−7.7% in the month</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Against the benchmark <strong>S&amp;P 500</strong> — the index for its NYSE listing — Sempra's roughly 5.7% annualised price return over five years has almost certainly lagged materially; precise index return figures were not sourced for this report and no comparison number is asserted. Against the <strong>NASDAQ-100</strong>, the gap would be wider still, though that is a comparison of a defensive regulated utility against a concentrated technology index and tells you little. The more useful comparison is within the sector, and here the numbers are sourced: on trailing P/E, Sempra at <strong>24.28×</strong> screens above every one of NextEra (18.75×), Duke (18.10×), Southern (21.21×), AEP (21.56×), Dominion (22.87×), Exelon (16.05×) and Xcel (20.76×). On forward earnings the ordering inverts — Sempra's 16.02× forward multiple against a 7–9% growth target is a discount to how a regulated utility with that growth profile would normally trade. <strong>The caveat that makes all of this soft: none of those seven owns an LNG export business.</strong> Sempra is not directly comparable to any of them, and part of the multiple gap is simply the market declining to pay a utility multiple for a segment that is not a utility.</p>
+</div>
+
+<!-- ============ 08 SUMMARY & KEY RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Sempra is the cheapest way to own the best load-growth story in American utilities. Oncor faces 44 GW of eligible large-load interconnection requests against 31 GW of current peak load, with 8 GW already energising, a freshly reset 9.75% authorised ROE and a $57.5B identified capital opportunity through 2030. The $64.9B five-year plan is 95% regulated and is being funded by selling a minority of the LNG platform to KKR for ~$10B rather than by issuing equity. At 16.0× forward earnings with a 3.13% yield and an affirmed 7–9% growth target, the market is paying a discount for exactly the segment mix that produced +66% Texas and +219% Infrastructure earnings growth last quarter.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Half the earnings base sits in California, growing rate base at ~5% against an 11% platform average, and carrying a wildfire liability the company cannot quantify and Sacramento has not yet legislated. Free cash flow is −$5.24B, the funding plan depends on a transaction that has not closed, and buyback yield is already negative. Trailing ROE of 6.68% is below Oncor's own allowed return, and GAAP EPS fell 16% year over year. The de-rating since February 2025 has been persistent, not a dip: the stock is at the same price it reached in March 2022 and 16.8% below its 52-week high, and four desks cut targets in the week before this report despite a beat-and-affirm quarter. The market has seen the Texas numbers and is still not paying.</p>
+    </div>
+  </div>
+  <div style="margin-top:32px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Top 3 Risks</div>
+    <div class="risk-list">
+      <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">California wildfire liability.</strong> An SDG&amp;E-attributed catastrophic fire under California's liability regime is the one scenario that can impair the equity outright rather than dent earnings. The $235M of wildfire fund contributions on the balance sheet is not a cap on exposure, and management itself says the status quo does not work. No legislated resolution exists as of this report's data date.</div></div>
+      <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Funding execution.</strong> The entire $64.9B plan is predicated on the KKR sale closing in Q3 2026 and deconsolidating ~$9B of debt to displace common-equity issuance. A delay, a repricing, or a regulatory hold-up puts equity issuance back on the table at a share price 16.8% below the 52-week high — the worst possible moment to issue.</div></div>
+      <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">LNG execution and the conglomerate discount.</strong> ECA Phase 1's compressor damage cost a quarter on a single-train, 3.25 Mtpa project; Port Arthur is 26 Mtpa across two phases with no disclosed FID cost or financing on the sources fetched. Construction slippage in a segment that is neither rate-regulated nor comparable to any peer both hits earnings and reinforces the reason the market applies a discount to the whole structure.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid" style="grid-template-columns:1fr;">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">California Wildfire Liability — the sector's unresolved constitutional problem</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">California is the only major US jurisdiction where an investor-owned utility can face damages for a fire started by its equipment without a finding of negligence. That doctrine has already produced one utility bankruptcy in the state. Sempra's exposure runs through SDG&amp;E, and the balance-sheet marker — <strong>$235M of wildfire fund contributions at June 30, 2026, down from $246M at year-end 2025</strong> — is a participation asset, not a liability ceiling. On the Q2 2026 call management said the Governor and legislative leaders are <strong>"actively working"</strong> with <strong>"solid progress expected,"</strong> that <strong>"the status quo doesn't work,"</strong> and that it was <strong>"premature to evaluate specific proposals without bill language."</strong> Asked whether utilities might contribute to a second phase of fund financing, management framed reform as <strong>"public policy for livability, not a utility bailout"</strong> and said it would <strong>"evaluate the totality of the package."</strong> Read that as: a deal is being negotiated, utilities expect to pay something, and nobody will say how much. For the equity, the consequence is mechanical — an unquantifiable tail risk cannot be discounted, so it is capitalised as a permanent multiple discount on the California half of the business.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">ERCOT Load Growth — the first real volume growth in US utilities in forty years</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">US electricity demand was flat to declining for a generation; efficiency gains offset economic growth and utilities grew earnings purely by spending capital on replacement and hardening. Data centres broke that. In Oncor's territory the numbers are extreme: <strong>44 GW of large-load interconnection requests meeting eligibility screens against a 31 GW current peak — a potential 140% increase — with 8 GW already ramping onto the system</strong>, and <strong>127 GW of substantiated large load</strong> submitted into the 2026 regional transmission plan. ERCOT has endorsed high-voltage transmission projects requiring <strong>more than $7B</strong>, most of it expected to be built by Oncor. The transmission-and-distribution utility is the one participant in the AI build-out with a legal monopoly and a regulator obliged to let it earn a return on what it builds — no technology risk, no chip cycle, no customer-concentration renegotiation. The caveat is conversion: interconnection requests are not signed load, queues are systematically overstated by speculative applications, and the gap between a 44 GW queue and 8 GW actually connecting is the entire uncertainty. Sempra's own plan assigns $38.2B to Texas out of Oncor's $47.5B approved base and $57.5B identified opportunity — the incremental $10B is optionality, not guidance.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">The Conglomerate Question — bull and bear implications</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">Every comparison in this report is compromised by the same fact: Sempra is three businesses with three risk profiles wearing one ticker. NextEra, Duke, Southern, AEP, Dominion, Exelon and Xcel are all regulated utilities that trade on regulated-utility logic — rate base, allowed ROE, and a stable payout. Sempra has that in California and Texas, plus an LNG export developer with construction risk, commodity-adjacent contracts and a 45% partner arriving from private equity. <strong>The bear implication</strong> is that this is exactly why the discount exists and why it should persist: investors buying a utility for defensiveness do not want a $22.2B LNG platform attached, the parent structure burns $190M a half in costs, and the Q2 GAAP result had to be adjusted <em>down</em> for interest-rate-swap gains on Port Arthur — earnings quality that a pure utility does not have to explain. <strong>The bull implication</strong> is that the capital-recycling machine is real and repeatable: Sempra sold 45% of Infrastructure for ~$10B and Ecogas for ~$500M, deconsolidating ~$9B of debt and funding a $65B regulated plan without issuing equity — something a pure-play utility with the same growth would have to fund by diluting shareholders. Whether that is a value-creating structure or an expensive way to avoid the equity market is the argument, and at 16.0× forward earnings the market is currently voting for the second answer.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DISCLAIMER ============ -->
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:14px;">Data as of September 4, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;line-height:1.8;">
+    <strong>Sources.</strong> Price, market cap, 52-week range, sector/industry labels, employees, valuation and ratio data: <a href="https://stockanalysis.com/stocks/sre/" style="color:var(--accent);">stockanalysis.com/stocks/sre/</a> (PRICE_SOURCE_URL), plus its /statistics/, /financials/, /financials/ratios/, /forecast/ and /company/ pages (ratios sourced there to S&amp;P Global Market Intelligence, last updated August 6, 2026; forecasts to S&amp;P Global Market Intelligence and TipRanks, updated September 3, 2026). Segment earnings, capital plan, guidance, KKR transaction, Ecogas sale, wildfire fund balance and executive quotes: Sempra's Q2 2026 results release (August 6, 2026) via sempra.com and PR Newswire, the Sempra newsroom releases of July 9, July 27 and August 20, 2026, and the Q2 2026 earnings-call summary at finance.biggo.com. Oncor rate case detail (9.75% ROE, 43.5% equity layer, $4.4B UTM filing, 127 GW submitted load): tikr.com. Named analyst actions: marketbeat.com and tipranks.com. Global market-cap rank: companiesmarketcap.com. Monthly price history: digrin.com unadjusted "Real Price" series.
+  </p>
+  <p style="max-width:900px;margin:0 auto 12px;line-height:1.8;">
+    <strong>What is estimated or unverified.</strong> The US and NYSE market-cap ranks are marked (est.) and were not directly sourced. The next earnings date is an estimate; no confirmed Q3 2026 date appeared on the pages fetched. The "Industry Avg" column shows a median of seven large-cap regulated utilities (NEE, DUK, SO, AEP, D, EXC, XEL) computed from stockanalysis.com comparison data, and is populated only for trailing P/E — the only metric that source published for all seven. The S&amp;P 500 column is blank throughout because no index-level figures were sourced. Competitor bubbles marked "n/v" were not fetched. Institutional holders were not verified and are not named. TAM and market-share figures are not disclosed by the company for its regulated segments and are not estimated here. Port Arthur LNG Phase 2 FID date, project cost and financing structure were <strong>not disclosed on any page fetched</strong>; the report states only that Phases 1 and 2 were described as "on time and on budget" with combined 26 Mtpa nameplate capacity. The contents of Sempra's February 2025 guidance revision were not verified from live sources; the February 2025 de-rating is described only from the observed price series.
+  </p>
+  <p style="max-width:900px;margin:0 auto 12px;line-height:1.8;">
+    <strong>Chart data.</strong> 60 real month-end closes, October 2021 through August 2026, from digrin.com's unadjusted "Real Price" series, with every close through July 2023 halved to adjust for the 2-for-1 stock split effective August 2023. <strong>No months were reconstructed or interpolated.</strong> The 60th and final point is the September 4, 2026 close of $84.04 — a live price, not a completed month-end — and equals the header price by construction. Moving averages and RSI are computed in-page from that series.
+  </p>
+  <p style="max-width:900px;margin:0 auto;line-height:1.8;">
+    This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. All figures are as reported by the sources named above and may contain errors or be superseded. Past performance does not indicate future results. Do your own research and consult a licensed financial professional before making investment decisions.
+  </p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Source: digrin.com unadjusted "Real Price" series; closes through Jul 2023 halved for the Aug 2023 2-for-1 split.
+// Final point = Sep 4, 2026 close ($84.04) per stockanalysis.com.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [63.82,59.94,66.14,69.08,72.11,84.06,80.68,81.93,75.14,82.90,82.49,74.97,75.47,83.10,77.27,80.17,74.98,75.58,77.75,71.77,72.80,74.51,70.22,68.03,70.03,72.87,74.73,71.56,70.60,71.83,71.63,77.03,76.06,80.06,82.18,83.63,83.37,93.67,87.72,82.93,71.57,71.36,74.27,78.59,75.77,81.68,82.56,89.98,91.94,94.72,88.29,87.01,96.27,97.17,95.12,89.13,92.71,88.55,81.70,84.04];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 5,  label: 'Mar 2022 — energy-shock peak $84.06 (split-adj.)', color: '#22c55e' },
+  { idx: 23, label: 'Sep 2023 — 5-year low $68.03, rate shock',         color: '#ef4444' },
+  { idx: 37, label: 'Nov 2024 — pre-reset high $93.67',                 color: '#3b82f6' },
+  { idx: 40, label: 'Feb 2025 — worst month in series, −13.7%',         color: '#ef4444' },
+  { idx: 53, label: 'Mar 2026 — 5-year closing high $97.17',            color: '#22c55e' },
+  { idx: 58, label: 'Aug 2026 — post-Q2 de-rating $81.70',              color: '#f59e0b' },
+  { idx: 59, label: 'Sep 4, 2026 — $84.04 (live close)',                color: '#4AA8E8' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(74,168,232,0.22)');
+grad.addColorStop(1, 'rgba(74,168,232,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4AA8E8', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4AA8E8'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
