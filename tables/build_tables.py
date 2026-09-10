@@ -18,6 +18,10 @@ GAMES = [  # id, slug, title, short name, og description
     ('roulette', 'roulette', 'Roulette', 'Roulette: pick the wheel, not the bet — single, double and triple zero, la partage, wheel bias, and a variance simulator.'),
     ('slots', 'slots', 'Slots', 'Slots: the only game where the price is a secret — reported holds by denomination, the design tricks, and why there is no simulator.'),
 ]
+EXTRA = [  # pages in a family, not on the grade board: (id, slug, title, desc, sim game, prev slug, next slug)
+    ('blackjack-variants', 'blackjack-variants', 'Blackjack Variants', 'Free Bet Blackjack, Blackjack Switch, Spanish 21, Double Exposure and Super Fun 21: what each gives, what each takes back, the house edge with the right chart, and a variance simulator.', 'blackjack-variants', 'blackjack', 'video-poker'),
+]
+FAMILY = {'blackjack': [('blackjack.html', 'Blackjack'), ('blackjack-variants.html', 'Variants'), ('blackjack-trainer.html', 'Trainer')]}
 GRADES = {'blackjack': ('a', 'A'), 'video-poker': ('a', 'A&minus;'), 'craps': ('b', 'B+'), 'baccarat': ('b', 'B'),
           'ultimate-texas-holdem': ('b', 'B&minus;'), 'three-card-poker': ('c', 'C+'), 'roulette': ('c', 'C&minus;'), 'slots': ('d', 'D')}
 ONELINE = {
@@ -46,7 +50,7 @@ board, _, _ = between(src, '<!-- ================= GRADE BOARD =================
 method, _, _ = between(src, '<!-- ================= METHOD ================= -->', '</section>')
 outro, _, _ = between(src, '<!-- ================= OUTRO ================= -->', '</section>')
 sections = {}
-for gid, *_ in GAMES:
+for gid, *_ in GAMES + [(e[0],) for e in EXTRA]:
     sec, _, _ = between(src, '<section class="game" id="%s">' % gid, '</section>')
     sections[gid] = sec
 
@@ -63,6 +67,10 @@ extra_css = r'''
   a.gcard p{color:var(--dim);font-size:14px;line-height:1.6;flex:1;}
   a.gcard .more{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:2.5px;color:var(--cyan);}
   a.gcard:hover .more{color:var(--cyan-neon);}
+  .famtabs{display:flex;flex-wrap:wrap;gap:8px;padding:18px 0 0;}
+  .famtabs a{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:2.5px;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:8px 14px;transition:color .15s,border-color .15s;}
+  .famtabs a:hover{color:var(--cyan-neon);border-color:var(--cyan);}
+  .famtabs a.on{color:var(--gold);border-color:var(--gold);}
   .crumbs{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);padding:22px 0 0;}
   .crumbs a{color:var(--gold);} .crumbs a:hover{color:var(--gold-hi);}
   .crumbs span{margin:0 8px;color:var(--dim2);}
@@ -193,6 +201,16 @@ def page_nav(idx):
     if nxt: a += f'<a class="next" href="{nxt[1]}.html"><div class="k">Next &rarr;</div><div class="t">{nxt[2]}</div></a>'
     return f'<div class="wrap pagenav">{a}</div><div class="wrap allgames"><a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>'
 
+def family_tabs(slug):
+    for fam, tabs in FAMILY.items():
+        if any(t[0] == slug + '.html' for t in tabs):
+            links = ''
+            for h, t in tabs:
+                cls = ' class="on"' if h == slug + '.html' else ''
+                links += '<a href="%s"%s>%s</a>' % (h, cls, t)
+            return '<div class="wrap famtabs">' + links + '</div>'
+    return ''
+
 def nav_for(current):
     n = nav.replace('<a href="casino-games.html">The Tables</a>', '<a href="casino-games.html" aria-current="page">The Tables</a>')
     return n
@@ -213,9 +231,31 @@ for i, (gid, slug, title, desc) in enumerate(GAMES):
 <script src="sim/ttg-sim.js"></script>
 <script>TTGSim.mount('#simmount', {{game: '{gid}', n: {'700' if gid == 'baccarat' else '500'}}});</script>'''
     crumbs = f'<div class="wrap crumbs"><a href="../">Home</a><span>/</span><a href="casino-games.html">The Tables</a><span>/</span>{html.escape(title, quote=False)}</div>'
-    body = nav_for(gid) + '\n\n' + crumbs + '\n\n' + sec + '\n\n' + page_nav(i) + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
+    body = nav_for(gid) + '\n\n' + crumbs + (('\n' + family_tabs(slug)) if family_tabs(slug) else '') + '\n\n' + sec + '\n\n' + page_nav(i) + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
     out = head(title + ', graded', desc, slug + '.html') + body
     open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8').write(out)
+
+# ---------- extra (family) pages ----------
+for gid, slug, title, desc, simgame, prev, nxt in EXTRA:
+    sec = sections[gid].replace('<section class="game" id="%s">' % gid, '<section class="game first" id="%s">' % gid, 1)
+    marker = '    <div class="ap">'; assert sec.count(marker) == 1, gid
+    simblk = f'''
+    <div class="simsec" id="sim">
+      <div class="kicker">Feel the edge</div>
+      <h3 class="simhead">Run a session <em>at each variant</em>.</h3>
+      <p class="simsub">Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart.</p>
+      <div id="simmount"><div class="simnojs">The simulator needs JavaScript. The house edge on every variant is in the table above.</div></div>
+    </div>'''
+    sec = sec.replace(marker, simblk + '\n' + marker, 1)
+    prevT = next(g[2] for g in GAMES if g[1] == prev); nxtT = next(g[2] for g in GAMES if g[1] == nxt)
+    pnav = f'<div class="wrap pagenav"><a class="prev" href="{prev}.html"><div class="k">&larr; Previous</div><div class="t">{prevT}</div></a><a class="next" href="{nxt}.html"><div class="k">Next &rarr;</div><div class="t">{nxtT}</div></a></div><div class="wrap allgames"><a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>'
+    crumbs = f'<div class="wrap crumbs"><a href="../">Home</a><span>/</span><a href="casino-games.html">The Tables</a><span>/</span><a href="{prev}.html">{prevT}</a><span>/</span>{html.escape(title, quote=False)}</div>'
+    scripts = f'''
+<script src="sim/games.js"></script>
+<script src="sim/ttg-sim.js"></script>
+<script>TTGSim.mount('#simmount', {{game: '{simgame}', n: 500}});</script>'''
+    body = nav_for(gid) + '\n\n' + crumbs + '\n' + family_tabs(slug) + '\n\n' + sec + '\n\n' + pnav + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
+    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8').write(head(title + ', graded', desc, slug + '.html') + body)
 
 # ---------- index ----------
 board_i = board
@@ -227,7 +267,7 @@ hero_i = hero_i.replace("and where a disciplined player can flip the edge — le
 cards = ''
 for gid, slug, title, desc in GAMES:
     gc, gl = GRADES[gid]
-    cards += f'''      <a class="gcard" href="{slug}.html"><div class="top"><h3>{html.escape(title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[gid]}</p><span class="more">{'READ THE ANALYSIS' if gid == 'slots' else ('ANALYSIS + SIMULATOR + TRAINER' if gid == 'blackjack' else 'ANALYSIS + SIMULATOR')} &rarr;</span></a>\n'''
+    cards += f'''      <a class="gcard" href="{slug}.html"><div class="top"><h3>{html.escape(title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[gid]}</p><span class="more">{'READ THE ANALYSIS' if gid == 'slots' else ('ANALYSIS · VARIANTS · TRAINER' if gid == 'blackjack' else 'ANALYSIS + SIMULATOR')} &rarr;</span></a>\n'''
 games_section = f'''<!-- ================= GAME PAGES ================= -->
 <section id="games">
   <div class="wrap">
@@ -242,4 +282,4 @@ games_section = f'''<!-- ================= GAME PAGES ================= -->
 index_body = nav + '\n\n' + hero_i + '\n' + board_i + '\n\n' + games_section + '\n' + method + '\n\n' + outro + '\n\n' + footer + '\n\n' + navscript + '\n</body>\n</html>\n'
 index_head = head('Casino Games, Graded', 'Eight casino games, graded honestly: how each one plays, the house edge on every bet, the best and worst bets, the quirks, advantage play — and a variance simulator on every game page.', 'casino-games.html').replace('<title>Casino Games, Graded — The Tilted Gent</title>', '<title>Casino Games, Graded — The Tilted Gent</title>').replace('property="og:type" content="article"', 'property="og:type" content="website"')
 open(os.path.join(ROOT, 'casino-games.html'), 'w', encoding='utf-8').write(index_head + index_body)
-print('built', len(GAMES), 'game pages + index + tables.css')
+print('built', len(GAMES), 'game pages +', len(EXTRA), 'family pages + index + tables.css')

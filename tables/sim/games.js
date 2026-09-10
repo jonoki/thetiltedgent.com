@@ -192,5 +192,38 @@ window.TTG_GAMES = (function () {
     }
   };
 
+  /* ---------- BLACKJACK VARIANTS (approximate shapes, calibrated to published edges) ---------- */
+  function bjv(name, edge, sd, bjPay, extra) {
+    var rows = [ {p: 0.0453, x: bjPay}, {p: 0.070, x: 2}, {p: 0.320, x: 1}, {p: 0.10, x: 0}, {p: 0.415, x: -1}, {p: 0.0497, x: -2} ];
+    if (extra) rows = rows.concat(extra);
+    return { name: name, edge: edge, kind: "approx", sd: sd, rows: rows };
+  }
+  G["blackjack-variants"] = {
+    name: "Blackjack variants", pace: 70, paceNote: "hands per hour at a moderately busy table (Switch: two hands each)",
+    unit: 25, defaultBet: "spanish21-s17",
+    bets: {
+      "spanish21-s17": bjv("Spanish 21, dealer stands on soft 17", 0.0040, 1.25, 1.5, [ {p: 0.004, x: 3}, {p: 0.002, x: 1.5} ]),
+      "spanish21-h17": bjv("Spanish 21, hits soft 17, redoubling", 0.0042, 1.25, 1.5, [ {p: 0.004, x: 3}, {p: 0.002, x: 1.5} ]),
+      "spanish21-h17-nr": bjv("Spanish 21, hits soft 17, no redoubling", 0.0076, 1.22, 1.5, [ {p: 0.004, x: 3}, {p: 0.002, x: 1.5} ]),
+      "switch": bjv("Blackjack Switch, 6 decks H17, full strategy (per hand)", 0.0058, 1.10, 1),
+      "switch-simple": bjv("Blackjack Switch, simple switching rule (per hand)", 0.0075, 1.10, 1),
+      "free-bet": bjv("Free Bet Blackjack, 6 decks H17", 0.0104, 1.45, 1.5, [ {p: 0.06, x: 2}, {p: 0.04, x: 3} ]),
+      "double-exposure-best": bjv("Double Exposure, best-known rules", 0.0026, 1.05, 1),
+      "double-exposure-typ": bjv("Double Exposure, typical rules", 0.0067, 1.05, 1),
+      "double-exposure-worst": bjv("Double Exposure, worst common rules", 0.0147, 1.02, 1),
+      "superfun-1d": bjv("Super Fun 21, single deck", 0.0116, 1.12, 1, [ {p: 0.0012, x: 2} ]),
+      "superfun-6d": bjv("Super Fun 21, six decks", 0.0140, 1.12, 1, [ {p: 0.0012, x: 2} ]),
+      "super-match": { name: "Switch — Super Match side bet", edge: 0.0255, kind: "approx", sd: 2.6,
+        rows: [ {p: 0.000357, x: 40}, {p: 0.0026, x: 8}, {p: 0.0140, x: 5}, {p: 0.0270, x: 3}, {p: 0.30, x: 1}, {p: 0.656, x: -1} ] },
+      "match-dealer": { name: "Spanish 21 — Match the Dealer (6 decks)", edge: 0.0306, kind: "approx", sd: 3.1,
+        rows: [ {p: 0.006, x: 22}, {p: 0.008, x: 15}, {p: 0.005, x: 14}, {p: 0.14, x: 4}, {p: 0.02, x: 9}, {p: 0.821, x: -1} ] },
+      "pot-of-gold": { name: "Free Bet — Pot of Gold side bet", edge: 0.0464, kind: "approx", sd: 3.4,
+        rows: [ {p: 0.0008, x: 50}, {p: 0.004, x: 25}, {p: 0.03, x: 10}, {p: 0.06, x: 5}, {p: 0.10, x: 2}, {p: 0.8052, x: -1} ] },
+      "push-22": { name: "Free Bet — Push 22 side bet", edge: 0.1176, kind: "approx", sd: 3.0,
+        rows: [ {p: 0.003, x: 50}, {p: 0.012, x: 20}, {p: 0.04, x: 8}, {p: 0.03, x: 6}, {p: 0.915, x: -1} ] }
+    },
+    note: "All variant tables are approximate result shapes calibrated to the published house edge; side-bet paytables are representative examples."
+  };
+
   return G;
 })();
