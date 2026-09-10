@@ -10,7 +10,7 @@ window.BJTable = (function () {
   function sgn(n) { return (n > 0 ? '+' : '') + n; }
 
   var DEFAULTS = { decks: 6, h17: true, das: true, surrender: true, penetration: 0.75, bots: 2, seat: 'last', speed: 500, mode: 'play',
-                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo' };
+                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0 };
   function loadSettings() { try { var s = JSON.parse(localStorage.getItem('ttg-bjt') || 'null'); return s ? Object.assign({}, DEFAULTS, s) : Object.assign({}, DEFAULTS); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function saveSettings(s) { try { localStorage.setItem('ttg-bjt', JSON.stringify(s)); } catch (e) {} }
 
@@ -27,7 +27,7 @@ window.BJTable = (function () {
     function sel_(label, key, options) {
       var f = el('label', 'bjt-field'); f.appendChild(el('span', 'k', label));
       var s = el('select'); options.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; s.appendChild(op); }); s.value = String(S[key]);
-      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); rebuild(); });
+      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); if (key === 'bustRemove' || key === 'rcEvery' || key === 'tcEvery') { renderFelt(); return; } rebuild(); });
       f.appendChild(s); return f;
     }
     bar.appendChild(sel_('Decks', 'decks', [[1, '1 deck'], [2, '2 decks'], [4, '4 decks'], [6, '6 decks'], [8, '8 decks']]));
@@ -38,6 +38,9 @@ window.BJTable = (function () {
     bar.appendChild(sel_('Other players', 'bots', [[0, 'None'], [1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']]));
     bar.appendChild(sel_('Your seat', 'seat', [['first', 'First base'], ['middle', 'Middle'], ['last', 'Third base']]));
     bar.appendChild(sel_('Mode', 'mode', [['play', 'Play — I make the decisions'], ['drill', 'Count drill — everyone auto-plays']]));
+    bar.appendChild(sel_('Busted hands', 'bustRemove', [[2000, 'Removed after 2 s'], [5000, 'Removed after 5 s'], [0, 'Stay on the table']]));
+    bar.appendChild(sel_('Ask my running count', 'rcEvery', [[0, 'Never'], [3, 'Every 3 hands'], [5, 'Every 5 hands'], [10, 'Every 10 hands'], [20, 'Every 20 hands']]));
+    bar.appendChild(sel_('Ask my true count', 'tcEvery', [[0, 'Never'], [26, 'Every half deck dealt'], [52, 'Every deck dealt'], [104, 'Every 2 decks dealt']]));
     var spd = el('label', 'bjt-field'); spd.appendChild(el('span', 'k', 'Deal speed'));
     var spdIn = el('input'); spdIn.type = 'range'; spdIn.min = '60'; spdIn.max = '1500'; spdIn.step = '20'; spdIn.value = S.speed;
     var spdOut = el('span', 'bjt-spd', S.speed + ' ms/card');
@@ -58,6 +61,10 @@ window.BJTable = (function () {
     var grid = el('div', 'bjt-grid');
     var felt = el('div', 'bjt-felt');
     var shoeLine = el('div', 'bjt-shoe'); felt.appendChild(shoeLine);
+    var gaugeRow = el('div', 'bjt-gaugerow');
+    gaugeRow.innerHTML = '<div class="bjt-tray" title="discard tray"><div class="stack"></div><span>discards</span></div><div class="bjt-gauge"><div class="segs"></div><div class="fill"></div><div class="cut"></div><div class="lbl"></div></div><div class="bjt-shoebox" title="shoe"><div class="stack"></div><span>shoe</span></div>';
+    felt.appendChild(gaugeRow);
+    var gauge = gaugeRow.querySelector('.bjt-gauge'), trayStack = gaugeRow.querySelector('.bjt-tray .stack'), shoeStack = gaugeRow.querySelector('.bjt-shoebox .stack');
     var table = el('div', 'bjt-table');
     table.innerHTML = '<div class="bjt-rail"></div><div class="bjt-surface">' +
       '<svg class="bjt-arcsvg" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true"><defs><path id="bjt-arc-outer" d="M 58 24 A 442 516 0 0 0 942 24"/></defs>' +
@@ -150,6 +157,7 @@ window.BJTable = (function () {
         tile('Hands', st.hands) + tile('Session result', fmt(st.net), st.net < 0 ? 'dn' : st.net > 0 ? 'up' : '') +
         tile('Strategy accuracy', st.decisions ? acc + '%' : '—', acc >= 95 ? 'up' : acc >= 85 ? '' : 'dn', st.correct + ' of ' + st.decisions + ' decisions') +
         tile('Count checks', st.countChecks ? cacc + '% exact' : '—', cacc >= 90 ? 'up' : '', st.countChecks ? 'average miss ' + (st.countOff / st.countChecks).toFixed(1) : 'none yet') +
+        tile('True-count checks', st.tcChecks ? Math.round(100 * (st.tcExact || 0) / st.tcChecks) + '% within ½' : '—', st.tcChecks && (st.tcExact || 0) / st.tcChecks >= 0.9 ? 'up' : '', st.tcChecks ? 'average miss ' + (st.tcOff / st.tcChecks).toFixed(1) : 'none yet') +
         tile('Win / loss / push', st.wins + ' / ' + st.losses + ' / ' + st.pushes) + tile('Shoes dealt', game.shoeNo) + '</div>' +
         '<p class="bjt-help">Basic strategy alone gets the house edge to about half a percent; the count only pays once your strategy accuracy is above 95% and your count checks are exact. Fix the strategy first.</p>' +
         '<button type="button" class="bjt-btn ghost" id="bjt-reset">Reset session</button>';
@@ -164,6 +172,7 @@ window.BJTable = (function () {
       return '<span class="bjt-card' + (red ? ' red' : '') + '"><b>' + c.label + '</b><i>' + c.s + '</i><u>' + c.s + '</u><em>TG</em></span>';
     }
     function handHTML(h, showTotal) {
+      if (h.removed) return '<div class="bjt-hand gone"><div class="cards"></div><div class="meta"><em class="bjt-status bust">Bust</em></div></div>';
       var t = B.total(h.cards), s = '';
       h.cards.forEach(function (c) { s += cardHTML(c); });
       var lab = '';
@@ -173,7 +182,15 @@ window.BJTable = (function () {
     }
     function renderFelt() {
       var decksLeft = game.decksRemaining();
-      shoeLine.innerHTML = '<span>Shoe ' + game.shoeNo + '</span><span>' + game.shoe.length + ' cards left · ~' + decksLeft + ' deck' + (decksLeft === 1 ? '' : 's') + '</span><span>cut card at ' + Math.round(S.penetration * 100) + '%</span>' + (game.needShuffle ? '<span class="warn">shuffle after this hand</span>' : '');
+      var totalCards = S.decks * 52, dealt = totalCards - game.shoe.length;
+      shoeLine.innerHTML = '<span>Shoe ' + game.shoeNo + '</span>' + (S.showCount ? '<span>' + game.shoe.length + ' cards left · ~' + decksLeft + ' deck' + (decksLeft === 1 ? '' : 's') + '</span>' : '<span>' + S.decks + ' decks · estimate what\'s left from the tray</span>') + '<span>cut card at ' + Math.round(S.penetration * 100) + '%</span>' + (game.needShuffle ? '<span class="warn">shuffle after this hand</span>' : '');
+      // shoe gauge: one segment per deck, fill = dealt, cut-card marker at penetration; tray/shoe stacks grow and shrink
+      if (gauge.querySelector('.segs').children.length !== S.decks) { var sg = ''; for (var q = 0; q < S.decks; q++) sg += '<i></i>'; gauge.querySelector('.segs').innerHTML = sg; }
+      gauge.querySelector('.fill').style.width = (100 * dealt / totalCards) + '%';
+      gauge.querySelector('.cut').style.left = (100 * S.penetration) + '%';
+      gauge.querySelector('.lbl').textContent = S.showCount ? (Math.round(dealt / 52 * 2) / 2) + ' dealt · ' + decksLeft + ' left' : '';
+      var trayN = Math.min(12, Math.round(dealt / (totalCards / 12))), shoeN = Math.min(12, Math.ceil(game.shoe.length / (totalCards / 12)));
+      trayStack.innerHTML = new Array(trayN + 1).join('<b></b>'); shoeStack.innerHTML = new Array(shoeN + 1).join('<b></b>');
       arcText.textContent = 'BLACKJACK PAYS 3 TO 2  ·  DEALER MUST ' + (S.h17 ? 'HIT SOFT 17' : 'STAND ON ALL 17s') + '  ·  THE TILTED GENT';
       if (!round) {
         dealerBox.innerHTML = '<div class="bjt-label">Dealer</div><div class="bjt-hand"><div class="cards"><span class="bjt-card back ghost"></span><span class="bjt-card back ghost"></span></div></div>';
@@ -315,7 +332,11 @@ window.BJTable = (function () {
       if (act === 'H') { h.cards.push(game.draw()); renderFelt(); var t2 = B.total(h.cards); if (t2.t > 21) { h.status = 'bust'; h.statusText = 'Bust'; wait(function () { finishHand(h); }); return; } if (t2.t === 21) { wait(function () { finishHand(h); }); return; } wait(playNext); return; }
       finishHand(h); // stand
     }
-    function finishHand(h) { h.active = false; round.handIdx++; renderFelt(); wait(playNext, Math.min(S.speed, 300)); }
+    function scheduleBustRemoval(h) {
+      if (!S.bustRemove || !h.bet) return; var r = round;
+      setTimeout(function () { if (round !== r) return; h.removed = true; renderFelt(); }, S.bustRemove);
+    }
+    function finishHand(h) { h.active = false; if (h.status === 'bust') scheduleBustRemoval(h); round.handIdx++; renderFelt(); wait(playNext, Math.min(S.speed, 300)); }
     function dealerPlay() {
       round.seats.forEach(function (s) { s.hands.forEach(function (x) { x.active = false; }); });
       game.reveal(round.dealer.cards[1]); round.dealerDone = true; renderFelt();
@@ -342,7 +363,7 @@ window.BJTable = (function () {
           else if (t.t < d.t) { net = -h.bet; txt = 'lose'; }
           else { net = 0; txt = 'push'; }
           if (seat.you && h === seat.hands[0] && seat.insured) { net += dBJ ? h.bet : -h.bet / 2; txt += dBJ ? ' + insurance' : ' − insurance'; }
-          h.status = net > 0 ? 'win' : net < 0 ? 'lose' : 'push'; h.statusText = txt;
+          if (!h.removed) { h.status = net > 0 ? 'win' : net < 0 ? 'lose' : 'push'; h.statusText = txt; }
           if (seat.you) { st.net += net; st.hands++; if (net > 0) st.wins++; else if (net < 0) st.losses++; else st.pushes++; lines.push(txt + ' ' + (net ? (net > 0 ? '+' : '') + fmt(net).replace('$', '$') : '')); }
         });
       });
@@ -350,7 +371,37 @@ window.BJTable = (function () {
       say('Dealer ' + (d.t > 21 ? 'busts' : 'has ' + d.t) + '. You: ' + lines.join(', ') + '.', 'info');
       actions.innerHTML = '';
       var next = el('button', 'bjt-btn gold', 'Deal next hand'); next.type = 'button'; next.addEventListener('click', startRound); actions.appendChild(next);
+      // count prompts, at the round boundary
+      var wantRC = S.rcEvery > 0 && st.hands > 0 && st.hands % S.rcEvery === 0;
+      var dealtNow = S.decks * 52 - game.shoe.length;
+      var wantTC = S.tcEvery > 0 && dealtNow - (game.tcMark || 0) >= S.tcEvery;
+      if (wantTC) game.tcMark = dealtNow;
+      if (wantRC || wantTC) { promptCount(wantRC ? 'rc' : 'tc', function () { if (wantRC && wantTC) promptCount('tc', function () { if (S.autoNext) wait(startRound, 600); }); else if (S.autoNext) wait(startRound, 600); }); return; }
       if (S.autoNext) wait(startRound, Math.max(S.speed * 2, 900));
+    }
+
+    /* ---------- in-table count prompts ---------- */
+    function promptCount(kind, done) {
+      actions.innerHTML = '';
+      var box = el('div', 'bjt-prompt');
+      box.innerHTML = '<div class="k">' + (kind === 'rc' ? 'Running count check' : 'True count check') + '</div><p>' + (kind === 'rc' ? 'What is the running count right now?' : 'Estimate the decks left in the shoe and give the true count (to the nearest half).') + '</p>';
+      var inp = el('input'); inp.type = 'number'; inp.step = kind === 'rc' ? '1' : '0.5'; inp.placeholder = kind === 'rc' ? 'running count' : 'true count';
+      var ok = el('button', 'bjt-btn gold', 'Check'); ok.type = 'button';
+      var skip = el('button', 'bjt-btn ghost', 'Skip'); skip.type = 'button';
+      var out = el('div', 'out');
+      box.appendChild(inp); box.appendChild(ok); box.appendChild(skip); box.appendChild(out); actions.appendChild(box); inp.focus();
+      function finish() { var n = el('button', 'bjt-btn gold', 'Deal next hand'); n.type = 'button'; n.addEventListener('click', startRound); actions.appendChild(n); done(); }
+      ok.addEventListener('click', function () {
+        if (inp.value === '') { inp.focus(); return; }
+        var st = game.stats, yours = +inp.value;
+        if (kind === 'rc') { var off = Math.abs(yours - game.rc); st.countChecks++; st.countOff += off; if (off === 0) st.countExact++;
+          out.innerHTML = '<span class="' + (off === 0 ? 'ok' : 'bad') + '">' + (off === 0 ? '✓ Exact.' : '✗ Off by ' + off + '.') + ' Running count is <b>' + sgn(game.rc) + '</b>.</span>'; }
+        else { var tc = Math.round(game.trueCount() * 2) / 2, offt = Math.abs(yours - tc); st.tcChecks = (st.tcChecks || 0) + 1; st.tcOff = (st.tcOff || 0) + offt; if (offt <= 0.5) st.tcExact = (st.tcExact || 0) + 1;
+          out.innerHTML = '<span class="' + (offt <= 0.5 ? 'ok' : 'bad') + '">' + (offt <= 0.5 ? '✓ Close enough.' : '✗ Off by ' + offt + '.') + ' True count is <b>' + sgn(tc) + '</b> — running count ' + sgn(game.rc) + ' over ' + game.decksRemaining() + ' decks left (' + game.shoe.length + ' cards).</span>'; }
+        ok.disabled = true; skip.disabled = true; renderStats(); setTimeout(finish, 1800);
+      });
+      skip.addEventListener('click', function () { box.remove(); finish(); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') ok.click(); });
     }
 
     /* ---------- bet row + count check ---------- */
