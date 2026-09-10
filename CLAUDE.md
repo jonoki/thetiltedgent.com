@@ -36,11 +36,12 @@ The previous palette (black, gold, crimson; Sep 3–4 2026) is archived at `asse
 - `reports/index.html` — 189 report cards grouped by sector with filter chips (incl. Dow 30); brand chrome.
 - `reports/view.html` — iframe viewer (`view.html?r=aapl`) that loads `<ticker>_analysis.html` and removes the report's embedded `#tg-sitenav`; brand chrome.
 - `reports/*_analysis.html` — 189 self-contained tear-sheets (Playfair headings, Chart.js price chart, per-company accent). **These are documents, not chrome: leave their internal design alone.** Each embeds static data as of its own date, with a "Static data as of …" banner at the top. Eleven of them (aapl, amgn, bac, crwd, ge, ibm, lin, meta, nflx, pgr, unh) embed a `#tg-sitenav` block right after `<body>`; the rest have no site nav.
+- `tables/casino-games.html` — "Casino Games, Graded" (Sep 10 2026): the first Pillar 02 page. Eight games with a grade board, per-game house-edge tables, best/worst bets, quirks, advantage-play notes and a Gent's Grade. Brand chrome copied from `index.html` (own nav/footer, mobile drawer, relative `../assets/` paths). Figures are published game math; no operators named; keep both disclaimers. Linked from the nav ("The Tables"), Pillar 02 EXPLORE and the Toolbox odds card.
 - `brand.html` — brand system reference (marks, palette tokens, type, wordmark rules, components, voice); brand chrome, `noindex`. Rebuilt Sep 4 2026.
 
-The three "chrome pages" are `index.html`, `reports/index.html`, `reports/view.html`.
+The chrome pages are `index.html`, `reports/index.html`, `reports/view.html` and `tables/casino-games.html`.
 
-**Mobile nav**: `index.html` and `brand.html` carry a toggle + drawer below 820px (`.navtoggle` button, `.navlinks#navmenu` panel). A one-line script in `<head>` adds `js` to `<html>` before paint so the drawer starts closed; without JS the links degrade to a plain stacked list instead of disappearing. `.navrow` sets its own horizontal padding (28px, 18px on the reports index) because it shares an element with `.wrap` and would otherwise override it.
+**Mobile nav**: `index.html`, `brand.html` and `tables/casino-games.html` carry a toggle + drawer below 820px (`.navtoggle` button, `.navlinks#navmenu` panel). A one-line script in `<head>` adds `js` to `<html>` before paint so the drawer starts closed; without JS the links degrade to a plain stacked list instead of disappearing. `.navrow` sets its own horizontal padding (28px, 18px on the reports index) because it shares an element with `.wrap` and would otherwise override it.
 
 ## Building or fixing report pages
 
