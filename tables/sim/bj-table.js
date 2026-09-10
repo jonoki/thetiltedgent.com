@@ -58,8 +58,17 @@ window.BJTable = (function () {
     var grid = el('div', 'bjt-grid');
     var felt = el('div', 'bjt-felt');
     var shoeLine = el('div', 'bjt-shoe'); felt.appendChild(shoeLine);
-    var dealerBox = el('div', 'bjt-dealer'); felt.appendChild(dealerBox);
-    var seatsBox = el('div', 'bjt-seats'); felt.appendChild(seatsBox);
+    var table = el('div', 'bjt-table');
+    table.innerHTML = '<div class="bjt-rail"></div><div class="bjt-surface">' +
+      '<svg class="bjt-arcsvg" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true"><defs><path id="bjt-arc-outer" d="M 58 24 A 442 516 0 0 0 942 24"/></defs>' +
+      '<text class="arc1"><textPath href="#bjt-arc-outer" startOffset="50%" text-anchor="middle"></textPath></text>' +
+      '<text class="arc2" x="500" y="222" text-anchor="middle">INSURANCE PAYS 2 TO 1</text></svg>' +
+      '<div class="bjt-brand"><img src="../assets/ttg-mark-neon.svg" alt=""><span>THE TILTED GENT</span></div></div>';
+    felt.appendChild(table);
+    var surface = table.querySelector('.bjt-surface');
+    var arcText = table.querySelector('.arc1 textPath');
+    var dealerBox = el('div', 'bjt-dealer'); surface.appendChild(dealerBox);
+    var seatsBox = el('div', 'bjt-seats'); surface.appendChild(seatsBox);
     var msg = el('div', 'bjt-msg'); felt.appendChild(msg);
     var actions = el('div', 'bjt-actions'); felt.appendChild(actions);
     var betRow = el('div', 'bjt-bet'); felt.appendChild(betRow);
@@ -150,9 +159,9 @@ window.BJTable = (function () {
 
     /* ---------- rendering the felt ---------- */
     function cardHTML(c, hidden) {
-      if (hidden || c.hidden) return '<span class="bjt-card back">?</span>';
+      if (hidden || c.hidden) return '<span class="bjt-card back" aria-label="face-down card"></span>';
       var red = c.s === '♥' || c.s === '♦';
-      return '<span class="bjt-card' + (red ? ' red' : '') + '"><b>' + c.label + '</b><i>' + c.s + '</i></span>';
+      return '<span class="bjt-card' + (red ? ' red' : '') + '"><b>' + c.label + '</b><i>' + c.s + '</i><u>' + c.s + '</u><em>TG</em></span>';
     }
     function handHTML(h, showTotal) {
       var t = B.total(h.cards), s = '';
@@ -160,20 +169,36 @@ window.BJTable = (function () {
       var lab = '';
       if (showTotal && !h.cards.some(function (c) { return c.hidden; })) lab = (B.isBJ(h.cards) && !h.split ? 'BJ' : (t.soft && t.t <= 21 ? 'soft ' : '') + t.t);
       var st = h.status ? '<em class="bjt-status ' + h.status + '">' + h.statusText + '</em>' : '';
-      return '<div class="bjt-hand' + (h.active ? ' active' : '') + '"><div class="cards">' + s + '</div><div class="meta">' + (lab ? '<span class="tot">' + lab + '</span>' : '') + (h.bet ? '<span class="bet">' + fmt(h.bet) + '</span>' : '') + st + '</div></div>';
+      return '<div class="bjt-hand' + (h.active ? ' active' : '') + '"><div class="cards">' + s + '</div><div class="meta">' + (lab ? '<span class="tot">' + lab + '</span>' : '') + (h.bet && (h.doubled || h.split) ? '<span class="bet">' + fmt(h.bet) + '</span>' : '') + st + '</div></div>';
     }
     function renderFelt() {
       var decksLeft = game.decksRemaining();
       shoeLine.innerHTML = '<span>Shoe ' + game.shoeNo + '</span><span>' + game.shoe.length + ' cards left · ~' + decksLeft + ' deck' + (decksLeft === 1 ? '' : 's') + '</span><span>cut card at ' + Math.round(S.penetration * 100) + '%</span>' + (game.needShuffle ? '<span class="warn">shuffle after this hand</span>' : '');
-      if (!round) { dealerBox.innerHTML = '<div class="bjt-label">Dealer</div><div class="bjt-hand"><div class="cards"></div></div>'; seatsBox.innerHTML = ''; return; }
-      dealerBox.innerHTML = '<div class="bjt-label">Dealer' + (round.dealerDone ? '' : '') + '</div>' + handHTML(round.dealer, round.dealerDone);
+      arcText.textContent = 'BLACKJACK PAYS 3 TO 2  ·  DEALER MUST ' + (S.h17 ? 'HIT SOFT 17' : 'STAND ON ALL 17s') + '  ·  THE TILTED GENT';
+      if (!round) {
+        dealerBox.innerHTML = '<div class="bjt-label">Dealer</div><div class="bjt-hand"><div class="cards"><span class="bjt-card back ghost"></span><span class="bjt-card back ghost"></span></div></div>';
+        seatsBox.innerHTML = ''; var n0 = S.bots + 1, i0;
+        for (i0 = 0; i0 < n0; i0++) { var you0 = (S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor(n0 / 2) : n0 - 1) === i0; var d0 = el('div', 'bjt-seat' + (you0 ? ' you' : '')); d0.innerHTML = '<div class="bjt-hand"><div class="cards"></div></div><div class="bjt-circle">' + (you0 ? 'YOU' : i0 + 1) + '</div>'; seatsBox.appendChild(d0); }
+        placeSeats(); return;
+      }
+      dealerBox.innerHTML = '<div class="bjt-label">Dealer</div>' + handHTML(round.dealer, round.dealerDone);
       seatsBox.innerHTML = '';
       round.seats.forEach(function (seat) {
         var d = el('div', 'bjt-seat' + (seat.you ? ' you' : ''));
-        d.innerHTML = '<div class="bjt-label">' + (seat.you ? 'You' : 'Player ' + seat.n) + '</div>' + seat.hands.map(function (h) { return handHTML(h, true); }).join('');
+        d.innerHTML = seat.hands.map(function (h) { return handHTML(h, true); }).join('') + '<div class="bjt-circle' + (seat.you ? ' you' : '') + '">' + (seat.you ? 'YOU' : 'P' + seat.n) + '<small>' + fmt(seat.hands[0].bet) + '</small></div>';
         seatsBox.appendChild(d);
       });
-      renderLive();
+      placeSeats(); renderLive();
+    }
+    // Seats sit on the arc of the half-ellipse table: seat 1 (first base) on the right, last seat on the left.
+    function placeSeats() {
+      var seats = seatsBox.children, n = seats.length, i, wide = felt.clientWidth >= 600;
+      felt.classList.toggle('arc', wide);
+      for (i = 0; i < n; i++) {
+        var th = n === 1 ? 90 : 22 + i * (136 / (n - 1)), rad = th * Math.PI / 180;
+        var x = 50 + 41 * Math.cos(rad), y = 24 + 46 * Math.sin(rad);
+        seats[i].style.left = wide ? x + '%' : ''; seats[i].style.top = wide ? y + '%' : '';
+      }
     }
     function renderLive() {
       if (S.showCount) liveCount.innerHTML = '<div class="k">Live count</div><div class="v">RC <b>' + sgn(game.rc) + '</b> · TC <b>' + sgn(Math.round(game.trueCount() * 10) / 10) + '</b> · ' + game.decksRemaining() + ' decks left</div>';
@@ -349,6 +374,8 @@ window.BJTable = (function () {
       if (btn && !btn.disabled) { btn.click(); e.preventDefault(); }
       if (k === ' ') { pauseBtn.click(); e.preventDefault(); }
     });
+
+    window.addEventListener('resize', function () { placeSeats(); });
 
     /* ---------- build ---------- */
     function rebuild(keepNothing) {
