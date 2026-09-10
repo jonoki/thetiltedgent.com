@@ -205,6 +205,9 @@ for i, (gid, slug, title, desc) in enumerate(GAMES):
     marker = '    <div class="ap">'
     assert sec.count(marker) == 1, gid
     sec = sec.replace(marker, sim_block(gid) + '\n' + marker, 1)
+    if gid == 'blackjack':
+        sec = sec.replace('    <div class="ap">', '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>
+    <div class="ap">''', 1)
     scripts = '' if gid == 'slots' else f'''
 <script src="sim/games.js"></script>
 <script src="sim/ttg-sim.js"></script>
@@ -224,7 +227,7 @@ hero_i = hero_i.replace("and where a disciplined player can flip the edge — le
 cards = ''
 for gid, slug, title, desc in GAMES:
     gc, gl = GRADES[gid]
-    cards += f'''      <a class="gcard" href="{slug}.html"><div class="top"><h3>{html.escape(title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[gid]}</p><span class="more">{'READ THE ANALYSIS' if gid == 'slots' else 'ANALYSIS + SIMULATOR'} &rarr;</span></a>\n'''
+    cards += f'''      <a class="gcard" href="{slug}.html"><div class="top"><h3>{html.escape(title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[gid]}</p><span class="more">{'READ THE ANALYSIS' if gid == 'slots' else ('ANALYSIS + SIMULATOR + TRAINER' if gid == 'blackjack' else 'ANALYSIS + SIMULATOR')} &rarr;</span></a>\n'''
 games_section = f'''<!-- ================= GAME PAGES ================= -->
 <section id="games">
   <div class="wrap">
