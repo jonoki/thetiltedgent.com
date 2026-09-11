@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ED — Consolidated Edison, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4EA8DE;
+  --accent-dim: #4EA8DE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<div class="container">
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">ED</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Utilities / Utilities — Regulated Electric</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $39.5B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #660</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: not verified</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: not verified</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Consolidated Edison, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$106.73</div>
+      <div class="price-change" style="color:var(--text-muted);">Session change not verified from sources fetched</div>
+      <div class="price-date">Previous close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Sourced as the "Previous Close" field on stockanalysis.com/stocks/ed/ while the Sep 11 session was still open; the live quote at the time of writing was $106.88 (+0.14%) and is deliberately not used.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 4 Irving Place, New York, NY 10003</div>
+    <div class="meta-item"><span>Employees:</span> 15,407</div>
+    <div class="meta-item"><span>Founded:</span> 1884</div>
+    <div class="meta-item"><span>Next Earnings:</span> Early November 2026 (est. — Q2 was reported Aug 6, 2026; Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Consolidated Edison is the regulated energy-delivery monopoly for New York City and Westchester County — roughly <strong>3.7 million electric customers</strong>, <strong>1.1 million gas customers</strong> and <strong>1,490 steam customers</strong>, served through its principal subsidiary Consolidated Edison Company of New York (CECONY), plus a smaller utility, Orange &amp; Rockland (O&amp;R), covering a 1,300-square-mile territory in southeastern New York and northern New Jersey. FY2025 revenue was <strong>$16.92B, up 10.9%</strong> from $15.26B in FY2024, with <span class="tip" title="Trailing twelve months — the most recent four reported quarters, rather than a fiscal year">TTM</span> revenue through June 2026 of <strong>$17.69B (+9.5%)</strong>. The company ranks roughly <strong>#660 globally by market capitalisation</strong> at $39.5B, and carries a <strong>53-year streak of consecutive annual dividend increases</strong> — among the longest in the S&amp;P 500.</p>
+  <p class="prose" style="margin-top:16px;">The central debate here is not growth versus no growth — a regulated utility's earnings are close to an engineering output of rate base times allowed return. It is <strong>price</strong>. Con Edison trades at roughly <strong>17.5× trailing earnings</strong> with a <strong>3.33% dividend yield</strong> while its authorized return on equity under the newly approved CECONY rate plan is <strong>9.40%</strong> and its actual <span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span> is <strong>8.96%</strong>. In other words, investors are paying about <strong>1.54× book value</strong> for a business legally capped near a 9-handle return. That premium is only rational if the <strong>$41.7B 2026–2030 capital plan</strong> converts into rate base at close to the authorized return, and if New York regulators and politicians permit the bill increases that plan implies. Section 04 and the Industry Commentary take that apart. A second, quieter issue: reported <span class="tip" title="Generally Accepted Accounting Principles — the standardised, audited financial reporting basis">GAAP</span> earnings have been repeatedly flattered by asset sales, so the trailing multiple you see on a screener is not the multiple you are actually buying.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Timothy P. Cawley</div>
+      <div class="card-note">Chairman, President and Chief Executive Officer. Verified from the company profile on stockanalysis.com as of the data date. A career Con Edison operator rather than an outside financial hire — the profile of executive New York's regulatory process tends to reward.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Kirkland B. Andrews</div>
+      <div class="card-note">Senior Vice President and Chief Financial Officer. Verified from the same profile page. Owner of the adjusted-EPS framing, the $6.00–$6.20 FY2026 guidance range, the 6–7% long-term growth target, and the $2B at-the-market equity programme announced May 8, 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership Structure</div>
+      <div class="card-value" style="font-size:20px;">369.83M shares</div>
+      <div class="card-note">Single class of common stock; float of 369.30M shares is essentially the entire share count, so there is no founder or family control block. <strong>Specific institutional holders were not verified from the sources fetched and are therefore not listed.</strong> Note that the share count is rising — the $2B ATM programme issues equity to fund the capital plan.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Con Edison discloses revenue by <strong>service type</strong> — electric, gas, steam and a residual non-utility line — rather than by a conventional product segmentation. The split below is the verified FY2025 disaggregation from the company's 2025 earnings release. A structural note the sector brief demands: <strong>the Clean Energy Businesses no longer exist inside Con Edison.</strong> That subsidiary was sold in 2023, and the 2026 releases refer to it only as "its former subsidiary, Con Edison Clean Energy Businesses, Inc." when describing adjustments to the gain. The surviving structure is CECONY, O&amp;R, and Con Edison Transmission (a FERC-regulated transmission investment vehicle) — and even Transmission has been shrinking: it sold its equity interest in the Mountain Valley Pipeline during 2026 for a <strong>$134M after-tax gain ($0.37/share)</strong>.</p>
+  <div class="seg-bar">
+    <div style="flex:74.5;background:#4EA8DE;">ELECTRIC 74.5%</div>
+    <div style="flex:21.3;background:#f59e0b;">GAS 21.3%</div>
+    <div style="flex:4.2;background:#a78bfa;">STEAM 4.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4EA8DE;"></span> Electric — $12,602M (FY2025), +8.9% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Gas — $3,610M (FY2025), +16.2% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Steam — $703M (FY2025), +21.6% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Non-utility — $3M (FY2025), flat</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note on what these numbers do and do not mean: under the <strong>revenue decoupling mechanisms</strong> in the New York electric and gas rate plans, revenues are "generally not affected by changes in delivery volumes." Revenue growth here is therefore mostly rate-plan mechanics and commodity pass-through, not demand. Earnings follow <em>rate base</em>, not revenue — which is why the rate-base figures in each card below matter more than the revenue line above them.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4EA8DE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Electric Delivery — CECONY &amp; O&amp;R</div>
+        <span class="biz-badge dominant">FRANCHISE MONOPOLY — 100% OF SERVICE TERRITORY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$12.60B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+8.9%</div><div class="biz-stat-label"><span class="tip" title="Year over year — this period compared with the same period a year earlier">YoY</span> Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">100%</div><div class="biz-stat-label">Territory Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">74.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The core asset: the wires, substations and underground network that deliver electricity to New York City and Westchester. Roughly <strong>3.7 million electric customers</strong>, <strong>552 circuit miles of transmission line</strong> and <strong>89,675 in-service transformers</strong>. Con Edison is a <em>delivery</em> business — it does not compete for customers, and in a franchise territory there is no share to win or lose. Earnings come from the approved <strong>average electric rate base of $32,935M in 2026</strong>, rising to <strong>$35,149M in 2027</strong> and <strong>$39,174M in 2028</strong> under the approved rate plan, earning an <strong>authorized return on equity of 9.40%</strong> on a <strong>48% common equity ratio</strong>. The rate plan grants electric delivery revenue increases of <strong>$222M (2026), $473M (2027) and $329M (2028)</strong>. The load story underneath is the interesting part: New York City electrification of buildings and transport, plus data-centre and grid-interconnection demand, is why management expects <strong>28 new substations in service by 2035</strong>.</p>
+    <div class="biz-tam"><strong>Addressable size:</strong> defined by regulation, not market — 2026 average electric rate base $32.9B, growing to $39.2B by 2028 per the approved plan. There is no third-party TAM estimate to quote and none is invented here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">National Grid (upstate NY / Long Island)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">PSEG (northern New Jersey)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Rooftop solar &amp; DER</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:12px;font-size:13px;">"n/v" = not verified from the sources fetched. These are adjacent territory operators and substitution threats, not direct competitors for Con Edison's customers — no utility can bid for a household inside the CECONY franchise. Their financials were not fetched and are not estimated here.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Gas Delivery</div>
+        <span class="biz-badge emerging">STRUCTURALLY CONTESTED — CLIMATE POLICY RISK</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3.61B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16.2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">100%</div><div class="biz-stat-label">Territory Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Gas service to roughly <strong>1.1 million customers</strong> in Manhattan, the Bronx, Queens and Westchester, over nearly <strong>4,400 miles of distribution mains</strong>. Financially this is the same machine as electric — rate base times allowed return, with an approved <strong>average gas rate base of $11,485M in 2026</strong> rising to <strong>$12,615M in 2028</strong>. Strategically it is the opposite of electric. Under the approved plan gas delivery revenue <em>falls</em> $46M in 2026 before rising $170M in 2027 and $93M in 2028 — a shape consistent with a regulator unwilling to let gas investment compound the way electric investment does. New York's building-electrification policy points toward a long-dated question no utility in the state has answered: who pays for the gas network's remaining book value once customers are being pushed off it. That is a stranded-asset risk with a multi-decade fuse, not a next-quarter risk.</p>
+    <div class="biz-tam"><strong>Addressable size:</strong> 2026 average gas rate base $11.5B → $12.6B by 2028 (approved plan). Growth deliberately slower than electric.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Electric heat pumps (substitute)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Penetration</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">National Grid NY gas</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Steam</div>
+        <span class="biz-badge dominant">UNIQUE ASSET — NO COMPARABLE US SYSTEM AT SCALE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$0.70B</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+21.6%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">1,490</div><div class="biz-stat-label">Customers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The Manhattan district steam system — <strong>1,490 customers</strong> generating <strong>$703M of FY2025 revenue</strong>, or about <strong>$472,000 of revenue per customer</strong>. That ratio tells the story: these are large commercial and institutional buildings, not households. Steam is the smallest line and the most exposed to commercial real-estate occupancy and to the same decarbonisation pressure as gas, since the system is substantially fossil-fired. It is also the least likely part of the business to be replicated or attacked — nobody is building a new district steam network under Manhattan. Revenue grew fastest of the three lines in FY2025 (+21.6%), which on a base this small is commodity and rate mechanics, not a franchise expansion.</p>
+    <div class="biz-tam"><strong>Addressable size:</strong> fixed by the physical footprint of the Manhattan steam network; no separate rate-base figure was verified from the sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Building-level boilers / chillers</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Con Edison Transmission &amp; Other</div>
+        <span class="biz-badge growth">SHRINKING — MVP INTEREST SOLD IN 2026</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3M</div><div class="biz-stat-label">FY2025 Non-Utility Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$134M</div><div class="biz-stat-label">MVP After-Tax Gain</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$0.37</div><div class="biz-stat-label">EPS Impact 2026</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">0.02%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Con Edison Transmission develops and invests in electric transmission projects under <strong>FERC</strong> (Federal Energy Regulatory Commission) oversight. It contributes almost nothing to revenue — <strong>$3M of non-utility revenue in FY2025</strong> — but it has been a repeated source of one-off earnings. In 2026 it sold its equity interest in the <strong>Mountain Valley Pipeline</strong>, booking a <strong>$134M after-tax gain, $0.37 per share</strong>, which management explicitly excludes from adjusted EPS. Read alongside the 2023 disposal of the Clean Energy Businesses, the direction of travel is clear: Con Edison is retreating to a pure regulated-delivery balance sheet and monetising everything else to help fund the capital plan. That simplifies the story and removes the only parts of the business that could ever have earned above the allowed return.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> Clean Energy Businesses sold in 2023; MVP interest sold in 2026. What remains is CECONY, O&amp;R and a much-reduced Transmission arm.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">LEGAL MONOPOLY FRANCHISE</span>
+    <span class="moat-pill">IRREPLACEABLE UNDERGROUND NETWORK</span>
+    <span class="moat-pill">REVENUE DECOUPLING</span>
+    <span class="moat-pill">RATE-BASE EARNINGS FORMULA</span>
+    <span class="moat-pill">142-YEAR OPERATING HISTORY</span>
+    <span class="moat-pill">53-YEAR DIVIDEND STREAK</span>
+    <span class="moat-pill">BETA 0.26</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">Con Edison's moat is the strongest kind and the least valuable kind at the same time. It is <strong>absolute</strong>: no competitor can deliver a kilowatt-hour to a Manhattan apartment, and nobody is going to dig a second network under the densest city in North America. <span class="tip" title="A measure of how much a stock moves relative to the overall market; 1.0 = moves with the market">Beta</span> of <strong>0.26</strong> is the market's arithmetic statement of that — this stock has roughly a quarter of the index's sensitivity to market swings. Revenue decoupling removes even weather and conservation risk from the revenue line. But the same regulatory bargain that grants the monopoly caps the return on it: the approved CECONY rate plan sets <span class="tip" title="Return on equity — the profit a regulator allows the utility to earn on the shareholder-funded portion of its asset base">authorized ROE</span> at <strong>9.40%</strong> on a <strong>48% equity ratio</strong>. Con Edison originally asked for <strong>10.10%</strong> and was cut. So the honest framing of the moat is this: it guarantees that the earnings will exist, and guarantees they will never be spectacular. Everything hinges on how much capital the regulator lets the company put into rate base — which is why the <strong>$41.7B 2026–2030 plan</strong> is the whole growth story.</p>
+  <div style="margin-top:28px;">
+    <p class="prose"><strong style="color:var(--red);">Political and affordability risk is the binding constraint.</strong> Con Edison serves the most politically scrutinised customer base in America, and its rate requests are public, contested proceedings. In the 2026–2028 case, the company requested a year-one electric increase of <strong>$1,612M</strong> and gas of <strong>$441M</strong>; what it received was a phased <strong>$222M / $473M / $329M</strong> on electric and an initial <strong>$46M decrease</strong> on gas. That is a very large gap between ask and award, and a 70-basis-point haircut to requested ROE on top of it. Every future case will be litigated against the same New York City affordability politics.</p>
+    <p class="prose" style="margin-top:16px;"><strong style="color:var(--red);">The capital plan requires equity the market must absorb.</strong> $41.7B of capital spend over 2026–2030 against a $39.5B market cap cannot be funded from an operating cash flow of $3.96B TTM against $4.82B of capex — which is exactly why <span class="tip" title="Free cash flow — operating cash flow minus capital expenditures">free cash flow</span> is <strong>negative $862M</strong>. The May 8, 2026 announcement of a <strong>$2B at-the-market equity programme</strong> is the tell. Every share issued below a reasonable multiple of book dilutes per-share growth against the 6–7% target.</p>
+    <p class="prose" style="margin-top:16px;"><strong style="color:var(--red);">Gas is a long-dated stranded-asset problem.</strong> New York's building-decarbonisation trajectory puts $11.5B of gas rate base on a path where the customer count shrinks while the remaining book value still has to be recovered. The approved rate plan already treats gas differently from electric — a $46M decrease in year one. Nobody has yet had to answer who pays for the last mile of pipe.</p>
+    <p class="prose" style="margin-top:16px;"><strong style="color:var(--red);">Interest rates set the valuation, not operations.</strong> With a 3.33% yield and a 0.26 beta, ED is bought as a bond substitute. The five-year chart in Section 07 is essentially a rates chart: the stock fell from $99 in July 2022 to $85.76 in September 2022 as yields spiked, and made its highs in March–April 2026 when the market was pricing easing. Nothing in the operating business explains those moves.</p>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>ED</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings — share price divided by earnings per share over the last twelve months">Trailing P/E</span></td><td>17.54</td><td>—</td><td>—</td><td>$106.73 ÷ $6.09 TTM EPS = 17.5×. But TTM EPS includes the $0.37 Mountain Valley Pipeline gain — strip it and the multiple is closer to 18.6×.</td></tr>
+      <tr><td><span class="tip" title="Share price divided by analysts' expected earnings per share for the coming year">Forward P/E</span></td><td>17.12</td><td>—</td><td>—</td><td>Against management's own FY2026 adjusted guidance midpoint of $6.10, the multiple is 17.5×. Guidance and consensus are effectively identical here.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth — the P/E ratio divided by the expected earnings growth rate">PEG Ratio</span></td><td>2.69</td><td>—</td><td>—</td><td>A PEG near 2.7 is expensive on its face; for a utility it simply restates that you are paying a bond-proxy price for 6–7% guided growth.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months, on a diluted basis">EPS (TTM)</span></td><td>$6.09</td><td>—</td><td>—</td><td>GAAP. FY2025 GAAP EPS was $5.66 versus $5.70 adjusted; H1 2026 GAAP $3.37 versus $3.00 adjusted — the gap is the MVP gain.</td></tr>
+      <tr><td><span class="tip" title="Percentage change in revenue versus the same period one year earlier">Revenue Growth (YoY)</span></td><td>+9.50%</td><td>—</td><td>—</td><td>TTM. FY2025 was +10.89%. Under revenue decoupling this is rate mechanics and commodity pass-through, not volume growth.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue">Gross Margin</span></td><td>53.37%</td><td>—</td><td>—</td><td>For a utility this mostly measures purchased-power and fuel pass-through, not pricing power. Operating margin of 21.66% is the more meaningful line.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue — what is left after every cost, including tax and interest">Net Profit Margin</span></td><td>12.53%</td><td>—</td><td>—</td><td>$2.22B of net income on $17.69B TTM revenue. Regulator-set, not competed for.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price">Dividend Yield</span></td><td>3.33%</td><td>—</td><td>—</td><td>$3.55 annualised ($0.8875 quarterly, paid Sep 15, 2026) on $106.73. Payout ratio 58.33% — comfortable, and backed by a 53-year increase streak.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of shares outstanding — a gauge of bearish positioning">Short Interest</span></td><td>2.69%</td><td>—</td><td>—</td><td>9.94M shares short. Modest; nobody is pressing a short thesis on a regulated monopoly.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage measure">Debt-to-Equity</span></td><td>1.10</td><td>—</td><td>—</td><td>$28.32B of total debt against a $39.5B market cap; enterprise value $66.33B. High by market standards, normal and regulator-sanctioned for a utility.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — a short-term liquidity measure">Current Ratio</span></td><td>1.27</td><td>—</td><td>—</td><td>Quick ratio 0.97. Adequate; utilities run thin working capital because revenue is contractually certain.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow — cash from operations minus capital expenditure">Free Cash Flow</span></td><td>−$862M</td><td>—</td><td>—</td><td>$3.96B operating cash flow against $4.82B of capex. Negative FCF is the intended state of a utility in a build cycle — it is funded by debt and equity issuance, which is the dilution risk.</td></tr>
+      <tr><td><span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span></td><td>8.96%</td><td>—</td><td>—</td><td>Sitting just below the 9.40% authorized ROE in the approved CECONY plan. The company is earning close to, but not above, what the regulator permits.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital — after-tax operating profit divided by the debt and equity employed">ROIC</span></td><td>4.57%</td><td>—</td><td>—</td><td>Roughly half of ROE because of the leverage. The spread over cost of capital is thin — this is a capital-recycling business, not a compounder.</td></tr>
+      <tr><td><span class="tip" title="A measure of how much a stock moves relative to the overall market; 1.0 = moves with the market">Beta</span></td><td>0.26</td><td>—</td><td>1.00</td><td>Five-year. One of the lowest betas in the S&amp;P 500 — the defensive characteristic is real and is most of why the stock is owned.</td></tr>
+      <tr><td>52-Week Range</td><td>$94.96 – $116.23</td><td>—</td><td>—</td><td>At $106.73 the stock sits 12.4% above the low and 8.2% below the high — mid-range, with a 52-week gain of +10.13%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>On the empty columns:</strong> industry-average and S&amp;P 500 benchmark values were not sourced from any page fetched for this report, and are left as "—" rather than estimated. The one exception is index beta, which is 1.00 by construction.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Notable one-off items — this matters more than usual for ED.</strong> Three separate distortions sit in the reported numbers. First, the <strong>2026 Mountain Valley Pipeline sale</strong> produced a <strong>$134M after-tax gain, $0.37 per share</strong>, which inflates both H1 2026 GAAP EPS ($3.37 GAAP versus $3.00 adjusted) and the TTM EPS of $6.09 that the trailing P/E is computed against. Second, the <strong>2023 sale of the Clean Energy Businesses</strong> is why FY2023 net income of <strong>$2,519M</strong> and EPS of <strong>$7.21</strong> tower over the years either side — FY2022 was $1,660M and FY2024 $1,820M — and any five-year earnings CAGR anchored on 2023 is meaningless. Third, <strong>adjusted EPS has recently run below GAAP</strong>, which is the unusual direction: in H1 2026 adjusted was $3.00 against GAAP $3.37. Management is stripping out gains, not losses. Take the guidance range of <strong>$6.00–$6.20</strong> as the honest earnings power, not the $6.09 TTM GAAP figure.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">Hold</div>
+      <div class="card-note">18 analysts covering (stockanalysis.com). MarketBeat's separate tally reads the same book of ratings as <strong>Reduce</strong> — the disagreement between the two aggregators is itself informative about how thin the enthusiasm is.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$110.28</div>
+      <div class="card-note">+3.33% above the $106.73 close. MarketBeat's average is $108.93 (+2.1%). Either way, the consensus target implies roughly one year of dividend and nothing else.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$94 – $130</div>
+      <div class="card-note">Low implies −11.9%, high implies +21.8%. A 36-point spread on a regulated utility reflects disagreement about the rate environment, not about the business.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">2 / 9 / 7</div>
+      <div class="card-note">Strong Buy 2, Buy 0, Hold 9, Sell 4, Strong Sell 3. Seven bearish ratings against two bullish ones is genuinely unusual for a dividend-aristocrat utility.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:2;background:var(--green);"></div>
+    <div style="flex:9;background:var(--amber);"></div>
+    <div style="flex:7;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Buy / Strong Buy — 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 9</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell / Strong Sell — 7</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:12px;">KEY RECENT ANALYST CALLS</div>
+  <div class="prose">
+    <p style="margin-bottom:12px;"><span style="color:var(--red);">●</span> <strong>Morgan Stanley</strong> — David Arcaro, <strong>Underweight</strong>, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$101.00</span> (lowered from $105), Aug 21, 2026. The most negative of the large-bank calls and the most recent; target sits 5.4% below the current price.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--green);">●</span> <strong>Evercore ISI</strong> — Nicholas Amicucci, <strong>Positive</strong> (reiterated), PT <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$112.00</span>, Aug 17, 2026. The bull case in the coverage group, and note how modest it is: a $112 target is only 5% upside.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--red);">●</span> <strong>Barclays</strong> — Nicholas Campanella, <strong>Underweight</strong>, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$106.00</span> (lowered from $112), Aug 7, 2026. Cut the day after Q2 results — a six-dollar reduction on an in-line quarter.</p>
+    <p style="margin-bottom:12px;"><span style="color:var(--amber);">●</span> <strong>Wells Fargo</strong> — Shahriar Pourreza, <strong>Equal Weight</strong>, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$108.00</span> (raised from $106), Aug 7, 2026. Moved the other way on the same day as Barclays, which captures the split view neatly.</p>
+    <p><span style="color:var(--red);">●</span> <strong>KeyCorp</strong> — Sophie Karp, <strong>Underweight</strong>, PT <span style="font-family:'JetBrains Mono',monospace;color:var(--red);">$94.00</span> (lowered from $97), Jul 23, 2026. The low end of the published range, 11.9% below the current price.</p>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were read from the MarketBeat price-target page for NYSE:ED. Consensus counts and the $110.28 average come from stockanalysis.com; MarketBeat's separate tally of the same universe shows 3 buy / 6 hold / 6 sell and a $108.93 average. Where the two disagree, both figures are shown rather than reconciled.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Quarterly Dividend Payment — $0.8875/share</div>
+        <div class="tl-desc">Declared July 16, 2026 with an August 19 ex-date. The January 27, 2026 declaration carried an annualised increase of 15 cents, extending what stockanalysis.com records as a <strong>53-year streak of consecutive increases</strong>. The annual rate is now $3.55 versus $3.40 in 2025 and $3.32 in 2024.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Nov 2026<br>(est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings — the seasonal quarter that matters</div>
+        <div class="tl-desc">Q3 is Con Edison's heavy quarter: Q3 2025 delivered $688M of net income and $1.90 of EPS versus $308M and $0.83 in Q2 2026. The test is whether the company holds the reaffirmed <strong>$6.00–$6.20 adjusted EPS</strong> range after a first half of $3.00 adjusted. <em>Date estimated from the Aug 6, 2026 Q2 release; the specific Q3 date was not confirmed on any page fetched.</em></div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 1, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate Year 2 of the CECONY Plan — the largest step-up</div>
+        <div class="tl-desc">The approved 2026–2028 plan grants electric delivery revenue increases of $222M in 2026, <strong>$473M in 2027</strong> and $329M in 2028, with gas moving from a $46M decrease to a $170M increase. Average electric rate base steps from $32,935M to $35,149M. This is the single largest scheduled earnings driver in the plan — and the largest bill increase customers will see.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026 – 2030</div>
+      <div class="tl-content">
+        <div class="tl-title">$41.7B Capital Investment Plan</div>
+        <div class="tl-desc">Approximately <strong>$41.693B</strong> of planned investment: $6,595M in 2026, $6,759M in 2027 and $24,339M across 2028–2030. Management frames this as supporting <strong>6–7% compounded adjusted EPS growth</strong> off the 2026 midpoint, and <strong>28 new substations in service by 2035</strong>. The plan is larger than the company's entire market cap, which is the reason the financing question dominates the bear case.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$2 Billion At-The-Market Equity Programme</div>
+        <div class="tl-desc">Announced as the funding mechanism for the capital plan. An ATM issues shares gradually into the open market rather than in a single block — less price shock, but continuous dilution. Against a $39.5B market cap, $2B is roughly 5% of the company. Watch the share count in each 10-Q.</div>
+        <div class="tl-impact down">Dilution overhang — already announced</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 Results — beat, then two target cuts</div>
+        <div class="tl-desc">Net income of $308M / $0.83 per share versus $246M / $0.68 a year earlier, driven by higher electric and gas rate base at CECONY and O&amp;R; full-year guidance reaffirmed. The market's response was not warm: Barclays cut its target from $112 to $106 the next day and Morgan Stanley trimmed to $101 two weeks later. The stock closed August at $107.02, below its July close of $108.85.</div>
+        <div class="tl-impact down">Reaction already happened — negative</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">During 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Mountain Valley Pipeline Interest Sold</div>
+        <div class="tl-desc">Con Edison Transmission sold its equity interest in the MVP, producing a <strong>$134M after-tax gain ($0.37/share)</strong> that management excludes from adjusted EPS. Combined with the 2023 Clean Energy Businesses disposal, it completes the pivot to a pure regulated-delivery balance sheet and provides non-dilutive funding for the capital plan.</div>
+        <div class="tl-impact up">Reaction already happened — positive for funding</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;">ED MONTHLY CLOSES — OCTOBER 2021 → SEPTEMBER 2026</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:20px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:20px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4EA8DE;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:24px;">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <p class="prose" style="font-size:13px;margin-bottom:18px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen on most of the recent periods and may be stretched; below 30 means the opposite. It is a momentum gauge, not a valuation signal — a cheap stock can stay oversold for a year. Computed here on the 60 monthly closes above.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the <strong>October 2021 close of $75.40</strong> to the <strong>September 10, 2026 close of $106.73</strong>, ED returned <strong>+41.6% on price alone</strong>. Add roughly 3.2–3.5% of dividend yield compounding across those years and the total return lands materially higher — which is the entire point of owning this name. What the line does <em>not</em> show is any relationship to the operating business. Revenue rose from $13.68B in FY2021 to $17.69B TTM and rate base grew every single year, yet the stock spent 2022 through 2024 chopping between $85 and $105 with no trend. The chart is a chart of ten-year yields wearing a utility's name.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">Starting point — $75.40</div>
+        <div class="tl-desc">The end of the zero-rate era. ED yielded well above the 10-year Treasury and was priced as a scarce income asset.</div>
+        <div class="tl-impact neutral">Baseline</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Defensive bid peak — $99.27</div>
+        <div class="tl-desc">Up 31.7% from the October 2021 base in nine months, while the broad market was in a bear market. Utilities were the rotation destination as recession fear peaked.</div>
+        <div class="tl-impact up">+31.7% from base</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate shock — $85.76</div>
+        <div class="tl-desc">A 13.6% drawdown in two months as the Fed's terminal-rate expectation reset sharply higher. Nothing changed at the company; the discount rate applied to its cash flows did.</div>
+        <div class="tl-impact down">−13.6% in two months</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">The bond-proxy trough — $85.53</div>
+        <div class="tl-desc">The 5-year low in monthly closes, reached as long yields hit their cycle peak. Note that FY2023 was the company's highest reported EPS year of the period at $7.21 — inflated by the Clean Energy Businesses sale. Best reported earnings, worst price.</div>
+        <div class="tl-impact down">5-year monthly low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-election yield backup — $89.23</div>
+        <div class="tl-desc">Down 14.3% from the September 2024 close of $104.13 in three months, as the market repriced growth and inflation expectations and rotated out of defensives.</div>
+        <div class="tl-impact down">−14.3% from Sep 2024</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Tariff-shock flight to safety — $112.75</div>
+        <div class="tl-desc">A 26.4% rally off the December 2024 low in four months as market volatility sent capital into low-beta defensives. A beta of 0.26 does its work in exactly these months.</div>
+        <div class="tl-impact up">+26.4% off the low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle high — $113.18</div>
+        <div class="tl-desc">The highest monthly close of the five years, set as the 2026–2028 rate plan took effect and FY2026 guidance of $6.00–$6.20 was in hand. The 52-week intraday high of $116.23 sits just above.</div>
+        <div class="tl-impact up">5-year monthly high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Current — $106.73</div>
+        <div class="tl-desc">Down 5.7% from the March peak and 8.2% below the 52-week high, after a Q2 beat that nonetheless drew target cuts from Barclays and Morgan Stanley. Six consecutive monthly closes have now been lower than the one before in four of the last five months.</div>
+        <div class="tl-impact neutral">−5.7% from March high</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Against the <strong>S&amp;P 500</strong> — the benchmark for this NYSE listing — a +41.6% five-year price return is a substantial shortfall; the index's return over the same window was driven by a mega-cap technology complex that a 0.26-beta utility structurally cannot track. That underperformance is the price of the insurance: in the drawdown months of 2022 and the April 2025 volatility shock, ED went up while the index went down. Against the <strong>NASDAQ-100</strong> the gap is wider still, and not a meaningful comparison — the two instruments are bought for opposite reasons. The relevant peer set is the regulated-utility group and the long Treasury curve, and specific utility-index returns were not sourced from any page fetched, so no number is asserted here. What the 52-week data does confirm: ED is <strong>+10.13% over the past year</strong> and sits mid-range between $94.96 and $116.23 — an ordinary year for a bond proxy in a year of rate uncertainty.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>An approved three-year rate plan removes the single biggest uncertainty a utility faces: CECONY has a <strong>9.40% authorized ROE</strong> on a <strong>48% equity ratio</strong> with electric rate base rising from $32.9B to $39.2B by 2028 and scheduled revenue increases of $222M / $473M / $329M. Behind it sits a <strong>$41.7B capital plan</strong> and management's <strong>6–7% long-term adjusted EPS growth</strong> target, funded partly by non-dilutive asset sales (Clean Energy Businesses in 2023, Mountain Valley Pipeline in 2026). Pair that with a <strong>3.33% yield</strong>, a <strong>58% payout ratio</strong>, a <strong>53-year</strong> increase streak and a <strong>0.26 beta</strong>, and you own an inflation-linked, regulator-guaranteed income stream in the most electricity-hungry city in America — with electrification and data-centre load giving the rate base a reason to keep growing past 2030.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying <strong>17.5× earnings</strong> and <strong>1.54× book</strong> for a business the state of New York has legally capped at a <strong>9.40%</strong> return — and it is currently earning <strong>8.96%</strong>, below even that. The regulator cut the ROE request from 10.10%, awarded $222M of year-one electric revenue against a $1,612M ask, and made gas revenue go <em>down</em> in 2026. <span class="tip" title="Free cash flow — cash from operations minus capital expenditure">FCF</span> is <strong>−$862M</strong>, the capital plan is larger than the market cap, and the funding answer is a <strong>$2B ATM equity programme</strong> that dilutes the per-share growth being promised. Reported TTM EPS of $6.09 is flattered by a $0.37 one-off gain. And seven of eighteen analysts rate it Sell against two Buys — the average target of $110.28 implies 3.3% upside, less than the dividend.</p>
+    </div>
+  </div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:var(--text);">Regulatory and affordability risk in New York.</strong> The 2026–2028 case showed how wide the gap between request and award can be: a $1,612M year-one electric ask became $222M, and a 10.10% ROE request became 9.40%. Every subsequent case will be fought in the same political environment, and the $41.7B capital plan only earns its return if the regulator keeps approving the spend into rate base.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:var(--text);">Financing and dilution.</strong> Negative free cash flow of $862M, $28.32B of debt at 1.10× equity, and $6.6B of annual capex mean Con Edison must continuously access debt and equity markets. The $2B ATM is about 5% of the share count. A higher-for-longer rate environment raises both the cost of the debt and the discount rate applied to the stock — hitting earnings and multiple at the same time.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:var(--text);">Gas stranded-asset exposure and one-off earnings quality.</strong> $11.5B of gas rate base faces a state policy trajectory that shrinks its customer base over decades, and the current plan already cuts 2026 gas revenue. Meanwhile the last three years of GAAP earnings have been repeatedly moved by asset sales — the 2023 Clean Energy disposal and the 2026 MVP gain — which makes the headline trailing multiple misleading and leaves the guided $6.00–$6.20 as the only clean number.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card" style="border-left:3px solid var(--red);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">New York Affordability Politics vs. a $41.7B Build</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">Con Edison's capital plan and its customers' bills are the same number viewed from two sides. The company asked for a <strong>$1,612M</strong> first-year electric increase and a <strong>$441M</strong> gas increase; the approved outcome was a phased <strong>$222M / $473M / $329M</strong> on electric and a <strong>$46M decrease</strong> on gas in year one, with authorized ROE set at <strong>9.40%</strong> against the <strong>10.10%</strong> requested. That is the regulator visibly rationing. Yet the plan still requires <strong>$6,595M of capex in 2026 and $6,759M in 2027</strong>, and rate base still has to climb from $32.9B to $39.2B on electric by 2028 for the growth algorithm to work. The constraint is not engineering or demand — it is how much bill increase New York City will tolerate. Every future rate case is a negotiation about that ceiling, and the last one suggests the ceiling is lower than the company's ask.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--amber);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">The Rate Cycle Owns the Multiple</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">With a <strong>0.26 beta</strong> and a <strong>3.33% yield</strong>, ED is priced against the long end of the Treasury curve, not against the S&amp;P 500. The five-year chart makes this unarguable: the stock's worst monthly close of the period (<strong>$85.53 in September 2023</strong>) came in the same fiscal year as its highest reported EPS (<strong>$7.21 in FY2023</strong>), and its best monthly close (<strong>$113.18 in March 2026</strong>) came when easing was being priced. The headwind is double-barrelled — higher rates compress the multiple <em>and</em> raise the cost of the $28.32B debt stack that funds the rate base. Utilities are the one sector where the financing cost and the valuation input are literally the same variable.</p>
+  </div>
+  <div class="card" style="border-left:3px solid var(--green);">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">Electrification and Load Growth — Bull vs. Bear</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-bottom:0;">After two decades of flat demand, electricity load is growing again — building electrification, transport electrification, and interconnection demand. Con Edison's own marker is <strong>28 new substations in service by 2035</strong>, and electric revenue grew <strong>8.9%</strong> in FY2025 against gas at 16.2% and steam at 21.6% (the latter two on far smaller bases). <strong>The bull reading:</strong> load growth is the first genuine reason in a generation for a regulator to approve large rate-base expansion, which is exactly the input the 6–7% EPS growth target needs, and it is a multi-decade runway rather than a cycle. <strong>The bear reading:</strong> load growth does not change the allowed return, so it can only make the company bigger, not better — and it arrives simultaneously with an affordability fight and a gas network that has to be decommissioned while its book value is still being recovered. At 17.5× earnings and 1.54× book, the price already assumes the bull reading wins.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Price, market cap, 52-week range, sector/industry labels, valuation and profitability statistics, dividend data, quarterly and annual financials and consensus figures: <strong>stockanalysis.com/stocks/ed/</strong> (price source URL — the $106.73 header price is the "Previous Close" field read while the September 11 session was open, representing the last completed market close of Thursday, September 10, 2026; the live intraday quote of $106.88 was deliberately not used, and the daily change for the September 10 session could not be verified from the sources fetched and is therefore not stated). Monthly closing prices: <strong>digrin.com/stocks/detail/ED/price</strong>, unadjusted "Real Price" column — 59 real month-end closes from October 2021 through August 2026, with the 60th and final point set to the September 10, 2026 close of $106.73 rather than a month-end, since September 2026 is incomplete. <strong>No chart months were reconstructed or interpolated.</strong> The August 2026 digrin close of $107.02 was cross-checked against the stockanalysis.com daily history row for August 31, 2026 and matched exactly. Earnings, guidance, segment revenue and capital plan: Con Edison's 2026 second-quarter earnings release (prnewswire.com) and 2025 full-year earnings release (investor.conedison.com). Rate plan terms — 9.40% authorized ROE, 48% equity ratio, rate base and revenue-increase schedules: the CECONY 2025 electric and gas rate filing documents on sec.gov and investor.conedison.com. Named analyst calls: <strong>marketbeat.com/stocks/NYSE/ED/price-target/</strong>. Global market-cap rank: <strong>companiesmarketcap.com</strong>.</p>
+  <p style="max-width:900px;margin:0 auto 12px;"><strong>Explicitly not verified and therefore omitted or marked:</strong> US and NYSE market-cap ranks; specific institutional shareholders; all competitor market caps, revenues and growth rates (shown as "n/v"); industry-average and S&amp;P 500 benchmark columns in the metrics table (shown as "—", never estimated); third-party TAM estimates for any business line; the specific Q3 2026 earnings date (estimated from the Q2 reporting cadence). The 53-year dividend increase streak is reported as stated on stockanalysis.com's dividend page rather than asserted from prior knowledge; the company's own count in its press releases was not located on the pages fetched. Note also that stockanalysis.com's "next earnings date" field still displayed August 6, 2026 — a past date — and was not used.</p>
+  <p style="max-width:900px;margin:0 auto;">This document is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. All analysis reflects publicly available information as of the stated date and may be incomplete or superseded. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making any investment decision.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com; final point = Sep 10, 2026 close from stockanalysis.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [75.40,77.64,85.32,86.45,85.77,94.68,92.74,99.26,95.10,99.27,97.74,85.76,87.96,98.04,95.31,95.31,89.35,95.67,98.47,93.30,90.40,94.86,88.96,85.53,87.79,90.11,90.97,90.90,87.21,90.81,94.40,94.55,89.42,97.52,101.56,104.13,101.68,100.59,89.23,93.74,101.52,110.59,112.75,104.49,100.35,103.50,98.23,100.52,97.41,100.36,99.32,106.63,112.52,113.18,111.49,105.63,110.63,108.85,107.02,106.73];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — starting point $75.40',                color: '#94a3b8' },
+  { idx: 9,  label: 'Jul 2022 — defensive bid peak $99.27',            color: '#22c55e' },
+  { idx: 11, label: 'Sep 2022 — rate shock $85.76',                    color: '#ef4444' },
+  { idx: 23, label: 'Sep 2023 — 5-yr monthly low $85.53',              color: '#ef4444' },
+  { idx: 38, label: 'Dec 2024 — post-election yield backup $89.23',    color: '#ef4444' },
+  { idx: 42, label: 'Apr 2025 — flight to safety $112.75',             color: '#22c55e' },
+  { idx: 53, label: 'Mar 2026 — 5-yr monthly high $113.18',            color: '#22c55e' },
+  { idx: 59, label: 'Sep 10 2026 — last close $106.73',                color: '#4EA8DE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(78,168,222,0.22)');
+grad.addColorStop(1, 'rgba(78,168,222,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4EA8DE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4EA8DE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
