@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRMN — Garmin Ltd. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EA8F0;
+  --accent-dim: #2EA8F033;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">GRMN</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Scientific &amp; Technical Instruments</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $52.49B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #478</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Switzerland: #11</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: not verified</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Garmin Ltd.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$272.20</div>
+      <div class="price-change" style="color:var(--green);">+$0.02 (+0.01%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Schaffhausen, Switzerland (operational HQ: Olathe, Kansas)</div>
+    <div class="meta-item"><span>Employees:</span> 23,000</div>
+    <div class="meta-item"><span>Founded:</span> 1990 (IPO Dec 12, 2000)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Garmin designs and manufactures GPS-enabled hardware across five reported segments — fitness, outdoor, aviation, marine and auto <span class="tip" title="Original Equipment Manufacturer: parts sold to carmakers to be built into their vehicles rather than sold to consumers">OEM</span> — and wraps them in the Garmin Connect software ecosystem. FY2025 revenue was <strong>$7.25B, up 15.1%</strong> from $6.30B in FY2024, with the trailing-twelve-month figure through the June 27, 2026 quarter at <strong>$7.67B, up 13.5% <span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span></strong>. At a $52.49B market capitalisation the company ranks roughly <strong>#478 globally</strong> and <strong>#11 among Swiss-domiciled companies</strong>, sitting between TE Connectivity and Honeywell in the electronics cohort.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is <strong>multiple, not execution</strong>. Execution is not in question: Q2 2026 delivered $2.02B of revenue (+11%), a 62.4% gross margin, a 30.4% operating margin, and <span class="tip" title="Generally Accepted Accounting Principles — standard, audited accounting, as opposed to company-defined 'adjusted' figures">GAAP</span> diluted <span class="tip" title="Earnings Per Share">EPS</span> of $2.80 against pro forma EPS of $2.81 — a one-cent gap, which is the cleanest earnings quality you will find in consumer technology. The question is what a hardware company whose largest segment is discretionary smartwatches should be worth. GRMN trades at <strong>28.1× trailing earnings</strong> after a five-year run that took the stock from $143.60 to $272.20, and it has already given back <strong>13% from its August 10 closing high of $313.16</strong> with no company-specific news in between. Sections 04 and 07 take apart whether the earnings base or the rating is the fragile part.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Cliff Pemble</div>
+      <div class="card-note">Clifton Albert Pemble — President, Chief Executive Officer and Director. Verified on the Q2 2026 earnings release (July 29, 2026) and the stockanalysis.com company profile. A Garmin engineer from the early days rather than an outside hire; his commentary on the Q2 release led with "double-digit revenue growth and robust margin expansion."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Doug Boessen</div>
+      <div class="card-note">Douglas Gerard Boessen, CPA — Chief Financial Officer and Treasurer, verified on the stockanalysis.com company profile (September 2026). Owner of the segment-level gross and operating margin disclosure that makes Garmin unusually transparent for a multi-segment hardware company.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Governance</div>
+      <div class="card-value" style="font-size:20px;">Founder-anchored</div>
+      <div class="card-note">Co-founder <strong>Dr. Min-Hwan Kao</strong> serves as Executive Chairman, and the co-founding families have historically held a meaningful block. Specific institutional holders and stake sizes could not be verified — the holders page on the primary source returned an error — so none are listed here rather than estimated. 192.85M shares outstanding, single class.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Garmin reports five segments and — unusually — discloses gross margin <em>and</em> operating margin for each one. The bar below is the verified FY2025 revenue split ($7,245.6M total). The Q2 2026 mix is meaningfully different: fitness has grown to 37.4% of quarterly revenue while outdoor has shrunk to 23.9%, which is the single most important structural change in the business right now.</p>
+  <div class="seg-bar">
+    <div style="flex:32.5;background:#2EA8F0;">FITNESS 32.5%</div>
+    <div style="flex:28.4;background:#22c55e;">OUTDOOR 28.4%</div>
+    <div style="flex:16.3;background:#a78bfa;">MARINE 16.3%</div>
+    <div style="flex:13.6;background:#f59e0b;">AVIATION 13.6%</div>
+    <div style="flex:9.2;background:#94a3b8;">AUTO 9.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EA8F0;"></span> Fitness — $2,357.0M (FY2025, +33%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Outdoor — $2,054.1M (FY2025, +5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Marine — $1,182.6M (FY2025, +10%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Aviation — $987.2M (FY2025, +13%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Auto OEM — $664.7M (FY2025, +9%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Q2 2026 segment revenue (13 weeks ended June 27, 2026), for comparison: fitness $756.8M (+25%), outdoor $482.7M (−2%), marine $341.4M (+14%), aviation $268.7M (+8%), auto OEM $172.4M (+1%). Total $2,022.1M, +11% YoY.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EA8F0;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Fitness</div>
+        <span class="biz-badge growth">GROWTH ENGINE — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,357.0M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+33% / +25%</div><div class="biz-stat-label">FY25 / Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">32.5% → 37.4%</div><div class="biz-stat-label">FY25 → Q2'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Running, cycling, triathlon and general wellness wearables — Forerunner, Venu, Vívoactive, Index, the Edge cycling computers, and the new screen-free CIRQA band launched July 21, 2026. This is now the largest segment and the fastest-growing: <strong>+33% in FY2025 and +25% in Q2 2026</strong>, on a Q2 gross margin of <strong>64%</strong> and an operating margin of <strong>37%</strong> — the highest operating margin of any Garmin segment. That combination is the whole bull case in one line: the segment adding the most dollars is also the most profitable one. The risk is symmetrical. Fitness hardware is a discretionary, replacement-cycle product; growth of this shape is driven by a product cycle, and product cycles end. The July 2026 <strong>TrainingPeaks and TrainHeroic acquisition</strong> is the clearest signal of where management wants this to go: recurring coaching and training-plan subscriptions layered on top of one-off hardware sales.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed by the company; third-party wearables TAM estimates were not verified from the sources fetched and are therefore omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Apple (Apple Watch)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Samsung (Galaxy Watch)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Whoop / Polar / Suunto</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Outdoor</div>
+        <span class="biz-badge emerging">HIGHEST MARGIN — NOW SHRINKING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,054.1M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5% / −2%</div><div class="biz-stat-label">FY25 / Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.4% → 23.9%</div><div class="biz-stat-label">FY25 → Q2'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">fēnix and epix adventure watches, Instinct, the inReach satellite communicators, golf and dog-tracking devices. Outdoor carries a <strong>69% gross margin in Q2 2026 — the second-highest in the company</strong> — on a 34% operating margin, and it is the segment that historically defined Garmin's premium positioning. It is also the segment that <strong>declined 2% year over year in Q2 2026</strong> after growing only 5% in FY2025. Those two facts together are why the Q2 print, headline-strong, was not uniformly good. Management's answer arrived on <strong>August 25, 2026 with the fēnix 9 and fēnix 9 Pro launch</strong> — a flagship refresh that lands in Q3 and Q4 and is the most checkable near-term claim in the story. If outdoor does not reaccelerate on a brand-new fēnix generation, the segment has a demand problem rather than a cycle problem.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> outdoor is ~24% of quarterly revenue at a 69% gross margin. Every point of mix it loses to fitness (64%) or marine (61%) is a small structural drag on consolidated gross margin.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Suunto / Coros</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Apple Watch Ultra</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Marine</div>
+        <span class="biz-badge growth">STEADY COMPOUNDER — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,182.6M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+10% / +14%</div><div class="biz-stat-label">FY25 / Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.3% → 16.9%</div><div class="biz-stat-label">FY25 → Q2'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Chartplotters, sonar, autopilots, instruments and — via the JL Audio acquisition — marine audio. Marine <strong>accelerated in Q2 2026 to +14%</strong> from +10% for FY2025, on a 61% gross margin and 29% operating margin. The September 1, 2026 product wave (SmartDrive autopilot for sailboats and catamarans, the GMI 40 instrument display, JL Audio M200 speakers and A60 head units) is a deliberate pre-season push into the autumn boat-show calendar. Marine is a cyclical end market tied to boat sales and marine refit budgets, but Garmin's position on the helm — where one brand's chartplotter tends to drag its sonar, autopilot and audio along with it — makes the attach rate unusually sticky once a boat is fitted out.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; marine-electronics TAM estimates were not verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Navico (Brunswick: Lowrance, Simrad, B&amp;G)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment rev</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Raymarine (Teledyne FLIR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Furuno</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Aviation</div>
+        <span class="biz-badge dominant">75% GROSS MARGIN — THE QUALITY SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$987.2M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13% / +8%</div><div class="biz-stat-label">FY25 / Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.6% → 13.3%</div><div class="biz-stat-label">FY25 → Q2'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Integrated flight decks, navigation and communication radios, autopilots and the Autoland emergency system, sold both as factory-fit to airframe makers and as retrofit avionics to existing aircraft owners. Aviation runs a <strong>75% gross margin</strong> — by far the highest in the company — because certified avionics are a regulated, high-switching-cost business where a supplier's <span class="tip" title="Supplemental Type Certificate: an FAA approval to install a specific piece of equipment in a specific aircraft model. Each one is expensive and slow to obtain, which limits who can compete.">STC</span> portfolio is itself the barrier to entry. Its 27% operating margin is below fitness and outdoor because certification and engineering spend is heavy and permanent. At 13% of revenue this segment will never move the top line much, but it is the reason Garmin's blended gross margin sits above 60%: it is a slow, defensible annuity that no consumer product cycle can disturb.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> aviation revenue is roughly evenly split between original-equipment and aftermarket in most years; Garmin does not disclose that split quarterly, so no figure is given here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Honeywell Aerospace</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Avionics share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Collins Aerospace (RTX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Avidyne / Dynon</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #94a3b8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Auto OEM</div>
+        <span class="biz-badge emerging">2% OPERATING MARGIN — THE DILUTIVE SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$664.7M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+9% / +1%</div><div class="biz-stat-label">FY25 / Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22%</div><div class="biz-stat-label">Q2'26 Gross Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.2% → 8.5%</div><div class="biz-stat-label">FY25 → Q2'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Infotainment, domain controllers and camera systems built into vehicles for carmakers — a components business sold to automotive procurement departments, which is a completely different animal from selling a $900 watch to a runner. The numbers say so: a <strong>22% gross margin and a 2% operating margin in Q2 2026</strong>, against a company average of 62.4% and 30.4%. The FY2025 release shows the segment at an <strong>operating loss for the full year</strong> even as revenue grew 9%. Growth has now stalled outright — <strong>+1% in Q2 2026</strong>. The charitable reading is that auto OEM buys scale in sensors and silicon that feed the consumer segments; the uncharitable one is that it consumes engineering capacity for margins the rest of the company would refuse. Either way, at 8.5% of revenue it is a rounding error on earnings and a real drag on the blended margin story.</p>
+    <div class="biz-tam"><strong>Disclosure note:</strong> Garmin does not name its auto OEM customers or disclose programme-level backlog, so customer concentration within this segment cannot be assessed from public filings alone.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Bosch / Continental</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Harman (Samsung)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">VERTICAL INTEGRATION</span>
+    <span class="moat-pill">AVIATION CERTIFICATION (STCs)</span>
+    <span class="moat-pill">GARMIN CONNECT ECOSYSTEM</span>
+    <span class="moat-pill">BATTERY-LIFE ENGINEERING</span>
+    <span class="moat-pill">HELM / COCKPIT ATTACH RATES</span>
+    <span class="moat-pill">FORTRESS BALANCE SHEET</span>
+    <span class="moat-pill">FIVE-MARKET DIVERSIFICATION</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">Garmin's moat is <strong>engineering integration plus regulatory time</strong>, and the two work on different clocks. On the consumer side the advantage is that Garmin builds most of its own hardware — it operates its own manufacturing rather than outsourcing the whole stack — which is why a fēnix can run for weeks on a charge while a general-purpose smartwatch runs for a day. That is not a software feature a competitor patches in; it is silicon, power management and industrial design decided years earlier. Layered on top is <strong>Garmin Connect</strong>, where a decade of a customer's training history lives, which makes switching brands cost the user their own data. On the professional side the moat is slower and harder: every avionics box requires an <span class="tip" title="Supplemental Type Certificate — an FAA approval to install specific equipment in a specific aircraft model">STC</span> for each airframe it goes into, and that library takes years and capital to build. The financial evidence is in the segment table: a <strong>75% gross margin in aviation and 69% in outdoor</strong> are not the margins of a commodity manufacturer. The balance sheet reinforces all of it — <strong>$226.9M of total debt against $2.67B of cash</strong>, a <span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. A measure of financial leverage; lower means less borrowed money at risk.">debt-to-equity</span> ratio of <strong>0.03</strong> — meaning Garmin can fund a product cycle, a downturn and a dividend simultaneously without asking anyone's permission.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Discretionary hardware concentration.</strong> Fitness plus outdoor is <strong>61.3% of Q2 2026 revenue</strong> and both are one-off purchases of expensive optional goods. There is no subscription base to cushion a consumer slowdown — TrainingPeaks and TrainHeroic, acquired July 2026, are the first serious attempt to build one, and they start from a negligible base. A recession does not compress Garmin's margins gradually; it stops the replacement cycle.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Outdoor is already declining.</strong> The highest-gross-margin consumer segment fell <strong>2% year over year in Q2 2026</strong>. Whether that is a pre-fēnix-9 air pocket or genuine share loss to Apple's Ultra line and Coros will be visible in the Q3 print on October 28. Mix shift out of a 69% gross margin segment and into a 64% one is a slow, quiet compression that headline growth hides.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Guidance implies second-half margin compression.</strong> Management guides FY2026 to a <strong>59.7% gross margin and 27.0% operating margin</strong> against Q2 actuals of 62.4% and 30.4%. That is not a rounding difference — it implies the back half runs materially below the quarter that sent the stock up 16%. Either guidance is conservative, as it has repeatedly proven to be, or the market has extrapolated a peak quarter.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Auto OEM as a permanent drag.</strong> A 22% gross margin, 2% operating margin segment inside a 62% gross margin company is dilutive by construction, and it ran an operating loss for FY2025. Automotive programme wins are lumpy and take years to convert into revenue, and Garmin has no pricing power against carmaker procurement. Growth has stopped (+1% in Q2 2026) without the margin improving.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">GRMN column from stockanalysis.com statistics at the September 10, 2026 close. <strong>Industry-average and S&amp;P 500 columns could not be sourced from a live page within this report's research budget and are left as "—" rather than estimated.</strong> Colour coding in the GRMN column therefore reflects the absolute quality of each figure, not a peer comparison — read the Context column for what the number actually means.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>GRMN</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--amber);">28.09</td><td>—</td><td>—</td><td>$272.20 ÷ $9.69 TTM EPS = 28.09×. Historically Garmin traded closer to the high teens/low twenties; the rating has expanded alongside the margin expansion.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--amber);">26.58</td><td>—</td><td>—</td><td>On consensus 2026 EPS of $10.13. Company guidance is $10.00 pro forma, which would put the forward multiple at 27.2× instead.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--red);">2.99</td><td>—</td><td>—</td><td>The single least flattering number on the page. You are paying roughly three times the growth rate — the market is pricing durability, not acceleration.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share, trailing twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months: the most recent four quarters combined">TTM</span>)</td><td style="color:var(--green);">$9.69</td><td>—</td><td>—</td><td>GAAP, up from $8.59 for FY2025. Q2 2026 GAAP EPS was $2.80 against $2.81 pro forma — a one-cent adjustment, i.e. essentially no add-backs.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+13.51%</td><td>—</td><td>—</td><td>TTM through June 27, 2026. FY2025 was +15.07%; Q2 2026 alone was +11%. Decelerating gently, still double-digit.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus the direct cost of making the product, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">60.08%</td><td>—</td><td>—</td><td>TTM. Q2 2026 hit 62.4%. Segment range is wide: 75% aviation, 69% outdoor, 64% fitness, 61% marine, 22% auto OEM.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue — what is left after every cost, including tax and interest">Net Profit Margin</span></td><td style="color:var(--green);">24.47%</td><td>—</td><td>—</td><td>$1.88B of net income on $7.67B of revenue. Up from 22.96% in FY2025 — margin expansion is doing real work in the earnings growth.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price — the cash yield you receive for holding the stock">Dividend Yield</span></td><td>1.54%</td><td>—</td><td>—</td><td>$4.20 annually ($1.05 quarterly, next paid September 25, 2026) on a 43.35% payout ratio. Covered roughly 2.3× by earnings.</td></tr>
+      <tr><td><span class="tip" title="Short Interest: the percentage of freely tradeable shares that have been borrowed and sold by investors betting the price will fall">Short Interest</span> / Float</td><td style="color:var(--green);">1.04%</td><td>—</td><td>—</td><td>Negligible. There is no organised bear position in this name — which also means no short-covering fuel on good news.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td style="color:var(--green);">0.03</td><td>—</td><td>—</td><td>$226.9M of debt against $2.67B of cash and $9.02B of equity. Effectively an unlevered balance sheet; enterprise value ($48.35B) is below market cap.</td></tr>
+      <tr><td><span class="tip" title="Current Ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td style="color:var(--green);">3.03</td><td>—</td><td>—</td><td>Three dollars of short-term assets per dollar of short-term obligations. Inventory-heavy by nature, but liquidity is not a question here.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditures — the cash actually available to pay dividends, buy back stock or make acquisitions">Free Cash Flow</span></td><td style="color:var(--green);">$1.60B</td><td>—</td><td>—</td><td>TTM, up from $1.36B in FY2025. Covers the ~$810M annual dividend roughly twice over with room for buybacks ($43M repurchased in Q2, $448M authorised remaining).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit each dollar of shareholder capital generates">ROE</span></td><td style="color:var(--green);">21.89%</td><td>—</td><td>—</td><td>Achieved with essentially no leverage, which makes it a much higher-quality 22% than a levered peer's.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: operating profit after tax divided by the total capital (debt plus equity) used to generate it">ROIC</span></td><td style="color:var(--green);">26.21%</td><td>—</td><td>—</td><td>ROIC above ROE is the signature of a debt-free, cash-rich balance sheet. Comfortably above any plausible cost of capital.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means it has historically been less volatile than the index.">Beta</span></td><td style="color:var(--green);">0.87</td><td>—</td><td>—</td><td>Below 1.0 — historically less volatile than the S&amp;P 500, which sits oddly against a 16% single-day move on July 29, 2026.</td></tr>
+      <tr><td>52-Week Range</td><td>$186.67 – $314.28</td><td>—</td><td>—</td><td>The current $272.20 sits in the upper third — 45.8% above the low, 13.4% below the high.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="prose" style="margin-top:24px;"><strong>Notable One-Off Items.</strong> Three things distort the comparisons above. First, <strong>FY2023 net income of $1,290M exceeded operating income of $1,092M</strong> — profit margin (24.67%) above operating margin (20.89%) in the same year — meaning non-operating income and tax items, not the business, produced a chunk of that year's earnings; the specific driver was not verified from the sources fetched, so any five-year EPS growth rate anchored on FY2023 should be treated with suspicion. Second, the <strong>TrainingPeaks and TrainHeroic acquisition closed in July 2026</strong>, inside the Q2 quarter-end, so purchase accounting effects are only beginning to appear. Third, and to Garmin's credit, <strong>there are effectively no recurring add-backs</strong>: Q2 GAAP EPS of $2.80 versus pro forma $2.81 is a one-cent difference, and for FY2025 GAAP EPS of $8.59 actually exceeded pro forma EPS of $8.56. A company whose "adjusted" number is lower than its GAAP number is the opposite of the usual disclosure problem.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">Hold</div>
+      <div class="card-note">8 analysts on stockanalysis.com. MarketBeat characterises the same coverage as "Moderate Buy" — the disagreement is about how two Sell-side ratings are weighted, not about the underlying calls.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$290.29</div>
+      <div class="card-note">+6.65% above the $272.20 close. MarketBeat's separately-computed average is $310.17 (+13.9%) on the same firm list — use the spread as a reminder that "consensus" is an arithmetic convention.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$220 – $370</div>
+      <div class="card-note">A 68% spread between low and high. The Street is not disagreeing about Garmin's business — it is disagreeing about what multiple a hardware compounder deserves.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">2 / 4 / 2</div>
+      <div class="card-note">2 Strong Buy · 4 Hold · 2 Sell (stockanalysis.com, 8 analysts). Thin coverage for a $52B company — eight analysts is fewer than many $10B names carry.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:2;background:var(--green);"></div>
+    <div style="flex:4;background:var(--amber);"></div>
+    <div style="flex:2;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Buy / Strong Buy — 2</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 4</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 2</div>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;text-transform:uppercase;">Key Recent Analyst Calls</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>Barclays — Tim Long</strong> · Equal Weight · <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">PT $238 → $297</span> (July 30, 2026). Raised the target 25% the day after Q2 without upgrading the rating — the analyst's estimates moved, his view of the multiple did not.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>Morgan Stanley — Erik Woodring</strong> · Equal Weight · <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">PT $249 → $289</span> (July 30, 2026). Same pattern, same day. Note that $289 is below the stock's August high of $313.16 — the shares ran through the post-earnings targets within two weeks.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>UBS Group</strong> · <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">PT $370</span> (August 6, 2026). The Street high, and 36% above the current price. This is the target that carries the entire bull case in the consensus average.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Tigress Financial — Ivan Feinseth</strong> · Strong Buy, reiterated (August 6, 2026). One of only two Buy-side voices in the eight-analyst coverage. TipRanks separately showed a Tigress target of $325, but that page's quoted price was materially stale, so the target is cited here only as reported by the firm, not as current.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>JPMorgan — Joseph Cardoso</strong> · Neutral · <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">PT $265 → $285</span> (April 16, 2026). Pre-dates the Q2 print and is therefore stale, but it establishes that the "good company, full price" view was in place well before the summer rally.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The single most important date on this page. Three things get answered at once: whether outdoor reaccelerates on the fēnix 9 launch after its −2% Q2, whether fitness can hold anything close to +25% against a harder comparison, and whether the FY2026 guidance of 59.7% gross margin / 27.0% operating margin was conservatism or a warning. Note that the equivalent late-October report in 2025 coincided with a 13% monthly decline in the shares.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 9, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Garmin Drive GPS navigators with ultrawide displays</div>
+        <div class="tl-desc">A refresh of the aftermarket automotive navigation line. Commercially minor — standalone GPS units are a legacy category — but it is a reminder that Garmin still monetises a product line most of the industry abandoned to smartphones a decade ago.</div>
+        <div class="tl-impact neutral">Low materiality</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Marine product wave: SmartDrive autopilot, GMI 40, JL Audio M200 &amp; A60</div>
+        <div class="tl-desc">Four marine launches in a single day — an autopilot for sailboats and catamarans, a colour instrument display, and two JL Audio marine audio lines — timed to the autumn boat-show season. Marine was the second-fastest-growing segment in Q2 at +14%, and this is the restock that has to feed Q4 and the 2027 boating season.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 25, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">fēnix 9 and fēnix 9 Pro launch</div>
+        <div class="tl-desc">The flagship refresh of the segment that just declined. fēnix is Garmin's halo product and its highest-gross-margin consumer line at 69%. If the outdoor decline was a pre-launch air pocket, Q3 and Q4 should show it; if outdoor is still negative with a brand-new fēnix generation on shelves, the thesis on that segment changes materially.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — record revenue, guidance raised</div>
+        <div class="tl-desc">Revenue $2,022.1M (+11%), gross margin 62.4%, operating margin 30.4%, GAAP EPS $2.80, and FY2026 guidance lifted to ~$8.05B revenue and $10.00 pro forma EPS. The stock closed at $253.65 on July 28 and $294.83 on July 29 — a <strong>16.2% single-day move</strong> in a stock with a beta of 0.87.</div>
+        <div class="tl-impact up">Reaction already occurred: +16.2%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Acquisition of TrainingPeaks and TrainHeroic</div>
+        <div class="tl-desc">Garmin's most strategically interesting move of the year: both are subscription training-software businesses with coach-athlete relationships attached. Terms were not disclosed in the sources fetched. The bet is that a hardware company with no recurring revenue can graft one on to the customers it already owns — which is precisely the gap the bear case exploits.</div>
+        <div class="tl-impact up">Structural — watch for subscription disclosure</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CIRQA smart band — screen-free health and fitness tracker</div>
+        <div class="tl-desc">A new form factor aimed below the Forerunner and Venu price points, competing directly with Whoop's screenless band. Widens the fitness funnel at a presumably lower gross margin per unit; the mix effect will be invisible for several quarters.</div>
+        <div class="tl-impact neutral">Category expansion</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-muted);letter-spacing:1px;">GRMN — 60 MONTHLY CLOSES · OCT 2021 → SEP 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:20px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2EA8F0;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:14px;">Month-end unadjusted closes. The final point is the <strong>September 10, 2026 close of $272.20</strong> — a partial month, not a month-end — so it is labelled "Sep 26*".</p>
+  </div>
+
+  <div class="chart-container" style="margin-top:24px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-muted);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;max-width:760px;">RSI measures how much of the recent price movement has been upward versus downward, on a 0–100 scale. Readings above 70 mean the stock has risen persistently and may be stretched; below 30 means the opposite. It says nothing about whether a business is good — only whether a price has moved a long way in one direction without pausing.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the <strong>October 2021 close of $143.60 to the September 10, 2026 close of $272.20, GRMN returned +89.6% on price alone</strong>, plus roughly five years of a dividend now running at $4.20 a share. That headline hides two completely different stocks. The first, from late 2021 through September 2022, was a post-pandemic hardware unwind: revenue actually <em>fell</em> 2.5% in FY2022 and the shares fell <strong>44.1% from $143.60 to $80.31</strong>. The second, from that low onward, is a <strong>+265.8% advance to the July 2026 peak close of $293.78</strong>, driven by something genuinely durable — operating margin went from 21.15% in FY2022 to 27.61% on a trailing basis today, while revenue compounded from $4.86B to $7.67B.</p>
+  <p class="prose" style="margin-top:16px;">The recent action is where the interesting tension sits. The stock gapped <strong>16.2% higher on July 29, 2026</strong> on the Q2 print, ran to a closing high of <strong>$313.16 on August 10</strong>, and has since drifted back to $272.20 — a <strong>13.1% decline with no company-specific news in the interval</strong>. Whatever that is, it is not a reaction to fundamentals; it is a rerating of a rerating. The 6-period monthly RSI panel above shows the same thing: a spike into overbought territory on the post-earnings surge, followed by a cooling that has not yet reached neutral.</p>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-pandemic peak — $143.60</div>
+        <div class="tl-desc">The starting point of this five-year window, and the top of the COVID-era fitness-hardware surge. Everything through the next eleven months is the unwind of pulled-forward demand.</div>
+        <div class="tl-impact neutral">Window start</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle low — $80.31</div>
+        <div class="tl-desc">A 44.1% drawdown from the window start, coinciding with the only revenue decline in the five-year record (FY2022, −2.46%) and a compression in operating margin to 21.15%. In hindsight, the buying opportunity of the decade in this name.</div>
+        <div class="tl-impact down">−44.1% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Breakout — $122.24 after 19 months of range-trading</div>
+        <div class="tl-desc">The stock spent most of 2023 between $92 and $106, then jumped 19.2% in a single month. FY2023 ended with revenue up 7.6% and the margin recovery clearly underway; the market stopped treating Garmin as a post-COVID casualty.</div>
+        <div class="tl-impact up">+19.2% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Drawdown to $186.87</div>
+        <div class="tl-desc">A 18.4% fall from the February 2025 close of $228.93 — the sharpest interruption to the 2023–2026 uptrend. The move was market-wide in character rather than company-specific; the underlying business grew 15.1% for the full year 2025.</div>
+        <div class="tl-impact down">−18.4% from Feb 2025</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">−13.1% monthly decline to $213.94</div>
+        <div class="tl-desc">The largest monthly fall of the post-2022 uptrend, landing in the late-October window when Garmin reports its third quarter. A useful reminder ahead of October 28, 2026 that this stock does move hard on quarterly prints in both directions.</div>
+        <div class="tl-impact down">−13.1% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">+25.4% surge to $252.83 on FY2025 results</div>
+        <div class="tl-desc">FY2025 landed at $7.25B revenue (+15%), a 25.9% operating margin and GAAP EPS of $8.59, with fitness up 33% for the year. The shares closed January at $201.64 and February at $252.83 — the largest monthly gain in the five-year record.</div>
+        <div class="tl-impact up">+25.4% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Peak monthly close — $293.78</div>
+        <div class="tl-desc">Driven almost entirely by the single 16.2% session on July 29 following the Q2 beat and guidance raise. The 52-week intraday high of $314.28 was set shortly after; the August 10 closing high was $313.16.</div>
+        <div class="tl-impact up">+16.2% on July 29 alone</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$272.20 — 13.4% below the 52-week high</div>
+        <div class="tl-desc">Six consecutive weeks of drift lower on no news, with the September 10 session itself essentially flat (+$0.02). The stock sits 45.8% above its 52-week low of $186.67 and 89.6% above where this five-year window began.</div>
+        <div class="tl-impact neutral">Current level</div>
+      </div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> A +89.6% five-year price return works out to roughly <strong>13.6% annualised</strong>, before the dividend. Verified index total returns for the identical October 2021 – September 2026 window were not available from the sources fetched, so no precise comparison to the <strong>S&amp;P 500</strong> (the benchmark for this NYSE listing) or the <strong>NASDAQ-100</strong> is asserted here — that is a gap, not an omission, and it is flagged rather than estimated. What can be said from verified data is narrower and more useful: GRMN's 52-week change is <strong>+14.13%</strong>, its beta is <strong>0.87</strong>, and the shape of the five-year path — a 44% drawdown, two years of range-trading, then a three-year advance driven by margin rather than multiple — looks nothing like a mega-cap technology index that was carried by a handful of AI-levered names over the same period. Garmin's rerating was earned in the operating margin line, which is both a compliment and the source of the risk: there is far less of that particular improvement left to harvest.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Five independent end markets, four of them growing, on a 62.4% consolidated gross margin and a 30.4% operating margin — with a balance sheet carrying $2.67B of cash against $226.9M of debt. Fitness grew 25% in Q2 2026 at a 37% operating margin, the fēnix 9 launch refreshes the highest-margin consumer line for Q4, and the TrainingPeaks acquisition opens a credible path to recurring revenue. Earnings quality is close to unimprovable: GAAP EPS of $2.80 against pro forma $2.81, and 26.2% ROIC achieved with no leverage. The stock is already 13.4% below its 52-week high on no news at all.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying 28.1× trailing earnings and a 2.99 PEG for a discretionary hardware manufacturer whose second-largest segment is already shrinking (outdoor, −2% in Q2). Company guidance implies the back half of 2026 runs at a 59.7% gross margin and 27.0% operating margin — below the quarter that produced a 16% single-day rally. There is no subscription base to cushion a consumer slowdown, auto OEM loses money at 22% gross margin, and four of eight covering analysts rate it Hold with two more at Sell. The rerating from ~18× to ~28× did the heavy lifting in the last three years, and that trick does not repeat.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">1</span><div><strong>Multiple compression.</strong> At 28.1× trailing and a PEG of 2.99, a return to the low-twenties multiple Garmin carried for most of the last decade costs roughly 25% of the share price without a single estimate being cut. This is the dominant risk and it is entirely independent of how well the company operates.</div></div>
+    <div class="risk-item"><span class="risk-num">2</span><div><strong>Outdoor fails to reaccelerate.</strong> A −2% quarter in the 69%-gross-margin segment, followed by a flagship fēnix 9 launch, sets up a clean test on October 28. A second negative quarter with new product on shelves would reframe outdoor as share loss to Apple and Coros rather than a timing air pocket — and would take the consolidated gross margin down with it via mix.</div></div>
+    <div class="risk-item"><span class="risk-num">3</span><div><strong>Consumer discretionary cyclicality with no recurring cushion.</strong> Fitness plus outdoor is 61.3% of revenue, all of it one-off purchases of expensive optional hardware. FY2022 already demonstrated what this looks like — revenue −2.5%, operating margin down to 21.15%, shares −44%. TrainingPeaks and TrainHeroic are the right idea, but they are months old and immaterial to 2026 revenue.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div><div class="biz-name">The wearables market is consolidating around two very different logics</div></div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc">Garmin competes against general-purpose computers worn on the wrist (Apple, Samsung) and against single-purpose sensors (Whoop, Coros, Polar). Its defence against the first is battery life and sport-specific depth; against the second it is ecosystem breadth. The July 2026 launch of <strong>CIRQA</strong>, a screen-free band, is Garmin moving onto Whoop's turf, while Apple's Ultra line has been moving onto Garmin's. The evidence that this is live pressure rather than theory is in the segment data: <strong>outdoor revenue fell 2% in Q2 2026</strong> while fitness grew 25% — the premium adventure end of the range is where the squeeze is showing up first, and it happens to be the 69%-gross-margin end.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div><div class="biz-name">Hardware companies are trying to buy their way into recurring revenue</div></div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc">The valuation gap between "sells devices" and "sells subscriptions" is the widest structural discount in consumer technology, and Garmin has spent 2026 attacking it: <strong>TrainingPeaks and TrainHeroic acquired in July 2026</strong>, on top of a Connect ecosystem that already holds years of user training data. The prize is real — a subscription attached to an installed base of tens of millions of devices would justify a multiple Garmin has never carried. The catch is that Garmin has historically refused to charge for software, which is part of why customers choose it. Converting goodwill into <span class="tip" title="Average Revenue Per User: how much revenue a company earns from each customer, typically measured annually">ARPU</span> without eroding the goodwill is the hardest thing management has attempted in a decade, and there is no disclosed subscription revenue line yet to track it.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--red);">
+    <div class="biz-header">
+      <div><div class="biz-name">Bull vs bear: this is a multiple argument, not a business argument</div></div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc">Almost nothing in the verified data disputes that Garmin is a high-quality business: <strong>26.2% ROIC, 0.03 debt-to-equity, 60.1% gross margin, $1.60B of free cash flow, a one-cent gap between GAAP and pro forma EPS</strong>. The bulls are right about the company. The bears are not arguing with them — they are arguing that a business whose revenue grows 11–15% and whose earnings grow 18% should not trade at 28× with a PEG of 2.99, particularly when the fastest-growing segment is discretionary hardware and management's own full-year guidance implies second-half margins below the quarter just reported. <strong>Bull implication:</strong> if the fēnix 9 reaccelerates outdoor and TrainingPeaks seeds a subscription line, the multiple holds and earnings do the work — $10.13 of 2026 EPS at 28× is $284, and 2027 estimates carry it further. <strong>Bear implication:</strong> if outdoor stays negative and guidance proves literal rather than conservative, the same $10.13 at a 22× multiple is $223 — below every analyst target on the page except the low. The Street's $220–$370 range is exactly that argument, expressed in dollars.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto;">Price, market cap, 52-week range, sector/industry labels, statistics, financial history, forecast and company profile: <strong>stockanalysis.com/stocks/grmn/</strong> (price source: https://stockanalysis.com/stocks/grmn/ — $272.20 close, September 10, 2026). Segment revenue, margins, EPS and guidance: Garmin's own Q2 2026 results release (investors.garmin.com, July 29, 2026) and FY2025 results release (investors.garmin.com). Monthly price history: Yahoo Finance monthly close series (October 2021 – September 2025) cross-checked against digrin.com unadjusted "Real Price" (October 2025 – August 2026); the final chart point is the September 10, 2026 close from stockanalysis.com. All 60 chart points are real observed closes — <strong>no interior months were reconstructed or interpolated</strong>. Market-cap rankings: companiesmarketcap.com (global #478, Switzerland #11); the NYSE-specific rank was not available and is marked "not verified". Named analyst calls: marketbeat.com/stocks/NYSE/GRMN/price-target. <strong>Industry-average and S&amp;P 500 benchmark columns in Section 04 could not be sourced and are shown as "—" rather than estimated. Segment market shares, TAM figures and competitor revenue/share/growth figures were not verifiable from the sources fetched and are shown as "n/d" rather than estimated. Institutional holder detail could not be retrieved.</strong> Index-relative return figures are deliberately omitted for the same reason.</p>
+  <p style="max-width:900px;margin:14px auto 0;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures may contain errors or be superseded by later disclosure. Do your own research and consult a qualified financial professional before making any investment decision.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted closes; final point = Sep 10, 2026 close) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26*'];
+const prices = [143.60,133.54,136.17,124.42,110.44,118.61,109.74,105.62,98.25,97.62,88.49,80.31,88.04,92.99,92.29,98.88,98.13,100.92,98.17,103.15,104.29,105.89,106.02,105.20,102.53,122.24,128.54,119.49,137.35,148.87,144.47,163.85,162.92,171.25,183.29,176.03,198.35,212.60,206.26,215.85,228.93,217.13,186.87,202.97,208.72,218.76,241.82,246.22,213.94,195.32,202.85,201.64,252.83,232.01,251.14,233.92,237.54,293.78,284.11,272.20];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window start $143.60',                 color: '#94a3b8' },
+  { idx: 11, label: 'Sep 2022 — cycle low $80.31 (−44.1%)',            color: '#ef4444' },
+  { idx: 25, label: 'Nov 2023 — breakout $122.24 (+19.2% in a month)', color: '#22c55e' },
+  { idx: 42, label: 'Apr 2025 — drawdown $186.87 (−18.4% from Feb)',   color: '#ef4444' },
+  { idx: 48, label: 'Oct 2025 — −13.1% month to $213.94',              color: '#ef4444' },
+  { idx: 52, label: 'Feb 2026 — FY2025 results, +25.4% to $252.83',    color: '#22c55e' },
+  { idx: 57, label: 'Jul 2026 — post-Q2 peak close $293.78',           color: '#f59e0b' },
+  { idx: 59, label: 'Sep 10, 2026 — $272.20 (partial month)',          color: '#2EA8F0' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,168,240,0.22)');
+grad.addColorStop(1, 'rgba(46,168,240,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EA8F0', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EA8F0'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
