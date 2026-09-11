@@ -95,12 +95,14 @@ window.TTGSim = (function () {
       var sorted = Array.prototype.slice.call(col).sort(function (a, b) { return a - b; });
       for (j = 0; j < q.length; j++) bands[j][k] = sorted[Math.min(paths - 1, Math.floor(q[j] * (paths - 1)))];
     }
+    var bi = 0, wi = 0; for (p = 1; p < paths; p++) { if (finals[p] > finals[bi]) bi = p; if (finals[p] < finals[wi]) wi = p; }
+    var bestPath = [0], worstPath = [0]; for (k = 0; k < K; k++) { bestPath.push(atCk[bi * K + k]); worstPath.push(atCk[wi * K + k]); }
     var fs = Array.prototype.slice.call(finals).sort(function (a, b) { return a - b; });
     var ds = Array.prototype.slice.call(maxDD).sort(function (a, b) { return a - b; });
     var lossCount = 0; for (p = 0; p < paths; p++) if (finals[p] < 0) lossCount++;
     function pct(arr, q) { return arr[Math.min(arr.length - 1, Math.floor(q * (arr.length - 1)))]; }
     return {
-      n: n, paths: paths, K: K, step: step, bands: bands, samples: samples,
+      n: n, paths: paths, K: K, step: step, bands: bands, samples: samples, bestPath: bestPath, worstPath: worstPath,
       pLoss: lossCount / paths, pEverDown: everDown / paths,
       best: fs[fs.length - 1], worst: fs[0], median: pct(fs, 0.5),
       f025: pct(fs, 0.025), f15: pct(fs, 0.15), f85: pct(fs, 0.85), f975: pct(fs, 0.975),
@@ -130,7 +132,7 @@ window.TTGSim = (function () {
     // y range: cover the 95% band, the sample paths, and zero, with a little headroom
     var lo = 0, hi = 0;
     for (i = 0; i < K; i++) { lo = Math.min(lo, sim.bands[0][i]); hi = Math.max(hi, sim.bands[4][i]); }
-    sim.samples.forEach(function (s) { for (i = 0; i < s.length; i++) { lo = Math.min(lo, s[i]); hi = Math.max(hi, s[i]); } });
+    sim.samples.concat([sim.bestPath, sim.worstPath]).forEach(function (s) { for (i = 0; i < s.length; i++) { lo = Math.min(lo, s[i]); hi = Math.max(hi, s[i]); } });
     var span = Math.max(hi - lo, 1) * 1.06; lo -= (span - (hi - lo)) / 2; hi = lo + span;
     function X(k) { return padL + (k / K) * pw; }           // k = checkpoint index 0..K (0 = start)
     function Y(v) { return padT + (hi - v) / (hi - lo) * ph; }
@@ -157,8 +159,16 @@ window.TTGSim = (function () {
     g.strokeStyle = 'rgba(241,230,207,.35)'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(padL, Y(0)); g.lineTo(W - padR, Y(0)); g.stroke(); g.setLineDash([]);
     // expectation (straight line)
     g.strokeStyle = C.goldHi; g.lineWidth = 1.5; g.setLineDash([8, 5]); g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(K), Y(prep.mean * n)); g.stroke(); g.setLineDash([]);
+    // best and worst of the thousand
+    function path(arr, color, width) { g.strokeStyle = color; g.lineWidth = width; g.beginPath(); g.moveTo(X(0), Y(0)); for (i = 1; i < arr.length; i++) g.lineTo(X(i), Y(arr[i])); g.stroke(); }
+    path(sim.worstPath, C.red, 1.8); path(sim.bestPath, C.green, 1.8);
     // median path
     g.strokeStyle = C.gold; g.lineWidth = 2.2; g.beginPath(); g.moveTo(X(0), Y(0)); for (i = 0; i < K; i++) g.lineTo(X(i + 1), Y(sim.bands[2][i])); g.stroke();
+    // end labels for best and worst
+    g.font = '600 11px "JetBrains Mono", monospace'; g.textAlign = 'right';
+    function endLabel(arr, color, text) { var y = Y(arr[arr.length - 1]), x = X(K) - 4; var w = g.measureText(text).width + 10; g.fillStyle = 'rgba(6,5,11,.8)'; g.fillRect(x - w, y - 9, w, 18); g.fillStyle = color; g.fillText(text, x - 5, y + 4); }
+    var bLab = 'BEST ' + money(sim.bestPath[sim.bestPath.length - 1], unit, 0), wLab = 'WORST ' + money(sim.worstPath[sim.worstPath.length - 1], unit, 0);
+    endLabel(sim.bestPath, C.green, bLab); endLabel(sim.worstPath, C.red, wLab);
     // axes labels
     g.fillStyle = C.dim; g.textAlign = 'right'; g.font = '10.5px "JetBrains Mono", monospace';
     g.fillText('BETS →', W - padR, H - 6);
@@ -208,7 +218,7 @@ window.TTGSim = (function () {
     var meta = el('p', 'simmeta'); wrap.appendChild(meta);
     var stats = el('div', 'simstats'); wrap.appendChild(stats);
     var cwrap = el('div', 'simchart'); var canvas = el('canvas'); cwrap.appendChild(canvas);
-    var legend = el('div', 'simlegend', '<span><i class="l-med"></i>median session</span><span><i class="l-ev"></i>expectation</span><span><i class="l-70"></i>70% of sessions</span><span><i class="l-95"></i>95% of sessions</span><span><i class="l-smp"></i>20 sample sessions</span>');
+    var legend = el('div', 'simlegend', '<span><i class="l-med"></i>median session</span><span><i class="l-ev"></i>expectation</span><span><i class="l-70"></i>70% of sessions</span><span><i class="l-95"></i>95% of sessions</span><span><i class="l-smp"></i>20 sample sessions</span><span><i class="l-best"></i>best of 1,000</span><span><i class="l-worst"></i>worst of 1,000</span>');
     wrap.appendChild(cwrap); wrap.appendChild(legend);
     var foot = el('p', 'simfoot'); wrap.appendChild(foot);
     root.appendChild(wrap);
@@ -236,12 +246,15 @@ window.TTGSim = (function () {
         tile('Standard deviation', money(sdTot, unit, 0).replace('+', '±'), '', 'per bet: ' + money(prep.sd, unit).replace('+', '±') + ' · the noise is ' + (Math.abs(evTot) > 0 ? (sdTot / Math.abs(evTot)).toFixed(1) : '∞') + '× the signal') +
         tile('Chance you’re losing at the end', pctf(sim.pLoss), sim.pLoss > 0.5 ? 'dn' : 'up', 'ever behind during the session: ' + pctf(sim.pEverDown)) +
         tile('70% of sessions land between', money(sim.f15, unit, 0) + ' and ' + money(sim.f85, unit, 0), '', '95%: ' + money(sim.f025, unit, 0) + ' to ' + money(sim.f975, unit, 0)) +
-        tile('Best / worst of 1,000', money(sim.best, unit, 0) + ' / ' + money(sim.worst, unit, 0), '', 'median ' + money(sim.median, unit, 0)) +
+        tile('Best session of 1,000', money(sim.best, unit, 0), 'up', 'the luckiest run — ' + (sim.best > 0 ? 'up ' + (Math.abs(evTot) > 0 ? (sim.best / Math.abs(evTot)).toFixed(1) + '× the expected loss' : money(sim.best, unit, 0)) : 'still not a winner')) +
+        tile('Worst session of 1,000', money(sim.worst, unit, 0), 'dn', 'the unluckiest run — ' + (Math.abs(evTot) > 0 ? (Math.abs(sim.worst) / Math.abs(evTot)).toFixed(1) + '× the expected loss' : money(sim.worst, unit, 0)) + ' · median ' + money(sim.median, unit, 0)) +
         tile('Biggest drawdown', money(-sim.ddMedian, unit, 0), 'dn', 'typical session; 1 in 20 sees ' + money(-sim.dd95, unit, 0) + ' or worse') +
         tile('Bets until the edge is undeniable', isFinite(nStar) ? num(nStar) : '—', '', isFinite(nStar) ? '≈ ' + num(nStar / game.pace) + ' hours before 95% of players are behind' : 'no house edge on this bet');
       writeHash({ bet: state.bet, unit: state.unit, n: state.n, seed: state.seed });
       draw(canvas, sim, prep, unit);
-      foot.innerHTML = '1,000 simulated sessions of ' + num(n) + ' bets, drawn from the bet’s actual outcome table (not a normal approximation). Bands are the empirical 15th–85th and 2.5th–97.5th percentiles across sessions at each point. Seed ' + state.seed + ' — the link in your address bar reproduces this exact chart. Education, not advice: the point is to see what the edge looks like from inside a session.';
+      var story = el('p', 'simstory'); story.innerHTML = '<b>Best and worst of the thousand.</b> Playing ' + num(n) + ' bets of ' + money(1, unit, unit % 1 ? 2 : 0).replace('+', '') + ' on <b>' + bet.name + '</b>, the luckiest of the 1,000 sessions finished at <b class="up">' + money(sim.best, unit, 0) + '</b> and the unluckiest at <b class="dn">' + money(sim.worst, unit, 0) + '</b>; the typical session landed at ' + money(sim.median, unit, 0) + ' against an expectation of ' + money(evTot, unit, 0) + '. ' + (sim.best > 0 ? 'Someone in that room walked away a winner and will tell you the game is beatable — ' + pctf(1 - sim.pLoss) + ' of sessions ended ahead. ' : 'Not one session of the thousand ended ahead. ') + 'The spread between the best and worst is ' + money(sim.best - sim.worst, unit, 0).replace('+', '') + ' wide, which is why the edge is invisible from inside a single night.';
+      foot.innerHTML = ''; foot.appendChild(story);
+      var fine = el('span'); fine.textContent = '1,000 simulated sessions of ' + num(n) + ' bets, drawn from the bet’s actual outcome table (not a normal approximation). Bands are the empirical 15th–85th and 2.5th–97.5th percentiles across sessions at each point. Seed ' + state.seed + ' — the link in your address bar reproduces this exact chart. Education, not advice: the point is to see what the edge looks like from inside a session.'; foot.appendChild(fine);
     }
     run.addEventListener('click', render);
     reroll.addEventListener('click', function () { state.seed = Math.floor(Math.random() * 1e9) + 1; render(); });

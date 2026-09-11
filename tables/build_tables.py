@@ -121,8 +121,9 @@ extra_css = r'''
   .simlegend span{display:inline-flex;align-items:center;gap:7px;}
   .simlegend i{display:inline-block;width:18px;height:3px;border-radius:2px;}
   .l-med{background:var(--gold);} .l-ev{background:repeating-linear-gradient(90deg,var(--gold-hi) 0 5px,transparent 5px 8px);height:2px !important;}
-  .l-70{background:rgba(31,203,227,.42);height:10px !important;} .l-95{background:rgba(31,203,227,.20);height:10px !important;} .l-smp{background:rgba(163,153,166,.5);height:1px !important;}
+  .l-70{background:rgba(31,203,227,.42);height:10px !important;} .l-95{background:rgba(31,203,227,.20);height:10px !important;} .l-smp{background:rgba(163,153,166,.5);height:1px !important;} .l-best{background:var(--green);} .l-worst{background:var(--red-neon);}
   .simfoot{margin-top:14px;font-size:12.5px;color:var(--dim2);line-height:1.65;}
+  .simstory{margin:0 0 10px;font-size:14.5px;color:var(--dim);line-height:1.7;} .simstory b{color:var(--cream);font-weight:500;} .simstory b.up{color:var(--green);} .simstory b.dn{color:var(--red-neon);}
   .simnojs{padding:16px;border:1px dashed var(--line);border-radius:10px;color:var(--dim);font-size:14px;}
   html.js .simnojs{display:none;}
   .slotnote{border:1px solid rgba(224,56,79,.45);background:rgba(224,56,79,.06);border-radius:12px;padding:20px 22px;margin-top:14px;color:var(--dim);font-size:15px;line-height:1.7;}
