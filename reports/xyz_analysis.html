@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XYZ — Block, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #00D632;
+  --accent-dim: #00D63233;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">XYZ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software — Infrastructure</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $47.83B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: not verified</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: not verified</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: not verified</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px;font-family:'JetBrains Mono',monospace;">companiesmarketcap.com returned 404 on the pages fetched; no rank is estimated here rather than invented.</div>
+      <div class="company-name" style="margin-top:14px;">Block, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$79.07</div>
+      <div class="price-change" style="color:var(--green);">+$0.06 (+0.08%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Retrieved Sep 11, 2026 during market hours; intraday last sale was $79.13. No after-hours quote available.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1955 Broadway, Oakland, California</div>
+    <div class="meta-item"><span>Employees:</span> 10,205</div>
+    <div class="meta-item"><span>Listed:</span> Nov 19, 2015 (as SQ; ticker changed to XYZ Jan 2025)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Early November 2026 (est. — Q3 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Block runs two consumer-and-merchant ecosystems: <strong>Square</strong>, the point-of-sale, payments and business-software stack used by more than 4.5 million sellers, and <strong>Cash App</strong>, a 59-million-user consumer money app that has quietly turned into a bank-substitute and a lender. FY2025 revenue was <strong>$24.19B, up just 0.3%</strong> from $24.12B — a number that tells you almost nothing, because roughly a third of Block's reported revenue is the gross proceeds of bitcoin it sells to customers at near-zero margin. The metric management actually guides on is <strong>gross profit: $10.36B in FY2025, up 17%</strong>, and on track for <strong>$12.51B in FY2026, up 21%</strong> on the August guidance raise. The company also changed its ticker from SQ to XYZ in January 2025 — the price series below is continuous through that change.</p>
+  <p class="prose" style="margin-top:16px;">The central debate is not whether Block grows. It is <strong>what the earnings power actually is, and who paid for it</strong>. In February 2026 the company cut more than 40% of its workforce — headcount now stands at 10,205 — and in the two quarters since, adjusted operating income margin has hit successive records (25% in Q1 2026, 27% in Q2). That is either a business that had years of accumulated slack and has now found operating leverage, or a business that has bought two quarters of margin with a one-time cost reset. The stock trades at <strong>134× trailing <span class="tip" title="Generally Accepted Accounting Principles — the standardised US accounting rules; GAAP earnings include everything, including stock compensation and restructuring charges">GAAP</span> earnings and roughly 17–20× forward adjusted earnings</strong>. Reconciling those two numbers is the whole job of this page.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive ("Block Head")</div>
+      <div class="card-value" style="font-size:20px;">Jack Dorsey</div>
+      <div class="card-note">Co-founder and CEO, and co-founder/former CEO of Twitter. Verified from the Q2 2026 earnings coverage fetched, where he framed the current strategy around AI-driven shipping velocity: <em>"The biggest proof point is our shipping velocity."</em> Also the architect of the company's bitcoin-centric product line (Bitkey, Proto, Spiral).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Amrita Ahuja</div>
+      <div class="card-note">CFO and COO. Verified from Q2 2026 earnings coverage, where she described the quarter's strength as <em>"broad-based."</em> Owner of the gross-profit-plus-adjusted-operating-income guidance framework and of the "Rule of 40" framing (28% margin + 21% growth = 49% in the FY2026 guide).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Key Holders</div>
+      <div class="card-value" style="font-size:20px;">Dual-class</div>
+      <div class="card-note">604.50M shares outstanding across Class A and founder-held Class B super-voting stock. Other named insiders appearing in the FY2025 10-K include co-founder <strong>Jim McKelvey</strong> and Afterpay co-founder <strong>Anthony Eisen</strong>. <strong>Specific institutional holders and their stakes were not verified from the sources fetched and are therefore not listed.</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Block reports <strong>two reportable segments — Square and Cash App</strong>. Since the FY2025 10-K it also disaggregates revenue into three cross-cutting categories that do not map one-to-one onto the segments: <strong>Commerce Enablement</strong> (Square payments, software, hardware, Cash App Card, buy-now-pay-later, TIDAL), <strong>Financial Solutions</strong> (Cash App Borrow, Square Loans, savings, banking, ATM) and <strong>Bitcoin Ecosystem</strong>. The bar below is the <strong>gross profit</strong> split for Q2 2026 — not revenue, because revenue is distorted by bitcoin (see below).</p>
+  <div class="seg-bar">
+    <div style="flex:62.0;background:#00D632;">CASH APP 62.0%</div>
+    <div style="flex:36.5;background:#3b82f6;color:#fff;">SQUARE 36.5%</div>
+    <div style="flex:1.5;background:#64748b;color:#fff;">1.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#00D632;"></span> Cash App — $1.97B gross profit, +31% <span class="tip" title="Year over year — compared with the same period one year earlier">YoY</span> (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Square — $1.16B gross profit, +13% YoY (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Residual to reported total of $3.179B (~$49M)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note on the third slice: Block reported total Q2 2026 gross profit of <strong>$3,179M</strong> against segment figures of $1.97B (Cash App) and $1.16B (Square); the ~$49M residual reflects rounding and non-segment items in the sources fetched and is not separately disclosed. The <strong>Bitcoin Ecosystem</strong> category ($72M of gross profit in Q2) sits inside these segments rather than beside them, so it is treated as a category below, not as a fourth bar. <strong>FY2025 gross profit by segment was not disclosed in the sources fetched and has not been estimated.</strong></p>
+
+  <div class="biz-card" style="border-left: 3px solid #00D632;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Cash App — Consumer Finance</div>
+        <span class="biz-badge dominant">GROWTH ENGINE — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.97B</div><div class="biz-stat-label">Q2'26 Gross Profit</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+31%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">62.0%</div><div class="biz-stat-label">Gross Profit Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Cash App is now the larger and faster-growing half of Block, and the composition of its growth has changed. Q2 2026 gross profit of <strong>$1.97B grew 31% YoY</strong>, driven by a <strong>59% jump in lending originations</strong> and 17% commerce growth. The user base is flat at <strong>59 million monthly transacting actives</strong> — the same figure reported for Q4 2025 — but the monetisation per user is not: <strong>primary banking actives rose 17% to 9.4 million</strong> and total inflows reached <strong>$87B, up 13%</strong> (FY2025 inflows were $316B). Read that carefully: <em>growth is no longer coming from adding users</em>. It is coming from converting existing users into direct-deposit customers and then lending to them. Consumer lending originations ran <strong>$18.5B in Q4 2025 alone, up 69% YoY</strong>. That is a credit business dressed in a consumer-app interface, and it carries credit risk that a payments business does not.</p>
+    <div class="biz-tam"><strong>Category size:</strong> no third-party <span class="tip" title="Total Addressable Market — the estimated total revenue opportunity available for a product or service">TAM</span> estimate was verified from the sources fetched, and none is invented here. The disclosed operating base is 59M monthly actives and $316B of annual inflows (FY2025).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">PayPal / Venmo (PYPL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$46.14B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$34.13B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+5.7%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Chime Financial (CHYM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$12.37B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$2.46B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+26.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Zelle / bank-owned P2P</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Consortium</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Square — Merchant Commerce</div>
+        <span class="biz-badge emerging">RE-ACCELERATING — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.16B</div><div class="biz-stat-label">Q2'26 Gross Profit</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$72.8B</div><div class="biz-stat-label">Q2'26 GPV (+13%)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">36.5%</div><div class="biz-stat-label">Gross Profit Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Square is the original business and, until this year, the problem child. <strong><span class="tip" title="Gross Payment Volume — the total dollar value of card and other payments processed for merchants through Square, before Square's own take">GPV</span></strong> was <strong>$250B across 4.5M+ sellers and 5.9 billion transactions in FY2025</strong>; Q2 2026 GPV reached <strong>$72.8B, up 13%</strong>, with <strong>U.S. GPV growth accelerating to 9.8%</strong> — described in the Q2 coverage as the fastest U.S. pace since Q2 2023 — and <strong>international GPV up 28%</strong> (25% in constant currency). The gross profit line lagged that: $1.16B, +13%, after just <strong>+7% in Q4 2025</strong> (+9% excluding hardware losses) and +9% in Q1 2026. So the sequence matters — volume turned first, gross profit is following. Margin profile: Square earns a spread on payment volume plus higher-margin software and hardware-adjacent subscription revenue; hardware itself is sold near or below cost as a customer-acquisition device, which is why "excluding hardware losses" keeps appearing in the disclosure.</p>
+    <div class="biz-tam"><strong>Disclosed base:</strong> $250B FY2025 GPV · 4.5M+ sellers · 5.9B transactions. No third-party merchant-acquiring TAM was verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Toast (TOST)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$18.37B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$6.80B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+23.1%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Fiserv / Clover (FI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$26.98B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$20.87B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">−1.2%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Stripe / Shopify Payments</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private / bundled</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Bitcoin Ecosystem — The Revenue Line That Isn't a Business</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">CATEGORY, NOT A SEGMENT — 28.5% OF REVENUE, 2.3% OF GROSS PROFIT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1.89B</div><div class="biz-stat-label">Q2'26 Revenue (−13%)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$72M</div><div class="biz-stat-label">Q2'26 Gross Profit (−31%)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">3.8%</div><div class="biz-stat-label">Implied Gross Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.3%</div><div class="biz-stat-label">Of Total Gross Profit</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>This is the single most important accounting fact about Block, and most screens get it wrong.</strong> When a Cash App customer buys bitcoin, Block books the <em>entire sale amount</em> as revenue and the cost of the bitcoin in cost of revenue. In Q2 2026 that was <strong>$1.89B of revenue producing $72M of gross profit — a 3.8% margin</strong>. Across the first half of 2026 bitcoin revenue was <strong>$3.69B</strong> ($1.80B in Q1, $1.89B in Q2) against total H1 revenue of <strong>$12.68B</strong>, i.e. <strong>29% of reported revenue generating about 2.4% of reported gross profit</strong> (derived from the segment figures, not a company-stated ratio). Three consequences follow. First, <strong>headline revenue growth is meaningless</strong> for this company — FY2025 revenue grew 0.3% while gross profit grew 17%. Second, <strong>the gross margin "improvement" from 25.15% (FY2021) to 46.57% (TTM) is substantially a mix effect</strong>: bitcoin revenue is shrinking (−13% YoY in Q2) faster than the rest is growing, so the low-margin denominator keeps falling. Third, this is exactly why management guides on gross profit and adjusted operating income and why any peer <span class="tip" title="Price-to-Sales — market value divided by revenue">P/S</span> comparison against PayPal or Toast is structurally invalid.</p>
+    <div class="biz-tam"><strong>Adjacent bitcoin assets:</strong> the FY2025 10-K classifies holdings as "investing purposes" and "operating purposes"; Q1 2026 GAAP results included a <strong>$173M bitcoin loss</strong>, so the balance-sheet position moves earnings independently of the trading business. Specific holdings quantities were not verified from sources fetched. Hardware/protocol projects (Bitkey, Proto, Spiral) sit here too.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">59M Cash App actives</span>
+    <span class="moat-pill">4.5M+ Square sellers</span>
+    <span class="moat-pill">$316B annual inflows</span>
+    <span class="moat-pill">Proprietary underwriting data</span>
+    <span class="moat-pill">Two-sided commerce loop</span>
+    <span class="moat-pill">Bank charters &amp; licences</span>
+    <span class="moat-pill">Consumer brand</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The durable advantage is <strong>data plus distribution in the same box</strong>. Cash App sees the inflow — paychecks, transfers, card spend — for 59 million people and 9.4 million primary banking customers, and Square sees the receipts for 4.5 million merchants and 5.9 billion transactions a year. That gives Block a credit-underwriting dataset that a standalone lender has to buy and a bank has to wait for. The September 2026 decision to <strong>open Cash App Score to third-party lenders via Nova Credit</strong> is the tell: management believes the underwriting data is good enough to sell. Lending originations up <strong>59% (Q2 2026)</strong> and <strong>69% (Q4 2025)</strong> without a corresponding rise in user count is the mechanism working. The moat is not the payment rails — those are commoditised and Stripe, Fiserv and Toast compete hard on price — it is the ability to originate credit cheaply against behaviour Block already observes.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">—</span><div><strong>Growth now depends on credit, not users.</strong> Monthly transacting actives were 59 million in Q4 2025 and 59 million in Q2 2026. Every point of Cash App's 31% gross profit growth therefore came from monetising the existing base, and the fastest-growing lever is lending. Credit businesses look like high-margin software until the cycle turns, at which point provisions arrive all at once. Block does not disclose a loss rate or reserve ratio in the sources fetched.</div></div>
+    <div class="risk-item"><span class="risk-num">—</span><div><strong>The 40% headcount cut is unrepeatable.</strong> Margins hit records in the two quarters immediately following a February 2026 reduction of more than 40% of staff. Some of that is genuine operating leverage; some is simply a smaller cost base against a revenue line that was already booked. The Q1 2026 GAAP loss of <strong>−$309M included $852M of restructuring charges</strong>. The test is FY2027, when the cut has annualised and there is nothing left to remove.</div></div>
+    <div class="risk-item"><span class="risk-num">—</span><div><strong>Bitcoin cuts both ways on the income statement.</strong> Bitcoin gross profit fell 31% YoY in Q2 and 26% in Q1, and a $173M mark-to-market bitcoin loss hit Q1 GAAP earnings. The economics are tiny (2.3% of gross profit) but the volatility is not, and the brand is entangled with an asset class Block does not control.</div></div>
+    <div class="risk-item"><span class="risk-num">—</span><div><strong>Regulatory surface area is enormous and widening.</strong> Block operates as a payments company, a lender, a broker-dealer, a virtual-currency business and — pending the September 2026 <strong>Builders Bank</strong> trust-charter application — a national trust bank. The FY2025 10-K lists all of these as risk factors. Each new licence adds capital, compliance and examination exposure that a pure software company never carries.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>XYZ</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings — share price divided by earnings per share over the last twelve months">P/E</span></td><td style="color:var(--red);">134.41</td><td>—</td><td>—</td><td>On $0.59 of TTM GAAP EPS. $79.07 ÷ $0.59 = 134×. Depressed earnings base, not a rich multiple on normal earnings — see one-offs below.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price-to-Earnings using forecast rather than historical earnings">P/E</span></td><td style="color:var(--green);">17.28</td><td>—</td><td>—</td><td>Source figure. Against 2026 consensus EPS of $4.05 the arithmetic gives 19.5×; against the company's own FY2026 adjusted EPS guide of $4.02, 19.7×. The gap suggests a forward-12-month blended base.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — the P/E divided by the expected earnings growth rate; under 1.0 is conventionally considered cheap for the growth on offer">PEG</span> Ratio</td><td style="color:var(--green);">0.68</td><td>—</td><td>—</td><td>Below 1.0 — cheap relative to forecast growth, but the denominator is a 70% adjusted-EPS growth rate off a restructured base.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share">EPS</span> (<span class="tip" title="Trailing Twelve Months — the most recent four reported quarters">TTM</span>)</td><td>$0.59</td><td>—</td><td>—</td><td>GAAP. FY2025 was $2.10 and FY2024 $4.56; the TTM figure is dragged down by the Q1 2026 loss of −$0.52.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year over year">YoY</span>)</td><td style="color:var(--amber);">+5.07%</td><td>—</td><td>—</td><td>TTM. Latest quarter +9.30%. Both understate the business: gross profit grew 25% in Q2. Revenue is contaminated by bitcoin gross-proceeds accounting.</td></tr>
+      <tr><td><span class="tip" title="Gross Margin — revenue minus the direct cost of delivering it, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--amber);">46.57%</td><td>—</td><td>—</td><td>Up from 25.15% in FY2021 — but largely because low-margin bitcoin revenue is shrinking, not because the core got twice as profitable.</td></tr>
+      <tr><td><span class="tip" title="Net Profit Margin — net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--red);">1.43%</td><td>—</td><td>—</td><td>Optically terrible, and largely an artefact of the same bitcoin denominator plus Q1 restructuring. Adjusted operating margin was 27% in Q2.</td></tr>
+      <tr><td><span class="tip" title="Dividend Yield — annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>—</td><td>—</td><td>No dividend. Capital returned via buybacks: $2.3B repurchased in FY2025.</td></tr>
+      <tr><td><span class="tip" title="Short Interest — shares sold short as a percentage of shares outstanding; high readings indicate bearish positioning">Short Interest</span> / Float %</td><td style="color:var(--green);">2.26%</td><td>—</td><td>—</td><td>13.66M shares short. Low — this is not a crowded short despite the optical P/E.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity — total borrowings divided by shareholders' equity; a gearing measure">Debt-to-Equity</span></td><td style="color:var(--green);">0.33</td><td>—</td><td>—</td><td>$7.17B total debt against $6.74B cash — close to net-cash neutral. No financing pressure.</td></tr>
+      <tr><td><span class="tip" title="Current Ratio — current assets divided by current liabilities; above 1.0 means short-term assets cover short-term obligations">Current Ratio</span></td><td style="color:var(--green);">2.21</td><td>—</td><td>—</td><td>Quick ratio 1.08. Comfortable, though for a lender the composition of current assets matters more than the ratio.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — cash from operations less capital expenditure; the cash actually available to owners">Free Cash Flow</span></td><td style="color:var(--green);">$3.88B</td><td>—</td><td>—</td><td>TTM. Roughly 8.1% of market cap, and far above TTM GAAP net income of $357M — the clearest evidence the accounting earnings understate cash generation.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity">ROE</span></td><td style="color:var(--red);">1.61%</td><td>—</td><td>—</td><td>Suppressed by the same depressed TTM net income. On FY2025's $1.31B it would be roughly 6× higher.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by the debt and equity capital employed">ROIC</span></td><td style="color:var(--red);">2.72%</td><td>—</td><td>—</td><td>ROA 2.01%. A large equity base built from the Afterpay acquisition keeps returns structurally low on GAAP measures.</td></tr>
+      <tr><td><span class="tip" title="Beta — sensitivity to moves in the broad market; 1.0 moves with the index, above 1.0 amplifies it">Beta</span></td><td style="color:var(--red);">2.52</td><td>—</td><td>—</td><td>Five-year. Among the highest in large-cap fintech — consistent with the −84% drawdown visible in Section 07. Size positions accordingly.</td></tr>
+      <tr><td>52-Week Range</td><td>$48.21 – $86.92</td><td>—</td><td>—</td><td>Current price sits at the 68th percentile of the range. 52-week change +4.72%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:14px;font-size:13px;"><strong>On the two dashed columns:</strong> industry-average and S&amp;P 500 comparison figures could not be sourced from any page fetched for this report. They are left as "—" rather than filled with plausible-looking approximations. A same-industry sanity check is available from the peer cards in Section 02: PayPal trades at 10.05× earnings, Fiserv at 9.38×, Toast at 40.50× — a spread that says "Software — Infrastructure" is not a meaningful comparison set for this company.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Notable One-Off Items.</strong> Three distort the table above and all three run in the same direction. (1) <strong>Q1 2026 carried $852M of restructuring charges</strong> from the February 2026 workforce reduction plus a <strong>$173M bitcoin loss</strong>, producing a GAAP net loss of −$309M (−$0.52 per share) in a quarter when adjusted operating income was <em>+$728M</em>. That single quarter is why TTM EPS is $0.59 and trailing P/E is 134×. (2) <strong>FY2024 net income of $2,897M exceeded FY2024 operating income of $1,038M</strong> — a below-the-line item roughly tripled reported earnings that year, and therefore flatters every multi-year EPS growth comparison starting in 2024. The specific driver was not verified from the sources fetched and is not asserted here. (3) <strong>Square hardware is sold at a loss</strong> and management routinely quotes Square gross profit growth "excluding hardware losses" (+9% vs +7% reported in Q4 2025), so the two versions of that number differ by roughly two points.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">45 analysts polled by S&amp;P Global via stockanalysis.com.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$98.35</div><div class="card-note">+24.4% above the $79.07 close. Median target $99.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$75 – $125</div><div class="card-note">Low implies −5.2%; high implies +58.1%. A 67% spread between low and high — unusually wide, which is itself informative.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">38 / 7 / 0</div><div class="card-note">28 Strong Buy + 10 Buy · 7 Hold · 0 Sell · 0 Strong Sell. Not a single sell rating on the name.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:84.4;background:#22c55e;"></div>
+    <div style="flex:15.6;background:#f59e0b;"></div>
+    <div style="flex:0.1;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 38 (84.4%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 7 (15.6%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 0</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Goldman Sachs</strong> (Will Nance) — Buy, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$107</span>. The most bullish of the named calls on the page, roughly 35% above the current price and near the top of the visible distribution.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>UBS</strong> (Timothy Chiodo) — Buy, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$98</span>. Sits almost exactly on the $98.35 consensus average — the definition of a consensus view.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Bernstein</strong> (Harshita Rawat) — Buy, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$95</span>. Bernstein's payments franchise is the most-followed sell-side seat in the sector.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>RBC Capital Markets</strong> (Daniel Perlin) — Buy, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$95</span>. Clusters with Bernstein; the $95–$99 band is where most of the book sits.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>Scotiabank</strong> — Hold, PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$82</span> (initiated). The dissent, and a useful one: a new initiation at essentially the current price says the margin records are already in the number.</div></div>
+  </div>
+  <p class="prose" style="margin-top:18px;font-size:13px;">All five calls above were read from the stockanalysis.com XYZ forecast page fetched for this report. Dates for each individual call were not shown on that page, so none is claimed here. Consensus forecasts on the same page: FY2026 revenue $26.06B (+7.7%) and EPS $4.05; FY2027 revenue $28.96B (+11.2%) and EPS $5.16.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Block applies to establish "Builders Bank," a national trust bank</div>
+        <div class="tl-desc">An application for an <em>uninsured</em> national trust bank focused on custody and fiduciary services, explicitly including bitcoin and stablecoins. If granted, it moves Block from being a bank's customer to being a chartered institution in its own right — lowering dependence on third-party bank partners, which the FY2025 10-K names as a risk factor. It also adds a federal banking regulator to an already long list of supervisors.</div>
+        <div class="tl-impact up">Potential upside catalyst — structural</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cash App Score opened to third-party lenders via Nova Credit</div>
+        <div class="tl-desc">Block will license its consumer cash-flow underwriting signal to outside lenders through Nova Credit's platform. This is the data moat being converted into a revenue line — near-pure-margin if it scales, and an implicit statement that management rates its own underwriting data as externally saleable. No revenue contribution has been disclosed.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 5, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026: record 27% adjusted operating margin — and the stock fell</div>
+        <div class="tl-desc">Gross profit $3.18B (+25%), Cash App +31%, Square +13%, adjusted EBITDA $1.17B, adjusted operating income $864M at a record 27% margin, adjusted diluted EPS $1.02 (+65%). FY2026 guidance was raised to $12.51B gross profit and $3.47B adjusted operating income. Contemporaneous coverage nonetheless reported the stock falling roughly 5% on the print — a good reminder that a raise into a high bar is not automatically a positive catalyst.</div>
+        <div class="tl-impact neutral">Reaction already happened — beat, sold off</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 guidance: $12.51B gross profit, 28% margin, "Rule of 40" at 49%</div>
+        <div class="tl-desc">The guide implies H2 2026 gross profit of roughly $6.42B against the $6.09B delivered in H1 — a step up that requires the Square re-acceleration to hold and Cash App lending to keep compounding. Management's Rule-of-40 framing (21% growth + 28% margin) is the number to test each quarter; it has been raised twice in 2026, from $12.20B in February to $12.33B in May to $12.51B in August.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — the first quarter with no restructuring alibi</div>
+        <div class="tl-desc">The exact date was not confirmed on any source fetched (stockanalysis.com still displayed the prior Aug 5 date). Q3 is the second full quarter after the 40% workforce reduction completed, so the margin should now be a run-rate rather than a transition. Watch Square gross profit growth specifically: 7% → 9% → 13% over the last three quarters is the sequence that has to continue.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Consumer credit cycle and lending origination growth</div>
+        <div class="tl-desc">Cash App consumer lending originations grew 69% in Q4 2025 and 59% in Q2 2026, and are now the primary driver of the segment's 31% gross profit growth. Credit quality metrics were not disclosed in the sources fetched. This is the line that turns Block's margin story into a credit story, and the first quarter of rising charge-offs would reprice the multiple faster than any payments-volume miss.</div>
+        <div class="tl-impact down">Ongoing risk — watch provisions</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">XYZ (SQ before Jan 2025) — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#00D632;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 monthly close of <strong>$254.50</strong> to the September 2026 close of <strong>$79.07</strong>, the stock has lost <strong>68.9%</strong> — a compound annual return of roughly <strong>−20.9%</strong>, with no dividend to cushion it. Set that against the operating record over the same window: gross profit went from <strong>$4.44B (FY2021) to $10.42B (FY2025), up 134%</strong>, and is guided to $12.51B this year. An investor who owned this business for five years was right about the business and wrong about the price, which is what a de-rating from zero-rate multiples looks like. The path inside that number is violent even by growth-stock standards: <strong>−84.2%</strong> from the Oct 2021 high to the October 2023 close of $40.25, then <strong>+120.0%</strong> to $88.55 in November 2024, then <strong>−38.6%</strong> to $54.33 in March 2025, then <strong>+51.0%</strong> to $82.02 in August 2026. A beta of <strong>2.52</strong> is not a statistical curiosity here; it is a description.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A precise five-year total return for the S&amp;P 500 (the benchmark for this NYSE listing) over the identical Oct 2021 – Sep 2026 window could not be verified from any source fetched for this report, so no relative figure is stated. What can be said from verified data: XYZ's <strong>52-week change is +4.72%</strong>, versus a 52-week range of $48.21–$86.92 — the stock has nearly doubled off its own 52-week low and still sits 9% below its 52-week high. Within its own peer set the dispersion is stark on the same day's data: Toast trades at 40.5× earnings, PayPal at 10.1×, Fiserv at 9.4×, with Fiserv's market cap down 63.6% and Toast's down 23.0% over the trailing year while Block's rose 4.7%. On a NASDAQ-100 basis no verified comparison was available either; both index comparisons are deliberately omitted rather than approximated.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$254.50 — the zero-rate peak (then trading as SQ)</div><div class="tl-desc">Peak enthusiasm for fintech disruption, valued on payment volume growth with Afterpay about to close. FY2021 gross profit was $4.44B; the market capitalised it at over $100B.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">$40.25 — cycle low, −84.2% from Oct 2021</div><div class="tl-desc">Two years of rate repricing plus a FY2022 net loss of −$541M and FY2023 net income of just $9.8M on $21.9B of revenue. At this price the market valued the whole company at roughly 2× that year's gross profit.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">$88.55 — +120% off the low as GAAP profit arrived</div><div class="tl-desc">FY2024 delivered $1.04B of operating income and $2.90B of net income (the latter inflated by a below-the-line item). The "will it ever earn anything" question was answered, and the stock more than doubled from the October 2023 trough.</div><div class="tl-impact up">Profitability re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan–Mar 2025</div><div class="tl-content"><div class="tl-title">$90.82 → $54.33 — the ticker changes, then the stock breaks</div><div class="tl-desc">SQ became XYZ in January 2025 at a monthly close of $90.82 — the highest close of the last five years after 2021 — and the stock then fell 40% in two months to $54.33 in March. Q1 2025 revenue declined 3.1% YoY and Q2 2025 declined 1.6%; growth had visibly stalled.</div><div class="tl-impact down">Growth stall — worst two months of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">$63.70 — the 40%+ workforce reduction is announced</div><div class="tl-desc">Block announced a reduction of more than 40% of its staff alongside FY2025 results (gross profit $10.36B, +17%; adjusted operating income $2.08B, +30%) and 2026 guidance of $12.20B gross profit. The stock did not rally on the cut; it drifted to $60.18 by March. The market waited for proof.</div><div class="tl-impact neutral">Cost reset — market withheld judgement</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">$82.02 — +51.0% off the March 2025 low as margins hit records</div><div class="tl-desc">Two consecutive quarters of record adjusted operating margin (25%, then 27%), guidance raised twice, and the proof the market was waiting for. This is the highest monthly close since January 2025 — and still 68% below October 2021.</div><div class="tl-impact up">Margin proof delivered</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 10, 2026</div><div class="tl-content"><div class="tl-title">$79.07 — consolidating below the recent high</div><div class="tl-desc">Down 3.6% from the August close, at the 68th percentile of the 52-week range, with monthly RSI having rolled over from the overbought reading set into the summer rally. Consensus sits 24% higher at $98.35.</div><div class="tl-impact neutral">Current level</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Read the income statement in the right order, or you will get this company wrong.</strong> Start at the top and Block looks stagnant: FY2025 revenue $24.19B, up 0.3%. Start one line lower and it looks like a compounder: FY2025 gross profit $10.36B, up 17%, guided to $12.51B and 21% growth this year. The difference is bitcoin. Block books the full sale price of every bitcoin a Cash App customer buys as revenue — <strong>$1.89B in Q2 2026 alone, 28.5% of all revenue, generating $72M of gross profit at a 3.8% margin</strong>. That line is also shrinking (−13% YoY), which mechanically flatters gross margin (25.15% in FY2021 → 46.57% TTM) without anything improving. Any screen that ranks this company on revenue growth, price-to-sales or gross margin is measuring an accounting artefact.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>What actually happened in 2026.</strong> In February, Block cut more than 40% of its workforce — headcount is now <strong>10,205</strong> — and took <strong>$852M of restructuring charges</strong> in Q1, producing a GAAP net loss of <strong>−$309M</strong> in the same quarter that adjusted operating income was <strong>+$728M at a then-record 25% margin</strong>. Q2 took the margin to <strong>27% on $864M of adjusted operating income</strong>, with adjusted EBITDA of $1.17B and adjusted diluted EPS of $1.02, up 65%. Guidance has been raised twice, from $12.20B of gross profit in February to $12.33B in May to $12.51B in August. The honest summary is that Block traded a very large one-time charge for a permanently smaller cost base, and the market has paid for two quarters of it — the stock is +51% from its March 2025 low but still fell roughly 5% on the Q2 beat itself.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Where the growth now comes from — and why that changes the risk.</strong> Cash App's gross profit grew 31% in Q2 on a user base that did not grow at all: <strong>59 million monthly transacting actives in Q4 2025, 59 million in Q2 2026</strong>. The growth came from depth — <strong>primary banking actives +17% to 9.4 million</strong>, inflows +13% to $87B, and <strong>lending originations +59%</strong> (after +69% in Q4 2025). Square, meanwhile, has genuinely re-accelerated: GPV of <strong>$72.8B, +13%</strong>, with U.S. GPV growth at 9.8% and international at 28%, and gross profit growth improving from +7% (Q4'25) to +9% (Q1'26) to +13% (Q2'26). So the two halves are working, but the faster half is increasingly a <em>lender</em>. Block discloses origination growth and does not disclose loss rates or reserve coverage in anything fetched for this report. Credit revenue is recognised up front and credit losses arrive later; that asymmetry is the single largest unmodelled risk on this page.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation — and which earnings base.</strong> The answer moves by a factor of seven depending on the denominator, so be explicit. (i) On <strong>trailing GAAP EPS of $0.59, XYZ trades at 134×</strong> — arithmetically correct and analytically useless, since the base includes the $852M restructuring charge and a $173M bitcoin loss that will not recur. (ii) On <strong>FY2026 consensus EPS of $4.05 it trades at 19.5×</strong>, and on the company's own adjusted EPS guide of $4.02, 19.7×; the reported forward P/E of 17.28× implies a slightly later blended base. (iii) On <strong>TTM free cash flow of $3.88B the stock trades at about 12.3× FCF</strong>, an 8.1% free cash flow yield — and this is the number that does the most work, because FCF is not distorted by either the bitcoin denominator or the restructuring charge. (iv) On the FY2026 adjusted operating income guide of <strong>$3.47B against a $48.23B enterprise value, roughly 13.9×</strong>. The defensible band is <strong>(ii) through (iv): 12–20× depending on how much credit you give adjusted measures</strong>. That is not an expensive stock for 21% gross profit growth — which is precisely why 38 of 45 analysts rate it Buy with a $98.35 average target. The catch is that (ii) and (iv) both add back stock-based compensation and both assume the post-restructuring cost base holds through FY2027, when there is nothing left to cut and the comparison gets hard.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Both engines are working simultaneously for the first time in three years: Cash App gross profit +31% on deepening monetisation of 59M users, and Square GPV +13% with U.S. growth at a three-year high. The February restructuring converted a bloated cost base into a 27% adjusted operating margin, and guidance has been raised twice since. At roughly 12× trailing free cash flow and 19–20× forward adjusted earnings for 21% gross profit growth — a "Rule of 40" score of 49 — the valuation does not demand heroics. Net debt is effectively nil ($7.17B debt, $6.74B cash), $2.3B of stock was repurchased in FY2025, and the Builders Bank charter application plus the Nova Credit deal show the underwriting data being turned into new revenue lines.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The margin records follow a 40%+ headcount cut, not a demand inflection, and that lever can only be pulled once — FY2027 laps it with nothing left to remove. Cash App's user base has been flat at 59M for three quarters, so all growth now comes from lending into a consumer credit cycle whose loss rates Block does not disclose. Reported revenue growth of 5% and a 1.43% net margin are what a screen sees; a beta of 2.52 and an 84% peak-to-trough drawdown are what shareholders have lived. The stock fell on the Q2 beat, 38 of 45 analysts are already positive, and the only recent initiation was a Hold at $82 — the good news is in the price and the sell side has no upgrades left to give.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Undisclosed consumer credit quality.</strong> Lending originations grew 69% and 59% in the last two reported growth prints and are the primary driver of Cash App's 31% gross profit growth, but no charge-off rate, reserve ratio or vintage performance appears in any source fetched for this report. If the consumer credit cycle turns, provisions hit at exactly the moment the growth narrative depends on originations accelerating.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>The cost cut annualises.</strong> Record margins in Q1 and Q2 2026 both sit inside twelve months of a 40%+ workforce reduction. From roughly Q1 2027 the comparison includes the smaller base on both sides, and margin expansion has to come from revenue leverage alone. A guide that implies continued expansion into FY2027 without a new lever is the thing to stress-test.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Regulatory expansion with a 2.52 beta.</strong> Block is simultaneously a payments processor, lender, broker-dealer, virtual-currency business and — pending the Builders Bank application filed September 8, 2026 — an aspiring national trust bank, each with its own capital and examination regime. Add a bitcoin balance-sheet position that produced a $173M loss in a single quarter, and the equity carries operating leverage, credit leverage and asset-price leverage at the same time. Position size, not conviction, is the control variable here.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Fintech Is Being Repriced as Credit, Not Software</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Every consumer fintech that ran out of user growth has turned to lending, and the market is starting to price them accordingly. The evidence is in the same-day multiples: PayPal at 10.05× earnings and Fiserv at 9.38× with its market cap down 63.6% over a year, against Toast — still a pure software-and-payments story — at 40.50×. Block sits between the two identities: 62% of its gross profit now comes from a segment whose fastest-growing line is consumer credit (originations +59% in Q2 2026, +69% in Q4 2025), while it is valued on software-style forward multiples. Whichever identity the market settles on determines the multiple more than any operating result will.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Merchant Acquiring Is a Price War Fought With Software</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Square's $250B of FY2025 GPV is real scale, but payment processing itself is a commodity: the differentiation is the software wrapped around it, and everyone knows it. Toast grew revenue 23.1% to $6.80B targeting restaurants specifically; Fiserv's Clover attacks the same small-merchant base from a $20.87B revenue install base; Stripe and Shopify Payments compete online. Block's answer — selling hardware at a loss to acquire sellers, then monetising through software and Square Loans — is why management quotes Square gross profit "excluding hardware losses." It works (U.S. GPV growth just hit a three-year high), but it means the segment's incremental margin depends on attach rates, not on processing spreads, which are only going one way.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Charters and Stablecoins Are the Next Land Grab</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Block's September 8, 2026 application for Builders Bank — an uninsured national trust bank for bitcoin and stablecoin custody — puts it in the queue alongside the rest of the industry for direct federal banking status, and its September 1 deal to license Cash App Score to outside lenders through Nova Credit monetises the underwriting data without originating the loan. <strong>Bull framing:</strong> a charter removes the bank-partner dependency the 10-K flags as a risk, cuts funding costs on a lending book growing 59% a year, and turns custody into a fee stream — the pieces that would justify re-rating Block toward a financial-infrastructure multiple rather than a payments one. <strong>Bear framing:</strong> charters take time, invite examination, consume capital, and none of the above is yet in a revenue line. The verifiable position today is $79.07 against a $98.35 consensus target, 134× trailing GAAP earnings, and a business whose last two quarters of record margin followed a one-time 40% cost reduction.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 10, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, market cap, valuation, statistics, annual and quarterly financials, and analyst forecast data from <strong>stockanalysis.com</strong> (XYZ overview, statistics, financials, quarterly financials and forecast pages — price source URL: <strong>https://stockanalysis.com/stocks/xyz/</strong> — all retrieved Sep 11, 2026 during market hours; the header price of $79.07 is the last completed close reported on that page, and the intraday last sale at retrieval was $79.13). Sixty monthly unadjusted "Real Price" closes from <strong>digrin.com</strong> XYZ price history; the final chart point has been set to the $79.07 header close (digrin showed $79.04 for the partial September 2026 month — a $0.03 difference). Q2 2026, Q1 2026 and Q4/FY2025 operating detail, segment gross profit, GPV, bitcoin revenue, adjusted EBITDA, adjusted operating income and guidance from <strong>stocktitan.net</strong> 8-K and 10-K summaries and <strong>investing.com</strong> Q4 2025 slide coverage; executive names and quotes and the Q2 2026 market reaction from <strong>finance.biggo.com</strong> Q2 2026 earnings coverage; headquarters, segment structure, revenue categories, FY2025 GPV/inflow metrics, the 40%+ workforce reduction and risk factors from the FY2025 Form 10-K summary; the Builders Bank and Nova Credit items from stocktitan.net news listings dated Sep 8 and Sep 1, 2026. Peer figures for PayPal (PYPL), Toast (TOST), Fiserv (FI) and Chime (CHYM) from their stockanalysis.com overview pages, same date.</p>
+  <p style="max-width:900px;margin:0 auto 12px;"><strong>Ticker note:</strong> Block traded as <strong>SQ</strong> until January 2025 and as <strong>XYZ</strong> thereafter. The price series is continuous through the change, so <strong>all monthly chart points before January 2025 are SQ-era prices</strong> for the same security. <strong>No chart months were reconstructed or interpolated</strong> — all 60 points are real month-end closes except the final point, which is the September 10, 2026 close standing in for an incomplete month. <strong>Items not verified and therefore omitted rather than estimated:</strong> global, US and NYSE market-cap ranks (companiesmarketcap.com returned 404 on the pages fetched); the entire Industry Avg and S&amp;P 500 comparison columns in Section 04; five-year S&amp;P 500 and NASDAQ-100 relative returns; FY2025 gross profit by segment; named institutional holders; bitcoin holdings quantities; consumer credit loss and reserve metrics; third-party TAM estimates for either segment; the exact Q3 2026 earnings date; and the dates attached to individual analyst calls. Items marked <strong>n/d</strong> are not disclosed by the company. Derived figures (H1 2026 bitcoin revenue share of gross profit, EV/adjusted operating income, price/FCF, the 5-year CAGR) are arithmetic on the sourced numbers and are labelled as such in the text. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (unadjusted "Real Price", digrin.com) =====
+// Pre-Jan-2025 points are SQ-era prices for the same security (ticker changed SQ -> XYZ in Jan 2025).
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [254.50,208.33,161.51,122.29,127.50,135.60,99.54,87.51,61.46,76.06,68.91,54.99,60.07,67.77,62.84,81.72,76.73,68.65,60.79,60.39,66.57,80.53,57.65,44.26,40.25,63.43,77.35,65.01,79.47,84.58,73.00,64.08,64.49,61.88,66.08,67.13,72.32,88.55,84.99,90.82,65.30,54.33,58.47,61.75,67.93,77.26,79.64,72.27,75.94,66.80,65.09,60.43,63.70,60.18,70.51,75.72,76.00,81.24,82.02,79.07];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — zero-rate peak $254.50 (as SQ)',        color: '#94a3b8' },
+  { idx: 24, label: 'Oct 2023 — cycle low $40.25 (−84.2%)',             color: '#ef4444' },
+  { idx: 37, label: 'Nov 2024 — $88.55, GAAP profitability re-rating',  color: '#22c55e' },
+  { idx: 39, label: 'Jan 2025 — ticker changes SQ → XYZ at $90.82',     color: '#3b82f6' },
+  { idx: 41, label: 'Mar 2025 — growth stall low $54.33 (−40.2%)',      color: '#ef4444' },
+  { idx: 52, label: 'Feb 2026 — 40%+ workforce cut announced $63.70',   color: '#f59e0b' },
+  { idx: 58, label: 'Aug 2026 — record 27% adj. op margin $82.02',      color: '#22c55e' },
+  { idx: 59, label: 'Sep 10, 2026 — $79.07 (current)',                  color: '#00D632' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(0,214,50,0.20)');
+grad.addColorStop(1, 'rgba(0,214,50,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#00D632', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#00D632'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
