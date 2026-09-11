@@ -36,17 +36,17 @@ def spots(a, b):
     out = ''
     import math
     for i in range(8):
-        th0 = math.radians(i * 45 - 9.5); th1 = math.radians(i * 45 + 9.5)
+        th0 = math.radians(i * 45 - 7.5); th1 = math.radians(i * 45 + 7.5)
         x0, y0 = 540 + 470 * math.sin(th0), 540 - 470 * math.cos(th0); x1, y1 = 540 + 470 * math.sin(th1), 540 - 470 * math.cos(th1)
-        out += '<path d="M %.2f %.2f A 470 470 0 0 1 %.2f %.2f" fill="none" stroke-width="140" stroke-linecap="round" stroke="%s"/>\n' % (x0, y0, x1, y1, a if i % 2 == 0 else b)
+        out += '<path d="M %.2f %.2f A 470 470 0 0 1 %.2f %.2f" fill="none" stroke-width="104" stroke-linecap="round" stroke="%s"/>\n' % (x0, y0, x1, y1, a if i % 2 == 0 else b)
     return out
 
-CHIPS = [  # value, surface gradient (centre, mid, edge), body (rim field) colours, spot colours, value text colour
-    (1,   ('#5A5468', '#3A3446', '#221E2B'), ('#3A3446', '#221E2B', '#120F17'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
-    (5,   ('#D2293F', '#B71E36', '#7A1122'), ('#8F1A2B', '#5C0F1B', '#2E0810'), ('#F1E6CF', '#0B0913'), '#F1E6CF'),
-    (25,  ('#2E8A5A', '#1F6E45', '#0F3F27'), ('#1B5A39', '#0F3F27', '#082116'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
-    (100, ('#2A2434', '#141020', '#06050B'), ('#1A1428', '#0B0913', '#06050B'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
-    (500, ('#6A3FB8', '#4B2A8A', '#2E1A66'), ('#3A2070', '#2E1A66', '#160B36'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
+CHIPS = [  # value, inlay gradient (centre, mid, edge), rim/body field (chip colour, darker toward the edge), edge-spot colours, value text colour
+    (1,   ('#6A6478', '#4A4458', '#2E2A38'), ('#5A5468', '#3A3446', '#221E2B'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
+    (5,   ('#D8334A', '#B71E36', '#8A1428'), ('#C42239', '#8F1A2B', '#5C0F1B'), ('#F1E6CF', '#0B0913'), '#F1E6CF'),
+    (25,  ('#2F9862', '#1F7A4D', '#145233'), ('#237A4E', '#175A38', '#0D3A24'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
+    (100, ('#2A2434', '#161120', '#08060E'), ('#1E1830', '#0E0B16', '#06050B'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
+    (500, ('#7A4CCB', '#5A339E', '#3B2170'), ('#5E38A8', '#452A80', '#2A1750'), ('#F1E6CF', '#D9A85C'), '#FFD57A'),
 ]
 
 def chip_svg(v, disc, body, spot, txtc):
