@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DHI — D.R. Horton, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4C9BE8;
+  --accent-dim: #4C9BE833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">DHI</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Residential Construction</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $37.9B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: ~#660 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#125 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">D.R. Horton, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$135.57</div>
+      <div class="price-change">−$3.36 (−2.42%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Friday Sep 11 was still trading when this page was built; no settled Sep 11 close is used anywhere.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1341 Horton Circle, Arlington, Texas</div>
+    <div class="meta-item"><span>Employees:</span> 14,341</div>
+    <div class="meta-item"><span>Founded:</span> 1978 (IPO June 5, 1992)</div>
+    <div class="meta-item"><span>Fiscal Year End:</span> September 30</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 29, 2026 (FY2026 Q4 &amp; full year)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose"><strong>A note on the calendar before anything else.</strong> D.R. Horton's fiscal year ends <strong>September 30</strong>, not December 31. When this page says "FY2025" it means the twelve months ended September 30, 2025. The most recently reported quarter, <strong>fiscal Q3 2026, ended June 30, 2026</strong> and was reported on July 21, 2026. Fiscal 2026 closes in roughly three weeks from the data date on this page and will be reported October 29. Every builder comparison in the sector suffers from this: Lennar's year ends in November, PulteGroup's and NVR's in December. Do not line up "2025" across four homebuilders and assume you are comparing the same weather.</p>
+  <p class="prose" style="margin-top:16px;">D.R. Horton is the largest homebuilder in the United States by volume and has been since 2002, building and selling homes in <strong>126 markets across 36 states</strong> under the D.R. Horton, Emerald Homes, Express Homes and Freedom Homes badges. It is not only a builder: it consolidates a majority-owned public land developer (<strong>Forestar Group, NYSE: FOR</strong>), runs a captive mortgage and title operation, and develops single-family and multi-family rental communities for sale to investors. <strong>FY2025 revenue was $34.25B, down 6.9%</strong> from $36.80B in FY2024, with net income of <strong>$3.59B</strong> and diluted <span class="tip" title="Earnings Per Share: net income divided by the average number of shares outstanding">EPS</span> of <strong>$11.57</strong>. On a <span class="tip" title="Trailing Twelve Months: the most recent four reported quarters combined">TTM</span> basis through June 30, 2026, revenue is <strong>$33.35B, down 3.5%</strong>, and EPS is <strong>$10.51, down 15.8%</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is simple to state and hard to resolve: <strong>how much of D.R. Horton's reported revenue is a real price, and how much is a rebate the company pays to make a mortgage payment work?</strong> The company sells a home at a listed price, then buys the buyer's mortgage rate down from roughly 6.5% to something in the 4.99%–5.5% range. That buydown is a real cash cost, it lands in cost of sales, and it is the single largest reason <strong>home sales gross margin has fallen from 30.1% in FY2022 to 20.7% in the June 2026 quarter</strong>. Volume is being defended; price realisation is being surrendered to defend it. Section 02 and Section 04 take apart how much that costs, and Section 08 asks whether a 12.9× earnings multiple on a peak-incentive earnings base is cheap or is a value trap.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Paul J. Romanowski</div>
+      <div class="card-note">President, CEO and Director. A long-tenure internal promotion in a company that promotes internally — he ran the South Central region before stepping up. On the Q3 FY2026 call he framed the quarter in one sentence: "Affordability constraints and cautious consumer sentiment continue to impact new home demand." Verified from stockanalysis.com's company profile and the Q3 FY2026 earnings call transcript.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Bill W. Wheat</div>
+      <div class="card-note">EVP and CFO — one of the longest-serving CFOs in the sector. He is the executive who quantifies the incentive load each quarter; on the Q3 FY2026 call he put mortgage rate buydowns at <strong>1.6%</strong>, down from 1.7% the prior quarter. Michael J. Murray is COO and David V. Auld (the prior CEO) is Executive Chairman.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Institutional Base</div>
+      <div class="card-value" style="font-size:20px;">279.7M shares</div>
+      <div class="card-note">Single share class, <strong>250.6M free float</strong>, no dual-class structure — public shareholders hold the votes as well as the economics. The share count is falling fast: <strong>14.6M shares repurchased for $2.2B in the first nine months of FY2026</strong>, taking shares outstanding down roughly 6% year over year. Specific institutional stakes were not verified from the sources fetched and are therefore not listed rather than estimated.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">D.R. Horton reports four segments: <strong>Homebuilding</strong>, <strong>Forestar</strong> (land development), <strong>Rental</strong>, and <strong>Financial Services</strong>. The bar below is the fiscal Q3 2026 (quarter ended June 30, 2026) segment revenue split <em>before</em> intersegment eliminations — the four segments sum to $9,584M while consolidated revenue was $9,227M, because Forestar sells finished lots to the Homebuilding segment and those sales are eliminated on consolidation. That $357M gap is itself informative: roughly <strong>88% of Forestar's lot output is absorbed internally</strong> by its own parent.</p>
+  <div class="seg-bar">
+    <div style="flex:90.7;background:#4C9BE8;">HOMEBUILDING 90.7%</div>
+    <div style="flex:4.2;background:#22c55e;">FORESTAR 4.2%</div>
+    <div style="flex:2.8;background:#f59e0b;">RENTAL 2.8%</div>
+    <div style="flex:2.3;background:#a78bfa;">FIN SVCS 2.3%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4C9BE8;"></span> Homebuilding — $8,690M (Q3 FY2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Forestar — $407.0M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Rental — $266.1M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Financial Services — $220.7M</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Pre-tax income tells a different story from revenue. Homebuilding earned <strong>$1.1B (12.3% margin)</strong>; Financial Services earned <strong>$70.3M on $220.7M of revenue — a 31.9% pre-tax margin</strong>, nearly three times the builder's. The mortgage arm is 2.3% of revenue and roughly <strong>5.6% of pre-tax profit</strong>. That is not a rounding error, and it is the part of the business least understood by people who call this "a homebuilder."</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4C9BE8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Homebuilding</div>
+        <span class="biz-badge dominant">#1 US BUILDER BY VOLUME — SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$8,690M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~flat</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~12% (est.)</div><div class="biz-stat-label">US New-Home Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">90.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The engine, and the whole cycle exposure. In fiscal Q3 2026 D.R. Horton <strong>closed 23,983 homes for $8.68B</strong> at an average selling price (<strong>ASP</strong> — total home sales revenue divided by homes closed) of about <strong>$362,000, down 2% year over year and flat sequentially</strong>. That ASP is the tell: D.R. Horton is deliberately the cheapest large builder in America, aimed squarely at the entry-level buyer. <strong>65% of its mortgage closings in the quarter were first-time homebuyers</strong> — the cohort with the least equity, the least income cushion, and by far the most sensitivity to a mortgage rate.<br><br><strong>The margin story is the story.</strong> Home sales gross margin was <strong>20.7%</strong> in the quarter, against 30.1% for all of FY2022. The gap is incentives. Management's own quantification: mortgage rate buydowns ran <strong>1.6% in Q3, down from 1.7% in Q2</strong> — the company is writing buyers into <strong>4.99%–5.5% mortgages against a ~6.5% market rate</strong>, and paying the difference out of gross margin. Two things pushed Q3 margin above its own guidance: incentives eased slightly, and <strong>stick-and-brick construction costs fell 5% year over year</strong> on framing labour and materials. Management guided Q4 FY2026 home sales gross margin to <strong>20.5%–21%</strong> — flat, not recovering.<br><br><strong>The orders line is where the caution sits.</strong> Net sales orders were <strong>23,084 homes for $8.4B</strong> in Q3 — <em>below</em> the 23,983 homes closed. A builder whose orders run below its closings is shrinking its backlog, and the backlog confirms it: <strong>15,983 homes worth $6.18B</strong> at June 30. The <strong>cancellation rate rose to 20% from 17%</strong> a year earlier. Romanowski said demand "softened mid-quarter" after tracking normal seasonality early, and guided Q4 starts <em>lower</em> than Q3. <strong>Community count grew 9% year over year</strong> and management expects that to moderate to mid-single digits — the land pipeline that drove the last three years of share gain is being throttled to match demand.<br><br><strong>Inventory discipline is the offsetting positive.</strong> D.R. Horton ended Q3 with <strong>38,000 homes in inventory (down 1% both sequentially and year over year), 23,300 of them unsold, 7,600 completed specs, and only 600 completed more than six months ago.</strong> For a speculative-build model in a softening market, 600 aged units out of 38,000 is genuinely tight. This is the single strongest operational number in the release and the main reason the company has not had to fire-sale.<br><br><strong>The land bank.</strong> <strong>126,600 lots owned and 441,900 controlled</strong> through options and purchase contracts — <strong>568,500 total</strong>, roughly 6.8 years of supply at the guided ~84,000 closings pace, with only about 1.5 years of it on balance sheet. Keeping four-fifths of the land under option rather than owned is the structural reason this builder can shrink fast without a writedown cycle. It is also what Forestar exists to make possible.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> US new single-family home sales run roughly 650–700k units annually in recent years (est. — not verified from a fetched source). D.R. Horton's guided FY2026 closings of <strong>83,800–84,300</strong> imply roughly a <strong>12–13% share of US new-home closings (est.)</strong>. The company does not disclose a market-share figure.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Lennar (LEN)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$19.15B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$32.74B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">−7.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">PulteGroup (PHM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$22.09B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$16.41B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">−7.3%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">NVR, Toll Brothers, Meritage</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Financial Services — Mortgage &amp; Title</div>
+        <span class="biz-badge growth">HIGHEST-MARGIN SEGMENT — 31.9% PRE-TAX</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$220.7M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$70.3M</div><div class="biz-stat-label">Q3 Pre-Tax Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">31.9%</div><div class="biz-stat-label">Pre-Tax Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">DHI Mortgage and the title operation originate and sell loans to D.R. Horton's own buyers, plus provide title insurance and closing services. Nine-month FY2026 revenue was <strong>$598.2M with $180.0M of pre-tax income — a 30.1% margin</strong>. Two things matter here. First, it is a <strong>capture business, not an origination business</strong>: its volume is a derivative of homes closed, so it does not diversify the cycle, it levers it. Second, and more subtly, <strong>it is the delivery mechanism for the incentive</strong>. The rate buydown that compresses homebuilding gross margin is executed through this captive lender. Investors who look at the 31.9% margin and see a clean fee annuity are looking at only one side of an internal transfer: the builder pays the points, the lender books the loan. The consolidated result is what counts, and the consolidated result is a 20.7% home sales gross margin.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> 65% of Q3 mortgage closings were first-time buyers. Captive-lender penetration rates were not disclosed in the sources fetched and are not estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Lennar Financial Services</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Pulte Mortgage</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Forestar Group — Land Development (majority-owned, consolidated)</div>
+        <span class="biz-badge emerging">SEPARATELY LISTED: NYSE: FOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$407.0M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">3,659</div><div class="biz-stat-label">Lots Sold (Q3)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.0%</div><div class="biz-stat-label">Pre-Tax Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">4.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Forestar is a publicly traded residential lot developer that D.R. Horton <strong>majority-owns and fully consolidates</strong> — its revenue, its debt and its inventory all appear in D.R. Horton's statements, with the minority stake backed out as non-controlling interest. (The exact ownership percentage was not verified from the sources fetched and is deliberately not stated.) The structure is elegant and slightly uncomfortable at the same time. <strong>Elegant</strong>, because it lets D.R. Horton convert raw land into finished lots off its own balance sheet and buy them back under option — which is precisely how 441,900 of its 568,500 lots stay <em>controlled</em> rather than <em>owned</em>, and why a downturn forces fewer impairments here than at a builder that banks its own dirt. <strong>Uncomfortable</strong>, because the majority of Forestar's output is sold to its own parent: the $357M of intersegment eliminations in Q3 against $407M of segment revenue implies roughly <strong>88% internal absorption</strong>. Forestar's standalone equity trades at a market cap of <strong>$1.38B on $1.72B of TTM revenue (+11.8%) and $170.4M of net income, at 8.1× earnings</strong> — a growing business inside a shrinking one, and the only part of the group posting double-digit revenue growth.</p>
+    <div class="biz-tam"><strong>Why it matters to a DHI holder:</strong> Forestar is the mechanism behind the 6.8-year land pipeline in Section 02 and behind the asset-light optionality in Section 03. Its nine-month FY2026 revenue was <strong>$1.1B with $113.4M of pre-tax income (10.8%)</strong>.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Forestar standalone (FOR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$1.38B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$1.72B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+11.8%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Private land developers</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Fragmented</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Rental — Single-Family &amp; Multi-Family Build-to-Sell</div>
+        <span class="biz-badge emerging">CYCLICAL RELIEF VALVE — LUMPY BY DESIGN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$266.1M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">940</div><div class="biz-stat-label">Units Sold (Q3)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.6%</div><div class="biz-stat-label">Pre-Tax Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">D.R. Horton builds rental communities — <strong>601 single-family and 339 multi-family units sold in Q3</strong> — and sells them whole to institutional investors. Revenue recognises on the sale of an entire community, which makes this the lumpiest line in the group: <strong>Q3 pre-tax margin was 11.6%, but the nine-month figure is only 7.4%</strong> ($43.5M on $587.4M). Strategically it is a shock absorber. When retail buyers cannot afford a 6.5% mortgage, an institutional buyer with a cost of capital and a rent roll still can, so the rental channel absorbs production that the retail channel will not take. The limit is the same limit: institutional bid for single-family rental portfolios is itself a function of financing costs. In a genuine rate shock, both channels close at once.</p>
+    <div class="biz-tam"><strong>Estimate flag:</strong> no TAM figure for the build-to-rent category was verified from the sources fetched, so none is stated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Institutional SFR buyers</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Counterparties</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Lennar Multifamily</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">SCALE PURCHASING</span>
+    <span class="moat-pill">OPTIONED LAND PIPELINE</span>
+    <span class="moat-pill">CAPTIVE MORTGAGE</span>
+    <span class="moat-pill">ENTRY-LEVEL PRICE POINT</span>
+    <span class="moat-pill">36-STATE GEOGRAPHIC SPREAD</span>
+    <span class="moat-pill">INVENTORY TURN DISCIPLINE</span>
+    <span class="moat-pill">FORTRESS BALANCE SHEET</span>
+  </div>
+  <p class="prose" style="margin-top:24px;"><strong>The core advantage is that D.R. Horton is the low-cost producer in a commodity business, and it has built the financing and land machinery to stay that way through a downturn.</strong> Three mechanisms do most of the work. First, <strong>scale in procurement</strong>: at roughly 84,000 homes a year it buys lumber, appliances, framing labour and trades at prices a regional builder cannot match — which is how stick-and-brick costs came down 5% year over year while the industry was complaining about input inflation. Second, <strong>land optionality</strong>: 441,900 of 568,500 lots are controlled rather than owned, largely via Forestar, so the balance sheet carries about 1.5 years of dirt rather than seven. In 2007–2009, land on the balance sheet is what killed builders; keeping it off is a structural lesson learned and applied. Third, <strong>the captive lender</strong>, which lets the company convert a price cut into a monthly-payment cut — a far more efficient way to spend a dollar on an entry-level buyer who is qualifying on payment, not on price. Add a <span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">debt-to-equity</span> ratio of <strong>0.29</strong>, a <strong>23.0% debt-to-total-capital ratio</strong>, <strong>$6.1B of total liquidity</strong> and only $600M of notes due within twelve months, and the company can survive a bad two years that would force weaker builders to liquidate inventory into its markets — which is, historically, exactly when D.R. Horton takes share.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>There is no moat against a mortgage rate.</strong> This is the vulnerability that dwarfs the others and it is not company-specific. D.R. Horton's buyer is qualifying on a monthly payment; the payment is set by a rate the company does not control. Its only defence is to buy the rate down out of gross margin, which it is doing at a cost management puts at 1.6% — and that defence has already taken home sales gross margin from 30.1% (FY2022) to 20.7% (Q3 FY2026). If the 30-year mortgage moves from ~6.5% to 7.5%, the buydown gets more expensive at exactly the moment order volume falls. Scale does not help here; it just makes the exposure bigger.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>The entry-level buyer is the most fragile buyer.</strong> 65% of Q3 mortgage closings were first-time buyers at a ~$362,000 average price. This cohort has no existing-home equity to roll into a down payment, the thinnest income buffer, and the highest sensitivity to unemployment. The <strong>cancellation rate rising from 17% to 20%</strong> is the early-warning instrument for exactly this, and it is already flashing. Toll Brothers' luxury buyer pays cash; D.R. Horton's buyer does not have that option.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Orders below closings means the backlog is a wasting asset.</strong> Q3 net sales orders of 23,084 were <em>below</em> 23,983 closings. Backlog stands at 15,983 homes / $6.18B — under one quarter of production. Builders with thin backlogs have very little visibility and very little pricing leverage; they build specs and then discount them. Management guiding Q4 starts <em>lower</em> than Q3 is the rational response, but it converts an operating problem into a revenue problem in the following fiscal year.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Community count growth is being switched off.</strong> Active selling communities grew 9% year over year, which is most of what kept closings flat while per-community absorption fell. Management has now guided that growth down to "mid-single digits" longer term. Community count is the volume lever a builder can actually control; throttling it protects margin and cash but removes the offset that has been masking soft demand in the reported closings line.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Ratios computed against the <strong>$135.57 close of Thursday September 10, 2026</strong>. "Industry Avg" is the large-cap public homebuilder group; where a peer figure was directly fetched (Lennar, PulteGroup) it is used, and where the group average is an approximation it is marked <strong>(est.)</strong>. The S&amp;P 500 column is marked (est.) throughout — no verified index-level figures were fetched, and these are included only as rough orientation.</p>
+  <div style="overflow-x:auto;">
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>DHI</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months">P/E</span></td><td style="color:var(--green);">12.90</td><td>~12.1 (est.)</td><td>~26 (est.)</td><td>$135.57 ÷ $10.51 TTM EPS. Roughly in line with Lennar (12.37) and PulteGroup (11.87), half the index. The question is not whether it is cheap — it is whether $10.51 is a normal earnings base or a peak-incentive one.</td></tr>
+      <tr><td>Forward <span class="tip" title="Share price divided by expected earnings per share over the next twelve months">P/E</span></td><td style="color:var(--green);">12.2</td><td>~11.5 (est.)</td><td>~23 (est.)</td><td>Consensus FY2026 EPS is $10.44, down 9.8% — so the forward multiple barely improves on the trailing one. This is the signature of a business whose earnings are still falling.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1 is conventionally 'cheap'.">PEG Ratio</span></td><td style="color:var(--red);">2.68</td><td>—</td><td>~2.0 (est.)</td><td>A low P/E on declining earnings produces a poor PEG. This single number is the cleanest rebuttal to "DHI is cheap at 13×".</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months">EPS (TTM)</span></td><td style="color:var(--red);">$10.51</td><td>—</td><td>—</td><td>Down 15.8% year over year. FY2025 was $11.57; FY2022 was $16.51. Earnings have fallen 36% from the 2022 peak while the share count fell ~6% a year.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--red);">−3.5%</td><td>~−7.3% (est.)</td><td>~+6% (est.)</td><td>TTM. Ugly in absolute terms, but the <em>best</em> of the big three: Lennar −7.4%, PulteGroup −7.3%. Share gain is real; it is just share of a shrinking pie.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of sales, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--amber);">21.30%</td><td>~21% (est.)</td><td>~35% (est.)</td><td>Consolidated TTM. The homebuilding-only figure — <strong>home sales gross margin of 20.7%</strong> in Q3 — is the number management guides and the Street models. It was 30.08% in FY2022.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">9.15%</td><td>~6.5% (est.)</td><td>~12% (est.)</td><td>Comfortably ahead of the peer group: Lennar's net income fell 50.4% and Pulte's 30.5% over the same TTM window against DHI's −23.0%. Being the low-cost producer shows up here.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">1.33%</td><td>~1.4% (est.)</td><td>~1.3% (est.)</td><td>$1.80 annualised ($0.45/quarter). Payout ratio 17.1% — trivially covered. The real capital return is the buyback, ~$2.5B guided for FY2026 versus ~$500M of dividends.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> / Float</td><td style="color:var(--green);">3.48% of shares<br>3.89% of float</td><td>~5% (est.)</td><td>~2% (est.)</td><td>Modest. Not a crowded short despite an unambiguously bad cycle — the market is treating this as a cyclical trough, not a solvency story.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--green);">0.29</td><td>~0.45 (est.)</td><td>~0.8 (est.)</td><td>$7.19B total debt, $2.08B cash, $6.1B liquidity, 23.0% debt-to-total-capital, only $600M due within twelve months. This balance sheet is built for a downturn.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--green);">6.01</td><td>~5 (est.)</td><td>~1.3 (est.)</td><td>Enormous, and largely an artefact of homebuilder accounting: 38,000 homes and 126,600 lots sit in current assets as inventory. Read it as "inventory-heavy", not "liquid" — the quick ratio is 0.42.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure — cash generated after maintaining the asset base">Free Cash Flow</span></td><td style="color:var(--green);">$3.20B</td><td>—</td><td>—</td><td>TTM, $11.45 per share — <em>above</em> GAAP EPS of $10.51. Builders generate cash when they shrink, because inventory liquidates. Guidance is ≥$3.0B operating cash flow for FY2026.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--amber);">12.63%</td><td>~11% (est.)</td><td>~19% (est.)</td><td>The company's own TTM figure is 12.8%, with homebuilding return on inventory of 17.0%. Down from the 20%+ printed in the 2021–2022 boom; this is mid-cycle-ish, not trough.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total capital employed in the business">ROIC</span></td><td style="color:var(--amber);">10.38%</td><td>~9% (est.)</td><td>~14% (est.)</td><td>Below ROE, the normal ordering for a modestly levered balance sheet. Around a plausible cost of capital — the business is creating value, but not dramatically, at this point in the cycle.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--red);">1.37</td><td>~1.4 (est.)</td><td>1.00</td><td>5-year. Homebuilders are a leveraged bet on the front end of the rate curve, and the chart in Section 07 shows the amplitude that produces.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$131.75 – $181.47</td><td>—</td><td>—</td><td>The $135.57 close sits just <strong>7.7% of the way up</strong> the range and within 2.9% of the 52-week low. 52-week price change: <strong>−21.59%</strong>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">D.R. Horton's fiscal 2026 accounts are, unusually for a cyclical, largely free of one-off distortions. No impairments, no acquisitions, no restructuring charges were disclosed in the fetched sources. What <em>is</em> distorting the per-share numbers is structural rather than exceptional, and runs in two directions.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The buyback is doing heavy lifting on EPS.</strong> In Q3 FY2026, revenue was flat year over year (+0.01%) and net income fell <strong>11.7% to $904.9M</strong> — but diluted EPS fell only <strong>4.8%, to $3.20 from $3.36</strong>. The difference is the share count: <strong>14.6M shares repurchased for $2.2B in nine months</strong> (4.2M for $615.7M in Q3 alone), taking shares outstanding down about 6% year over year to 280.7M. FY2026 guidance is ~$2.5B of repurchases — roughly <strong>6.6% of the current $37.9B market capitalisation</strong> — plus ~$500M of dividends. Total capital return of ~$3.0B is about <strong>7.9% of market cap</strong>. That is a genuine return of capital, funded by liquidating inventory in a downturn, and it is flattering the reported EPS decline by roughly seven percentage points a quarter. Strip it out and the underlying earnings deterioration is worse than the headline.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The incentive load is the real "non-recurring" item — and it may not be non-recurring.</strong> Mortgage rate buydowns quantified by the CFO at <strong>1.6% in Q3 (1.7% in Q2)</strong> are booked in cost of sales, not below the line, so they never appear as an adjustment. Jessica Hansen's framing on the call is worth reading precisely: incentives "remain elevated relative to historical levels" with only slight sequential improvement. If rates normalise, that 1.6% comes back to gross margin and the earnings base steps up materially. If they do not, this is simply the new cost of selling a home to a first-time buyer, and 20.7% is the normal margin — in which case there is nothing to add back and the current multiple is not a trough multiple at all.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Cost deflation is helping and management has flagged its expiry.</strong> Stick-and-brick costs fell 5% year over year on framing labour and materials. Hansen expects those savings to persist into Q4 and possibly early calendar 2027, but explicitly warned of "maybe a slight lumber headwind" later. That is a tailwind with a stated shelf life.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Book value:</strong> $84.85 per share at June 30, up 5% year over year. At $135.57 the stock trades at <strong>1.60× book</strong> — worth holding in mind, because homebuilders have historically traded below book at genuine cycle troughs.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">18 analysts (stockanalysis.com). MarketBeat's 15-analyst panel also reads "Hold". Rare unanimity of ambivalence across two panels.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$162.92</div><div class="card-note"><strong>+20.2%</strong> versus the $135.57 close. MarketBeat's panel averages $166.08. Median target is $157.50 (+16.2%) — the mean is dragged up by one outlier.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$125 – $206</div><div class="card-note">−7.8% to +51.9%. Note the asymmetry: the low target is barely below today's price, the high is more than 50% above. The Street's disagreement is about the upside case, not about downside risk.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">4 / 13 / 1</div><div class="card-note">4 Strong Buy, 0 Buy, 13 Hold, 1 Sell, 0 Strong Sell. A 72% Hold weighting on the largest company in its industry is an unusual amount of fence-sitting.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:4;background:var(--green);"></div>
+    <div style="flex:0.01;background:#4ade80;"></div>
+    <div style="flex:13;background:var(--amber);"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 4</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 0</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 13</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:8px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Wells Fargo</strong> — Sam Reid, <strong>Equal Weight</strong>, price target cut $170 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$155</span> (Aug 4, 2026). The most recent action on the tape and it is a reduction, taken two weeks after the Q3 print rather than on the day — the shape of an analyst who went back through the order book and did not like what he found.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>KBW</strong> — Jade Rahmani, <strong>Market Perform</strong>, target cut $175 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$167</span> (Jul 22, 2026). Cut the day after earnings, and still 23% above the current price — the neutral rating and the above-market target together say "good company, wrong part of the cycle."</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Goldman Sachs</strong> — Susan Maklari, <strong>Buy</strong>, reiterated (Jul 21, 2026). Price target not captured on the fetched page. One of the four Buy seats on an eighteen-analyst panel.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>BTIG Research</strong> — target set at <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$184</span> (Jul 22, 2026); rating not captured on the fetched page. Near the top of the published range at +35.7% from the current price.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Barclays</strong> — Matthew Bouley, <strong>Equal Weight</strong>, target nudged $140 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$141</span> (Jul 14, 2026). The most bearish published target of the group, and the only one within a few percent of where the stock actually trades. <strong>Citigroup</strong>'s Anthony Pettinari and <strong>RBC</strong>'s Mike Dahl both reiterated neutral-toned views on July 22; neither target was captured on the fetched page and neither is stated here.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read off a fetched MarketBeat price-target page for DHI. Where a firm's rating or target was not visible on that page it is marked "not captured" rather than inferred. Note the pattern: of the five actions with a target, <strong>two were cuts, one was a one-dollar increase, and the two constructive marks came from firms that did not publish a revised number on the fetched page</strong>. The average target of $162.92 implies 20% upside, but the <em>recent direction of revisions is downward</em> — a gap worth respecting.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q3 2026 results — margin beat, demand miss</div>
+        <div class="tl-desc">Revenue $9,227M (flat YoY), net income $904.9M (−11.7%), diluted EPS $3.20 (−4.8%). Home sales gross margin of <strong>20.7% beat guidance</strong> on lower stick-and-brick costs and slightly lower incentives. But net sales orders of 23,084 came in <em>below</em> 23,983 closings, the cancellation rate rose to 20% from 17%, and management guided Q4 starts lower. Dividend held at $0.45.</div>
+        <div class="tl-impact neutral">Mixed — margins beat, orders disappointed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Guidance: home sales gross margin 20.5%–21%, starts below Q3</div>
+        <div class="tl-desc">Management guided the September quarter's margin to be "relatively flat" versus Q3 — explicitly <em>not</em> a recovery. Starts are guided lower sequentially though above the prior-year Q4, when starts were deliberately suppressed. The important number to watch is not the margin, it is whether net sales orders close the gap to closings.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal year end — FY2026 guidance: $32.5–33.0B revenue, 83,800–84,300 closings</div>
+        <div class="tl-desc">Updated at the Q3 print. Against FY2025's $34.25B, the midpoint implies a <strong>~4.4% revenue decline</strong> — the second consecutive down year. Operating cash flow guided to ≥$3.0B, share repurchases ~$2.5B, dividends ~$500M, tax rate ~25.0%. The cash guidance is the part of this that is not cyclical: a shrinking builder liquidates inventory into cash.</div>
+        <div class="tl-impact down">Second consecutive revenue decline</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q4 &amp; full-year FY2026 results — plus the first FY2027 guide</div>
+        <div class="tl-desc">The single most important date on this page. D.R. Horton typically frames the next fiscal year at this print, and management gave the Street almost nothing on FY2027 during the July call beyond a target of lifting inventory turns toward <strong>3× from a historical 2×</strong>. Consensus already models FY2026 EPS of $10.44; the FY2027 frame is what the current 12.9× multiple is actually discounting.</div>
+        <div class="tl-impact neutral">Highest-impact scheduled event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">The 30-year mortgage rate — the only variable that really matters</div>
+        <div class="tl-desc">Management is writing buyers into <strong>4.99%–5.5%</strong> mortgages against a market rate around <strong>6.5%</strong>, absorbing the difference. Every 50bp move in the market rate moves both the cost of that buydown and the size of the qualified buyer pool, in the same direction, at the same time. There is no scheduled date for this catalyst and no company action that can substitute for it.</div>
+        <div class="tl-impact neutral">Dominant macro variable</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Continuous</div>
+      <div class="tl-content">
+        <div class="tl-title">~$2.5B buyback running against a $37.9B market cap</div>
+        <div class="tl-desc">At the FY2026 guided pace the company is retiring roughly 6.6% of its equity a year, at an average price well below the 52-week high. If earnings merely stabilise, the per-share arithmetic compounds in the holder's favour without any operational improvement. This is the quiet bull case and it requires nothing from the housing market except that it not get materially worse.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">DHI — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (unadjusted)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#4C9BE8;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal — a cheap stock can stay oversold for a long time, and a homebuilder in a rate cycle usually does.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 month-end close of <strong>$89.27</strong> to the September 10, 2026 close of <strong>$135.57</strong>, DHI has returned <strong>+51.9%</strong> in price — a compound annual rate of about <strong>8.7%</strong>, before a dividend that has run near 1% of price throughout. That is a respectable five-year number and it completely disguises the path. The stock fell <strong>39%</strong> from the December 2021 close of $108.45 to the June 2022 close of $66.19 as the Federal Reserve began raising rates. It then rose <strong>188%</strong> from that trough to the September 2024 close of <strong>$190.77</strong> — the cycle peak, printed in the month of the first rate cut, which is exactly when a rate-sensitive stock tops. From there it fell <strong>38%</strong> to the May 2025 close of $118.06, rallied back to $169.48 by August 2025, and has been chopping in a $135–$163 band ever since. The most recent leg is a <strong>−16.8% decline from the June 2026 close of $162.88</strong>, and the $135.57 close sits <strong>28.9% below the September 2024 peak</strong>.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A verified total-return comparison against the S&amp;P 500 over the identical five-year window was not obtained from the sources fetched and is therefore not stated — nor is a NASDAQ-100 comparison. What <em>can</em> be verified is the relative position within the homebuilder group over the last twelve months, and it favours D.R. Horton: its market capitalisation is down <strong>27.8%</strong> year over year, against <strong>−46.2% for Lennar</strong> and <strong>−18.1% for PulteGroup</strong>. On the price line, DHI's 52-week change is <strong>−21.59%</strong>. The group is being repriced together, and the ordering is what you would expect from margin resilience: PulteGroup (higher-priced, move-up-weighted buyer) held up best, D.R. Horton second, Lennar — which chased volume hardest and saw net income fall 50.4% — worst. With a beta of 1.37 and an S&amp;P 500 that has not fallen 20% over this window, DHI has clearly underperformed the index; the magnitude is deliberately left unquantified rather than estimated.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">$108.45 — the free-money peak</div><div class="tl-desc">The last month before the rate cycle turned. FY2022 would go on to produce the best numbers in the company's history — $16.51 EPS on a 30.08% gross margin — and the stock topped before a single one of them was reported. Homebuilders discount the rate, not the earnings.</div><div class="tl-impact neutral">Cycle top on fundamentals still improving</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">$66.19 — rate-shock trough, −39.0% in six months</div><div class="tl-desc">Five straight down months as the 30-year mortgage roughly doubled. At $66.19 the stock traded near book value on peak earnings — the market pricing not a slowdown but a 2008 repeat.</div><div class="tl-impact down">Maximum rate panic</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2023</div><div class="tl-content"><div class="tl-title">$151.98 — the pivot rally, +130% off the June 2022 low</div><div class="tl-desc">The single largest month of the five-year window. The Fed signalled the end of hikes, and every rate-sensitive asset re-rated. Note that FY2023 earnings ($13.82) were <em>below</em> FY2022's — the move was entirely multiple expansion on an expected rate path.</div><div class="tl-impact up">Multiple expansion, not earnings</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">$190.77 — five-year high, in the month of the first cut</div><div class="tl-desc">The textbook outcome: the stock peaked as the easing everyone had positioned for actually arrived. Mortgage rates did not follow the policy rate down, incentives kept climbing, and the fundamentals rolled over from here. Every month since has been below this close.</div><div class="tl-impact down">Sell-the-news top</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">$118.06 — affordability trough, −38.1% from the peak</div><div class="tl-desc">Eight months of near-continuous decline as it became clear that long rates were not going to cooperate and that the buydown cost was permanent, not transitional. FY2025 would close with revenue down 6.9% and gross margin down another 205bp.</div><div class="tl-impact down">The incentive-load repricing</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug–Sep 2025</div><div class="tl-content"><div class="tl-title">$169.48 / $169.47 — a 44% four-month rally that stalled</div><div class="tl-desc">A sharp relief rally on renewed easing hopes that took the stock back to within 11% of the 2024 high, then failed twice at the same level in consecutive months. That double top has capped every rally since.</div><div class="tl-impact up">Relief rally, rejected at resistance</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">$162.88 — the last local high before the Q3 print</div><div class="tl-desc">The third failed approach to the $163–$170 zone. The July 21 earnings release — margins beating but orders below closings and cancellations at 20% — broke it, and July closed at $143.06.</div><div class="tl-impact down">Third rejection at the same level</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 10, 2026</div><div class="tl-content"><div class="tl-title">$135.57 — 2.9% above the 52-week low of $131.75</div><div class="tl-desc">A −2.42% session on the day. The stock is now 28.9% below the September 2024 peak, at 1.60× book, on 12.9× trailing earnings that are themselves down 36% from the FY2022 record. Monthly RSI is in the lower half of its range without being washed out.</div><div class="tl-impact down">Testing the lows</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Start with the arithmetic of a home sale, because everything else follows from it.</strong> D.R. Horton sold 23,983 homes in its June 2026 quarter at an average of <strong>$362,000</strong>, generating $8.68B of home sales revenue and <strong>20.7% of gross margin</strong>. That means roughly <strong>$287,000 of direct cost per home</strong> and about <strong>$75,000 of gross profit</strong>. From that $75,000, SG&amp;A of $720.6M across the quarter takes roughly <strong>$30,000 per home</strong>, leaving homebuilding pre-tax income of $1.1B, or about <strong>$45,800 per home</strong> at a 12.3% segment margin. Now insert the incentive: at a buydown cost management puts at <strong>1.6%</strong>, the company is spending on the order of <strong>$5,800 per home</strong> purely to move a buyer's mortgage rate from ~6.5% to the 4.99%–5.5% range. That is roughly <strong>13% of the pre-tax profit on every house</strong>, handed back at the closing table, and it does not appear as an adjustment anywhere in the income statement.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The gross-margin bridge is the whole valuation argument.</strong> FY2022: 30.08% gross margin, $16.51 EPS. FY2025: 22.52%, $11.57. Q3 FY2026: home sales gross margin 20.7%, TTM EPS $10.51. That is <strong>940 basis points of margin and 36% of earnings, gone in four fiscal years</strong>, on volume that is only modestly lower. Nearly all of the decline is price realisation surrendered to keep the volume. So the question a buyer at $135.57 is really answering is: <em>is 20.7% the floor of a cycle or the new normal?</em> If it is a floor and margin reverts even halfway to FY2023's 25.13%, earnings power is well north of $14 per share and the stock is trading under 10× a normalised number. If 20.7% is what selling entry-level homes in a 6.5%-mortgage world simply costs, then $10.44 of FY2026 consensus EPS is the base, 13× is an ordinary multiple for a cyclical at mid-cycle, and there is no discount at all. Management guiding Q4 to <strong>"relatively flat" at 20.5%–21%</strong> is a vote for the second reading over the next two quarters at least.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 1 — the demand signals are deteriorating faster than the margin signals.</strong> Three numbers, all from the same July release, all pointing the same way. Net sales orders of <strong>23,084 were below 23,983 closings</strong>, so the company sold less than it delivered and the backlog shrank to <strong>15,983 homes / $6.18B</strong> — under one quarter of production. The <strong>cancellation rate rose to 20% from 17%</strong>. And management guided <strong>Q4 starts lower than Q3</strong>. Against that, <strong>community count grew 9% year over year</strong>, which means per-community absorption fell by <em>more</em> than the flat closings line suggests — and management has now guided community growth down to mid-single digits. The margin beat in Q3 was real, but it came from cost deflation (stick-and-brick −5%) with a stated expiry date, not from demand.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 2 — the inventory and land position is genuinely excellent, and that is the reason to take the bull case seriously.</strong> <strong>38,000 homes in inventory, down 1% both sequentially and year over year. 23,300 unsold. 7,600 completed specs. Only 600 completed more than six months ago.</strong> A speculative builder with 1.6% of its inventory aged past six months in a demonstrably softening market is running a tight ship. On land: <strong>126,600 lots owned against 441,900 controlled</strong> — about 1.5 years of owned supply inside a 6.8-year total pipeline. The 2006–2009 builder failures were balance-sheet failures caused by owned land, and D.R. Horton has structurally engineered that exposure away, largely through Forestar. Combine that with <span class="tip" title="Total debt divided by shareholders' equity">debt-to-equity</span> of <strong>0.29</strong>, a 23.0% debt-to-total-capital ratio, <strong>$6.1B of liquidity</strong> and $600M of near-term maturities, and the downside here is an earnings problem, not an existence problem.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 3 — cash generation inverts in a downturn, and the buyback is exploiting it.</strong> Trailing <span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure">free cash flow</span> is <strong>$3.20B, or $11.45 per share — above GAAP EPS of $10.51</strong>. That is not an accounting artefact; it is what happens when a builder stops replacing inventory as fast as it sells it. FY2026 guidance is <strong>≥$3.0B of operating cash flow, ~$2.5B of buybacks and ~$500M of dividends</strong> — a combined <strong>7.9% of market capitalisation returned in one year</strong>. Nine-month repurchases of 14.6M shares for $2.2B have already cut the count about 6% year over year, which is why Q3 EPS fell only 4.8% while net income fell 11.7%. Cut both ways: this is a real, compounding benefit to a patient holder, <em>and</em> it is currently disguising how fast underlying profitability is eroding.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Thread 4 — Forestar and the mortgage arm are not diversification.</strong> It is tempting to treat the four segments as a portfolio. They are not. Forestar's lots are ~88% absorbed by D.R. Horton itself; Financial Services originates loans exclusively for D.R. Horton's buyers and is the vehicle through which the margin-destroying buydown is delivered; Rental sells to institutions whose bid is set by the same financing costs that set the retail buyer's payment. <strong>All four segments are levered to one variable.</strong> The 31.9% pre-tax margin in Financial Services and the 12.0% at Forestar look like earnings diversity on a segment table and are, in economic substance, the same bet expressed three more times.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Valuation, stated plainly.</strong> At $135.57: <strong>12.90× trailing EPS of $10.51</strong>; <strong>~12.2× forward</strong>; <strong>1.60× book value of $84.85</strong>; <strong>10.45× EV/EBITDA</strong> on a $43.74B enterprise value; <strong>11.8× trailing free cash flow</strong> of $11.45 per share; a <strong>1.33% dividend yield</strong> on a 17.1% payout, with another ~6.6% of market cap coming back via buyback. Against a homebuilder peer set at 11.9–12.4× earnings, DHI is not cheap relative to its industry — it is <em>in line</em>, with better margins and a better balance sheet, at a modest premium to the two large peers whose earnings fell far harder. The <span class="tip" title="Price/Earnings-to-Growth: P/E divided by expected earnings growth">PEG</span> of <strong>2.68</strong> is the honest counterweight to the low headline multiple: you are not paying 13× for growth, you are paying 13× for a decline. The 52-week range is decisive on positioning — at <strong>7.7% of the way up a $131.75–$181.47 range</strong>, the market has already marked this down a long way. Whether that is opportunity or information depends entirely on the answer to the gross-margin question above.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The largest, lowest-cost builder in America is trading at 12.9× earnings and 1.60× book with a fortress balance sheet (0.29 debt-to-equity, $6.1B liquidity, 23% debt-to-total-capital) and is returning <strong>7.9% of its market cap in a single year</strong> through a ~$2.5B buyback and ~$500M of dividends — funded by $3.2B of free cash flow that exceeds GAAP earnings. Operationally it is doing everything right into a bad market: 5% stick-and-brick cost deflation, only 600 aged specs out of 38,000 homes, 78% of its 568,500-lot pipeline controlled rather than owned, and a margin beat against its own guidance. Net income fell 23% over the TTM against Lennar's 50%. If the 30-year mortgage rate falls, the 1.6% buydown cost reverses straight back into gross margin and the earnings base steps up sharply — with a 6%-a-year smaller share count to divide it into.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Home sales gross margin has fallen from 30.1% to 20.7% in four years and management guides it flat, not recovering. Net sales orders are running <em>below</em> closings, backlog is under one quarter of production, cancellations have risen to 20% from 17%, starts are guided down, and community-count growth — the lever that kept closings flat — is being throttled to mid-single digits. Earnings are down 36% from the FY2022 peak and consensus has FY2026 falling another 9.8%; the 2.68 <span class="tip" title="P/E divided by expected earnings growth">PEG</span> says the low multiple is a decline, not a discount. All four segments are the same bet on one mortgage rate the company cannot influence, 65% of its buyers are first-timers with no equity cushion, the Street is 13-of-18 Hold with the two most recent target actions both cuts, and the stock sits 2.9% above its 52-week low at 1.60× book — well above the sub-book levels at which homebuilders have historically bottomed.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Mortgage rates stay at or above ~6.5%.</strong> This is the risk that contains all the others. The incentive load compressing gross margin exists only because the market rate is unaffordable to a buyer at a $362,000 price point; the buydown to 4.99%–5.5% is the bridge. If long rates hold or rise, the buydown gets more expensive per home at the same time the qualified buyer pool shrinks — margin and volume deteriorate together, which is precisely the combination that turns a 12.9× multiple into a 12.9× multiple on much lower earnings.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>The backlog runs out before demand returns.</strong> Orders below closings, a $6.18B / 15,983-home backlog worth less than a quarter of production, cancellations at 20%, and guided-down starts together mean fiscal 2027 revenue is being set right now by order intake that is deteriorating. Management guiding community growth down to mid-single digits removes the volume lever that masked soft absorption through fiscal 2026. Consensus already has FY2026 EPS down 9.8% to $10.44; the risk is that FY2027 is not the recovery year the average $162.92 price target implies.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Entry-level credit quality, if unemployment turns.</strong> 65% of mortgage closings are first-time buyers, the cohort with the least equity and the thinnest income buffer, financed through a captive lender that also carries the buydown cost. A rise in unemployment would hit cancellations, spec absorption and Financial Services profitability simultaneously — and would do so in the one segment mix where D.R. Horton has no move-up or luxury business to cushion the blow, unlike Toll Brothers or the higher-priced end of PulteGroup's book.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The Payment, Not the Price, Is the Product</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">American homebuilders have spent four years discovering that they no longer sell houses — they sell monthly payments. When the 30-year mortgage sits near <strong>6.5%</strong> and the entry-level buyer qualifies on payment rather than price, a builder has two choices: cut the sticker, or buy the rate down. Cutting the sticker impairs the value of every unsold home in the same community and every lot behind it. Buying the rate down is invisible to the comparables and shows up only in gross margin. The entire industry has chosen the second, which is why <strong>D.R. Horton's home sales gross margin fell from 30.08% (FY2022) to 20.7%</strong> while its average selling price fell just 2% year over year to $362,000. The industry did not cut prices; it cut margins and called it an incentive. Watch the buydown percentage, not the ASP — it is the only place the real price cut is visible, and at D.R. Horton it was <strong>1.6% in Q3, 1.7% in Q2</strong>.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Easing Arrived and Mortgage Rates Did Not Follow</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">The chart in Section 07 makes the sector's central disappointment unmissable: DHI's five-year monthly-close high of <strong>$190.77 was printed in September 2024</strong>, the month the first rate cut landed, and the stock has not closed above it in the twenty-four months since. Homebuilder equities discount the <em>path</em> of long rates, and they had already fully priced an easing cycle that the 30-year mortgage declined to deliver. Policy rates and mortgage rates are set in different places, and 2024–2026 has been an extended, expensive lesson in that distinction. Practically, it means a DHI holder should not treat a Fed cut as a catalyst — the relevant instrument is the 10-year Treasury and the mortgage spread over it, and both are set by bond investors who have their own view on inflation.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Scale Consolidation Inside a Shrinking Market</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">Every soft housing market in the last forty years has ended with the public builders larger than they started, because scale players can absorb a margin squeeze that bankrupts a regional builder. The evidence is already in the TTM numbers: revenue fell <strong>3.5% at D.R. Horton against 7.4% at Lennar and 7.3% at PulteGroup</strong>, while net income fell <strong>23.0% versus 50.4% and 30.5%</strong> respectively. D.R. Horton has added 30 new markets in five years and grown community count 9% year over year into a downturn — funded by 5% cost deflation, an optioned land pipeline and $6.1B of liquidity. <strong>Bull framing:</strong> the company is buying permanent share at the cost of two years of margin, and when rates eventually cooperate it will operate more communities at a higher margin with 6% fewer shares outstanding. <strong>Bear framing:</strong> share of a shrinking market is still shrinking revenue, and the market is currently paying 12.9× for the privilege — the same multiple it pays for Lennar, which is executing worse. There is no valuation reward for the better operator right now, which tells you the market is discounting the sector, not the company.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 10, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, valuation, statistics, financials and forecast data from stockanalysis.com (DHI overview, statistics, financials annual and quarterly, forecast, company profile and daily price-history pages, retrieved September 11, 2026). <strong>Price source URL: https://stockanalysis.com/stocks/dhi/history/</strong> — the $135.57 figure is the settled close for Thursday September 10, 2026; Friday September 11 was still trading when this page was built and no Friday figure is used anywhere. 60 monthly unadjusted "Real Price" closes from digrin.com DHI price history (October 2021 through August 2026), with the final September 2026 point replaced by the verified September 10, 2026 close of $135.57 so that the chart terminates at the header price; that final point is therefore a partial-month value and is labelled as such. No interior chart months were reconstructed or invented. Fiscal Q3 2026 operating metrics, segment results, land and inventory positions, capital returns, balance-sheet figures and FY2026 guidance from the D.R. Horton fiscal 2026 third-quarter earnings release (July 21, 2026) as published on businesswire.com; management commentary, incentive and buydown quantification, cost-deflation and community-count detail from the D.R. Horton Q3 FY2026 earnings call transcript (fool.com, July 22, 2026). Global market-cap context from companiesmarketcap.com. Named analyst calls, ratings and price targets from a fetched MarketBeat DHI price-target page and from stockanalysis.com's forecast page. Peer figures for Lennar (LEN), PulteGroup (PHM) and Forestar (FOR) from their stockanalysis.com overview pages.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source: this includes the entire Industry Avg and S&amp;P 500 comparison columns in Section 04, all three market-cap rank pills, the US new-home sales figure and the implied ~12–13% market share in Section 02. Items marked <strong>n/d</strong> or "not captured" are not disclosed by the company or were not visible on the pages fetched — including D.R. Horton's exact ownership percentage of Forestar, NVR/Toll Brothers/Meritage peer figures, captive-lender penetration rates, build-to-rent TAM, top institutional holders, and the price targets attached to the Goldman Sachs, Citigroup and RBC actions. No figure has been estimated silently. A quantified five-year total-return comparison against the S&amp;P 500 or the NASDAQ-100 could not be verified and is deliberately omitted rather than approximated. Note that D.R. Horton's fiscal year ends <strong>September 30</strong>: all "FY" references on this page are fiscal, and fiscal Q3 2026 is the quarter ended June 30, 2026. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Oct 2021 – Aug 2026 are unadjusted month-end "Real Price" closes (digrin.com).
+// The final point (Sep 2026) is the verified Sep 10, 2026 settled close of $135.57 — a partial month.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [89.27,97.70,108.45,89.22,85.40,74.51,69.59,75.15,66.19,78.03,71.15,67.35,76.88,86.00,89.14,98.69,92.48,97.69,109.82,106.84,121.69,127.02,119.02,107.47,104.40,127.67,151.98,142.91,149.44,164.55,142.49,147.80,140.93,179.93,188.76,190.77,169.00,168.78,139.82,141.90,126.81,127.13,126.34,118.06,128.92,142.84,169.48,169.47,149.08,159.01,144.03,148.84,160.39,137.22,153.86,147.09,162.88,143.06,144.56,135.57];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 2,  label: 'Dec 2021 — free-money peak $108.45',              color: '#94a3b8' },
+  { idx: 8,  label: 'Jun 2022 — rate-shock trough $66.19 (−39.0%)',    color: '#ef4444' },
+  { idx: 26, label: 'Dec 2023 — Fed pivot rally $151.98',              color: '#22c55e' },
+  { idx: 35, label: 'Sep 2024 — 5-yr high $190.77, month of 1st cut',  color: '#f59e0b' },
+  { idx: 43, label: 'May 2025 — affordability trough $118.06',         color: '#ef4444' },
+  { idx: 47, label: 'Sep 2025 — double top at $169.47',                color: '#3b82f6' },
+  { idx: 56, label: 'Jun 2026 — third rejection $162.88',              color: '#3b82f6' },
+  { idx: 59, label: 'Sep 10 2026 — $135.57, near 52-wk low',           color: '#ef4444' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(76,155,232,0.22)');
+grad.addColorStop(1, 'rgba(76,155,232,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4C9BE8', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4C9BE8'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
