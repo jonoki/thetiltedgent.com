@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NTAP — NetApp, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3FA9F5;
+  --accent-dim: #3FA9F533;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">NTAP</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software — Infrastructure</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> ~$36.1B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #727</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#300 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#130 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">NetApp, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$183.60</div>
+      <div class="price-change">−$1.14 (−0.62%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Prior close (Sep 9): $184.74 · after-hours quote not used</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 3060 Olsen Drive, San Jose, California</div>
+    <div class="meta-item"><span>Employees:</span> 11,700</div>
+    <div class="meta-item"><span>Founded:</span> 1992</div>
+    <div class="meta-item"><span>Fiscal Year End:</span> Late April (FY2027 ends Apr 2027)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q2 FY2027, late November 2026 (est. — date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">NetApp sells enterprise data storage and the software that runs it — ONTAP, the operating system underneath its arrays, plus all-flash storage systems, object storage, and first-party cloud storage services sold inside AWS, Azure and Google Cloud. <strong>Fiscal 2026, which ended in late April 2026, produced $6.925B of revenue, up 5.4%</strong> from $6.572B in FY2025 — a perfectly ordinary number for a company that had grown revenue a cumulative 9.6% across the four years to FY2026. Then the first quarter of fiscal 2027, ended July 31, 2026, printed <strong>$2.025B, up 29.9% year over year</strong>. The trailing-twelve-month figure is now <strong>$7.39B, up 12.2%</strong>, and the company ranks roughly <strong>#727 globally by market capitalisation</strong> at about $36.1B.</p>
+  <p class="prose" style="margin-top:16px;">Fiscal-versus-calendar matters more here than at most companies, and this page is explicit about it throughout: NetApp's fiscal year ends in <strong>late April</strong>, so "FY2026" is mostly calendar 2025, and the blowout quarter described above is <em>fiscal</em> Q1 2027 covering May–July 2026. Fiscal 2027 is also a <strong>53-week year</strong>, and the extra week sits in Q1 — management flagged that public cloud grew 28% reported but <strong>19% adjusting for the extra week</strong>, and support revenue 11% reported but <strong>4% adjusted</strong>. The central debate of this report is therefore narrow and testable: how much of a 30% revenue quarter and a share price that has roughly doubled off its March 2025 low is a durable AI-infrastructure re-rating, and how much is a 53-week calendar, a NAND-cost-driven pricing cycle, and a balance sheet levered by two decades of buybacks into flattering return ratios.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">George Kurian</div>
+      <div class="card-note">CEO since 2015. Verified as CEO on the fiscal Q1 2027 earnings call (Sept 2026) and on the stockanalysis.com company profile. He is the executive who steered the pivot from spinning-disk filers to all-flash and to first-party cloud services — the two lines now carrying the story.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Wissam Jabre</div>
+      <div class="card-note">CFO, verified as present and speaking on the fiscal Q1 2027 earnings call. He owns the billings-versus-revenue framing, the non-GAAP operating-margin guide (30.3%–31.3% for FY2027), and the disclosure that product gross margin fell 150bps sequentially on component costs.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Index Membership</div>
+      <div class="card-value" style="font-size:20px;">Not in NDX</div>
+      <div class="card-note"><strong>Verified:</strong> NTAP does <strong>not</strong> appear on the current Nasdaq-100 constituent list, despite its Nasdaq listing — so the NASDAQ-100 is not the right benchmark here. NetApp is an S&amp;P 500 constituent and the S&amp;P 500 is used as the benchmark index throughout. Specific institutional holder stakes were not retrievable from the sources fetched (the holders page returned 404) and are therefore not listed rather than estimated.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">NetApp reports two segments — <strong>Hybrid Cloud</strong> (everything sold to run in a customer's own data centre or colo: storage systems, ONTAP software, support contracts, professional services) and <strong>Public Cloud</strong> (first-party and marketplace storage services consumed inside AWS, Azure and Google Cloud). The proportional bar below is the verified fiscal Q1 2027 split, the most recent reported quarter.</p>
+  <div class="seg-bar">
+    <div style="flex:89.8;background:#3FA9F5;">HYBRID CLOUD 89.8%</div>
+    <div style="flex:10.2;background:#a78bfa;">PUBLIC 10.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3FA9F5;"></span> Hybrid Cloud — $1,819M (fiscal Q1 2027)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Public Cloud — $206M (fiscal Q1 2027)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">A second, more analytically useful cut is by revenue <em>type</em>. On a trailing-twelve-month basis through July 2026: <strong>Product $3.53B (47.8%)</strong>, <strong>Support $2.71B (36.6%)</strong>, <strong>Public Cloud $733M (9.9%)</strong>, <strong>Professional &amp; other services $422M (5.7%)</strong>. The product-versus-support mix is the single most important thing on this page and is taken apart in the two cards below.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #3FA9F5;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Hybrid Cloud — Product (Systems &amp; Software)</div>
+        <span class="biz-badge dominant">ALL-FLASH IS THE ENGINE — SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$987M</div><div class="biz-stat-label">Q1 FY27 Product Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+47%</div><div class="biz-stat-label">All-Flash Rev YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">47.8%</div><div class="biz-stat-label">TTM Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The cyclical half of NetApp. <strong>All-flash array (AFA) revenue was $1,309M in fiscal Q1 2027, up 47% year over year</strong> — an <strong>annualised revenue run-rate of roughly $5.2B</strong> (4 × the quarter; NetApp's own headline run-rate metric was not separately quoted on the pages fetched, so this is a derived figure and should be read as such). All-flash plus public cloud together are now <strong>about 75% of total revenue</strong>, which is the clearest single statement of how far the mix has moved away from legacy spinning-disk hybrid systems. The bull framing is AI: management cited roughly <strong>350 AI and data-lake modernisation deals</strong> closed in the quarter, with deal sizes rising as customers move from proof-of-concept to production. The margin framing is less comfortable. <strong>Product gross margin was 54.6%, down 150 basis points sequentially, "mainly driven by higher component costs"</strong> — NAND flash pricing is in an up-cycle, and NetApp buys it. A memory-cost squeeze that persists compresses exactly the line that is growing fastest.</p>
+    <div class="biz-tam"><strong>Category size:</strong> external enterprise-storage TAM estimates were not verified from the sources fetched and are omitted rather than guessed. All-flash run-rate above is derived from the disclosed quarterly figure.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Dell Technologies (DELL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$359.1B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$151.2B</div><div class="comp-bubble-label">Rev TTM (all Dell)</div></div>
+          <div><div class="comp-bubble-val">+49.0%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Pure Storage (PSTG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$32.4B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$4.26B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+27.2%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">HPE / IBM / Huawei</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Storage Rev</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--green);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Hybrid Cloud — Support &amp; Professional Services</div>
+        <span class="biz-badge growth">HIGH-MARGIN, STICKY, RECURRING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$720M</div><div class="biz-stat-label">Q1 FY27 Support Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11% / +4%</div><div class="biz-stat-label">YoY Rptd / Ex-Extra Week</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$4.85B</div><div class="biz-stat-label">Deferred Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">36.6%</div><div class="biz-stat-label">TTM Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the line that makes NetApp's 70%+ blended gross margin possible, and it deserves to be said plainly: <strong>support revenue is high-margin and sticky</strong>. Support contracts attach to an installed base of arrays that a customer has already bought, already integrated, and cannot cheaply rip out; renewal is close to the default outcome, and the incremental cost of servicing an existing contract is a fraction of the revenue. With <strong>product gross margin at 54.6%</strong> and <strong>blended gross margin at 70.1% GAAP / 70.6% non-GAAP</strong>, the arithmetic tells you the services mix is carrying tens of points of margin. <strong>Deferred revenue of $4,846M (up 7% YoY)</strong> and <strong>remaining performance obligations of $5.65B (up 14%)</strong> are the forward book — they are what a support annuity looks like on a balance sheet. Add <strong>professional and other services of $112M</strong> in the quarter and the recurring, non-cyclical half of NetApp is roughly 42% of trailing revenue. The caveat is growth: ex the 53rd week, support grew <strong>4%</strong>. It is ballast, not a growth engine, and it only compounds if product keeps shipping boxes into the installed base.</p>
+    <div class="biz-tam"><strong>Why it matters:</strong> the same mix that caps NetApp's growth rate is what lets it earn 70% gross margins and convert ~$1.65B of trailing free cash flow on $7.39B of revenue.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Public Cloud</div>
+        <span class="biz-badge emerging">SMALLEST SEGMENT — STRATEGICALLY THE MOST IMPORTANT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$206M</div><div class="biz-stat-label">Q1 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+28% / +19%</div><div class="biz-stat-label">YoY Rptd / Ex-Extra Week</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$824M</div><div class="biz-stat-label">Annualised Run-Rate (derived)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.2%</div><div class="biz-stat-label">Q1 FY27 Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">First-party storage services sold as native offerings inside the hyperscalers (Azure NetApp Files, Amazon FSx for NetApp ONTAP, Google Cloud NetApp Volumes) plus marketplace and subscription products. Management attributed the quarter's growth to "strong demand for first-party and marketplace storage services." This is the segment the equity story is actually about: it is the proof that ONTAP is a <em>software</em> franchise that travels off NetApp's own hardware, rather than a reason to keep buying NetApp's own hardware. <strong>Note a disclosure gap:</strong> NetApp's public cloud <em>ARR</em> (annual recurring revenue) figure was not stated on any of the pages fetched for this report. The <strong>~$824M annualised run-rate above is derived</strong> by annualising the $206M quarter, and is not the same thing as the company's ARR metric — which excludes non-recurring elements and would normally be reported below this number. Treat it as a scale marker, not as NetApp's disclosed ARR. At roughly a tenth of revenue, this segment cannot yet move consolidated growth on its own; at 19% adjusted growth it also is not yet growing fast enough to become the whole company soon.</p>
+    <div class="biz-tam"><strong>Disclosure gap:</strong> public cloud ARR not captured from sources fetched. Run-rate shown is 4 × the reported quarter and is labelled derived.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Hyperscaler-native storage</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Pure Storage (Portworx/Cloud)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$32.4B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$4.26B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+27.2%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">ONTAP INSTALLED BASE</span>
+    <span class="moat-pill">FIRST-PARTY HYPERSCALER STATUS</span>
+    <span class="moat-pill">SUPPORT ANNUITY</span>
+    <span class="moat-pill">DATA-GRAVITY SWITCHING COSTS</span>
+    <span class="moat-pill">70% GROSS MARGIN STRUCTURE</span>
+    <span class="moat-pill">CHANNEL &amp; OEM REACH</span>
+    <span class="moat-pill">UNIFIED FILE + OBJECT + BLOCK</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">NetApp's moat is <strong>data gravity expressed through one piece of software</strong>. ONTAP is the storage operating system that enterprise teams have written runbooks, snapshot policies, replication topologies and compliance procedures around, sometimes for fifteen years. Migrating petabytes off it is not a purchasing decision, it is a multi-quarter project with an outage budget — which is why the support line renews at rates a hardware vendor has no business earning and why <strong>deferred revenue of $4.85B</strong> sits on a company with $7.39B of annual revenue. The genuinely differentiated asset, though, is the <strong>first-party relationship with all three major hyperscalers</strong>. Azure NetApp Files is not a NetApp product sold on a marketplace; it is a Microsoft-branded, Microsoft-billed service with NetApp technology inside. That is a position Dell and Pure have not replicated, and it converts the cloud from a pure threat into a distribution channel. The second-order effect is what makes the margin structure defensible: NetApp collects software-like economics (70.6% non-GAAP gross margin) on a business that superficially looks like it sells metal boxes at 54.6%.</p>
+  <p class="prose" style="margin-top:20px;">What the moat is <em>not</em> is protection against the cost of goods. The 150bp sequential fall in product gross margin, attributed directly to component costs, is the moat's clearest limit: ONTAP lock-in lets NetApp keep the customer, not escape the NAND market.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>NAND and memory cost inflation.</strong> Management said it plainly: product gross margin 54.6%, down 150bps sequentially, mainly on higher component costs. All-flash arrays are, by construction, a NAND pass-through business with a software margin layered on top. If flash pricing keeps rising through an AI-driven memory shortage, NetApp either eats the margin or raises prices into a competitive bid — and the fastest-growing 65% of product revenue is exactly the part exposed.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Cash conversion went the wrong way in a record quarter.</strong> Revenue grew 30% and billings 36%, but <strong>operating cash flow fell 25% to $503M and free cash flow fell 35% to $401M</strong>. Growth that consumes working capital — inventory pre-buys ahead of component inflation, receivables on larger AI deals — is normal, but it is also the mechanism by which a storage vendor books a great quarter and delivers a poor year of cash. This is the specific item that soured the market's reaction to an otherwise clean beat.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>A balance sheet hollowed out by buybacks.</strong> Total stockholders' equity is <strong>$1,495M against $10,955M of total assets</strong> — 13.6% — after two decades of repurchases. Equity is positive, so <span class="tip" title="Return on equity: net income divided by shareholders' equity. A very small equity base makes this number enormous without implying anything about operating quality.">ROE</span> and <span class="tip" title="Debt-to-equity: total debt divided by shareholders' equity. With a tiny denominator the ratio exaggerates real leverage.">debt-to-equity</span> are computable rather than n/m — but a <strong>114.8% ROE</strong> and a <strong>1.69× debt-to-equity</strong> on a company with <strong>$3.58B of cash against $2.53B of debt (net cash of $1.04B)</strong> are artefacts of the denominator, not statements about the business. See Section 04.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The 53rd week flatters everything.</strong> Fiscal 2027 has an extra week and it landed in Q1. Public cloud growth drops from 28% to 19% adjusted; support growth from 11% to 4%. Anyone anchoring a valuation on "30% growth" is anchoring on a number that contains a calendar artefact, and the comparison reverses in fiscal 2028.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">NTAP column from stockanalysis.com statistics, priced off the <strong>September 10, 2026 close of $183.60</strong>. <strong>Industry-average and S&amp;P 500 columns are shown as "—": no single verified source for them was fetched for this report, and the brief for this page forbids estimating them silently.</strong> Colour coding in the NTAP column therefore reflects a standalone read of the metric, not a comparison against those blank columns.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>NTAP</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Trailing <span class="tip" title="Price-to-earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past profit.">P/E</span></td>
+        <td style="color:var(--amber)!important;">25.9</td><td>—</td><td>—</td>
+        <td>$183.60 ÷ $7.09 TTM EPS. Not cheap for a 5%-growth-history hardware name; not expensive if fiscal 2027 guidance lands.</td>
+      </tr>
+      <tr>
+        <td>Forward <span class="tip" title="Forward P/E: share price divided by the consensus estimate of next year's earnings per share.">P/E</span></td>
+        <td style="color:var(--green)!important;">18.5</td><td>—</td><td>—</td>
+        <td>Against FY2027 consensus EPS of ~$10.01. The 7-turn gap between trailing and forward is the entire bull case in one number.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/earnings-to-growth: the P/E divided by the expected earnings growth rate. Below 1 is conventionally 'cheap for the growth'.">PEG</span> Ratio</td>
+        <td style="color:var(--amber)!important;">1.72</td><td>—</td><td>—</td>
+        <td>Above 1 — the market is paying a premium to the growth rate, which is defensible only if the 53rd-week-flattered growth persists.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share: net profit divided by shares outstanding.">EPS</span> (<span class="tip" title="Trailing twelve months: the most recent four reported quarters added together.">TTM</span>)</td>
+        <td style="color:var(--green)!important;">$7.09</td><td>—</td><td>—</td>
+        <td>Sum of the four quarters to July 2026 ($1.88 + $2.03 + $1.67 + $1.51). Up 25.2% <span class="tip" title="Year over year: compared with the same period one year earlier.">YoY</span>.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year over year: compared with the same period one year earlier.">YoY</span>)</td>
+        <td style="color:var(--green)!important;">+12.2%</td><td>—</td><td>—</td>
+        <td>TTM. The most recent quarter alone was +29.9%, against a five-year FY-average closer to 4%. Extra week included.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Gross margin: revenue minus the direct cost of the product or service, as a percentage of revenue.">Gross Margin</span></td>
+        <td style="color:var(--green)!important;">70.63%</td><td>—</td><td>—</td>
+        <td>Software-like for a systems vendor. Product alone is 54.6%; support and cloud carry the rest.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net profit margin: bottom-line profit as a percentage of revenue, after all costs, interest and tax.">Net Profit Margin</span></td>
+        <td style="color:var(--green)!important;">19.19%</td><td>—</td><td>—</td>
+        <td>$1.42B on $7.39B. Operating margin 26.0% <span class="tip" title="Generally Accepted Accounting Principles: the standard US reporting basis, before any company-chosen adjustments.">GAAP</span>; guided 30.3–31.3% non-GAAP for FY2027.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td>
+        <td style="color:var(--text-muted)!important;">1.07%</td><td>—</td><td>—</td>
+        <td>$2.08/yr ($0.52 quarterly, next payable Oct 28, 2026). Modest — the cash return here runs mostly through buybacks.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Short interest: the percentage of shares sold short — borrowed and sold by investors betting the price falls.">Short Interest</span></td>
+        <td style="color:var(--amber)!important;">5.45%</td><td>—</td><td>—</td>
+        <td>Elevated for a large-cap. Consistent with a split tape: 12 Holds against 8 Buy-or-better in the sell-side book.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Debt-to-equity: total debt divided by shareholders' equity. A leverage measure that breaks down when equity is tiny.">Debt-to-Equity</span></td>
+        <td style="color:var(--red)!important;">1.69 ⚠</td><td>—</td><td>—</td>
+        <td><strong>Distorted, not dangerous.</strong> Equity is only $1,495M after years of buybacks, so the ratio is huge; NetApp actually holds $3.58B cash against $2.53B debt — <strong>net cash of $1.04B</strong>. Read the net-cash figure, not this ratio.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current ratio: current assets divided by current liabilities — a short-term liquidity check.">Current Ratio</span></td>
+        <td style="color:var(--amber)!important;">1.24</td><td>—</td><td>—</td>
+        <td>Thin-looking, but deferred revenue sits in current liabilities. For a company with a large support book that depresses the ratio structurally.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free cash flow: cash from operations minus capital expenditure — the cash actually available to shareholders and creditors.">Free Cash Flow</span></td>
+        <td style="color:var(--green)!important;">$1.65B</td><td>—</td><td>—</td>
+        <td>TTM. But Q1 FY27 FCF was $401M, <strong>down 35% YoY</strong> — the trailing number has not yet absorbed the working-capital drag.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity: net income divided by shareholders' equity.">ROE</span></td>
+        <td style="color:var(--text-dim)!important;">114.8% ⚠</td><td>—</td><td>—</td>
+        <td><strong>Not meaningful as a quality signal.</strong> $1.42B of profit on a $1.5B equity base that buybacks have nearly eliminated. Use return on assets (11.7%) instead.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital: operating profit after tax divided by the capital — debt plus equity — invested in the business.">ROIC</span></td>
+        <td style="color:var(--text-dim)!important;">313.2% ⚠</td><td>—</td><td>—</td>
+        <td>Same denominator problem, worse. A figure above 300% is arithmetic, not economics. Ignore it.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1 means more volatile than the index.">Beta</span></td>
+        <td style="color:var(--amber)!important;">1.43</td><td>—</td><td>—</td>
+        <td>Meaningfully more volatile than the S&amp;P 500. The chart in Section 07 shows why — this is a name that moves 50%+ in a month on guidance.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td style="color:var(--text-muted)!important;">$93.69 – $209.06</td><td>—</td><td>—</td>
+        <td>The close of $183.60 sits 96.0% above the low and 12.2% below the high. A 2.2× range in twelve months is not a low-drama stock.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable One-Off Items.</strong> Three distortions matter here and none of them are accounting scandals — they are structural features you have to adjust for by hand. <strong>First, the 53rd week.</strong> Fiscal 2027 is a 53-week year with the extra week in Q1; management gave the adjusted comparisons itself (public cloud +19% vs +28% reported; support +4% vs +11% reported), which is unusually clean disclosure and should be used. <strong>Second, the equity base.</strong> Total stockholders' equity of $1,495M on $10,955M of assets is the cumulative result of buybacks — including <strong>$200M repurchased in fiscal Q1 2027 alone</strong>, part of $302M returned to shareholders with the $102M dividend. Diluted share count has fallen from roughly 229M in FY2022 to 196.4M today, about a 14% reduction, which flatters EPS growth relative to net-income growth by a couple of points a year. Because equity is positive, ROE and debt-to-equity are computable rather than n/m — but both are flagged ⚠ above and should be read as denominator artefacts. <strong>Third, the GAAP-to-non-GAAP gap.</strong> Q1 FY27 GAAP EPS was $1.88 against non-GAAP $2.58 — a 37% uplift, and GAAP operating margin 23.9% against non-GAAP 31.9%, an 800bp gap. Full-year guidance is given on the non-GAAP basis ($9.73–$10.03), so the forward P/E of 18.5 above is a non-GAAP multiple sitting next to a trailing GAAP one. They are not the same yardstick.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">20 analysts (stockanalysis.com). MarketBeat, with a 17-analyst panel, scores the same book as <strong>Hold</strong> — the split is a genuine disagreement about how to weight 12 Holds, not a data error.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$195.13</div>
+      <div class="card-note"><span style="color:var(--green);">+6.28%</span> above the $183.60 close. MarketBeat's panel averages $192.07. Either way the street sees single-digit upside — the re-rating has largely happened.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$170 – $219</div>
+      <div class="card-note">Low implies −7.4%, high implies +19.3%. A 29% spread between bear and bull targets on a $36B company is a wide band, reflecting the memory-cost and cash-conversion debate.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">6 / 2 / 12 / 0</div>
+      <div class="card-note">Strong Buy 6 · Buy 2 · Hold 12 · Sell 0 · Strong Sell 0. Nobody is willing to say sell, and a clear majority is unwilling to say buy.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:30;background:var(--green);"></div>
+    <div style="flex:10;background:#4ade80;"></div>
+    <div style="flex:60;background:var(--amber);"></div>
+  </div>
+  <div class="seg-legend" style="margin-bottom:24px;">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy 6 (30%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy 2 (10%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold 12 (60%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin-top:28px;margin-bottom:12px;">Key Recent Analyst Calls</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Barclays — Tim Long</strong> (Sep 3, 2026): Overweight, price target raised <strong style="color:var(--green);">$199 → $219</strong>. The high target on the street. Raised the day after the fiscal Q1 2027 print, on the back of the all-flash acceleration and the raised full-year guide.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Goldman Sachs</strong> (Sep 3, 2026): Buy reiterated, <strong style="color:var(--green);">$210</strong> target. Held the second-highest target on the panel through the print without changing it — an implicit statement that the quarter met an already-bullish model.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong>Citigroup — Asiya Merchant</strong> (Sep 3, 2026): Neutral, price target <strong style="color:var(--red);">lowered $209 → $190</strong>. The only cut in the post-earnings batch, and the one that maps most directly onto the cash-flow miss — a 30% revenue quarter that produced 35% less free cash flow than the year before.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>Wells Fargo — Aaron Rakers</strong> (Sep 3, 2026): Equal Weight, target raised <strong style="color:var(--amber);">$180 → $190</strong>. Also that day: <strong>Northland's Nehal Chokshi</strong> to Outperform/$187 (from $171) and <strong>UBS's David Vogt</strong> to Neutral/$171 (from $160). Note the pattern — nearly every analyst raised their number and most still would not raise their rating.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 1–2, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q1 2027 results — record quarter, poor cash conversion</div>
+        <div class="tl-desc">Revenue $2.025B (+30%), billings $2.057B (+36%), all-flash revenue $1.309B (+47%), non-GAAP EPS $2.58 (+66%), and a raised full-year guide. Against that: operating cash flow $503M (−25%) and free cash flow $401M (−35%). The stock closed at $180.77 on Sep 2, down 1.3%, having traded as high as $209.06 three weeks earlier — the market took the cash-flow line, not the revenue line.</div>
+        <div class="tl-impact neutral">Already reacted — beat on P&amp;L, miss on cash</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Six sell-side target revisions in a single day</div>
+        <div class="tl-desc">Barclays to $219, Wells Fargo to $190, Northland to $187, UBS to $171 — all raises — against Citigroup cutting to $190. Five up, one down, and the consensus rating did not move. The average target of $195.13 now sits just 6% above the market.</div>
+        <div class="tl-impact neutral">Key near-term event — consensus already marked to market</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q2 2027 earnings — the first clean read</div>
+        <div class="tl-desc">Guided to revenue of $2.025–$2.175B and non-GAAP EPS of $2.54–$2.64. This is the quarter where the extra-week distortion is gone and the two open questions get answered directly: did product gross margin stabilise after the 150bp component-cost hit, and did free cash flow recover. Date not confirmed on the sources fetched.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Quarterly dividend payable — $0.52/share</div>
+        <div class="tl-desc">Ex-dividend October 9, 2026. A 1.07% yield is not the reason to own this, but the dividend plus the $200M-a-quarter buyback pace is roughly $1.2B of annualised shareholder return against ~$1.65B of trailing free cash flow.</div>
+        <div class="tl-impact up">Potential upside catalyst — capital return continuity</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Through FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">NAND / memory pricing cycle</div>
+        <div class="tl-desc">The 150bp sequential fall in product gross margin was attributed to component costs. With AI infrastructure absorbing memory supply industry-wide, this is the single largest swing factor on NetApp's fiscal 2027 margin guide of 30.3–31.3% non-GAAP operating margin. A resolution in either direction moves the stock more than a revenue beat would.</div>
+        <div class="tl-impact down">Ongoing headwind — margin risk</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Through FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">AI and data-lake deal conversion</div>
+        <div class="tl-desc">Roughly 350 AI and data-lake modernisation deals closed in fiscal Q1 2027, with management stating that deal sizes are growing as customers move from proof-of-concept to production. If that conversion holds, the $5.2B all-flash annualised run-rate compounds; if AI storage spend proves to be a one-off refresh, the FY2028 comparison is brutal.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">NTAP — 60 Monthly Closes, Oct 2021 → Sep 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3FA9F5;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Annotated inflection (hover)</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;max-width:780px;">RSI compares the size of recent up-moves to the size of recent down-moves on a 0–100 scale. Above 70 the stock has risen far and fast relative to its own recent history ("overbought"); below 30 it has fallen far and fast ("oversold"). It says nothing about value — only about how stretched the recent move is.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">From the October 2021 close of <strong>$89.30</strong> to the September 10, 2026 close of <strong>$183.60</strong>, NTAP returned <strong>+105.6% on price alone</strong> over five years — roughly 15.5% annualised, before the ~1% dividend. That headline conceals a stock that did essentially nothing for two and a half years and then did everything in sixteen months. The December 2022 trough of <strong>$60.06</strong> was <strong>32.7% below</strong> the window's starting level; from there to the August 2026 close of $185.29 the stock tripled. The defining move is a single month: <strong>April 2026 $110.77 → May 2026 $174.29, +57.3%</strong>, on the fiscal Q4 2026 report and the initial fiscal 2027 guidance. A 57% monthly move in a $30B+ company is not a re-rating of a quarter, it is the market discovering it had the wrong model for the business entirely.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">$89.30 — the pre-derating level</div>
+        <div class="tl-desc">NetApp entered the window near the top of the zero-rate enterprise-tech tape, trading on an FY2022 that would deliver $6.32B of revenue and $4.09 of EPS.</div>
+        <div class="tl-impact neutral">Window start</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">$60.06 — cycle low, −32.7% from the window start</div>
+        <div class="tl-desc">Rate shock plus an enterprise IT spending pause. FY2023 revenue grew 0.7% and FY2024 actually shrank 1.5%; the multiple compression was rational given the growth on offer.</div>
+        <div class="tl-impact down">−32.7% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">$91.39 — +25.6% in one month</div>
+        <div class="tl-desc">The first all-flash inflection. Gross margin stepped from 66.2% in FY2023 to 70.7% in FY2024 as the mix moved to flash and higher-margin software, and the market began paying for the margin rather than the growth.</div>
+        <div class="tl-impact up">+25.6% month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">$128.80 — first AI-storage peak</div>
+        <div class="tl-desc">The initial "AI needs storage" trade carried NTAP up 114% from the December 2022 low. It did not hold: revenue growth of 4.9% in FY2025 was not what an AI multiple required.</div>
+        <div class="tl-impact up">+114% off the low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$87.84 — the second drawdown trough, −31.8% from January</div>
+        <div class="tl-desc">From $122.10 in January 2025 to $87.84 in March. The AI-storage premium unwound entirely; by January 2026 the stock was back at $96.35, below where it had traded in November 2023.</div>
+        <div class="tl-impact down">−31.8% in two months</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$174.29 — +57.3% in a single month</div>
+        <div class="tl-desc">Fiscal Q4 2026 delivered $1.948B of revenue (+12.5%) and fiscal 2027 guidance implying ~18% growth on a business that had averaged low single digits. This is the month the story changed from "value hardware" to "AI infrastructure."</div>
+        <div class="tl-impact up">+57.3% month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug–Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$209.06 high, then $183.60 — the digestion phase</div>
+        <div class="tl-desc">The intraday 52-week high of $209.06 was set August 13, 2026, three weeks before the fiscal Q1 2027 print. The record quarter that followed was met with a lower share price. The stock now sits 12.2% below its high and 6.3% below the average analyst target.</div>
+        <div class="tl-impact neutral">−12.2% from the 52-week high</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Over the five years to September 10, 2026, NTAP's +105.6% price return comfortably beats the <strong>S&amp;P 500</strong>, the benchmark used here — but almost all of the outperformance was manufactured in the last sixteen months, and NTAP's beta of 1.43 means an index-relative comparison flatters it in a rising tape and will punish it in a falling one. The <strong>Nasdaq-100</strong> is deliberately used only as a secondary reference on this page, because <strong>NTAP is not a member of the Nasdaq-100</strong> despite its Nasdaq listing (verified against the current constituent list). Against its own sector the picture is less flattering: Pure Storage grew trailing revenue 27.2% against NetApp's 12.2%, and Dell's storage-plus-server franchise grew 49% on an AI-server surge. NetApp is participating in the AI infrastructure cycle; it is not leading it. Relative index returns for the S&amp;P 500 and Nasdaq-100 over this exact window were not fetched from a verified source and are therefore described qualitatively rather than quantified.</p>
+</div>
+
+<!-- ============ 08 SUMMARY & RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A decade-old storage franchise has found a genuine growth vector: all-flash revenue of $1.309B in fiscal Q1 2027 (+47%, a ~$5.2B annualised run-rate) and ~350 AI/data-lake deals in a single quarter, with deal sizes rising as pilots go to production. Behind it sits a 36.6%-of-revenue support annuity with $4.85B of deferred revenue and a 70.6% blended gross margin — the cyclical upside is real but the downside is cushioned. At 18.5× forward earnings against guided non-GAAP EPS growth of ~22%, and with net cash of $1.04B funding a $200M-per-quarter buyback, you are not paying an AI multiple for AI exposure.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The 30% growth quarter contained a 53rd week; ex-week, support grew 4% and public cloud 19%. Product gross margin fell 150bps sequentially on component costs at exactly the moment NAND pricing is tightening. Most damningly, the record quarter produced <em>less</em> cash — operating cash flow −25%, free cash flow −35% — which is what a storage vendor looks like when it is buying inventory ahead of a cost squeeze and financing larger deals. The stock has doubled off its March 2025 low, sits 6% below a consensus target that 12 of 20 analysts will only call a Hold, and carries 5.45% short interest. The re-rating has been paid for; the delivery has not.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">1</span><div><strong>Component cost inflation compresses the growth line.</strong> All-flash is the fastest-growing product and the most NAND-exposed. A 150bp sequential hit is already in the numbers; a sustained memory shortage would put the 30.3–31.3% non-GAAP operating margin guide at risk without any change in demand.</div></div>
+    <div class="risk-item"><span class="risk-num">2</span><div><strong>Cash conversion does not recover.</strong> Free cash flow down 35% in a +30% revenue quarter is the sort of divergence that either mean-reverts in one quarter or turns out to be the new run-rate. Everything about the capital-return story — the $200M quarterly buyback, the dividend, the thin $1.5B equity base — assumes ~$1.6B of annual free cash flow keeps arriving.</div></div>
+    <div class="risk-item"><span class="risk-num">3</span><div><strong>AI storage demand proves to be a refresh, not a secular step-up.</strong> NetApp has been here before: the June 2024 AI-storage peak of $128.80 unwound to $87.84 nine months later when growth failed to follow. Fiscal 2028 laps both a 53-week year and the strongest comparison in a decade. If the ~350-deal AI pipeline is a one-time modernisation wave rather than a durable budget line, the forward multiple has nothing to grow into.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left: 3px solid var(--red);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">The memory squeeze is the storage industry's defining constraint</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+    </div>
+    <p class="biz-desc">AI training and inference infrastructure is absorbing DRAM and NAND supply industry-wide, and every all-flash vendor buys into the same market. NetApp's CFO quantified the effect precisely: <strong>product gross margin 54.6%, down 150 basis points sequentially, "mainly driven by higher component costs."</strong> That is a direct pass-through of an input price into a reported margin in the same quarter the company printed record revenue. The asymmetry is uncomfortable — AI demand is what is driving the top line and it is also what is driving the input cost. A vendor with ONTAP-grade lock-in can eventually raise prices, but list-price moves lag component moves by quarters, and enterprise storage is still bid competitively against Dell, Pure and HPE on every large deal.</p>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid var(--green);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Enterprise AI has moved from pilots to production — and production needs storage</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+    </div>
+    <p class="biz-desc">For two years the AI capex story was about GPUs and the companies that sell them. The fiscal Q1 2027 datapoints suggest the spend is broadening: <strong>~350 AI and data-lake modernisation deals in a quarter</strong>, with management explicitly noting <strong>deal sizes increasing as customers move from proof of concept to production</strong>. Production AI workloads need governed, versioned, snapshot-able data with enterprise access controls — which is a description of ONTAP. The corroborating evidence sits outside NetApp too: <strong>Dell's trailing revenue grew 49% to $151.2B</strong> and <strong>Pure Storage's grew 27.2% to $4.26B</strong>, both on AI infrastructure demand. This is a real category-wide acceleration, not one company's story. The question is duration, not existence.</p>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">What it comes down to: a cyclical business wearing a secular multiple</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+    </div>
+    <p class="biz-desc">The bull reading is that NetApp has genuinely changed character — 75% of revenue now comes from all-flash and public cloud, the support annuity underwrites a 70% gross margin, and 18.5× forward earnings for ~22% guided EPS growth is a reasonable price for a company with net cash and a standing buyback. The bear reading is that this is what the top of a storage cycle has always looked like: peak pricing, peak mix, peak guidance, and a free cash flow line already rolling over before the revenue line does. The decisive evidence will be two numbers in the late-November fiscal Q2 2027 report — product gross margin, and free cash flow — reported for the first time without a 53rd week to flatter them. Everything on this page is downstream of those two lines.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;margin-bottom:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Price, market cap, 52-week range, sector/industry labels, statistics and forecast data: <strong>stockanalysis.com/stocks/ntap/</strong> (price source: <strong>https://stockanalysis.com/stocks/ntap/history/</strong> — the September 10, 2026 settled close of $183.60, with the September 9 close of $184.74 used for the daily change; the September 11 session was in progress at the time of writing and is deliberately excluded). Fiscal-year and quarterly financials: stockanalysis.com financials pages. Segment and revenue-type disaggregation: stockanalysis.com revenue-by-segment (trailing-twelve-month basis). Fiscal Q1 2027 operating detail, segment revenue, all-flash revenue, billings, deferred revenue, guidance and balance-sheet figures: NetApp's Q1 FY2027 earnings release (s21.q4cdn.com), stocktitan.net and the Motley Fool earnings-call transcript. Named analyst calls and the secondary consensus panel: marketbeat.com. Market-cap rank: companiesmarketcap.com (global #727). Monthly price series: <strong>digrin.com unadjusted "Real Price"</strong>. Nasdaq-100 membership checked against stockanalysis.com's constituent list — <strong>NTAP is not a member</strong>.</p>
+  <p style="max-width:900px;margin:0 auto 12px;"><strong>Estimates and derivations flagged in-page:</strong> the US (~#300) and NASDAQ (~#130) market-cap ranks are estimates; the all-flash annualised revenue run-rate (~$5.2B) and the public cloud annualised run-rate (~$824M) are derived by annualising the reported quarter and are <em>not</em> NetApp's own disclosed ARR metrics, which were not captured from the sources fetched; competitor figures for HPE, IBM and Huawei were not fetched and are shown as n/v; TAM and industry-average figures were not sourced and are shown as "—" rather than estimated; market cap of ~$36.1B is computed as 196.42M shares × $183.60 (companiesmarketcap.com independently shows $35.47B). <strong>Chart data:</strong> 60 real month-end closes, October 2021 through August 2026 from digrin, with the final point set to the September 10, 2026 settled close of $183.60. <strong>No interior months were reconstructed or invented.</strong> Institutional holder detail was not available from the sources fetched and is omitted.</p>
+  <p style="max-width:900px;margin:0 auto;">This document is for informational and educational purposes only and is not investment advice, a recommendation, or an offer to buy or sell any security. It reflects publicly available information at a single point in time and may be incomplete or superseded. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making any investment decision.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 (digrin.com unadjusted "Real Price"; final point = Sep 10, 2026 settled close) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [89.30,88.88,91.99,86.51,78.38,83.00,73.25,71.95,65.24,71.33,72.13,61.85,69.27,67.61,60.06,66.23,64.55,63.85,62.89,66.35,76.40,78.01,76.70,75.88,72.78,91.39,88.16,87.20,89.12,104.97,102.21,120.43,128.80,126.98,120.72,123.51,115.31,122.64,116.08,122.10,99.81,87.84,89.75,99.16,106.55,104.13,112.79,118.46,117.78,111.56,107.09,96.35,99.03,102.39,110.77,174.29,154.76,178.50,185.29,183.60];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — pre-derating level $89.30',              color: '#94a3b8' },
+  { idx: 14, label: 'Dec 2022 — cycle low $60.06 (−32.7%)',              color: '#ef4444' },
+  { idx: 25, label: 'Nov 2023 — all-flash margin inflection $91.39',     color: '#22c55e' },
+  { idx: 32, label: 'Jun 2024 — first AI-storage peak $128.80',          color: '#3b82f6' },
+  { idx: 41, label: 'Mar 2025 — drawdown trough $87.84 (−31.8%)',        color: '#ef4444' },
+  { idx: 55, label: 'May 2026 — FY27 guidance shock $174.29 (+57.3%)',   color: '#22c55e' },
+  { idx: 59, label: 'Sep 10, 2026 — settled close $183.60',              color: '#3FA9F5' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(63,169,245,0.22)');
+grad.addColorStop(1, 'rgba(63,169,245,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3FA9F5', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3FA9F5'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
