@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NDAQ — Nasdaq, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EB7E6;
+  --accent-dim: #2EB7E633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">NDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Financial Data &amp; Stock Exchanges</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $51.43B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #315</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#175 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#85 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Nasdaq, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$92.01</div>
+      <div class="price-change">−$2.21 (−2.35%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 151 West 42nd Street, New York, NY</div>
+    <div class="meta-item"><span>Employees:</span> 9,525</div>
+    <div class="meta-item"><span>Founded:</span> 1971 (IPO July 1, 2002)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 20, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Nasdaq, Inc. is no longer primarily a stock exchange. It describes itself as "a technology company that serves capital markets and other industries," and the reported numbers back the description: in the second quarter of 2026, the trading business — Market Services — produced <strong>$340M of the company's $1,500M in net revenue, roughly 23%</strong>. The other 77% came from index licensing, listings, data, anti-financial-crime software, regulatory reporting technology and capital-markets infrastructure software. Full-year 2025 net revenue was <strong>$5,249M, up 12.9%</strong> from $4,649M in 2024, and the trailing-twelve-month figure through June 30, 2026 is <strong>$5,614M, up 14.2%</strong>. At a $51.43B market capitalisation the company ranks <strong>#315 globally</strong> by market value.</p>
+  <p class="prose" style="margin-top:16px;">A point of order, because the ticker invites confusion: <strong>NDAQ is listed on the Nasdaq Stock Market but is not a member of the Nasdaq-100 index</strong>, which excludes financial companies by construction — so the company that owns and licenses the index is not in it. The benchmark used throughout this page is the S&amp;P 500, with the Nasdaq-100 referenced only as a business driver. The central debate is this: Nasdaq has spent the last several years converting a cyclical, volume-dependent exchange into a recurring-revenue software and index business, and the market has awarded it a <span class="tip" title="Price-to-earnings ratio: share price divided by earnings per share. A higher number means investors pay more for each dollar of profit.">P/E</span> of <strong>26.8× against a peer median near 22.8×</strong>. The question is whether the recurring mix justifies that premium, or whether the <strong>$8.76B of debt</strong> and the gap between 57% non-GAAP and 47% <span class="tip" title="Generally Accepted Accounting Principles — the standardised US accounting rules. GAAP figures include costs that adjusted figures often exclude.">GAAP</span> operating margins mean investors are paying a software multiple for an acquisition-assembled one.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Adena T. Friedman</div>
+      <div class="card-note">Chair and Chief Executive Officer. Named in the Q2 2026 results release as CEO and listed on the company profile as Chief Executive Officer and Chairman. She has driven the strategic pivot from transaction revenue toward index, data and financial-technology software.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Sarah M. Youngwood</div>
+      <div class="card-note">Executive Vice President and Chief Financial Officer, verified from both the Q2 2026 results release and the company profile. She owns the deleveraging narrative — gross leverage and the pace of debt paydown are the metrics she is most consistently measured against.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note">The institutional-holders page was unavailable from the sources fetched (HTTP 404), so no specific holders or stakes are named here rather than estimated. What is verified: <strong>558.98M shares outstanding</strong>, a single share class, and <strong>1.86% short interest as a percentage of float</strong> — an unusually low level of bearish positioning.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Nasdaq reports three segments. The bar below is the verified <strong>Q2 2026</strong> net revenue split — "net revenue" meaning revenue after transaction-based expenses (the rebates and fees Nasdaq passes straight through to market participants), which is the basis the company and the data providers both use.</p>
+  <div class="seg-bar">
+    <div style="flex:41.4;background:#2EB7E6;">CAPITAL ACCESS 41.4%</div>
+    <div style="flex:35.9;background:#a78bfa;">FINANCIAL TECH 35.9%</div>
+    <div style="flex:22.7;background:#f59e0b;">MARKET SVCS 22.7%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EB7E6;"></span> Capital Access Platforms — $621M (Q2 2026, +19% <span class="tip" title="Year-over-year: compared with the same period one year earlier.">YoY</span>)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Financial Technology — $539M (+16% YoY)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Market Services (net) — $340M (+11% YoY)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">First-half 2026 net revenue by segment: Capital Access Platforms <strong>$1,186M (+15%)</strong>, Financial Technology <strong>$1,057M (+18%)</strong>, Market Services <strong>$657M (+12%)</strong>, against total net revenue of <strong>$2,908M (+14%)</strong>. The three segment lines sum to $2,900M; the $8M residual is rounding and unallocated items in the company's own table and has not been reassigned here. <strong>FY2025 segment-level revenue was not verified from the sources fetched</strong> and is therefore not shown — the FY2025 figure quoted on this page is the audited company total of $5,249M.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EB7E6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Capital Access Platforms</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT — INDEX IS THE ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$621M</div><div class="biz-stat-label">Q2'26 Net Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+19%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">41.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Three sub-lines, and they are not growing at remotely the same rate. <strong>Index</strong> — licensing the Nasdaq-100 and roughly 40,000 other indexes to ETF and structured-product issuers — did <strong>$271M, up 38% (35% adjusted)</strong>. <strong>Data &amp; Listing Services</strong> did <strong>$217M, up 10%</strong>. <strong>Workflow &amp; Insights</strong> — investor-relations and ESG software — did <strong>$133M, up 5%</strong>. Index is the highest-margin revenue in the entire company: the fee is a basis-point charge on assets tracking the index, so it scales with markets and flows at almost no incremental cost. Index <span class="tip" title="Exchange-traded product: an ETF or similar fund that trades on an exchange. AUM = assets under management.">ETP</span> assets crossed <strong>$1.114 trillion</strong> for the first time, with <strong>$109B of net inflows over the trailing twelve months</strong>. On the listings side, Q2 2026 brought <strong>68 Nasdaq IPOs including 26 operating companies</strong> — headlined by <strong>SpaceX at an $86B valuation</strong>, the largest IPO of the quarter. Note the asymmetry this creates: the segment's growth is disproportionately a function of one line item that is levered to equity-market levels.</p>
+    <div class="biz-tam"><strong>Segment ARR:</strong> $1,388M (Q2 2026). Total addressable market estimates were not verified from sources fetched and are omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">MSCI Inc. (MSCI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$40.19B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$3.33B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">29.99×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ICE (NYSE parent)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$88.51B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$10.56B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.00×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">S&amp;P Global / LSEG</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Financial Technology</div>
+        <span class="biz-badge growth">FASTEST-GROWING — SOFTWARE, SOLD TO BANKS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$539M</div><div class="biz-stat-label">Q2'26 Net Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+16%</div><div class="biz-stat-label">YoY (+15% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">35.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the part of Nasdaq that has nothing to do with running a stock market. <strong>Capital Markets Technology</strong> — trade-lifecycle, risk and treasury software sold to banks and other exchanges — is the biggest piece at <strong>$321M, up 15%</strong>. <strong>Regulatory Technology</strong>, which automates the reporting banks owe their supervisors, did <strong>$120M, up 15%</strong>. <strong>Financial Crime Management Technology</strong> — anti-money-laundering and fraud surveillance sold largely to small and mid-sized banks — is the smallest but fastest at <strong>$98M, up 22%</strong>. The strategic point is the revenue quality: these are multi-year subscription and licence contracts, not trading fees. Segment <span class="tip" title="Annualised recurring revenue: the annualised value of subscription and recurring contracts in force, a standard software-industry measure of the contracted base.">ARR</span> stands at <strong>$1,870M</strong>, larger than the Capital Access Platforms base. The offsetting point is that this segment was assembled substantially by acquisition, and it is the reason the company carries $8.76B of debt and a 10-point spread between its GAAP and non-GAAP operating margins.</p>
+    <div class="biz-tam"><strong>Segment ARR:</strong> $1,870M (Q2 2026). Annualised SaaS revenue across the company is <strong>38% of total ARR</strong> (≈$1.24B), growing 12% reported and 15% organic.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">FIS / Fiserv / SS&amp;C</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Growth</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ICE (Mortgage/Fixed Income Tech)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$88.51B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$10.56B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.00×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Market Services</div>
+        <span class="biz-badge emerging">THE ORIGINAL BUSINESS — NOW 23% OF REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$340M</div><div class="biz-stat-label">Q2'26 Net Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+11%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Equities, options and fixed-income trading across the US and the Nordics — the business the ticker is named after, reported net of the transaction rebates paid to liquidity providers. It grew <strong>11% in Q2 2026</strong> and <strong>12% in the first half</strong>, which is respectable but is the slowest of the three segments and is also the most volatile: Market Services revenue is a direct function of volumes, and volumes are a direct function of volatility. It is the reason a 0.97 <span class="tip" title="Beta measures how much a stock moves relative to the overall market. Above 1.0 means more volatile than the market, below 1.0 less.">beta</span> understates the cyclicality embedded in the top line. Strategically, the segment is best understood as the source of the proprietary data and the listings franchise that the other two segments monetise — it is the funnel, not the destination.</p>
+    <div class="biz-tam"><strong>Note:</strong> US equity market share by venue is not disclosed in the sources fetched and has not been estimated here.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">CME Group (CME)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$99.16B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$6.76B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">23.24×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Cboe Global Markets (CBOE)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$29.78B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$5.06B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.41×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ICE / NYSE</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$88.51B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$10.56B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.00×</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">NASDAQ-100 BRAND</span>
+    <span class="moat-pill">$1.114T INDEX ETP AUM</span>
+    <span class="moat-pill">$3.26B ARR BASE</span>
+    <span class="moat-pill">REGULATORY LICENCE</span>
+    <span class="moat-pill">LISTINGS NETWORK EFFECT</span>
+    <span class="moat-pill">PROPRIETARY MARKET DATA</span>
+    <span class="moat-pill">BANK SWITCHING COSTS</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is not the trading venue — order flow is fickle and venues compete on fractions of a cent. It is that Nasdaq owns a <strong>brand that funds flow into</strong>. The Nasdaq-100 is one of a small handful of index brands worldwide that retail and institutional money will buy by name, and the fee on it is a basis-point charge against <strong>$1.114 trillion</strong> of tracking assets that cost essentially nothing more to service as they grow. That is why Index revenue grew <strong>38%</strong> while Data &amp; Listing Services grew 10% and Workflow &amp; Insights grew 5% in the same quarter. Layered underneath is a second, less glamorous moat: <strong>$3.26B of ARR</strong> in compliance-critical software sitting inside banks' regulatory and trade-processing stacks — systems that are audited, examined and painful to rip out. Neither moat depends on winning a price war for order flow.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Index revenue is a leveraged bet on equity market levels.</strong> A basis-point fee on $1.114T of ETP assets falls when those assets fall, and it falls without any operational failure by the company. The line that grew 38% and drove most of the segment's outperformance is the same line that would contract fastest in a drawdown — and because it carries near-100% incremental margin, the operating-profit impact is amplified in both directions.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Leverage from an acquisition-built software segment.</strong> Total debt was <strong>$8.76B</strong> against <strong>$520M of cash</strong> at June 30, 2026, with a <span class="tip" title="Debt-to-equity: total borrowings divided by shareholders' equity. Higher means more reliance on borrowed money.">debt-to-equity</span> ratio of 0.78 and a <span class="tip" title="Current ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">current ratio</span> of 1.01. The company repaid a net $162M in Q2 while also spending $530M on dividends and buybacks — deleveraging is real but deliberate rather than urgent. <span class="tip" title="Return on invested capital: profit generated per dollar of total capital (debt plus equity) employed.">ROIC</span> of 10.43% against <span class="tip" title="Return on equity: profit generated per dollar of shareholder equity.">ROE</span> of 16.52% is the visible signature of that borrowed capital.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>A 10-point GAAP-to-adjusted margin gap.</strong> Q2 2026 GAAP operating margin was <strong>47%</strong>; non-GAAP was <strong>57%</strong>. GAAP diluted <span class="tip" title="Earnings per share: net profit divided by the number of shares outstanding.">EPS</span> was <strong>$0.89 (+14%)</strong> while non-GAAP EPS was <strong>$1.07 (+25%)</strong>. Almost every valuation you will see quoted on this name uses the larger number. The forward P/E of 21.02× versus the trailing 26.83× is that same gap expressed as a multiple.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Regulatory dependence cuts both ways.</strong> Exchange status is a licence granted by the SEC, and market-data pricing, access fees and the consolidated-tape economics are all subject to regulatory review. The same rulemaking that creates demand for Regulatory Technology can compress the economics of Market Services and proprietary data. Nasdaq is unusually exposed to the direction of US market-structure policy in both directions at once.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>NDAQ</th><th>Industry Avg<br>(exchange peers)</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings ratio on the last twelve months of actual reported earnings.">Trailing P/E</span></td><td style="color:var(--red);">26.83×</td><td>22.83× (median)</td><td>—</td><td>Median of ICE 22.00, CME 23.24, CBOE 22.41, MSCI 29.99. NDAQ trades at a ~17% premium to that median — the recurring-revenue mix is the justification offered.</td></tr>
+      <tr><td><span class="tip" title="Price divided by expected earnings over the coming twelve months.">Forward P/E</span></td><td style="color:var(--amber);">21.02×</td><td>—</td><td>—</td><td>Implies roughly 28% earnings growth from the trailing base. Consensus 2026 EPS of $4.14 puts the multiple at 22.2× on the calendar year.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth: the P/E divided by the expected earnings growth rate. Around 1.0 is often read as fairly priced.">PEG Ratio</span></td><td style="color:var(--amber);">1.15</td><td>—</td><td>—</td><td>Slightly above 1.0 — priced roughly in line with its own growth, not at a deep discount or a bubble premium.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months.">EPS</span> (<span class="tip" title="Trailing twelve months — the most recent four reported quarters.">TTM</span>)</td><td>$3.43</td><td>—</td><td>—</td><td>GAAP, through June 30, 2026. $92.01 ÷ $3.43 = 26.8×, which reconciles to the stated P/E. FY2025 GAAP EPS was $3.09.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year: compared with the same period one year earlier.">YoY</span>)</td><td style="color:var(--green);">+14.2%</td><td>—</td><td>—</td><td>TTM net revenue $5.61B. Q2 2026 grew 15%; first-half 2026 grew 14%. Financial Technology (+18% 1H) is the fastest segment.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering it, as a percentage of revenue.">Gross Margin</span></td><td style="color:var(--text-dim);">n/m (100% reported)</td><td>—</td><td>—</td><td>Not meaningful. Data providers show 100% because exchange revenue is already reported net of transaction-based expenses; there is no separate cost-of-revenue line. Use operating margin instead.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including interest and tax.">Net Profit Margin</span></td><td style="color:var(--green);">35.04%</td><td>—</td><td>—</td><td>$1,967M of net income on $5,614M of net revenue. GAAP operating margin was 47% in Q2 2026; non-GAAP 57%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--amber);">1.35%</td><td>—</td><td>—</td><td>$1.24 per share annually, a 36.16% payout ratio. Q2 2026 returned $174M in dividends plus $356M of buybacks — buybacks are twice the dividend.</td></tr>
+      <tr><td><span class="tip" title="Short interest: shares sold short as a percentage of the freely tradable float. High numbers signal bearish positioning.">Short % of Float</span></td><td style="color:var(--green);">1.86%</td><td>—</td><td>—</td><td>9.25M shares short, 1.65% of shares outstanding. Very low — this is not a contested name among short sellers.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td style="color:var(--amber);">0.78</td><td>—</td><td>—</td><td>$9.32B total debt per the statistics page; $8.76B per the Q2 balance sheet at June 30, 2026, against $520M of cash. Enterprise value $60.19B vs $51.43B market cap.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">Current Ratio</span></td><td style="color:var(--amber);">1.01</td><td>—</td><td>—</td><td>Thin, but exchange balance sheets carry large offsetting clearing and default-fund balances; the quick ratio of 0.39 reflects that structure rather than distress.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow: cash from operations minus capital spending — the cash actually available to pay debt, dividends and buybacks.">Free Cash Flow</span></td><td style="color:var(--green);">$1.95B</td><td>—</td><td>—</td><td>$3.49 per share, slightly above GAAP EPS of $3.43. FY2025 FCF was $1,989M. At $51.43B the stock trades at roughly 26× free cash flow.</td></tr>
+      <tr><td><span class="tip" title="Return on equity: net income as a percentage of shareholders' equity.">ROE</span></td><td style="color:var(--green);">16.52%</td><td>—</td><td>—</td><td>Healthy, and flattered by leverage. Compare with ROIC below to see how much of it is borrowed.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital: operating profit after tax as a percentage of all capital employed, debt plus equity.">ROIC</span></td><td style="color:var(--amber);">10.43%</td><td>—</td><td>—</td><td>The 6-point gap to ROE is the leverage effect. ROA of 5.85% on $27.34B of total assets underlines how capital-heavy the post-acquisition balance sheet is.</td></tr>
+      <tr><td><span class="tip" title="Beta: sensitivity to overall market moves. 1.0 means it moves with the market.">Beta</span></td><td style="color:var(--green);">0.97</td><td>—</td><td>—</td><td>Essentially market-like. Note this understates the operating cyclicality: trading volumes and index AUM both swing with markets, so revenue beta exceeds price beta.</td></tr>
+      <tr><td>52-Week Range</td><td>$76.55 – $101.79</td><td>—</td><td>—</td><td>The $92.01 close sits 20.2% above the low and 9.6% below the high. 52-week price change: −3.02%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items.</strong> Three things distort the reported figures and are worth naming. First, <strong>FY2024 GAAP EPS of $1.93 was an outlier low</strong> — net income of $1,117M on $4,649M of revenue, a 24% margin, against $1,788M on $5,249M (34%) in FY2025. The 60% FY2025 EPS jump is partly a recovery from a depressed base, not pure operating improvement. Second, <strong>the GAAP-to-non-GAAP bridge is large and recurring</strong>: 47% versus 57% operating margin, $0.89 versus $1.07 of quarterly EPS. Amortisation of acquired intangibles is a permanent feature of this company's income statement, not a one-time event, and excluding it every quarter for years is a choice, not a correction. Third, <strong>Index revenue growth of 38% in Q2 2026 is not a run-rate</strong> — it reflects ETP assets crossing $1.114T after $109B of twelve-month inflows, and the comparison base resets each year. The Industry Avg and S&amp;P 500 columns above are left blank where no figure was sourced from a fetched page; only the peer P/E median was computed from verified data.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">BUY</div>
+      <div class="card-note">17 analysts polled by S&amp;P Global via stockanalysis.com.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$109.87</div>
+      <div class="card-note"><span style="color:var(--green);">+19.4% upside</span> from the $92.01 close of September 10, 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$84 – $135</div>
+      <div class="card-note">Low implies −8.7%, high implies +46.7%. A 61% spread between extremes — wide for a low-beta financial.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">8 / 6 / 2 / 1</div>
+      <div class="card-note">Strong Buy 8 · Buy 6 · Hold 2 · Sell 1. Fourteen of seventeen are positive.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:8;background:#22c55e;"></div>
+    <div style="flex:6;background:#4ade80;"></div>
+    <div style="flex:2;background:#f59e0b;"></div>
+    <div style="flex:1;background:#ef4444;"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+    <span><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px;margin-right:6px;"></span>Strong Buy 8</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#4ade80;border-radius:2px;margin-right:6px;"></span>Buy 6</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px;margin-right:6px;"></span>Hold 2</span>
+    <span><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px;margin-right:6px;"></span>Sell 1</span>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:12px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>William Blair</strong> — Jeff Schmitt, <span style="color:var(--green);">Buy (maintained)</span>, no published target · Sep 3, 2026. The most recent call on the tape and the only one after the early-September pullback, which means the post-earnings positive stance survived the price decline.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>J.P. Morgan</strong> — Michael Cho, <span style="color:var(--green);">Buy (maintained)</span>, PT <span style="color:var(--green);">$112 → $114</span> · Jul 29, 2026. A target raise a week after the Q2 print, implying roughly 24% upside from today's price.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>UBS</strong> — Alex Kramm, <span style="color:var(--green);">Buy (maintained)</span>, PT <span style="color:var(--green);">$120</span> · Jul 24, 2026. The highest target among the four post-earnings calls listed, and 9% above the $109.87 consensus average.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>RBC Capital</strong> — Ashish Sabadra, <span style="color:var(--green);">Buy (maintained)</span>, PT <span style="color:var(--green);">$108</span> · Jul 24, 2026 · and <strong>TD Cowen</strong> — William Katz, <span style="color:var(--green);">Buy (maintained)</span>, PT <span style="color:var(--green);">$105 → $108</span> · Jul 24, 2026. Two independent shops landing on the identical $108 figure, below consensus — the conservative end of the bull camp.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">Every named call above was read from the stockanalysis.com NDAQ forecast page. Note the pattern: <strong>all five are maintained Buys, and the three with target changes all raised</strong>. The single Sell rating in the 17-analyst poll is not attributed to a named firm on the sources fetched and is therefore not named here.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 20, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings</div>
+        <div class="tl-desc">The next scheduled report. The specific line to watch is Index revenue: Q2 grew 38% on ETP assets crossing $1.114 trillion, and the question is whether that is a level effect that annualises away or a flow story that persists. Also watch ARR, which grew 11% reported and 12% organic — a deceleration there would undercut the recurring-revenue framing that supports the multiple.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — $1.5B net revenue, +15%</div>
+        <div class="tl-desc">All three segments grew double digits: Capital Access Platforms +19%, Financial Technology +16%, Market Services +11%. Non-GAAP EPS of $1.07 rose 25% against GAAP EPS of $0.89, up 14%. The stock's July monthly close was $94.19 against a June close of $78.82 — a 19.5% monthly gain that brackets this print.</div>
+        <div class="tl-impact up">Reaction already positive</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q2 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">SpaceX lists on Nasdaq at an $86B valuation</div>
+        <div class="tl-desc">The largest IPO of the quarter, within a slate of 68 Nasdaq IPOs including 26 operating companies. Listings revenue itself is modest — Data &amp; Listing Services grew only 10% — but a marquee listing feeds the ecosystem that matters: index inclusion candidacy, proprietary data volume, and the credibility Nasdaq sells to the next generation of issuers.</div>
+        <div class="tl-impact up">Franchise validation</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Expense guidance: $2.530–$2.570B non-GAAP operating expense</div>
+        <div class="tl-desc">Against a consensus revenue forecast of $5.91B for 2026, this expense range implies the company intends to hold its non-GAAP operating margin near the 57% posted in Q2. Guidance also set a non-GAAP tax rate of 22.5%–24.5%. A raise to the expense range without a matching revenue raise would be the clearest negative signal available before October.</div>
+        <div class="tl-impact neutral">Margin discipline test</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Deleveraging versus capital return</div>
+        <div class="tl-desc">In Q2 2026 Nasdaq repaid $162M of debt net, paid $174M in dividends and repurchased $356M of stock — $530M to shareholders against $162M to lenders. With $8.76B of debt against $520M of cash, the allocation split is a live management choice, and a shift toward faster paydown would likely come at the expense of the buyback.</div>
+        <div class="tl-impact neutral">Ongoing balance-sheet question</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Seven-session slide from the August high</div>
+        <div class="tl-desc">From the August 31 close of $98.61 the stock fell to $92.01 by September 10 — a 6.7% decline in seven sessions, including −2.35% on the final day. No company-specific news was identified in the sources fetched to explain it; the move coincides with a broad give-back in financial-data and exchange peers, with ICE down 3.13% and MSCI down 3.52% year to date.</div>
+        <div class="tl-impact down">Recent weakness, cause unverified</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">NDAQ — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026 (SPLIT-ADJUSTED FOR THE AUG 2022 3-FOR-1)</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:14px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:16px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:18px;height:3px;background:#2EB7E6;vertical-align:middle;margin-right:6px;"></span>Price</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #f59e0b;vertical-align:middle;margin-right:6px;"></span>1-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #3b82f6;vertical-align:middle;margin-right:6px;"></span>3-Month MA</span>
+      <span><span style="display:inline-block;width:18px;height:0;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:6px;"></span>10-Month MA</span>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:4px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);margin-bottom:6px;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">In plain English: RSI measures how much of the recent move has been up versus down. Above 70 the stock has run hard and may be stretched; below 30 it has been beaten up and may be washed out. It is a momentum gauge, not a valuation signal.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 split-adjusted monthly close of <strong>$69.96</strong> to the September 10, 2026 close of <strong>$92.01</strong>, NDAQ appreciated <strong>+31.5%</strong> over five years — roughly <strong>5.6% a year</strong> in price alone, plus a dividend currently yielding 1.35%. The verified five-year annualised total return is <strong>8.41%</strong>. That is a respectable but unspectacular outcome, and it conceals a genuine two-act structure: a <strong>30.6% drawdown</strong> from the December 2021 close of $70.00 to the September 2023 trough of <strong>$48.59</strong>, followed by a <strong>+103% advance</strong> from that trough to the August 2026 close of $98.61. An investor who bought the 2021 peak waited nearly four years to recover; one who bought the 2023 low doubled.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Relative performance.</strong> A directly comparable five-year total return for the <strong>S&amp;P 500</strong> over the identical window could not be verified from the sources fetched and is deliberately not stated. What is verified is the peer comparison on the same basis and the same page: five-year annualised returns of <strong>NDAQ 8.41%, Cboe 19.25%, CME 12.23%, ICE 6.96%, MSCI −2.29%</strong>. Nasdaq sits mid-pack — well behind Cboe, comfortably ahead of ICE and MSCI. Over the trailing year it returned <strong>−1.24%</strong> against ICE −8.38%, MSCI −1.40%, CME +9.15% and Cboe +22.70%. On the <strong>Nasdaq-100</strong>: the index is a revenue driver for this company, not a benchmark for its stock — NDAQ is not a constituent, since the Nasdaq-100 excludes financial companies. The relationship runs the other way, which is precisely the asymmetry worth understanding: Nasdaq collects fees on the index's assets whether or not its own shares participate in the index's returns.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$69.96 split-adjusted — start of the window</div><div class="tl-desc">Peak-liquidity conditions, record IPO issuance and heavy retail trading volumes. Unadjusted, the shares closed at $209.87 before the three-for-one split the following August.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2022</div><div class="tl-content"><div class="tl-title">Three-for-one stock split</div><div class="tl-desc">The unadjusted month-end price fell from $180.90 in July to $59.53 in August — the split, not a crash. Every pre-August-2022 price on the chart above has been divided by three to keep the series continuous; the underlying source series is unadjusted.</div><div class="tl-impact neutral">Mechanical, not economic</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2023</div><div class="tl-content"><div class="tl-title">$48.59 — cycle low, −30.6% from Dec 2021</div><div class="tl-desc">The trough coincided with the rate-driven de-rating of financials, a frozen IPO market and investor anxiety about the debt Nasdaq was taking on to buy its way into financial technology. FY2023 net income of $1,059M was the lowest of the five years shown, and FY2024 EPS of $1.93 would prove lower still.</div><div class="tl-impact down">Maximum pessimism</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">$82.99 — +70.8% off the low</div><div class="tl-desc">The re-rating phase. Revenue growth accelerated to 19.4% in FY2024 as the financial-technology segment annualised, and the market began valuing the recurring base rather than the trading volumes.</div><div class="tl-impact up">Thesis shift to recurring revenue</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">$97.13 — FY2025 delivers $3.09 of GAAP EPS</div><div class="tl-desc">Full-year 2025 net revenue of $5,249M (+12.9%) and net income of $1,788M — a 60% EPS increase on FY2024's depressed $1.93. The stock closed 2025 within 5% of its eventual 52-week high.</div><div class="tl-impact up">Earnings catch up to the price</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">$78.82 — −18.8% from the January close</div><div class="tl-desc">A four-month slide from $96.89 in January through $87.58 in February, $84.89 in March and a brief recovery to $92.52 in May before June's drop. No single company-specific cause was verified from the sources fetched; the timing sits immediately ahead of the Q2 print.</div><div class="tl-impact down">Pre-earnings trough</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">$94.19 → $98.61 — post-earnings surge, +25% off the June low</div><div class="tl-desc">The July 23 Q2 report (net revenue +15%, non-GAAP EPS +25%, index ETP assets through $1.114T) drove a 19.5% single-month gain, and August added another 4.7% to the highest monthly close in the five-year window. Four brokers raised or reiterated Buy ratings in the following week.</div><div class="tl-impact up">Earnings-driven re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 10, 2026</div><div class="tl-content"><div class="tl-title">$92.01 — giving back 6.7% in seven sessions</div><div class="tl-desc">From $98.61 on August 31 through $98.71 on September 3 and then steadily down: $96.88, $95.04, $94.22, $92.01. The stock now sits 9.6% below its 52-week high of $101.79 and 20.2% above the $76.55 low.</div><div class="tl-impact down">Momentum broken, thesis intact</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+
+  <p class="prose"><strong>Start with the mix, because that is the whole argument.</strong> Of $1,500M of Q2 2026 net revenue, <strong>$340M — 22.7% — came from trading</strong>. The rest came from index licensing, listings, data, and software sold to banks. Total <strong>ARR is $3,258M</strong>, split $1,870M in Financial Technology and $1,388M in Capital Access Platforms, growing 11% reported and 12% organic, with <strong>annualised SaaS revenue at 38% of ARR</strong> growing 15% organically. Against TTM net revenue of $5,614M, that ARR base covers roughly <strong>58% of the company's revenue on a contracted, recurring footing</strong>. That is the number that separates Nasdaq from a pure exchange and it is the number that justifies a 26.8× trailing P/E against a 22.8× peer median.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Now the part that complicates it.</strong> The fastest-growing revenue line in the company is <strong>Index, at +38%</strong>, and Index is not really recurring in the software sense — it is a basis-point fee on <strong>$1.114 trillion</strong> of exchange-traded product assets. It recurs as long as the assets remain and the market does not fall. Strip Index out and Capital Access Platforms grew at Data &amp; Listing's 10% and Workflow &amp; Insights' 5%. So the segment carrying the "recurring, high-quality revenue" banner is disproportionately driven by the one line most levered to equity market levels. The bull case and the cyclicality live in the same place.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>The valuation, on three bases.</strong> (i) On <strong>trailing GAAP EPS of $3.43, NDAQ trades at 26.8×</strong> — the fully-loaded number, charging the company for the amortisation of what it paid to build the Financial Technology segment. (ii) On <strong>2026 consensus EPS of $4.14, it trades at 22.2×</strong>, and the published forward P/E of 21.02× implies a slightly higher or later earnings base. (iii) On <strong>trailing free cash flow of $1.95B, it trades at about 26× equity value, or roughly 31× on the $60.19B enterprise value</strong> — the EV multiple is the honest one, because it charges for the $8.76B of debt that the equity multiple ignores. Against a peer set trading at 22.0–23.2× (ICE, CME, Cboe) with MSCI at 30×, Nasdaq's premium is real but modest, and the direction of travel — toward MSCI's index-and-data profile and away from ICE's exchange profile — is the implicit bet.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>What the balance sheet is doing.</strong> $8.76B of debt against $520M of cash and $27.34B of total assets, a 0.78 debt-to-equity ratio, ROE of 16.52% against ROIC of 10.43%. In the quarter, management sent <strong>$530M to shareholders and $162M to lenders</strong>. That is a deliberate statement: the leverage is regarded as comfortable rather than pressing. It is also why the forward multiple looks cheaper than the trailing one — deleveraging plus amortisation roll-off mechanically lifts GAAP EPS over time without any operating improvement. Investors who like the forward number should be clear that a meaningful part of it is financial, not operational.</p>
+
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The mix shift is done and it worked: 77% of revenue now comes from outside trading, $3.26B of ARR covers roughly 58% of revenue on a contracted basis, and all three segments grew double digits in Q2 2026 with Financial Technology at +18% for the half. Index ETP assets crossed $1.114 trillion with $109B of twelve-month inflows, SpaceX chose Nasdaq for the quarter's largest IPO, and non-GAAP operating margin of 57% shows the operating leverage is real. Fourteen of seventeen analysts rate it Buy with a $109.87 average target, 19.4% above the current price, and short interest of 1.86% of float says almost nobody is betting against it.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying a 17% P/E premium to exchange peers for a recurring-revenue story whose fastest-growing component — Index at +38% — is a basis-point fee on $1.114T of assets that will shrink with the market, not a subscription. Ex-Index, the rest of Capital Access Platforms grew 5–10%. GAAP operating margin is 47% against the 57% everyone quotes, and GAAP EPS grew 14% against the 25% non-GAAP figure; the difference is permanent amortisation from an acquisition-built segment that also left $8.76B of debt, a 1.01 current ratio and ROIC six points below ROE. The stock has returned 8.41% annualised over five years — behind Cboe's 19.25% and CME's 12.23% — and is down 3.02% over the past year.</p>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Index AUM is the single point of leverage.</strong> A basis-point fee on $1.114 trillion carries near-100% incremental margin on the way up and near-100% decremental margin on the way down. A 20% equity drawdown would cut the fastest-growing, highest-margin revenue line by roughly the same proportion, with no offsetting cost relief — and would do so in exactly the quarter that listings and index flows also dry up. The three exposures are correlated, not diversifying.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>The multiple depends on the non-GAAP bridge holding.</strong> At 26.8× trailing GAAP earnings versus a 22.8× peer median, Nasdaq is priced as a software-and-data company. If ARR growth decelerates from the current 11–12% toward the 5–10% growth rates in Data &amp; Listing Services and Workflow &amp; Insights, the premium has no support. No earnings miss is required for that de-rating — a single soft ARR print would do it.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Regulatory and market-structure risk on both sides of the business.</strong> Exchange status, market-data pricing and access-fee economics are all subject to SEC rulemaking, and the same policy environment that creates demand for Regulatory Technology can compress the margins in Market Services and proprietary data. With a 1.01 current ratio and $8.76B of debt, the company has less balance-sheet cushion to absorb an adverse ruling than its 0.97 beta implies.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">&nbsp;</span> Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Passive Flows Are the Exchange Industry's Real Growth Engine</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <div class="card-note">The structural shift from active management to index products has turned index ownership into the most valuable franchise in capital-markets infrastructure — better than trading, better than data. Nasdaq's index ETP assets crossed <strong>$1.114 trillion</strong> with <strong>$109 billion of net inflows in twelve months</strong>, and the resulting Index revenue of <strong>$271M grew 38%</strong> while the rest of its segment grew 5–10%. The economics are extraordinary: a basis-point fee that requires no additional headcount as assets grow. This is the same dynamic that supports MSCI's 30× P/E, the highest in the peer group. The catch is that it is a fee on a stock of assets, so it inherits the market's cycle wholesale.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">The IPO Window Reopened — and the Quality Bar Moved</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <div class="card-note">Q2 2026 brought <strong>68 Nasdaq IPOs, of which only 26 were operating companies</strong> — the balance largely vehicles and funds. That ratio is the quiet story: headline listing counts recovered faster than the underlying pipeline of real businesses. And listings monetise thinly in any case: <strong>Data &amp; Listing Services revenue grew just 10%</strong> in the quarter that produced SpaceX's <strong>$86 billion</strong> IPO, the largest of the period. A marquee listing is worth more as a franchise signal — index inclusion candidacy, data volume, credibility with the next issuer — than as a revenue line. Exchanges compete hard for listings they barely profit from directly.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;font-size:16px;">Everyone Is Buying the Same Software Business</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <div class="card-note">Exchange operators have spent the past several years converting trading franchises into financial-software companies, and they have done it with debt. Nasdaq carries <strong>$8.76B of borrowings against $520M of cash</strong>, an enterprise value <strong>$8.76B above its market cap</strong>, and a <strong>10-point gap between 47% GAAP and 57% non-GAAP operating margin</strong> that is essentially permanent acquisition amortisation. <strong>Bull framing:</strong> the strategy worked — 77% of revenue now sits outside trading, ARR of $3.26B covers ~58% of revenue, and the company can deleverage out of $1.95B of annual free cash flow while still returning $530M a quarter to shareholders. <strong>Bear framing:</strong> every peer bought the same kind of asset, which means the differentiation investors are paying a 17% P/E premium for is not obviously proprietary — and the only fully unique asset in the portfolio, the Nasdaq-100 brand, is levered to the very market cycle the software was supposed to diversify away from.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 10, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, valuation, statistics, financials, comparison and forecast data from stockanalysis.com — NDAQ overview, statistics, financials, company, market-cap, history and forecast pages, and the NDAQ vs ICE vs CME vs CBOE vs MSCI comparison page, all retrieved September 11, 2026. <strong>Price source: https://stockanalysis.com/stocks/ndaq/history/</strong> (daily table, Sep 10, 2026 close of $92.01; prior close Sep 9, 2026 of $94.22 used for the daily change). Segment net revenue, sub-line revenue, ARR, annualised SaaS revenue, operating margins, EPS, balance-sheet, capital-return, ETP AUM, IPO counts and FY2026 expense guidance from Nasdaq's Q2 2026 results release (July 23, 2026), read from the GlobeNewswire release and the Nasdaq investor-relations PDF. Executive names verified from both the Q2 2026 release and the stockanalysis.com company profile. Global market-cap rank of #315 from the stockanalysis.com NDAQ market-cap page (stated as of September 4, 2026, at a $54.15B market cap — the rank will differ slightly at the September 10 price). Named analyst calls from the stockanalysis.com NDAQ forecast page. Monthly price history from digrin.com NDAQ price history, unadjusted "Real Price" column.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Chart construction: 60 real month-end closes, October 2021 through August 2026, plus the September 10, 2026 close as the final point (September 2026 is therefore a partial month, labelled "Sep 26"). <strong>No interior months were reconstructed or invented.</strong> All prices through July 2022 have been divided by three to adjust for the August 2022 three-for-one stock split, which is visible in the unadjusted source series as a July 2022 close of $180.90 followed by an August 2022 close of $59.53. The digrin series was cross-checked against stockanalysis.com: July 31, 2026 matched exactly at $94.19, and August 31, 2026 matched to three cents ($98.58 vs $98.61 — the stockanalysis figure of $98.61 is used on the chart). Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source — specifically the US and NASDAQ-exchange market-cap rank pills. Items marked <strong>n/d</strong> are not disclosed by the company; <strong>n/v</strong> means not verified from the sources fetched. FY2025 segment-level revenue, top institutional holders (page returned HTTP 404), total addressable market estimates, industry-average metrics other than the computed peer P/E median, and all S&amp;P 500 benchmark metrics could not be verified and are left blank rather than estimated. A five-year S&amp;P 500 total return over the identical window was not verified and is deliberately omitted; the peer five-year annualised returns quoted are from the stockanalysis.com comparison page. Verify all figures against primary SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Source: digrin.com NDAQ unadjusted "Real Price" month-end series, divided by 3 for all
+// months through Jul 2022 to adjust for the Aug 2022 three-for-one split.
+// Aug 2026 ($98.61) and the final Sep 2026 point ($92.01, Sep 10 close) from stockanalysis.com.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [69.96,67.74,70.00,59.74,57.05,59.40,52.46,51.75,50.85,60.30,59.53,56.68,62.24,68.46,61.35,60.19,56.06,54.67,55.37,55.35,49.85,50.49,52.48,48.59,49.60,55.84,58.14,57.77,56.20,63.10,59.85,59.03,60.26,67.68,72.08,73.01,73.92,82.99,77.31,82.34,82.78,75.86,76.21,83.54,89.42,96.22,94.74,88.45,85.49,90.92,97.13,96.89,87.58,84.89,91.91,92.52,78.82,94.19,98.61,92.01];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window start $69.96 (split-adj.)',   color: '#94a3b8' },
+  { idx: 10, label: 'Aug 2022 — 3-for-1 stock split',                color: '#3b82f6' },
+  { idx: 23, label: 'Sep 2023 — cycle low $48.59 (−30.6%)',          color: '#ef4444' },
+  { idx: 37, label: 'Nov 2024 — $82.99, +70.8% off the low',         color: '#22c55e' },
+  { idx: 50, label: 'Dec 2025 — $97.13, FY25 EPS $3.09',             color: '#22c55e' },
+  { idx: 56, label: 'Jun 2026 — pre-earnings trough $78.82',         color: '#ef4444' },
+  { idx: 58, label: 'Aug 2026 — 5-yr high monthly close $98.61',     color: '#22c55e' },
+  { idx: 59, label: 'Sep 10, 2026 — $92.01, −6.7% in 7 sessions',    color: '#f59e0b' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,183,230,0.22)');
+grad.addColorStop(1, 'rgba(46,183,230,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EB7E6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EB7E6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
