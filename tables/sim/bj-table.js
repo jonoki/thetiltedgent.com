@@ -10,7 +10,7 @@ window.BJTable = (function () {
   function sgn(n) { return (n > 0 ? '+' : '') + n; }
 
   var DEFAULTS = { decks: 6, h17: true, das: true, surrender: true, penetration: 0.75, bots: 2, seat: 'last', speed: 500, mode: 'play',
-                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0, bankroll: 1000, startBankroll: 1000, bonus: 'none', mainChips: [], bonusChips: [] };
+                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0, bankroll: 1000, startBankroll: 1000, bonus: 'none', mainChips: [], bonusChips: [], unitSize: 10, rampBets: true };
   function loadSettings() { try { var s = JSON.parse(localStorage.getItem('ttg-bjt') || 'null'); return s ? Object.assign({}, DEFAULTS, s) : Object.assign({}, DEFAULTS); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function saveSettings(s) { try { localStorage.setItem('ttg-bjt', JSON.stringify(s)); } catch (e) {} }
 
@@ -27,7 +27,7 @@ window.BJTable = (function () {
     function sel_(label, key, options) {
       var f = el('label', 'bjt-field'); f.appendChild(el('span', 'k', label));
       var s = el('select'); options.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; s.appendChild(op); }); s.value = String(S[key]);
-      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); if (key === 'bustRemove' || key === 'rcEvery' || key === 'tcEvery' || key === 'bonus') { if (key === 'bonus' && S.bonus === 'none') returnChips('bonus'); renderFelt(); renderBank(); return; } if (key === 'startBankroll') { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; saveSettings(S); } rebuild(); });
+      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); if (key === 'bustRemove' || key === 'rcEvery' || key === 'tcEvery' || key === 'bonus') { if (key === 'bonus' && S.bonus === 'none') returnChips('bonus'); renderFelt(); renderBank(); return; } if (key === 'startBankroll') { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; S.unitSize = suggestUnit(S.startBankroll); saveSettings(S); } rebuild(); });
       f.appendChild(s); return f;
     }
     bar.appendChild(sel_('Decks', 'decks', [[1, '1 deck'], [2, '2 decks'], [4, '4 decks'], [6, '6 decks'], [8, '8 decks']]));
@@ -57,6 +57,7 @@ window.BJTable = (function () {
     tog.appendChild(toggle('Show advice before I act', 'showAdvice'));
     tog.appendChild(toggle('Use index plays (Illustrious 18) in advice', 'useIndex'));
     tog.appendChild(toggle('Auto-deal next hand', 'autoNext'));
+    tog.appendChild(toggle('Size my bet by the count (ramp × unit)', 'rampBets'));
     wrap.appendChild(tog);
 
     // main grid: table + side panel
@@ -163,7 +164,7 @@ window.BJTable = (function () {
         tile('Win / loss / push', st.wins + ' / ' + st.losses + ' / ' + st.pushes) + tile('Shoes dealt', game.shoeNo) + '</div>' +
         '<p class="bjt-help">Basic strategy alone gets the house edge to about half a percent; the count only pays once your strategy accuracy is above 95% and your count checks are exact. Fix the strategy first.</p>' +
         '<button type="button" class="bjt-btn ghost" id="bjt-reset">Reset session</button>';
-      g.querySelector('#bjt-reset').addEventListener('click', function () { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; saveSettings(S); rebuild(true); });
+      g.querySelector('#bjt-reset').addEventListener('click', function () { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; S.unitSize = suggestUnit(S.startBankroll); saveSettings(S); rebuild(true); });
     }
     function tile(k, v, cls, s) { return '<div class="st' + (cls ? ' ' + cls : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
 
@@ -194,20 +195,49 @@ window.BJTable = (function () {
       var trayN = Math.min(12, Math.round(dealt / (totalCards / 12))), shoeN = Math.min(12, Math.ceil(game.shoe.length / (totalCards / 12)));
       trayStack.innerHTML = new Array(trayN + 1).join('<b></b>'); shoeStack.innerHTML = new Array(shoeN + 1).join('<b></b>');
       arcText.textContent = 'BLACKJACK PAYS 3 TO 2  ·  DEALER MUST ' + (S.h17 ? 'HIT SOFT 17' : 'STAND ON ALL 17s') + '  ·  THE TILTED GENT';
+      var youIdx0 = S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor((S.bots + 1) / 2) : S.bots;
       if (!round) {
         dealerBox.innerHTML = '<div class="bjt-label">Dealer</div><div class="bjt-hand"><div class="cards"><span class="bjt-card back ghost"></span><span class="bjt-card back ghost"></span></div></div>';
         seatsBox.innerHTML = ''; var n0 = S.bots + 1, i0;
-        for (i0 = 0; i0 < n0; i0++) { var you0 = (S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor(n0 / 2) : n0 - 1) === i0; var d0 = el('div', 'bjt-seat' + (you0 ? ' you' : '')); d0.innerHTML = '<div class="bjt-hand"><div class="cards"></div></div><div class="bjt-circle">' + (you0 ? 'YOU' : i0 + 1) + '</div>'; seatsBox.appendChild(d0); }
-        placeSeats(); return;
+        for (i0 = 0; i0 < n0; i0++) { var you0 = youIdx0 === i0; var d0 = el('div', 'bjt-seat' + (you0 ? ' you' : '')); d0.innerHTML = '<div class="bjt-hand"><div class="cards"></div></div>' + circlesHTML(you0 ? null : i0 + 1, you0); seatsBox.appendChild(d0); }
+        wireCircles(); placeSeats(); return;
       }
       dealerBox.innerHTML = '<div class="bjt-label">Dealer</div>' + handHTML(round.dealer, round.dealerDone);
       seatsBox.innerHTML = '';
       round.seats.forEach(function (seat) {
         var d = el('div', 'bjt-seat' + (seat.you ? ' you' : ''));
-        d.innerHTML = seat.hands.map(function (h) { return handHTML(h, true); }).join('') + '<div class="bjt-circle' + (seat.you ? ' you' : '') + '">' + (seat.you ? 'YOU' : 'P' + seat.n) + '<small>' + fmt(seat.hands[0].bet) + '</small></div>';
+        d.innerHTML = seat.hands.map(function (h) { return handHTML(h, true); }).join('') + circlesHTML(seat.you ? null : seat.n, seat.you, seat);
         seatsBox.appendChild(d);
       });
+      wireCircles();
       placeSeats(); renderLive();
+    }
+    // Betting circles on the felt. Before the deal, your circle shows the chips you've placed (click a chip to take it back,
+    // click the circle to target it for the rack); during a round every seat shows its wager as chips.
+    function circlesHTML(botN, you, seat) {
+      var locked = betLocked(), h = '';
+      if (you) {
+        var mainChips = round && round.stage !== 'done' ? toChips(seat ? seat.hands.reduce(function (a, x) { return a + x.bet; }, 0) : 0) : S.mainChips;
+        var mainSum = sum(mainChips);
+        h += '<div class="bjt-circle main' + (target === 'main' && !locked ? ' target' : '') + (locked ? ' locked' : '') + '" data-c="main"><span class="lab">YOU</span>' + (mainChips.length ? stackHTML(mainChips, 'inbet') : '') + '<small>' + (mainSum ? '$' + mainSum.toLocaleString() : 'place bet') + '</small></div>';
+        if (S.bonus !== 'none') {
+          var bChips = round && round.stage !== 'done' ? (round.bonusStake ? toChips(round.bonusStake) : []) : S.bonusChips, bSum = sum(bChips);
+          h += '<div class="bjt-circle bonus' + (target === 'bonus' && !locked ? ' target' : '') + (locked ? ' locked' : '') + '" data-c="bonus"><span class="lab">' + (S.bonus === '21plus3' ? '21+3' : 'PAIRS') + '</span>' + (bChips.length ? stackHTML(bChips, 'inbet') : '') + '<small>' + (bSum ? '$' + bSum.toLocaleString() : 'optional') + '</small></div>';
+        }
+        return '<div class="bjt-circles' + (S.bonus !== 'none' ? ' two' : '') + '">' + h + '</div>';
+      }
+      var bet = seat ? seat.hands.reduce(function (a, x) { return a + x.bet; }, 0) : 0;
+      return '<div class="bjt-circles"><div class="bjt-circle"><span class="lab">P' + botN + '</span>' + (bet ? stackHTML(toChips(bet), 'inbet') : '') + '<small>' + (bet ? '$' + bet.toLocaleString() : '') + '</small></div></div>';
+    }
+    function wireCircles() {
+      Array.prototype.forEach.call(seatsBox.querySelectorAll('.bjt-seat.you .bjt-circle[data-c]'), function (c) {
+        c.addEventListener('click', function (e) {
+          var which = c.getAttribute('data-c'); target = which;
+          var w = e.target.closest('.chipwrap');
+          if (w && !betLocked()) { var arr = which === 'bonus' ? S.bonusChips : S.mainChips; if (arr.length) { S.bankroll += arr.pop(); saveSettings(S); } }
+          renderFelt(); renderBank();
+        });
+      });
     }
     // Seats sit on the arc of the half-ellipse table: seat 1 (first base) on the right, last seat on the left.
     function placeSeats() {
@@ -215,7 +245,7 @@ window.BJTable = (function () {
       felt.classList.toggle('arc', wide);
       for (i = 0; i < n; i++) {
         var th = n === 1 ? 90 : 22 + i * (136 / (n - 1)), rad = th * Math.PI / 180;
-        var x = 50 + 41 * Math.cos(rad), y = 27 + 46 * Math.sin(rad);
+        var x = 50 + 38 * Math.cos(rad), y = 27 + 45 * Math.sin(rad);
         seats[i].style.left = wide ? x + '%' : ''; seats[i].style.top = wide ? y + '%' : '';
       }
     }
@@ -235,9 +265,10 @@ window.BJTable = (function () {
       if (timer) clearTimeout(timer); timer = null; pendingCheck = false;
       if (game.needShuffle) { game.newShoe(); say('New shoe. Count resets to ' + sgn(game.rc) + '.', 'info'); }
       var bet = sum(S.mainChips); if (bet <= 0) return; lastBet = { main: S.mainChips.slice(), bonus: S.bonusChips.slice() }; S.unit = bet; saveSettings(S);
+      var bonusStake0 = sum(S.bonusChips);
       var n = S.bots + 1, youIdx = S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor(n / 2) : n - 1, i;
-      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal', netBefore: game.stats.net };
-      for (i = 0; i < n; i++) round.seats.push({ n: i + 1, you: i === youIdx, hands: [{ cards: [], bet: i === youIdx ? bet : S.unit }] });
+      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal', netBefore: game.stats.net, bonusStake: bonusStake0 };
+      for (i = 0; i < n; i++) round.seats.push({ n: i + 1, you: i === youIdx, hands: [{ cards: [], bet: i === youIdx ? bet : S.unitSize }] });
       round.you = round.seats[youIdx];
       stratHi = null; highlightStrategy(); actions.innerHTML = ''; feedback.innerHTML = ''; say('Dealing…');
       renderFelt(); renderBank();
@@ -385,11 +416,13 @@ window.BJTable = (function () {
     }
     function startRoundIfBet() { if (sum(S.mainChips) > 0) startRound(); }
     function rebet() {
-      if (!lastBet || sum(S.mainChips) > 0 || betLocked()) return sum(S.mainChips) > 0;
-      var need = sum(lastBet.main) + (S.bonus !== 'none' ? sum(lastBet.bonus) : 0);
-      if (need > S.bankroll) { renderBank(); say('Not enough in the rack to repeat the bet. Size down, or rebuy.', 'info'); return false; }
-      lastBet.main.forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); if (S.bonus !== 'none') lastBet.bonus.forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; });
-      saveSettings(S); renderBank(); return true;
+      if (sum(S.mainChips) > 0 || betLocked()) return sum(S.mainChips) > 0;
+      var mainAmt, bonusAmt = 0;
+      if (S.rampBets) { mainAmt = rampUnits(Math.floor(game.trueCount())) * S.unitSize; bonusAmt = lastBet && S.bonus !== 'none' ? sum(lastBet.bonus) : 0; }
+      else { if (!lastBet) return false; mainAmt = sum(lastBet.main); bonusAmt = S.bonus !== 'none' ? sum(lastBet.bonus) : 0; }
+      if (mainAmt + bonusAmt > S.bankroll) { if (mainAmt <= S.bankroll) bonusAmt = 0; else { renderBank(); say('Not enough in the rack for the next bet. Size down, or rebuy.', 'info'); return false; } }
+      toChips(mainAmt).forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); toChips(bonusAmt).forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; });
+      saveSettings(S); renderFelt(); renderBank(); return true;
     }
     function autoRebet() { if (rebet()) startRound(); }
 
@@ -424,12 +457,14 @@ window.BJTable = (function () {
     function toChips(amount) { var out = [], i; for (i = DENOMS.length - 1; i >= 0; i--) { while (amount >= DENOMS[i] - 1e-9) { out.push(DENOMS[i]); amount -= DENOMS[i]; } } if (amount > 0.01) out.push(1); return out; }
     function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
     var target = 'main';
+    function suggestUnit(bank) { var raw = bank / 100, steps = [1, 2, 5, 10, 25, 50, 100, 250, 500], best = steps[0], i; for (i = 0; i < steps.length; i++) if (steps[i] <= raw) best = steps[i]; return best; }
+    function rampUnits(tc) { var ramp = game.system.betRamp, u = ramp[0][1], i; for (i = 0; i < ramp.length; i++) if (tc >= ramp[i][0]) u = ramp[i][1]; return u; }
     function returnChips(which) { var arr = which === 'main' ? S.mainChips : S.bonusChips; S.bankroll += sum(arr); arr.length = 0; saveSettings(S); }
     function betLocked() { return !!(round && round.stage !== 'done'); }
 
     var bank = el('div', 'bjt-bank');
     var rack = el('div', 'bjt-rack'); bank.appendChild(rack);
-    var circles = el('div', 'bjt-circles'); bank.appendChild(circles);
+    var betctl = el('div', 'bjt-betctl'); bank.appendChild(betctl);
     var feedback = el('div', 'bjt-feedback'); bank.appendChild(feedback);
     var dealBtn = el('button', 'bjt-btn gold', 'Deal'); dealBtn.type = 'button';
     dealBtn.addEventListener('click', function () { if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; if (sum(S.mainChips) <= 0) { feedback.innerHTML = '<span class="bad">Put chips in the betting circle first — click a chip in your rack.</span>'; return; } startRound(); });
@@ -446,32 +481,35 @@ window.BJTable = (function () {
         var n = Math.min(20, Math.floor(left / v)); if (v === 1) n = Math.min(20, Math.round(left)); // show the pile at each denomination
         var pile = el('button', 'pile' + (S.bankroll < v ? ' empty' : ''), stackHTML(new Array(Math.max(1, Math.min(n, 8))).join(',').split(',').map(function () { return v; })) + '<small>$' + v + (n > 8 ? ' ×' + n : '') + '</small>');
         pile.type = 'button'; pile.disabled = locked || S.bankroll < v; pile.title = 'Add a $' + v + ' chip to the ' + (target === 'bonus' ? 'bonus' : 'main') + ' bet';
-        pile.addEventListener('click', function () { var arr = target === 'bonus' ? S.bonusChips : S.mainChips; if (target === 'bonus' && S.bonus === 'none') { target = 'main'; arr = S.mainChips; } arr.push(v); S.bankroll -= v; saveSettings(S); renderBank(); });
+        pile.addEventListener('click', function () { var arr = target === 'bonus' ? S.bonusChips : S.mainChips; if (target === 'bonus' && S.bonus === 'none') { target = 'main'; arr = S.mainChips; } arr.push(v); S.bankroll -= v; saveSettings(S); renderFelt(); renderBank(); });
         row.appendChild(pile);
       });
       var mainSum = sum(S.mainChips), bonusSum = sum(S.bonusChips);
-      circles.innerHTML = '';
-      var mc = el('div', 'circle main' + (target === 'main' ? ' target' : '') + (locked ? ' locked' : ''), '<div class="k">Bet</div>' + stackHTML(S.mainChips, 'inbet') + '<div class="amt">' + (mainSum ? '$' + mainSum.toLocaleString() : 'place bet') + '</div>');
-      mc.addEventListener('click', function (e) { target = 'main'; var w = e.target.closest('.chipwrap'); if (w && !locked && S.mainChips.length) { S.bankroll += S.mainChips.pop(); saveSettings(S); } renderBank(); });
-      circles.appendChild(mc);
-      if (S.bonus !== 'none') {
-        var bc = el('div', 'circle bonus' + (target === 'bonus' ? ' target' : '') + (locked ? ' locked' : ''), '<div class="k">' + (S.bonus === '21plus3' ? '21+3' : 'Pairs') + '</div>' + stackHTML(S.bonusChips, 'inbet') + '<div class="amt">' + (bonusSum ? '$' + bonusSum.toLocaleString() : 'optional') + '</div>');
-        bc.addEventListener('click', function (e) { target = 'bonus'; var w = e.target.closest('.chipwrap'); if (w && !locked && S.bonusChips.length) { S.bankroll += S.bonusChips.pop(); saveSettings(S); } renderBank(); });
-        circles.appendChild(bc);
-      }
-      var clear = el('button', 'bjt-btn ghost small', 'Clear bets'); clear.type = 'button'; clear.disabled = locked || (!mainSum && !bonusSum);
-      clear.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); renderBank(); });
+      betctl.innerHTML = '';
+      var unitLab = el('label', 'bjt-field'); unitLab.appendChild(el('span', 'k', '1 unit ($)'));
+      var unitIn = el('input'); unitIn.type = 'number'; unitIn.min = '1'; unitIn.step = '1'; unitIn.value = S.unitSize; unitIn.disabled = locked;
+      unitIn.addEventListener('change', function () { S.unitSize = Math.max(1, Math.round(+unitIn.value || suggestUnit(S.startBankroll))); saveSettings(S); renderBank(); });
+      unitLab.appendChild(unitIn); betctl.appendChild(unitLab);
+      var tc = Math.floor(game.trueCount()), units = rampUnits(tc), rampAmt = units * S.unitSize;
+      var rampInfo = el('div', 'bjt-rampinfo', S.rampBets
+        ? '<div class="k">Ramp</div><div class="v">' + (S.showCount ? 'TC ' + sgn(tc) + ' → ' : '') + '<b>' + units + ' unit' + (units === 1 ? '' : 's') + ' = $' + rampAmt.toLocaleString() + '</b></div><div class="s">1 unit ≈ bankroll ÷ 100. The bet is re-placed at the ramp each hand; ' + (S.showCount ? 'the true count is shown because the live count is on.' : 'the units alone tell you the count is up, so keep counting.') + '</div>'
+        : '<div class="k">Flat betting</div><div class="v">ramp off — your last bet is repeated</div>');
+      betctl.appendChild(rampInfo);
+      var bb = el('div', 'betbtns');
+      var rampBtn = el('button', 'bjt-btn ghost small', 'Bet the ramp'); rampBtn.type = 'button'; rampBtn.disabled = locked || rampAmt > S.bankroll + mainSum;
+      rampBtn.addEventListener('click', function () { returnChips('main'); toChips(rampAmt).forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); saveSettings(S); renderFelt(); renderBank(); });
       var rep = el('button', 'bjt-btn ghost small', 'Repeat last'); rep.type = 'button'; rep.disabled = locked || !lastBet || sum(lastBet.main) + sum(lastBet.bonus) > S.bankroll + mainSum + bonusSum;
-      rep.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); lastBet.main.forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); if (S.bonus !== 'none') lastBet.bonus.forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; }); saveSettings(S); renderBank(); });
-      var bb = el('div', 'betbtns'); bb.appendChild(clear); bb.appendChild(rep); circles.appendChild(bb);
+      rep.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); lastBet.main.forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); if (S.bonus !== 'none') lastBet.bonus.forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; }); saveSettings(S); renderFelt(); renderBank(); });
+      var clear = el('button', 'bjt-btn ghost small danger', 'Clear all bets'); clear.type = 'button'; clear.disabled = locked || (!mainSum && !bonusSum);
+      clear.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); renderFelt(); renderBank(); });
+      bb.appendChild(rampBtn); bb.appendChild(rep); bb.appendChild(clear); betctl.appendChild(bb);
       dealBtn.disabled = locked || mainSum <= 0;
       rebuy.hidden = !(S.bankroll < 1 && mainSum <= 0);
-      if (S.showCount) { var sb = game.suggestedBet(S.unit); rack.querySelector('.k').innerHTML += ' <span class="ramp">ramp says $' + sb.toLocaleString() + '</span>'; }
     }
     var lastBet = null;
     // payout animation: chips appear beside the circle, then flow to the rack (or the bet flows to the dealer)
     function showPayout(net, kind) {
-      var c = circles.querySelector(kind === 'bonus' ? '.circle.bonus' : '.circle.main'); if (!c) return;
+      var c = seatsBox.querySelector(kind === 'bonus' ? '.bjt-seat.you .bjt-circle.bonus' : '.bjt-seat.you .bjt-circle.main'); if (!c) return;
       var fx = el('div', 'payfx ' + (net > 0 ? 'win' : net < 0 ? 'lose' : 'push'));
       if (net > 0) fx.innerHTML = stackHTML(toChips(net), 'pay') + '<b>+$' + net.toLocaleString() + '</b>';
       else if (net < 0) fx.innerHTML = '<b>−$' + Math.abs(net).toLocaleString() + '</b>';
@@ -497,7 +535,7 @@ window.BJTable = (function () {
       var you = round.you, h = you.hands[0], mult = bonusResult(S.bonus, h.cards[0], h.cards[1], round.dealer.cards[0]);
       var net = mult ? bet * mult : -bet; var st = game.stats; st.bonusNet = (st.bonusNet || 0) + net; st.bonusBets = (st.bonusBets || 0) + 1;
       if (mult) { S.bankroll += bet + bet * mult; feedback.innerHTML = '<span class="ok">Bonus hits: ' + (S.bonus === 'pairs' ? 'pair pays ' : '21+3 pays ') + mult + ':1 — +$' + (bet * mult).toLocaleString() + '.</span>'; }
-      S.bonusChips.length = 0; saveSettings(S); showPayout(net, 'bonus'); renderBank();
+      S.bonusChips.length = 0; round.bonusStake = 0; saveSettings(S); showPayout(net, 'bonus'); renderFelt(); renderBank();
     }
 
     checkBtn.addEventListener('click', function () {
@@ -521,7 +559,7 @@ window.BJTable = (function () {
     function rebuild(keepNothing) {
       if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; pauseBtn.textContent = 'Pause';
       game = new B.Game({ rules: { decks: S.decks, h17: S.h17, das: S.das, surrender: S.surrender, penetration: S.penetration }, system: S.system });
-      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; renderBank();
+      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; if (!S.unitSize) S.unitSize = suggestUnit(S.startBankroll); renderBank();
       renderGuide(); renderStrategy(); renderStats(); renderFelt();
       say(S.mode === 'play' ? 'Set your bet and press Deal. Keys: H, S, D, P, R; space pauses.' : 'Count drill: press Deal and everyone plays basic strategy on their own — just keep the count. Space pauses; check your count from the Count tab.', 'info');
     }
