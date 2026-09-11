@@ -126,6 +126,87 @@ window.BJT = (function () {
     return { act: act, why: why };
   }
 
+
+  /* ---------- expected-value engine (infinite-deck, composition-independent) ----------
+     Prices every action for a hand state against a dealer up card under the rule set. Used to charge each
+     deviation from the best play its actual EV cost (not "one error"), and to derive the base house edge.
+     State = (hard total with aces counted as 1, has-ace flag); the effective total is hard+10 when that fits. */
+  var EV_CACHE = {};
+  function evEngine(rules) {
+    var key = JSON.stringify(rules); if (EV_CACHE[key]) return EV_CACHE[key];
+    var P = {}; for (var r = 2; r <= 9; r++) P[r] = 1 / 13; P[10] = 4 / 13; P[11] = 1 / 13;
+    var h17 = !!rules.h17, das = !!rules.das, sur = !!rules.surrender;
+    function eff(h, ace) { return (ace && h + 10 <= 21) ? h + 10 : h; }
+    function isSoft(h, ace) { return ace && h + 10 <= 21; }
+    function cv(c) { return c === 11 ? 1 : c; }
+    // dealer final-total distribution from a state
+    var dealerMemo = {};
+    function dealerDist(h, ace) {
+      var k = h + (ace ? 'a' : 'x'); if (dealerMemo[k]) return dealerMemo[k];
+      var out = { 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, bust: 0 };
+      if (h > 21) { out.bust = 1; dealerMemo[k] = out; return out; }
+      var t = eff(h, ace), soft = isSoft(h, ace);
+      if (t > 17 || (t === 17 && !(soft && h17))) { out[t] = 1; dealerMemo[k] = out; return out; }
+      for (var c = 2; c <= 11; c++) { var sub = dealerDist(h + cv(c), ace || c === 11); for (var q in out) out[q] += P[c] * sub[q]; }
+      dealerMemo[k] = out; return out;
+    }
+    var DUP = {};
+    for (var up = 2; up <= 11; up++) {
+      var d = dealerDist(cv(up), up === 11), res = { 17: d[17], 18: d[18], 19: d[19], 20: d[20], 21: d[21], bust: d.bust };
+      if (up === 11 || up === 10) { // the peek has happened: remove the natural and renormalise
+        var pNat = up === 11 ? P[10] : P[11]; res[21] = Math.max(0, res[21] - pNat); var tot = 0; for (var q in res) tot += res[q]; for (var q2 in res) res[q2] /= tot;
+      }
+      DUP[up] = res;
+    }
+    function evStandT(t, up) { if (t > 21) return -1; var d = DUP[up], ev = d.bust; for (var f = 17; f <= 21; f++) { if (t > f) ev += d[f]; else if (t < f) ev -= d[f]; } return ev; }
+    function evStand(h, ace, up) { return evStandT(eff(h, ace), up); }
+    var hitMemo = {};
+    function evHit(h, ace, up) { // take one card, then play on optimally (stand/hit only)
+      var k = h + (ace ? 'a' : 'x') + 'v' + up; if (hitMemo[k] != null) return hitMemo[k];
+      var ev = 0;
+      for (var c = 2; c <= 11; c++) { var nh = h + cv(c), na = ace || c === 11;
+        var v = nh > 21 ? -1 : (eff(nh, na) >= 21 ? evStand(nh, na, up) : Math.max(evStand(nh, na, up), evHit(nh, na, up))); ev += P[c] * v; }
+      hitMemo[k] = ev; return ev;
+    }
+    function evDouble(h, ace, up) { var ev = 0; for (var c = 2; c <= 11; c++) { var nh = h + cv(c); ev += P[c] * 2 * (nh > 21 ? -1 : evStand(nh, ace || c === 11, up)); } return ev; }
+    function evSplit(rank, up) { // one split; each hand takes one card then plays on (aces: one card only); DAS per rules
+      var ev = 0, h0 = cv(rank), a0 = rank === 11;
+      for (var c = 2; c <= 11; c++) { var h = h0 + cv(c), ace = a0 || c === 11, best;
+        if (rank === 11) best = evStand(h, ace, up);
+        else { best = Math.max(evStand(h, ace, up), evHit(h, ace, up)); if (das) best = Math.max(best, evDouble(h, ace, up)); }
+        ev += P[c] * best; }
+      return 2 * ev;
+    }
+    // t = effective total, soft = flag (as from total()); convert to state
+    function toState(t, soft) { return soft ? [t - 10, true] : [t, false]; }
+    function actions(t, soft, up, legal, pairRank) {
+      var s = toState(t, soft), h = s[0], ace = s[1];
+      var o = { S: evStand(h, ace, up), H: t >= 21 ? -1 : evHit(h, ace, up) };
+      if (legal.double) o.D = evDouble(h, ace, up);
+      if (legal.split && pairRank) o.P = evSplit(pairRank, up);
+      if (legal.surrender) o.R = -0.5;
+      return o;
+    }
+    // base edge: enumerate initial hands with best play, blackjack 3:2, dealer natural handled (no insurance)
+    var base = 0;
+    for (var a = 2; a <= 11; a++) for (var b = 2; b <= 11; b++) for (var u = 2; u <= 11; u++) {
+      var pw = P[a] * P[b] * P[u], h = cv(a) + cv(b), ace = a === 11 || b === 11, t = eff(h, ace), soft = isSoft(h, ace);
+      var pDealerNat = u === 11 ? P[10] : (u === 10 ? P[11] : 0), playerNat = t === 21, ev;
+      if (playerNat) ev = (1 - pDealerNat) * 1.5;
+      else { var o = actions(t, soft, u, { double: true, split: a === b, surrender: sur }, a === b ? a : 0), best = -9; for (var k in o) if (o[k] > best) best = o[k]; ev = -pDealerNat + (1 - pDealerNat) * best; }
+      base += pw * ev;
+    }
+    var eng = { actions: actions, baseEdge: -base, rules: rules };
+    EV_CACHE[key] = eng; return eng;
+  }
+  // EV of each legal action for an actual hand (cards) vs up card; returns {evs:{H,S,D,P,R}, best, bestEv, base}
+  function evFor(rules, cards, up, legal) {
+    var eng = evEngine(rules), tt = total(cards), pairRank = cards.length === 2 && cards[0].v === cards[1].v ? cards[0].v : 0;
+    var evs = eng.actions(tt.t, tt.soft, up, legal, pairRank), best = null, bestEv = -9;
+    for (var k in evs) if (evs[k] > bestEv) { bestEv = evs[k]; best = k; }
+    return { evs: evs, best: best, bestEv: bestEv, base: eng.baseEdge };
+  }
+
   /* ---------- game state machine ---------- */
   function Game(opts) {
     this.opts = opts; this.rand = rng(opts.seed || (Date.now() & 0xffffffff));
@@ -156,5 +237,5 @@ window.BJT = (function () {
     return b * unit;
   };
 
-  return { SYSTEMS: SYSTEMS, INDEX: INDEX, basicStrategy: basicStrategy, advise: advise, indexKey: indexKey, total: total, isBJ: isBJ, handKey: handKey, Game: Game, makeShoe: makeShoe, rng: rng };
+  return { SYSTEMS: SYSTEMS, INDEX: INDEX, basicStrategy: basicStrategy, advise: advise, indexKey: indexKey, evEngine: evEngine, evFor: evFor, total: total, isBJ: isBJ, handKey: handKey, Game: Game, makeShoe: makeShoe, rng: rng };
 })();
