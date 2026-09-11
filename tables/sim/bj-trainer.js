@@ -132,9 +132,18 @@ window.BJT = (function () {
      deviation from the best play its actual EV cost (not "one error"), and to derive the base house edge.
      State = (hard total with aces counted as 1, has-ace flag); the effective total is hard+10 when that fits. */
   var EV_CACHE = {};
-  function evEngine(rules) {
-    var key = JSON.stringify(rules); if (EV_CACHE[key]) return EV_CACHE[key];
-    var P = {}; for (var r = 2; r <= 9; r++) P[r] = 1 / 13; P[10] = 4 / 13; P[11] = 1 / 13;
+  function tcBucket(tc) { if (typeof tc !== 'number' || isNaN(tc)) return 0; return Math.max(-8, Math.min(8, Math.round(tc * 2) / 2)); }
+  // Card distribution implied by a Hi-Lo true count: +t means about t more high cards (10, A) than low cards (2–6)
+  // per remaining deck. The excess is spread within each group in proportion; 7, 8, 9 are untouched.
+  function distFor(tc) {
+    var P = {}, hi = (20 + tc / 2) / 52, lo = (20 - tc / 2) / 52, r;
+    for (r = 2; r <= 6; r++) P[r] = lo / 5; for (r = 7; r <= 9; r++) P[r] = 4 / 52; P[10] = hi * 0.8; P[11] = hi * 0.2;
+    return P;
+  }
+  function evEngine(rules, tc) {
+    tc = tcBucket(tc);
+    var key = JSON.stringify(rules) + '@' + tc; if (EV_CACHE[key]) return EV_CACHE[key];
+    var P = distFor(tc);
     var h17 = !!rules.h17, das = !!rules.das, sur = !!rules.surrender;
     function eff(h, ace) { return (ace && h + 10 <= 21) ? h + 10 : h; }
     function isSoft(h, ace) { return ace && h + 10 <= 21; }
@@ -196,16 +205,28 @@ window.BJT = (function () {
       else { var o = actions(t, soft, u, { double: true, split: a === b, surrender: sur }, a === b ? a : 0), best = -9; for (var k in o) if (o[k] > best) best = o[k]; ev = -pDealerNat + (1 - pDealerNat) * best; }
       base += pw * ev;
     }
-    var eng = { actions: actions, baseEdge: -base, rules: rules };
+    // EV of a two-card start against an up card, played optimally, including the dealer's possible natural
+    function startEv(a, b, u) {
+      var h = cv(a) + cv(b), ace = a === 11 || b === 11, t = eff(h, ace), soft = isSoft(h, ace);
+      var pDealerNat = u === 11 ? P[10] : (u === 10 ? P[11] : 0);
+      if (t === 21) return (1 - pDealerNat) * 1.5;
+      var o = actions(t, soft, u, { double: true, split: a === b, surrender: sur }, a === b ? a : 0), best = -9; for (var k in o) if (o[k] > best) best = o[k];
+      return -pDealerNat + (1 - pDealerNat) * best;
+    }
+    // insurance: pays 2:1 on a half-bet when the hole card is a ten; EV per unit of the main bet
+    var insuranceEv = (3 * P[10] - 1) / 2;
+    var eng = { actions: actions, startEv: startEv, baseEdge: -base, insuranceEv: insuranceEv, P: P, tc: tc, rules: rules };
     EV_CACHE[key] = eng; return eng;
   }
-  // EV of each legal action for an actual hand (cards) vs up card; returns {evs:{H,S,D,P,R}, best, bestEv, base}
-  function evFor(rules, cards, up, legal) {
-    var eng = evEngine(rules), tt = total(cards), pairRank = cards.length === 2 && cards[0].v === cards[1].v ? cards[0].v : 0;
+  // EV of each legal action for an actual hand (cards) vs up card at a true count; returns {evs:{H,S,D,P,R}, best, bestEv, base}
+  function evFor(rules, cards, up, legal, tc) {
+    var eng = evEngine(rules, tc), tt = total(cards), pairRank = cards.length === 2 && cards[0].v === cards[1].v ? cards[0].v : 0;
     var evs = eng.actions(tt.t, tt.soft, up, legal, pairRank), best = null, bestEv = -9;
     for (var k in evs) if (evs[k] > bestEv) { bestEv = evs[k]; best = k; }
     return { evs: evs, best: best, bestEv: bestEv, base: eng.baseEdge };
   }
+  // EV of the dealt two-card hand vs the up card (played optimally) at a true count, in units of the bet
+  function dealEv(rules, cards, up, tc) { return evEngine(rules, tc).startEv(cards[0].v, cards[1].v, up); }
 
   /* ---------- game state machine ---------- */
   function Game(opts) {
@@ -237,5 +258,5 @@ window.BJT = (function () {
     return b * unit;
   };
 
-  return { SYSTEMS: SYSTEMS, INDEX: INDEX, basicStrategy: basicStrategy, advise: advise, indexKey: indexKey, evEngine: evEngine, evFor: evFor, total: total, isBJ: isBJ, handKey: handKey, Game: Game, makeShoe: makeShoe, rng: rng };
+  return { SYSTEMS: SYSTEMS, INDEX: INDEX, basicStrategy: basicStrategy, advise: advise, indexKey: indexKey, evEngine: evEngine, evFor: evFor, dealEv: dealEv, tcBucket: tcBucket, total: total, isBJ: isBJ, handKey: handKey, Game: Game, makeShoe: makeShoe, rng: rng };
 })();
