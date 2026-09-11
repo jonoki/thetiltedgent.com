@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VEEV — Veeva Systems Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #FF6A3D;
+  --accent-dim: #FF6A3D33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">VEEV</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Health Information Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $42.26B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #608</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#250 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#130 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Veeva Systems Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$260.98</div>
+      <div class="price-change" style="color:var(--green);">+$0.18 (+0.07%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Sep 11 was trading around $262.4 intraday when sources were fetched; that quote is deliberately not used.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Pleasanton, California</div>
+    <div class="meta-item"><span>Employees:</span> 7,928</div>
+    <div class="meta-item"><span>IPO:</span> October 16, 2013</div>
+    <div class="meta-item"><span>Fiscal Year End:</span> January 31</div>
+    <div class="meta-item"><span>Next Earnings:</span> Early December 2026 (est. — Q3 FY2027 date not confirmed on sources fetched)</div>
+    <div class="meta-item"><span>Index:</span> S&amp;P 500 since May 7, 2026</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Veeva Systems sells industry-specific cloud software and data to life sciences — pharmaceutical, biotech and medical-device companies — covering everything from clinical trial management and regulatory submissions through to the tablet a sales rep carries into a physician's office. <strong>Fiscal 2026, which ended January 31, 2026, produced $3,195M of revenue, up 16.3%</strong> from $2,747M in FY2025, with GAAP operating income of $947M (29.6% margin) and $1,386M of free cash flow. On September 10, 2026 the market capitalisation was roughly <strong>$42.3B, ranking about #608 globally</strong>. Veeva joined the <strong>S&amp;P 500 on May 7, 2026</strong>, replacing Coterra Energy — confirmed on S&amp;P Global's own announcement page.</p>
+  <p class="prose" style="margin-top:16px;"><strong>A note on the calendar before anything else, because almost every number on this page depends on it.</strong> Veeva's fiscal year ends on <strong>January 31</strong>. So "FY2026" is the year that ended <em>January 2026</em> — it is mostly calendar 2025. The most recent reported quarter is <strong>fiscal Q2 FY2027, the three months ended July 31, 2026</strong>, reported on August 26, 2026. Anyone comparing Veeva's "2026" to a calendar-year company's 2026 is off by roughly eleven months. Every fiscal label below is stated explicitly.</p>
+  <p class="prose" style="margin-top:16px;">The central debate is a migration. Veeva's original commercial CRM was built on Salesforce's platform; the company has spent years building <strong>Vault CRM</strong> on its own Vault architecture and moving customers onto it. That transition is the live story, and it is visible in the segment numbers: in Q2 FY2027, <span class="tip" title="Research and Development">R&amp;D</span> and Quality subscription revenue grew <strong>19%</strong> while Commercial subscription revenue grew <strong>13%</strong>. Management says Vault CRM had "its best quarter ever," with <strong>over 180 customers live</strong> and <strong>12 of the top 20 biopharmas committed globally</strong>. The question this page works through is whether the Commercial half is mid-transition and about to reaccelerate, or whether that 13% is simply what a mature CRM franchise grows at — and whether a 44.8% non-<span class="tip" title="Generally Accepted Accounting Principles — the standard US financial reporting rules. Non-GAAP figures exclude items management considers non-operational, most often stock-based compensation.">GAAP</span> operating margin with no borrowings deserves 43× trailing earnings.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Peter Gassner</div>
+      <div class="card-note">Named as CEO in the Q2 FY2027 earnings release (Aug 26, 2026): "AI is opening up the next big chapter for Veeva and life sciences. Vault CRM had its best quarter ever and Veeva Falcon accelerated rapidly." Founder-CEO; the strategic bet on rebuilding CRM on Veeva's own Vault platform is his.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Brian Van Wagener</div>
+      <div class="card-note">Named as CFO in the same Q2 FY2027 release: "Second quarter results exceeded guidance on all metrics and our view for the full year improved across the board." Owns the guidance cadence — revenue, non-GAAP operating income and non-GAAP EPS ranges each quarter.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">Not verified</div>
+      <div class="card-note"><strong>161.91M shares outstanding.</strong> Specific institutional stakes could not be verified from the sources fetched (the holders page returned a 404) and are therefore not listed rather than estimated. What is verifiable: short interest is 5.84M shares, 3.61% of shares outstanding, and the company pays no dividend.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Veeva cuts its revenue two ways at once, and both cuts matter. The first is <strong>subscription services versus professional services</strong> — recurring software against consulting and implementation work. The second is <strong>Commercial Solutions versus R&amp;D and Quality Solutions</strong> — selling to the sales-and-marketing side of a drug company versus the clinical, regulatory and quality side. The bar below is the intersection of both for <strong>fiscal Q2 FY2027 (quarter ended July 31, 2026)</strong>, the most recent reported quarter, taken from the company's own earnings release. Total revenue was <strong>$928.0M, up 18% year over year</strong>.</p>
+  <div class="seg-bar">
+    <div style="flex:45.2;background:#FF6A3D;">R&amp;D SUBS 45.2%</div>
+    <div style="flex:37.4;background:#3b82f6;color:#fff;">COMM SUBS 37.4%</div>
+    <div style="flex:10.9;background:#a78bfa;">R&amp;D SVCS 10.9%</div>
+    <div style="flex:6.4;background:#f59e0b;">COMM SVCS 6.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#FF6A3D;"></span> R&amp;D &amp; Quality subscription — $419.4M (+19% <span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Commercial subscription — $347.4M (+13% YoY)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> R&amp;D &amp; Quality services — $101.5M (+24% YoY)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Commercial services — $59.7M (+25% YoY)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Rolled up the other way: <strong>subscription services $766.8M (82.6% of revenue, +16% YoY)</strong> and <strong>professional services and other $161.2M (17.4%, +24% YoY)</strong>. Note the shape — services is the faster-growing line. That is normally a <em>negative</em> mix signal for a software company, since consulting carries far lower gross margin than subscription. Here it is more ambiguous: implementation work is what a platform migration generates, and services revenue today is often subscription revenue in eighteen months. The FY2026 full-year split by these four buckets could not be retrieved from the sources fetched, so this section uses the verified quarterly split rather than an annualised guess.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #FF6A3D;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">R&amp;D and Quality Solutions</div>
+        <span class="biz-badge growth">GROWTH ENGINE — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$419.4M</div><div class="biz-stat-label">Q2 FY27 Subs Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+19%</div><div class="biz-stat-label">Subs YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">56.1%</div><div class="biz-stat-label">Rev Mix (subs+svcs)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The clinical, regulatory and quality stack — <span class="tip" title="Clinical Trial Management System: software that plans, tracks and administers a clinical trial's sites, patients and milestones">CTMS</span>, electronic data capture, <span class="tip" title="Electronic Trial Master File: the regulated document repository that proves a clinical trial was run properly">eTMF</span>, regulatory submission management, quality management and document control. This is the stickier half of Veeva by a wide margin. Regulated systems that hold trial and submission records are audited by health authorities, validated on installation, and embedded in standard operating procedures; ripping one out mid-programme is not a procurement decision, it is a regulatory event. That is why this segment compounds at <strong>19% subscription growth</strong> with services alongside it growing <strong>24%</strong> — new modules land on top of an installed base rather than replacing it. Combined R&amp;D and Quality revenue (subscription plus services) was <strong>$520.9M in Q2 FY2027, 56.1% of the company</strong>. Margin profile: subscription gross margin at the company level ran <strong>74.96%</strong> on a trailing twelve-month basis, and the R&amp;D subscription line is the higher-quality portion of it.</p>
+    <div class="biz-tam"><strong>Category size:</strong> third-party <span class="tip" title="Total Addressable Market: the estimated total annual revenue opportunity for a product category">TAM</span> estimates for life-sciences clinical and regulatory software were not verified from the sources fetched and are deliberately omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">IQVIA (IQV)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Rev — not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Medidata (Dassault Systèmes)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment of DSY</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Oracle Health Sciences</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not broken out</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:12px;font-size:13px;">Competitor revenue, share and growth figures were not verified on any page fetched for this report and are shown as <strong>n/d</strong> rather than estimated. The competitive set is named from the products, not from a sourced share table.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Commercial Solutions</div>
+        <span class="biz-badge emerging">IN MIGRATION — VAULT CRM TRANSITION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$347.4M</div><div class="biz-stat-label">Q2 FY27 Subs Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+13%</div><div class="biz-stat-label">Subs YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">43.9%</div><div class="biz-stat-label">Rev Mix (subs+svcs)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The sales-and-marketing side: <span class="tip" title="Customer Relationship Management: the system a sales organisation uses to track accounts, calls and interactions — here, pharmaceutical reps calling on physicians">CRM</span> for pharmaceutical field forces, plus content management, medical-affairs tooling and commercial data. This is where the migration story lives. Veeva's legacy CRM ran on Salesforce's platform; <strong>Vault CRM</strong> is the replacement built on Veeva's own Vault architecture, and moving a global field force between the two is a multi-year, customer-by-customer project. The verified state of play as of the Q2 FY2027 release: <strong>more than 180 Vault CRM customers live, including five of the top 20 biopharmas</strong>; <strong>two further top-20 biopharmas plus one large enterprise committed during August</strong>, taking total top-20 commitments to <strong>12 globally</strong>; and one top-20 customer deployed Vault CRM together with Agentic Call Report across its entire U.S. field team in the quarter. Commercial subscription growth of <strong>13%</strong> is the slowest of the four revenue lines; commercial <em>services</em> at <strong>+25%</strong> is the fastest, which is exactly the fingerprint of a migration in flight — consulting hours today, subscription renewals tomorrow.</p>
+    <div class="biz-tam"><strong>The falsifiable claim:</strong> 12 of the top 20 biopharmas committed, 5 live. If commercial subscription growth has not moved off 13% once the remaining 7 go live, the migration was not the reason it was 13%.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Salesforce (Life Sciences Cloud)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Rev — not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">IQVIA (OCE)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Rev — not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Professional Services &amp; Other</div>
+        <span class="biz-badge emerging">17.4% OF REVENUE — FASTEST GROWING LINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$161.2M</div><div class="biz-stat-label">Q2 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+24%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/a</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">17.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Implementation, configuration, data migration, business consulting and training — split $101.5M R&amp;D and Quality, $59.7M Commercial. Growing faster than subscription (24% vs 16%), which cuts both ways. Structurally, consulting is lower-margin and less valuable per dollar than software, so a rising services mix is a modest drag on blended gross margin. Cyclically, it is the leading indicator: nobody pays Veeva to migrate a field force off Salesforce-based CRM unless they intend to subscribe to Vault CRM afterwards. The CEO's framing in the Q2 release explicitly bundles "deep industry applications, agents, data, and consulting" as one offer, which suggests the services line is a deliberate strategic layer rather than a reluctant necessity.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> if services growth stays above subscription growth for several more quarters <em>without</em> commercial subscription accelerating, the mix shift stops being a migration signal and starts being a margin problem.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">REGULATORY VALIDATION LOCK-IN</span>
+    <span class="moat-pill">SINGLE-INDUSTRY DEPTH</span>
+    <span class="moat-pill">SYSTEM-OF-RECORD DATA</span>
+    <span class="moat-pill">TOP-20 BIOPHARMA PENETRATION</span>
+    <span class="moat-pill">MULTI-PRODUCT ATTACH</span>
+    <span class="moat-pill">44.8% NON-GAAP OP MARGIN</span>
+    <span class="moat-pill">ZERO-DEBT BALANCE SHEET</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The moat is <strong>regulatory, not technical</strong>. Veeva's software holds the records that health authorities inspect: trial master files, submission dossiers, quality deviations, promotional-material approvals. Those systems are formally validated when installed and re-validated when changed, and the customer's own standard operating procedures reference them by name. Switching is therefore not a software project with a budget — it is a compliance project with an audit trail, and the executive who authorises it owns the risk personally. That is a materially harder wall to climb than "our product is better," and it explains a set of numbers that do not usually coexist: <strong>74.96% gross margin</strong>, a <strong>44.8% non-GAAP operating margin</strong> in Q2 FY2027 (29.6% on a GAAP basis), <strong>$1.64B of trailing free cash flow</strong>, and a balance sheet carrying <strong>$7.24B of cash and short-term investments against $151.7M of reported total debt</strong> — a <span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">debt-to-equity</span> ratio of <strong>0.02</strong>, and an enterprise value ($35.46B) roughly $7B below the market cap. Veeva is one of the few scaled software companies with essentially no borrowings, and it funds every expansion from operating cash.</p>
+  <p class="prose" style="margin-top:16px;">The second layer is single-industry depth. A horizontal platform vendor has to build life-sciences features as one vertical among twenty; Veeva builds nothing else. The <strong>12 of the top 20 biopharmas now committed to Vault CRM</strong> did not choose it on price. But note what the moat does <em>not</em> cover: it protects the R&amp;D and Quality franchise far more completely than the Commercial one. A CRM system is not inspected by the FDA. That asymmetry is visible in the growth rates — 19% versus 13% — and it is the honest starting point for the vulnerabilities below.</p>
+  <p class="prose" style="margin-top:20px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The CRM franchise is the contestable half.</strong> Commercial subscription growth of 13% is the slowest line in the business, and CRM is precisely the product where the regulatory switching cost is weakest. Salesforce, having lost the Veeva partnership, has every incentive to compete directly for life-sciences CRM with its own vertical offering, and it can subsidise that effort from a revenue base many times Veeva's. Veeva is simultaneously migrating its own installed base onto a new platform and defending it — the most exposed moment in any platform transition.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Customer concentration in a consolidating industry.</strong> Veeva's revenue rests on a small number of very large pharmaceutical companies — the release itself counts progress in units of "top 20 biopharmas." Pharma mergers remove customers by arithmetic, and a single large customer rationalising its systems after a merger can cost more than a dozen mid-size wins. R&amp;D budget cuts at two or three majors would show up in Veeva's numbers within a few quarters.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>The GAAP / non-GAAP gap is not cosmetic.</strong> Q2 FY2027 non-GAAP operating income was $415.9M against GAAP operating income of $275.0M — a <strong>$140.9M quarterly difference, 15.2 percentage points of margin</strong>. The headline "44.8% operating margin" that makes Veeva look like one of the most profitable software businesses in the market becomes 29.6% on a GAAP basis. GAAP 29.6% is still excellent; the point is that the multiple is frequently justified with the 44.8% figure.</div></div>
+    <div class="risk-item"><span class="risk-num">▸</span><div><strong>Valuation leaves no margin for a slip.</strong> At $260.98 the stock trades at roughly <strong>42.8× trailing GAAP earnings</strong> of $6.10 and about <strong>28× the ~$9.21 of non-GAAP FY2027 EPS the company guides to</strong>, on 15–16% revenue growth. That is a price that requires both halves of the business to work. The April 2026 low of $155.97 — a 47.6% drawdown from the September 2025 monthly close — is a recent demonstration of how fast this multiple can compress when growth is questioned.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">VEEV column from stockanalysis.com statistics, re-based to the <strong>September 10, 2026 close of $260.98</strong> where the ratio depends on price. <strong>The Industry Avg and S&amp;P 500 columns are shown as "—" because no single verified source for them was fetched for this report</strong> — they are left blank rather than filled with plausible-looking estimates. Colour coding in the VEEV column therefore reflects the absolute character of each metric and the context note, not a numerical comparison.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>VEEV</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of annual profit.">P/E</span></td><td style="color:var(--red);">42.78</td><td>—</td><td>—</td><td>$260.98 ÷ $6.10 <span class="tip" title="Trailing Twelve Months">TTM</span> <span class="tip" title="Earnings Per Share">EPS</span>. Source page showed 43.09 against its intraday quote. Rich in absolute terms for 16% revenue growth.</td></tr>
+      <tr><td>Forward <span class="tip" title="Price divided by forecast earnings per share for the next twelve months, based on analyst consensus.">P/E</span></td><td style="color:var(--amber);">27.19</td><td>—</td><td>—</td><td>As reported. Against the company's own FY2027 non-GAAP EPS guide of ~$9.21, the multiple is 28.3×. Both are non-GAAP-based; the GAAP forward figure is materially higher.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally considered cheap relative to growth.">PEG</span> Ratio</td><td style="color:var(--green);">0.77</td><td>—</td><td>—</td><td>The one metric that makes VEEV look inexpensive — and it does so on forecast growth, not realised growth. Consensus FY2027 EPS growth is 14.0%.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the last twelve months, GAAP basis">EPS</span> (<span class="tip" title="Trailing Twelve Months">TTM</span>)</td><td style="color:var(--green);">$6.10</td><td>—</td><td>—</td><td>GAAP, up 25.5% year over year. FY2026 diluted EPS was $5.44; Q2 FY2027 alone was $1.66 GAAP / $2.35 non-GAAP.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year: change versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+16.5%</td><td>—</td><td>—</td><td>TTM. FY2026 grew 16.3%; Q2 FY2027 grew 17.6% on stockanalysis's calculation and 18% as the company rounds it. Growth is stable, not accelerating sharply.</td></tr>
+      <tr><td><span class="tip" title="Revenue minus cost of revenue, as a percentage of revenue">Gross Margin</span></td><td style="color:var(--green);">74.96%</td><td>—</td><td>—</td><td>TTM. High but not top-decile software, because 17.4% of revenue is professional services. Q2 FY2027 gross profit was $695.9M on $928.0M.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue">Net Profit Margin</span></td><td style="color:var(--green);">29.34%</td><td>—</td><td>—</td><td>TTM, GAAP. $1.01B of net income on $3.46B of revenue. Operating margin 29.93% GAAP; 44.8% non-GAAP in Q2 FY2027.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--text-dim);">None</td><td>—</td><td>—</td><td>No dividend has ever been paid. All cash is retained; the balance sheet holds $7.24B of cash and short-term investments.</td></tr>
+      <tr><td><span class="tip" title="Percentage of shares sold short — a gauge of bearish positioning">Short Interest</span> %</td><td style="color:var(--green);">3.61% of shares</td><td>—</td><td>—</td><td>5.84M shares short against 161.91M outstanding. Modest. This is not a crowded short despite the valuation.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity — a leverage gauge">Debt-to-Equity</span></td><td style="color:var(--green);">0.02</td><td>—</td><td>—</td><td><strong>Effectively debt-free.</strong> $151.7M of reported total debt against $7.24B of cash and short-term investments. Enterprise value $35.46B sits ~$7B below market cap — you are buying the operating business at a discount to the screen price.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity">Current Ratio</span></td><td style="color:var(--green);">5.46</td><td>—</td><td>—</td><td>Extremely liquid, and inflated by the investment portfolio. Deferred revenue sits in current liabilities, so this is conservative if anything.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure — cash generated after maintaining the asset base, but before deducting stock-based compensation.">Free Cash Flow</span></td><td style="color:var(--green);">$1.64B</td><td>—</td><td>—</td><td>TTM; operating cash flow $1.67B on capex of just $26.7M. FCF is 1.6× GAAP net income. Capital intensity is close to zero — this is why the balance sheet compounds cash.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity">ROE</span></td><td style="color:var(--amber);">14.42%</td><td>—</td><td>—</td><td>Understated, and for a good reason: the equity base is swollen by $7.24B of cash earning treasury yields. A cash-rich balance sheet mathematically depresses ROE.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the capital actually employed in the business">ROIC</span></td><td style="color:var(--green);">363.83%</td><td>—</td><td>—</td><td>As reported. Treat the precise figure with caution — when invested capital is nearly zero (no debt, minimal capex, huge cash), ROIC becomes a near-meaningless ratio. The qualitative read is right: the operating business requires almost no capital.</td></tr>
+      <tr><td><span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">Beta</span></td><td style="color:var(--green);">0.97</td><td>—</td><td>—</td><td>5-year. Essentially market-like — unusual for a 43× software stock, and a reflection of healthcare-sector classification. Note that a 0.97 beta did not prevent a 47.6% drawdown between September 2025 and April 2026.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text-dim);">$148.05 – $310.50</td><td>—</td><td>—</td><td>The $260.98 close sits at the 74th percentile of the range. The 52-week price change is −4.24% — the stock has essentially round-tripped a year in which revenue grew 16%.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:32px;"><strong>Notable One-Off Items</strong></p>
+  <p class="prose" style="margin-top:8px;">No acquisitions, restructurings, impairments or litigation settlements of a size that would distort the reported figures were identified on the pages fetched for this report. The trailing numbers appear to be clean operating results. Two structural — not one-off — items deserve the attention that one-offs usually get:</p>
+  <p class="prose" style="margin-top:12px;"><strong>The GAAP-to-non-GAAP bridge.</strong> In Q2 FY2027 the gap between $415.9M non-GAAP operating income and $275.0M GAAP operating income was <strong>$140.9M in a single quarter</strong> — roughly 15.2 points of operating margin. This recurs every quarter and is predominantly stock-based compensation and related items. It is not a one-off, which is precisely why it should not be mentally filed as one. The company's FY2027 guidance of ~$1,640M of operating income and ~$9.21 of EPS is stated on the non-GAAP basis; the GAAP equivalents will be materially lower.</p>
+  <p class="prose" style="margin-top:12px;"><strong>The fiscal-calendar trap.</strong> FY2026 ended January 31, 2026 and FY2027 ends January 31, 2027. Screeners and news summaries routinely compare Veeva's "FY2026" revenue of $3.195B against calendar-2026 figures for peers. Growth rates built that way are wrong by a quarter. Every figure on this page is labelled with its fiscal period for that reason.</p>
+  <p class="prose" style="margin-top:12px;"><strong>Margin trajectory, for context on whether 29.6% GAAP is the new normal.</strong> GAAP operating margin by fiscal year: FY2022 27.3%, FY2023 21.3%, FY2024 18.2%, FY2025 25.4%, FY2026 29.6%. The FY2023–FY2024 trough coincided with the platform-rebuild investment period; the recovery since is the clearest single piece of evidence that the Vault transition is passing its peak cost.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">28 analysts covering (stockanalysis.com, ratings as of August 2026). Not unanimous — there is one Strong Sell on the panel, which is rare for a name of this quality.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$297.30</div><div class="card-note"><strong>+13.9%</strong> versus the $260.98 close. Median target $300 (+14.9%) sits slightly above the mean, so the distribution is mildly left-skewed by the low outlier.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$180 – $350</div><div class="card-note">−31.0% to +34.1%. A 1.9× spread. The bear target of $180 is below the April 2026 monthly low area and implies the migration stalls; the $350 bull case implies commercial reacceleration.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">19 / 8 / 1</div><div class="card-note">11 Strong Buy + 8 Buy, 8 Hold, 0 Sell, 1 Strong Sell. Eight Holds on 28 analysts is a meaningful neutral bloc — this is not a consensus long.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:11;background:var(--green);"></div>
+    <div style="flex:8;background:#4ade80;"></div>
+    <div style="flex:8;background:var(--amber);"></div>
+    <div style="flex:0.01;background:var(--red);"></div>
+    <div style="flex:1;background:#b91c1c;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 11</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 8</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 8</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell — 0</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#b91c1c;"></span> Strong Sell — 1</div>
+  </div>
+  <p class="prose" style="margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Wells Fargo</strong> — Stan Berenshteyn, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$330</span> (+26.4% versus the close). Near the top of the range; consistent with the view that the Vault CRM migration converts into commercial reacceleration.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Raymond James</strong> — Brian Peterson, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$330</span> (+26.4%). Matches Wells Fargo at the high end of the mainstream bull case.</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>Oppenheimer</strong> — Kenneth Wong, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$325</span> (+24.5%).</div></div>
+    <div class="risk-item"><span style="color:var(--green);">●</span><div><strong>J.P. Morgan</strong> — Alexei Gogolev, <strong>Buy</strong>, price target <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$299</span> (+14.6%). A buy rating with a target essentially at the consensus average — constructive but not enthusiastic.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);">●</span><div><strong>Citi</strong> — Tyler Radke, <strong>Hold</strong>, price target <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$273</span> (+4.6%). The shape of this call is the one to notice: a target 4.6% above the market is a polite way of saying the stock is fairly valued after the August move.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were read off the fetched stockanalysis.com forecast page, which lists firm, analyst and target. Individual call <em>dates</em> were not shown on that page and are therefore not stated; the rating breakdown is dated August 2026. No named calls from MarketBeat, Benzinga or TipRanks were fetched for this report, and none are reported.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Apr 30 / May 7, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">S&amp;P 500 inclusion, replacing Coterra Energy</div>
+        <div class="tl-desc">S&amp;P Global announced on April 30, 2026 that Veeva would replace Coterra Energy in the S&amp;P 500 effective before the open on Thursday, May 7, 2026, the change driven by Devon Energy's pending acquisition of Coterra. Index inclusion forces a one-off wave of passive buying and permanently widens the institutional owner base — it does not change a single operating metric. Veeva's April 2026 monthly close of $155.97 was its five-year low; the announcement landed at the bottom.</div>
+        <div class="tl-impact up">Happened — structural demand for the shares</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 FY2027 results — beat on every guided metric</div>
+        <div class="tl-desc">Revenue $928.0M (+18% YoY); subscription $766.8M (+16%); professional services $161.2M (+24%). GAAP operating income $275.0M (+40%, 29.6% margin); non-GAAP operating income $415.9M (44.8% margin). GAAP EPS $1.66, non-GAAP EPS $2.35. The CFO's line was that results "exceeded guidance on all metrics and our view for the full year improved across the board." The stock closed August at $285.69 against a July close of $203.78.</div>
+        <div class="tl-impact up">Reaction: +40.2% over the month of August</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Guidance: revenue $932–935M, non-GAAP operating income $417–420M, non-GAAP EPS $2.33–2.34</div>
+        <div class="tl-desc">For the quarter ending October 31, 2026. Note the shape: the revenue midpoint of $933.5M is only 0.6% above Q2's $928.0M, and the non-GAAP EPS guide of $2.33–2.34 is fractionally <em>below</em> Q2's $2.35. Sequential guidance this flat, immediately after an 18% growth quarter, is the detail a bull and a bear will read in opposite directions — conservatism versus a genuine plateau.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Dec 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2027 earnings report</div>
+        <div class="tl-desc">The exact date was not confirmed on the sources fetched — stockanalysis.com still listed the already-passed August 26 date. Veeva has historically reported its October-quarter results in early December. The item to watch is commercial subscription growth: it was 13% in Q2 FY2027 against R&amp;D's 19%, and the whole migration thesis turns on whether that number starts moving.</div>
+        <div class="tl-impact neutral">Key near-term event — date unconfirmed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027 (to Jan 31, 2027)</div>
+      <div class="tl-content">
+        <div class="tl-title">Full-year guidance: revenue $3,682–3,687M, non-GAAP operating income ~$1,640M, non-GAAP EPS ~$9.21</div>
+        <div class="tl-desc">The revenue midpoint implies roughly 15.4% growth on FY2026's $3,195M — in line with the consensus $3.69B. A ~$1,640M non-GAAP operating income on ~$3,684M of revenue is a <strong>44.5% full-year non-GAAP operating margin</strong>, which would be among the highest of any software company at this scale. The GAAP equivalent will run roughly 15 points lower.</div>
+        <div class="tl-impact up">Guidance raised at Q2</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Vault CRM migration — 180+ live, 12 of top 20 biopharmas committed</div>
+        <div class="tl-desc">As of the Q2 FY2027 release: over 180 Vault CRM customers live including five of the top 20 biopharmas; two additional top-20 biopharmas and one large enterprise committed during August, taking global top-20 commitments to 12. One top-20 customer rolled out Vault CRM and Agentic Call Report across its entire U.S. field team during the quarter. The gap between 12 committed and 5 live is the pipeline that should convert to subscription revenue over the coming fiscal years.</div>
+        <div class="tl-impact up">The core thesis — measurable each quarter</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Veeva Falcon and agentic AI products</div>
+        <div class="tl-desc">The CEO's Q2 quote led with AI: "AI is opening up the next big chapter for Veeva and life sciences… Veeva Falcon accelerated rapidly," alongside a named product, Agentic Call Report, deployed at a top-20 customer. Financial contribution from AI products was not separately disclosed in the release and is therefore not quantified here. Directionally it is the argument for why a 15%-growth business should hold a premium multiple; until it is broken out in the numbers it remains narrative.</div>
+        <div class="tl-impact neutral">Narrative driver — not yet quantified in disclosures</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 STOCK PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-muted);letter-spacing:1px;">VEEV — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">Month-end closes (unadjusted); final point is the Sep 10, 2026 close, not a month-end</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:20px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#FF6A3D;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px;margin-bottom:8px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-muted);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;max-width:760px;">RSI compares the size of recent gains to the size of recent losses on a 0–100 scale. Above 70 is conventionally read as "overbought" — the stock has risen fast and may be due a pause; below 30 is "oversold." It measures momentum, not value: a company can be expensive with a low RSI or cheap with a high one. Calculated here on the 60 monthly closes above, using a 6-month lookback.</p>
+    <div class="chart-canvas-wrap" style="height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;"><strong>Five-year trajectory.</strong> From the October 2021 close of <strong>$317.01</strong> to the September 10, 2026 close of <strong>$260.98</strong>, VEEV is <strong>down 17.7%</strong> over five years — roughly <strong>−3.8% compounded annually</strong>, with no dividend to soften it. Over the same five years revenue went from $1.85B (FY2022) to a trailing $3.46B and GAAP EPS from $2.63 to $6.10. The business roughly doubled and the share price fell by a sixth. That is the entire five-year story in one sentence: this has been a multiple-compression name, not a fundamental disappointment. The starting point was a peak-liquidity software multiple; the market has spent five years taking it apart.</p>
+  <p class="prose" style="margin-top:16px;">Inside that flat-to-down line, the volatility has been severe despite a reported <span class="tip" title="A measure of a stock's volatility relative to the overall market. Above 1.0 means it moves more than the market.">beta</span> of only 0.97. The stock fell <strong>49.1%</strong> from October 2021 to the December 2022 close of $161.38, spent 2023 and 2024 chopping sideways in a $165–$232 band, broke out to a monthly-close high of <strong>$297.91 in September 2025</strong>, then lost <strong>47.6%</strong> in seven months to the April 2026 close of <strong>$155.97</strong> — the five-year low, and the month before S&amp;P 500 inclusion was announced. From there it has risen <strong>67.3%</strong> in five months, including a <strong>+40.2% single month in August 2026</strong> around the Q2 FY2027 print, before giving back 8.6% in the first ten days of September. An investor's outcome here has depended almost entirely on entry date.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Relative performance.</strong> Total-return series for the S&amp;P 500 and the NASDAQ-100 over the identical October 2021 – September 2026 window were not fetched for this report, so no precise relative figure is stated. What can be said from verified data on this page: VEEV's <strong>52-week price change is −4.24%</strong>, and over the five-year window it is down 17.7% in price terms. Both the S&amp;P 500 — the benchmark index for this NYSE listing, which VEEV joined on May 7, 2026 — and the NASDAQ-100 posted positive total returns over the same five years; VEEV has therefore underperformed both, and the underperformance is a valuation story rather than an earnings story. The 0.97 beta is worth treating with suspicion: a stock that fell 47.6% peak-to-trough in seven months and then rose 40% in a single month is not behaving like a market-tracking asset, and the low measured beta largely reflects the fact that its drawdowns have been idiosyncratic rather than correlated.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>Inflection points</strong></p>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 2021</div><div class="tl-content"><div class="tl-title">$317.01 — the peak-liquidity high</div><div class="tl-desc">The five-year window opens at the top. Veeva was trading on the same zero-rate software multiple as everything else in the category, on FY2022 revenue of $1.85B.</div><div class="tl-impact neutral">Starting point of the 5-year window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2022</div><div class="tl-content"><div class="tl-title">$161.38 — −49.1% from the high</div><div class="tl-desc">The rate-driven de-rating of high-multiple software, compounded by Veeva's own slowdown: revenue growth fell from 26.3% in FY2022 to 16.4% in FY2023 and then 9.7% in FY2024, while GAAP operating margin compressed from 27.3% to 18.2% as the Vault platform rebuild absorbed spending.</div><div class="tl-impact down">Growth slowdown meets multiple compression</div></div></div>
+    <div class="tl-item"><div class="tl-date">2023 – 2024</div><div class="tl-content"><div class="tl-title">$161 → $210 — two years of range-trading</div><div class="tl-desc">The stock spent 24 months between roughly $165 and $232, going nowhere while the company worked through the FY2024 trough (9.7% growth, 18.2% GAAP operating margin) and began rebuilding. Patience was not rewarded in price during this stretch.</div><div class="tl-impact neutral">Dead money while the rebuild ran</div></div></div>
+    <div class="tl-item"><div class="tl-date">May – Sep 2025</div><div class="tl-content"><div class="tl-title">$233.69 → $297.91 — the re-acceleration rally</div><div class="tl-desc">FY2025 delivered 16.2% growth and GAAP operating margin back to 25.4%; FY2026 followed with 16.3% and 29.6%. The market paid for the recovery, taking the stock up 27% in five months to its five-year monthly-close high in September 2025.</div><div class="tl-impact up">Margin recovery repriced</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025 – Apr 2026</div><div class="tl-content"><div class="tl-title">$291.20 → $155.97 — a 47.6% drawdown in seven months</div><div class="tl-desc">A relentless, uninterrupted monthly decline: 291.20, 240.29, 223.23, 203.92, 182.01, 175.66, 155.97. Seven consecutive down months. No single event on the pages fetched explains it; the pattern is consistent with a sustained de-rating of high-multiple software combined with scepticism about the pace of the Vault CRM migration and about life-sciences customer spending.</div><div class="tl-impact down">Five-year low — maximum scepticism</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 7, 2026</div><div class="tl-content"><div class="tl-title">$174.34 (May close) — S&amp;P 500 inclusion</div><div class="tl-desc">Announced April 30, effective May 7, replacing Coterra Energy. The stock closed May up 11.8% from the April low and did not make a new low again. Index inclusion arrived at almost exactly the bottom — a reminder that forced passive buying is a flow event, and flow events matter most when positioning is washed out.</div><div class="tl-impact up">Flow inflection</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">$203.78 → $285.69 — +40.2% in one month</div><div class="tl-desc">The Q2 FY2027 report on August 26 beat on every guided metric, raised the full year, and carried the "best quarter ever" Vault CRM line plus 12 top-20 biopharma commitments. August 31 alone traded a $273.60–$290.47 range on 2.8M shares. A 40% monthly move in a $42B company is a re-rating, not a reaction.</div><div class="tl-impact up">The August re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2026</div><div class="tl-content"><div class="tl-title">$260.98 — an 8.6% give-back</div><div class="tl-desc">From the August 31 close of $285.69, the stock has drifted lower through the first ten sessions of September: $279.23, $280.72, $284.38, $275.09, $264.84, $260.80, $260.98. Consolidation after a 40% month is unremarkable; the level still sits 67% above the April low and 12% below the September 2025 high.</div><div class="tl-impact neutral">Consolidation — current level</div></div></div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY & KEY RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Veeva owns the regulated systems of record for the pharmaceutical industry, and that position produces financials almost no software company at $3.5B of revenue can match: 74.96% gross margin, a 44.8% non-GAAP operating margin, $1.64B of free cash flow on $26.7M of capex, and $7.24B of cash against effectively no debt. The Vault CRM migration is visibly working — 180+ customers live, 12 of the top 20 biopharmas committed, and commercial services growing 25% as the implementation pipeline builds. If commercial subscription growth moves from 13% toward the R&amp;D segment's 19% as those commitments go live, revenue growth reaccelerates from a 15–16% base with no incremental capital required, and a PEG of 0.77 on a 28× forward multiple starts to look like the right price rather than a full one.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are paying 42.8× trailing GAAP earnings for 16% revenue growth that has been remarkably stable — and stable is another word for not accelerating. FY2027 guidance implies 15.4% growth, slightly slower than FY2026, and Q3 guidance puts non-GAAP EPS fractionally <em>below</em> Q2's. The headline 44.8% margin is non-GAAP; the GAAP figure is 29.6%, a $140.9M-per-quarter difference that recurs forever. Commercial, the contestable half of the business, is growing at 13% while a well-capitalised Salesforce competes directly for life-sciences CRM. And the price chart is a warning: this stock fell 47.6% in seven months as recently as April 2026, on no identifiable disaster, purely because the multiple moved.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:32px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>The Commercial migration stalls or leaks.</strong> Twelve of the top 20 biopharmas are committed but only five are live. Every migration is a re-evaluation moment, and CRM is the one Veeva product a customer can change without a regulatory filing. If commercial subscription growth is still 13% two or three quarters from now, the "mid-transition" explanation expires and what remains is a mature franchise growing at low-teens rates inside a 43× multiple.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Multiple compression without any operating deterioration.</strong> The five-year record is unambiguous: revenue nearly doubled, GAAP EPS more than doubled, and the share price fell 17.7%. The 2025–26 drawdown of 47.6% happened without a broken quarter. At 42.8× trailing and 28× guided non-GAAP earnings, the same thing can happen again, and nothing in the operating results would warn you first.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Customer concentration in a consolidating, budget-constrained industry.</strong> Veeva's disclosures measure progress in top-20 biopharmas. That concentration cuts both ways: each win is large, and each loss, merger or R&amp;D budget cut at a major customer is correspondingly large. Pharmaceutical R&amp;D spending is not a stable input — it moves with drug-pricing policy, patent cliffs and the cost of capital — and Veeva has no diversification outside the industry by design.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div><div class="biz-name">Agentic AI arrives in a regulated industry</div>
+      <span class="biz-badge growth">EMERGING TAILWIND</span></div>
+    </div>
+    <p class="biz-desc">The Q2 FY2027 release led, in the CEO's own words, with AI: "AI is opening up the next big chapter for Veeva and life sciences… Veeva Falcon accelerated rapidly," alongside a named agentic product — Agentic Call Report — deployed across an entire U.S. field team at a top-20 biopharma. The structural point in Veeva's favour is that life sciences cannot adopt general-purpose AI casually: outputs that touch clinical records, regulatory submissions or promotional claims must be traceable, validated and auditable. A vendor that already owns the validated system of record is better positioned to sell an agent that writes into it than a horizontal AI vendor is. The structural point against: <strong>Veeva has not disclosed any revenue figure for Falcon or its agentic products</strong>, so the contribution is currently narrative rather than measurable. It is, however, the most plausible mechanism by which a 15%-growth company reaccelerates.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div><div class="biz-name">The two halves of pharma software are diverging</div>
+      <span class="biz-badge emerging">ONGOING HEADWIND</span></div>
+    </div>
+    <p class="biz-desc">Veeva's own segment data is the cleanest available read on where life-sciences technology budgets are going: <strong>R&amp;D and Quality subscription +19%, Commercial subscription +13%</strong> in the most recent quarter. Money is flowing toward clinical, regulatory and quality systems — the spending a drug company cannot defer without delaying a programme — and more slowly toward commercial tooling, which is discretionary and competitive. That divergence is not unique to Veeva; it describes the category. For Veeva specifically it means the safer, stickier half of the business is also the faster-growing half, which is unusual and favourable, but it also means the migration story attached to the Commercial segment is being asked to overcome a genuine sector headwind rather than simply a product transition.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--red);">
+    <div class="biz-header">
+      <div><div class="biz-name">Index inclusion changed who owns the stock — and what a miss costs</div>
+      <span class="biz-badge dominant">CRITICAL CONSTRAINT</span></div>
+    </div>
+    <p class="biz-desc">Joining the S&amp;P 500 on May 7, 2026 permanently changed the shareholder register: a meaningful slice of the float is now held by index funds that will never sell for fundamental reasons and never buy more on good news. Active money at the margin sets the price against a thinner effective float, which amplifies both directions — and the price record since is exactly that, +67.3% from the April low including a single +40.2% month. <strong>Bull framing:</strong> a permanent passive bid underneath a business generating $1.64B of free cash with no debt, at a PEG of 0.77, with a migration pipeline that has 12 top-20 commitments and only 5 live. <strong>Bear framing:</strong> a stock that just re-rated 40% in a month, guides Q3 non-GAAP EPS slightly below Q2, trades at 42.8× trailing GAAP earnings, and demonstrated in the seven months to April 2026 that it can lose nearly half its value without a single bad quarter. Both framings are built from the same verified numbers; the difference is entirely what you pay.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Price, market cap, 52-week range, sector/industry labels, valuation ratios, margins, balance-sheet and cash-flow metrics, annual and quarterly financials, and the analyst forecast panel (consensus rating, 28 analysts, $297.30 average target, $180–$350 range, rating breakdown and the five named calls) are from <strong>stockanalysis.com</strong> — price source: <strong>https://stockanalysis.com/stocks/veev/history/</strong> (September 10, 2026 close of $260.98; the September 11 intraday quote of ~$262.4 was deliberately not used). Segment revenue, subscription versus professional services detail, GAAP and non-GAAP operating income and margin, EPS, guidance, executive names and quotes, and all Vault CRM migration statistics are from Veeva's own Q2 FY2027 earnings release at <strong>veeva.com</strong> (published August 26, 2026). Monthly closing prices for the chart are the unadjusted "Real Price" series from <strong>digrin.com</strong>, spot-checked against stockanalysis.com (August 2026 month-end matched exactly at $285.69). Global market-cap rank from <strong>companiesmarketcap.com</strong> (#608). S&amp;P 500 inclusion confirmed on <strong>press.spglobal.com</strong> (announced April 30, 2026; effective May 7, 2026, replacing Coterra Energy).</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;"><strong>Where this report is explicitly not sourced:</strong> the US and NYSE market-cap rank pills are marked (est.) and are approximations derived from the global rank, not fetched values. Industry-average and S&amp;P 500 comparison columns in Section 04 are shown as "—" because no verified source for them was fetched. Competitor market shares, revenues and growth rates in Section 02 are shown as n/d for the same reason. TAM estimates are omitted entirely. Institutional holders could not be verified (the holders page returned a 404) and are not listed. The next-earnings date is an estimate; the source page still showed the already-passed August 26, 2026 date. The FY2026 full-year four-way segment split could not be retrieved, so Section 02 uses the verified Q2 FY2027 quarterly split. Individual analyst call dates were not shown on the source page and are not stated. <strong>No chart months were reconstructed or invented</strong> — all 60 points are real closes; the first 59 are month-end closes from October 2021 through August 2026 and the 60th is the September 10, 2026 close, which is a partial-month value, as labelled on the chart.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This document is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. All figures are point-in-time and may be revised or superseded. Past performance does not indicate future results. Conduct your own research and consult a licensed financial professional before making investment decisions.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Oct 2021–Aug 2026: unadjusted month-end "Real Price" (digrin.com), Aug 2026 cross-checked vs stockanalysis.com.
+// Sep 2026: the Sep 10, 2026 close of $260.98 (partial month) — equals the header price.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [317.01,282.58,255.48,236.54,229.05,212.46,181.95,170.26,198.04,223.58,199.32,164.88,167.94,190.36,161.38,170.55,165.66,183.79,179.08,165.70,197.73,204.22,208.70,203.45,192.71,174.31,192.52,207.41,225.51,231.69,198.56,174.25,183.01,191.93,216.44,209.87,208.83,227.85,210.25,233.26,224.14,231.63,233.69,279.70,287.98,284.20,269.20,297.91,291.20,240.29,223.23,203.92,182.01,175.66,155.97,174.34,177.47,203.78,285.69,260.98];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — peak-liquidity high $317.01',            color: '#94a3b8' },
+  { idx: 14, label: 'Dec 2022 — $161.38, −49.1% from the high',          color: '#ef4444' },
+  { idx: 47, label: 'Sep 2025 — monthly-close high $297.91',             color: '#22c55e' },
+  { idx: 54, label: 'Apr 2026 — 5-year low $155.97 (−47.6% in 7 months)',color: '#ef4444' },
+  { idx: 55, label: 'May 2026 — joins S&P 500 (May 7), close $174.34',   color: '#3b82f6' },
+  { idx: 58, label: 'Aug 2026 — Q2 FY27 beat, +40.2% month to $285.69',  color: '#22c55e' },
+  { idx: 59, label: 'Sep 10, 2026 — $260.98 (current, partial month)',   color: '#f59e0b' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255,106,61,0.22)');
+grad.addColorStop(1, 'rgba(255,106,61,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#FF6A3D', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#FF6A3D'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
