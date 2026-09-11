@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDX — Becton, Dickinson and Company | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4DA3E8;
+  --accent-dim: #4DA3E833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">BDX</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Medical Instruments &amp; Supplies</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $48.05B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #498</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#120 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Becton, Dickinson and Company</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$176.42</div>
+      <div class="price-change">−$3.38 (−1.88%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1 Becton Drive, Franklin Lakes, New Jersey</div>
+    <div class="meta-item"><span>Employees:</span> ~60,000 post-separation (72,000 on stockanalysis.com profile — pre-separation basis)</div>
+    <div class="meta-item"><span>Founded:</span> 1897</div>
+    <div class="meta-item"><span>Next Earnings:</span> Early November 2026 (est. — FY2026 Q4 date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Becton, Dickinson and Company is a 129-year-old medical technology manufacturer whose products — syringes, needles, IV catheters, infusion pumps, medication-dispensing cabinets, prefillable drug-delivery systems and interventional devices — sit inside essentially every hospital in the developed world. Fiscal 2025 (year ended September 30, 2025) revenue as then reported was <strong>$21.84B, up 8.2%</strong> from $20.18B, with net income of $1.68B and diluted <span class="tip" title="Earnings per share — net income divided by diluted shares outstanding">EPS</span> of $5.82. The company ranks roughly <strong>#498 globally by market capitalisation</strong>.</p>
+  <p class="prose" style="margin-top:16px;">That FY2025 figure is now a historical artefact, and understanding why is the whole point of this page. <strong>On February 9, 2026, BD completed the separation of its Biosciences &amp; Diagnostic Solutions business and its combination with Waters Corporation.</strong> Those operations are now reported as <span class="tip" title="A business being sold or spun off is stripped out of revenue and operating income and shown as a single after-tax line, with prior periods restated the same way">discontinued operations</span>, prior periods have been restated, and what remains — "New BD" — is a smaller, four-segment, roughly <strong>$19B-revenue</strong> medical-device company. The central debate is whether that smaller company is a cleaner, faster-compounding asset that the market has not yet re-rated, or a low-growth commodity-supplies business that has just given away its most interesting growth engine and is left carrying <strong>$64.15B of enterprise value against $48.05B of equity value</strong> — that is, a balance sheet where debt still does a lot of the talking.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Tom Polen</div>
+      <div class="card-note">Chairman, President and Chief Executive Officer — verified from the BD Q1 and Q3 fiscal 2026 earnings releases (investors.bd.com), where he is quoted by name and title. He owns the "BD 2025 / New BD" strategy and the decision to separate Biosciences &amp; Diagnostic Solutions.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Vitor Roque</div>
+      <div class="card-note">EVP and Chief Financial Officer per the stockanalysis.com BDX company profile (retrieved September 11, 2026). <strong>Caveat:</strong> neither the Q1 nor the Q3 fiscal 2026 press releases fetched quoted a CFO by name — the IR contact on both is Shawn C. Bevec, SVP Investor Relations. Treat this name as sourced but not double-confirmed against a BD-issued document.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">98.19% inst.</div>
+      <div class="card-note">Institutional ownership is <strong>98.19%</strong> of shares against <strong>0.17%</strong> insider ownership, on a float of <strong>271.67M</strong> shares out of 272.39M outstanding. Individual institutional stakes (Vanguard, BlackRock and the like) were <strong>not verified</strong> from the sources fetched and are therefore not listed. Single share class, one vote per share.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Post-separation BD reports <strong>four segments</strong>: Medical Essentials, Connected Care, BioPharma Systems and Interventional. The old "Medical / Life Sciences / Interventional" three-segment structure named in many older write-ups <strong>no longer exists</strong> — BD Life Sciences appeared for the last time in the Q1 fiscal 2026 release at $766M (−8.3% <span class="tip" title="Year over year — compared with the same period one year earlier">YoY</span>) and was gone from the Q3 release. The bar below is the verified nine-month fiscal 2026 mix (October 1, 2025 – June 30, 2026).</p>
+  <div class="seg-bar">
+    <div style="flex:34.68;background:#4DA3E8;">MED ESSENTIALS 34.7%</div>
+    <div style="flex:28.91;background:#f59e0b;">INTERVENTIONAL 28.9%</div>
+    <div style="flex:24.50;background:#22c55e;">CONNECTED CARE 24.5%</div>
+    <div style="flex:11.91;background:#a78bfa;">BIOPHARMA 11.9%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4DA3E8;"></span> Medical Essentials — $4,918M (9M FY26, +3.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Interventional — $4,101M (9M FY26, +6.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Connected Care — $3,475M (9M FY26, +5.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> BioPharma Systems — $1,689M (9M FY26, +4.1%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Nine-month fiscal 2026 revenue totals <strong>$14,183M</strong>, up roughly <strong>4.8%</strong> on the restated prior-year base of about $13,540M implied by the segment growth rates. Third-quarter revenue was <strong>$4,983M, +5.4% reported and +4.4% <span class="tip" title="Foreign-currency-neutral — growth with exchange-rate movements stripped out">FXN</span></strong>. Note the consistent one-to-two-point gap between reported and FXN growth: a weak dollar is currently flattering the headline.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4DA3E8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Medical Essentials</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT — SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4,918M</div><div class="biz-stat-label">9M FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.3%</div><div class="biz-stat-label">YoY (+1.5% FXN)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">34.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The syringes, needles, IV catheters, sharps-disposal and specimen-collection business — the highest-volume, lowest-unit-price products BD makes, sold largely through hospital group purchasing organisations on multi-year contracts. This is the segment that makes BD a defensive stock: demand tracks patient encounters, not capital budgets, and switching costs are procedural rather than technological. It is also the segment that caps the growth rate. <strong>Q3 revenue was $1,675M, +4.5% reported</strong>, but the nine-month FXN growth of <strong>+1.5%</strong> is the honest number — this is a low-single-digit-volume business where pricing, mix and currency do most of the work. Margin profile: scale manufacturing, heavy fixed-cost absorption, and real exposure to resin, freight and tariff costs. Any tariff regime that touches medical consumables lands here first.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed by BD; third-party TAM estimates were not verified from sources fetched and are omitted rather than guessed.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Baxter International (BAX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$12.50B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$11.47B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+5.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ICU Medical / Cardinal Health</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Interventional</div>
+        <span class="biz-badge growth">FASTEST GROWER — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4,101M</div><div class="biz-stat-label">9M FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+6.5%</div><div class="biz-stat-label">YoY (+5.3% FXN)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Surgery (hernia and soft-tissue repair, biosurgery), peripheral intervention (vascular access ports, drug-coated balloons, biopsy, end-stage kidney disease) and urology and critical care. This is the highest-priced, highest-margin, most clinically differentiated part of New BD, and it grew <strong>+6.4% in Q3 and +6.5% over nine months</strong> — the fastest of the four and roughly two points above the company average. The FXN spread is narrow (<strong>+5.3% nine-month</strong>), meaning this growth is genuine volume and mix rather than translation. Strategically it matters more than its 28.9% weight suggests: it is the segment that determines whether BD is re-rated as a med-tech grower or valued as a consumables supplier. It is also the segment where BD competes head-on with specialists who have nothing else to defend.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; TAM estimates not verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Teleflex (TFX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$5.59B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$2.25B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+110.9%</div><div class="comp-bubble-label">YoY (see note)</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Boston Scientific / ConvaTec</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:10px;font-size:12px;">Note on Teleflex: the +110.9% <span class="tip" title="Trailing twelve months">TTM</span> revenue growth and negative earnings shown on stockanalysis.com reflect Teleflex's own corporate restructuring, not organic demand. It is reproduced as fetched, not interpreted.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Connected Care</div>
+        <span class="biz-badge emerging">SOFTWARE + INSTALLED BASE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,475M</div><div class="biz-stat-label">9M FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5.1%</div><div class="biz-stat-label">YoY (+4.2% FXN)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Medication management and infusion — the Pyxis dispensing cabinets, the Alaris infusion platform, pharmacy automation and the software layer that sits on top. Analytically this is the most interesting segment in New BD because it is the only one with a genuine installed base and recurring service economics: cabinets and pumps are placed, validated against a hospital's formulary and workflow, and then generate consumables, service contracts and software revenue for a decade. Q3 grew <strong>+4.9% to $1,224M</strong>. The Alaris franchise carries a long regulatory history — an extended <span class="tip" title="U.S. Food and Drug Administration">FDA</span> remediation cycle kept the pump off the market for years before its return — which is both the reason the comparison base is soft and the reason a single future regulatory event here could move the whole company. This is the segment where BD most closely resembles a recurring-revenue business rather than a manufacturer.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; TAM estimates not verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Baxter (infusion) / Omnicell</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Segment-level</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">BioPharma Systems</div>
+        <span class="biz-badge emerging">SMALLEST — HIGHEST STRATEGIC LEVERAGE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,689M</div><div class="biz-stat-label">9M FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4.1%</div><div class="biz-stat-label">YoY (+1.6% FXN)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Prefillable syringes, pen needles, safety devices and self-injection systems sold to pharmaceutical companies as the delivery hardware for injectable drugs. The segment is small but it is the one with a genuine secular tailwind attached: every <span class="tip" title="Glucagon-like peptide-1 receptor agonists — the injectable obesity and diabetes drug class">GLP-1</span> pen, every biologic, every self-administered autoinjector needs a containment and delivery system, and the qualification process for a primary drug-container component is long, regulated and extremely sticky. Q3 grew <strong>+6.6% to $670M</strong>, the best quarterly print of the four. But the nine-month FXN figure of <strong>+1.6%</strong> tells the other half of the story: growth here has been lumpy, because pharma-customer inventory cycles run in multi-quarter waves, not in smooth demand curves. The gap between Q3's +6.6% and the nine-month +4.1% is the single cleanest piece of evidence that BioPharma Systems has been re-accelerating.</p>
+    <div class="biz-tam"><strong>Category size:</strong> not disclosed; TAM estimates not verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">West Pharmaceutical (WST)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$24.19B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$3.33B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+12.4%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Stevanato / Gerresheimer</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:10px;font-size:13px;">The comparison worth sitting with: West Pharmaceutical carries a <strong>$24.19B market cap on $3.33B of revenue</strong> — roughly half of BD's entire equity value on one-sixth of its revenue — because the market pays for the drug-delivery component franchise as a consumables annuity on pharma growth. BD owns a business in the same category and receives essentially no separate credit for it inside a conglomerate multiple. That is either a sum-of-the-parts opportunity or a permanent conglomerate discount, and the separation of Biosciences says management has at least noticed the question.</p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">129-YEAR INSTALLED BASE</span>
+    <span class="moat-pill">GPO CONTRACT LOCK-IN</span>
+    <span class="moat-pill">FDA-QUALIFIED MANUFACTURING</span>
+    <span class="moat-pill">PRIMARY-CONTAINER QUALIFICATION</span>
+    <span class="moat-pill">CLINICAL WORKFLOW EMBEDDING</span>
+    <span class="moat-pill">SCALE IN COMMODITY CONSUMABLES</span>
+    <span class="moat-pill">54-YEAR DIVIDEND RECORD</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">BD's core advantage is not technological — it is procedural. A hospital that standardises on Pyxis cabinets has built medication-safety policy, nurse training, pharmacy audit trails and electronic-health-record integrations around a specific vendor's hardware; a pharmaceutical company that qualifies a BD prefillable syringe as the primary container for a biologic has written that component into a regulatory filing and cannot change it without a submission. These are switching costs measured in years of validation work, not in purchase price. Layer on manufacturing scale in products where the unit economics are measured in cents, distribution through group purchasing organisations that prefer to consolidate vendors, and a <strong>54-consecutive-year</strong> record of dividend increases that anchors a specific, very patient shareholder base — and you have a business that is extraordinarily hard to displace and equally hard to accelerate. The <span class="tip" title="Beta — sensitivity of the stock to moves in the overall market; 1.0 moves with the market">beta</span> of <strong>0.28</strong> is the market's summary of exactly that.</p>
+  <p class="prose" style="margin-top:24px;font-weight:700;color:var(--text);">Key Vulnerabilities</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The growth ceiling is structural, not cyclical.</strong> Nine-month fiscal 2026 FXN growth by segment runs +1.5%, +4.2%, +1.6% and +5.3%. Strip out currency and the blended organic rate is roughly 3–4%. No amount of operational execution turns a hospital-consumables business into a double-digit grower; the only levers are mix shift toward Interventional and BioPharma, price, and acquisition. That is a slow machine, and the FY2026 adjusted EPS guidance of $12.62–$12.72 leans heavily on margin and buyback rather than volume.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Leverage is doing real work in the equity story.</strong> Enterprise value of <strong>$64.15B</strong> against a <strong>$48.05B</strong> market cap implies roughly <strong>$16B of net debt</strong>, and the <span class="tip" title="Current ratio — current assets divided by current liabilities; below 1.0 means short-term obligations exceed short-term assets">current ratio</span> is <strong>0.87</strong>, meaning current liabilities exceed current assets. BD paid down <strong>$2,696M of debt</strong> and repurchased <strong>$2,250M of stock</strong> in nine months — a $4.9B capital-allocation program at a company generating $2.59B of <span class="tip" title="Free cash flow — operating cash flow minus capital expenditure">free cash flow</span>. That gap was funded by separation proceeds, which is a one-time source.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The dividend payout ratio on GAAP earnings is above 100%.</strong> At <strong>126.09%</strong> against $4.20 of annual dividend, BD is currently paying out more than it earns on a <span class="tip" title="Generally Accepted Accounting Principles — the standardised US financial reporting basis, including all charges">GAAP</span> basis. On adjusted EPS of roughly $12.65 the payout is a comfortable 33%, and the separation-related charges are the reason for the gap — but a 54-year dividend record is exactly the kind of asset a company will defend past the point of financial logic, and that constrains flexibility.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Regulatory concentration in Connected Care.</strong> BD has already lived through a multi-year FDA remediation on the Alaris infusion platform. Infusion pumps are among the most heavily scrutinised device classes in the United States, and a single recall or consent-decree event in a segment producing a quarter of revenue would do damage disproportionate to its weight — as it did the last time.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>BDX</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-earnings — share price divided by earnings per share over the last twelve months">Trailing P/E</span></td>
+        <td style="color:var(--amber);">30.29× (pub.)</td><td>—</td><td>—</td>
+        <td>As published by stockanalysis.com. This does <strong>not</strong> reconcile to $176.42 ÷ $3.33 TTM GAAP EPS, which gives <strong>53.0×</strong>. The gap is the discontinued-operations and separation-charge distortion — see One-Off Items below. Neither number is a clean earnings multiple right now.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Share price divided by expected earnings per share over the next twelve months">Forward P/E</span></td>
+        <td>13.33×</td><td>—</td><td>—</td>
+        <td>Implies forward EPS of about $13.23. Against FY2026 adjusted EPS guidance of $12.62–$12.72 the multiple on the current year is ~13.9×. Either way this is the number the market is actually trading on.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/earnings-to-growth — the P/E divided by the expected earnings growth rate">PEG Ratio</span></td>
+        <td style="color:var(--text-dim);">n/a</td><td>—</td><td>—</td>
+        <td>Not computed by the source. With consensus FY2026 EPS forecast <em>down</em> 12.3% on the restated base, a PEG is not meaningful this year.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td>
+        <td>$3.33</td><td>—</td><td>—</td>
+        <td>GAAP, twelve months to June 30, 2026, and heavily depressed: it includes a Q2 FY2026 net <em>loss</em> of $311M (−$1.11/sh) and nine-month discontinued-operations losses of $276M.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year over year">YoY</span>)</td>
+        <td style="color:var(--amber);">+5.4% (Q3 FY26)</td><td>—</td><td>—</td>
+        <td>+4.4% foreign-currency-neutral. Nine-month continuing-operations revenue $14,183M, ~+4.8%. The FY2025 headline of +8.2% is not comparable — it included Biosciences &amp; Diagnostic Solutions.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Gross margin — revenue minus cost of goods sold, as a percentage of revenue">Gross Margin</span></td>
+        <td>46.94%</td><td>—</td><td>—</td>
+        <td>TTM. Respectable for a business whose largest segment sells syringes and catheters, and a reminder that mix toward Interventional and BioPharma is the margin story.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net profit margin — net income as a percentage of revenue">Net Profit Margin</span></td>
+        <td style="color:var(--red);">4.19%</td><td>—</td><td>—</td>
+        <td>Against a 16.31% operating margin. The ~12-point gap between operating and net is interest expense, tax and separation charges — the clearest single illustration of how much the capital structure and the transaction are distorting reported earnings.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Annual dividend per share divided by share price">Dividend Yield</span></td>
+        <td style="color:var(--green);">2.38%</td><td>—</td><td>—</td>
+        <td>$4.20 annualised, paid quarterly ($1.05), most recent ex-date September 9, 2026, payable September 30, 2026. <strong>54 consecutive years of increases</strong> — but the last increase was only +0.96%.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Short interest — shares sold short, as a percentage of shares outstanding; high readings indicate bearish positioning">Short Interest</span></td>
+        <td style="color:var(--green);">3.44%</td><td>—</td><td>—</td>
+        <td>9.37M shares, 5.07 days to cover. Modest. This is not a crowded short and there is no squeeze setup here.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Debt-to-equity — total debt divided by shareholders' equity; higher means more leverage">Debt-to-Equity</span></td>
+        <td style="color:var(--amber);">0.69</td><td>—</td><td>—</td>
+        <td>Looks moderate, but enterprise value of $64.15B on a $48.05B market cap implies roughly $16B net debt. BD repaid $2,696M of debt in the first nine months of FY2026.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current ratio — current assets divided by current liabilities; below 1.0 means short-term liabilities exceed short-term assets">Current Ratio</span></td>
+        <td style="color:var(--red);">0.87</td><td>—</td><td>—</td>
+        <td>Below 1.0. Normal enough for an investment-grade industrial with committed credit lines, but it leaves no cushion and it is worth watching alongside the buyback pace.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free cash flow — operating cash flow less capital expenditure; the cash actually available to pay debt, dividends and buybacks">Free Cash Flow</span></td>
+        <td>$2.59B</td><td>—</td><td>—</td>
+        <td>TTM. Against $4.9B of combined buyback and debt repayment in nine months — the difference came from separation proceeds, not operations. The FY2027 free-cash-flow run-rate of New BD is the number to watch.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span></td>
+        <td style="color:var(--red);">6.61%</td><td>—</td><td>—</td>
+        <td>Depressed by the same charges that crushed net income. Not a usable read on the underlying business this year.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital — after-tax operating profit divided by the total debt and equity employed">ROIC</span></td>
+        <td style="color:var(--amber);">7.93%</td><td>—</td><td>—</td>
+        <td>The more informative of the two return measures, since it is less distorted by leverage. Around 8% on a large goodwill-heavy balance sheet is adequate, not impressive — a legacy of BD's acquisition history.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Beta — how much the stock moves relative to the overall market; 1.0 means it moves in line">Beta</span></td>
+        <td style="color:var(--green);">0.28</td><td>—</td><td>—</td>
+        <td>Very low. BDX is a defensive holding by construction. The corollary: it will lag hard in a risk-on market, and it has.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$140.11 – $213.08</td><td>—</td><td>—</td>
+        <td>The current $176.42 sits at the 55th percentile of that range. 52-week price change: <strong>−7.39%</strong>.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:18px;font-size:13px;">Industry-average and S&amp;P 500 comparison columns are shown as "—" because verified values for those comparators could not be sourced within this research pass. They are deliberately left blank rather than estimated, and per-row colour coding therefore reflects the metric's absolute character and BD's own history, not a peer comparison.</p>
+  <p class="prose" style="margin-top:20px;font-weight:700;color:var(--text);">Notable One-Off Items</p>
+  <p class="prose" style="margin-top:8px;">Fiscal 2026 is, for reporting purposes, a broken year, and almost every backward-looking ratio on this page is affected. <strong>(1)</strong> The Biosciences &amp; Diagnostic Solutions separation and Waters combination completed <strong>February 9, 2026</strong>; all historical results for that business are now discontinued operations and prior periods have been restated, which is why FY2025's reported $21.84B and the restated continuing-operations base of roughly $18.9B both circulate as "BD revenue." <strong>(2)</strong> The nine months to June 30, 2026 carry a <strong>$276M after-tax loss from discontinued operations</strong>. <strong>(3)</strong> Q2 FY2026 (quarter ended March 31, 2026 — the quarter containing the separation) printed a <strong>net loss of $311M, −$1.11 per diluted share</strong>, despite $695M of operating income. <strong>(4)</strong> TTM net income of $942M against FY2025's $1,678M is therefore a transaction artefact, not a collapse in the operating business. <strong>(5)</strong> The 126.09% dividend payout ratio is a direct consequence of the same depressed GAAP denominator. Use adjusted EPS guidance of $12.62–$12.72 and segment FXN growth as the operating read; use GAAP only if you are willing to unpick the charges.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value">Buy</div>
+      <div class="card-note">14 analysts covering. Note the shape below: 7 of 14 are Holds, so "Buy" here is a thin average rather than a conviction consensus.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$195.67</div>
+      <div class="card-note"><span style="color:var(--green);">+10.91%</span> from $176.42.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$170 – $225</div>
+      <div class="card-note">Low implies −3.64%; high implies +27.54%. A 32% spread from low to high — unusually narrow, consistent with a low-beta, well-understood business.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">7 / 7 / 0</div>
+      <div class="card-note">6 Strong Buy + 1 Buy = 7 bullish · 7 Hold · 0 Sell · 0 Strong Sell.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:42.9;background:var(--green);"></div>
+    <div style="flex:7.1;background:#4ade80;"></div>
+    <div style="flex:50.0;background:var(--amber);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Strong Buy — 6</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4ade80;"></span> Buy — 1</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 7</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell / Strong Sell — 0</div>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;text-transform:uppercase;">Key Recent Analyst Calls</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">B of A Securities</strong> — Travis Steed, <span style="color:var(--amber);">Neutral</span>, price target raised $185 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$200</span> on <strong>August 31, 2026</strong>. The most recent call on the tape and the highest target among the post-Q3 revisions — a target raise without a rating upgrade, which is the classic "results were better than I expected but I still do not want to own it" posture.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">RBC Capital</strong> — Kendall Au, <span style="color:var(--amber);">Sector Perform</span>, target raised $180 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$190</span> on <strong>August 13, 2026</strong>, having already gone $175 → $180 on August 7. Two raises in a week is the analyst chasing the stock's own move rather than changing the thesis.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Citigroup</strong> — Joanna Wiensch, <span style="color:var(--green);">Buy</span>, target raised $198 → <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$204</span> on <strong>August 7, 2026</strong> immediately after the Q3 print. The bullish anchor in the current cluster.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Piper Sandler</strong> — Jason Bednar, <span style="color:var(--amber);">Neutral</span>, target raised $161 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$175</span>, and <strong style="color:#fff;">Wells Fargo</strong> — Lawrence Biegelsen, <span style="color:var(--amber);">Equal-Weight</span>, $161 → <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$170</span>, both on <strong>August 7, 2026</strong>. Both were carrying $161 targets <em>below</em> where the stock now trades and had to mark up to roughly the current price. That is the honest read on sentiment: the sell side was positioned for worse than it got.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were taken from the Benzinga BDX analyst-ratings page as fetched on September 11, 2026. No other named calls are asserted. The five-analyst cluster on August 7 is the Q3 fiscal 2026 earnings reaction; four of the five raised targets without raising ratings.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Feb 9, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Biosciences &amp; Diagnostic Solutions separation completes; business combined with Waters Corporation</div>
+        <div class="tl-desc">The defining corporate event of the last five years for BD. The Biosciences and Diagnostic Solutions business was separated and combined with Waters Corporation, and its historical results moved to discontinued operations with prior periods restated. BD shares fell from a January month-end close of $203.48 to $176.48 at February month-end — a −13.3% move that includes the value distributed to shareholders in the transaction, so it is not a pure price decline.</div>
+        <div class="tl-impact neutral">Already happened — structural, not directional</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 fiscal 2026 results beat; adjusted EPS guidance narrowed upward</div>
+        <div class="tl-desc">Revenue of $4,983M, +5.4% reported and +4.4% FXN, with all four segments growing. CEO Tom Polen stated that revenue, adjusted operating margin and adjusted EPS all came in ahead of expectations. Full-year adjusted diluted EPS guidance was set at <strong>$12.62–$12.72</strong>, against $12.35–$12.65 given at Q1. Five analysts revised targets the following day, all upward.</div>
+        <div class="tl-impact up">Reaction already happened — stock rose from $170 to $188 through August</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal year end and quarterly dividend payment</div>
+        <div class="tl-desc">BD's fiscal year closes September 30. The $1.05 quarterly dividend (ex-date September 9, 2026) is payable the same day — the 54th consecutive year of increases is already banked, and the annualised rate of $4.20 gives a 2.38% yield.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 and full-year fiscal 2026 results — the first complete "New BD" year</div>
+        <div class="tl-desc">The most important scheduled event on this page. It closes the first fiscal year that contains the separation and delivers the first clean full-year baseline for continuing operations: consensus is <strong>$19.29B of revenue</strong> and <strong>$12.62 of EPS</strong>. Critically, it should come with FY2027 guidance — the first time the market sees what management thinks a standalone four-segment BD can grow at. <em>Date estimated from BD's historical reporting cadence; not confirmed on the sources fetched.</em></div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Capital allocation after the separation windfall</div>
+        <div class="tl-desc">In nine months BD repurchased $2,250M of stock and repaid $2,696M of debt — nearly $5B against $2.59B of TTM free cash flow, funded in part by the separation. Once that source is spent, the choice between deleveraging, buyback and acquisition becomes visible and consequential. With a current ratio of 0.87 and roughly $16B of implied net debt, the market will read the FY2027 allocation mix as a statement about management's confidence.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">BioPharma Systems re-acceleration and the injectable-drug cycle</div>
+        <div class="tl-desc">BioPharma Systems grew +6.6% in Q3 against +4.1% over nine months and only +1.6% FXN over nine months. If Q3's rate holds into fiscal 2027, the fastest-growing part of BD becomes the one with the clearest secular driver attached — self-administered biologics and GLP-1 delivery — and the segment most comparable to West Pharmaceutical's 44× earnings multiple. If it reverts to +1.6%, the re-rating case loses its best leg.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">BDX — Monthly Closes, October 2021 → September 10, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4DA3E8;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;max-width:760px;">RSI measures how much of the recent price movement has been upward versus downward, on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own history ("overbought"); below 30 means the opposite ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a year, and an expensive one can stay overbought. Here it is calculated on <em>monthly</em> closes, so each point represents a month of trading rather than a day.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">The five-year record is unambiguous and unkind. From the October 2021 close of <strong>$239.59</strong> to <strong>$176.42</strong> on September 10, 2026, BDX lost <strong>26.4%</strong> of its price — roughly <strong>−5.9% annualised</strong> — during a period in which the broad US market compounded strongly. Dividends of roughly $3.60–$4.20 a year soften that to something closer to −12% on a total-return basis before accounting for the Waters shares distributed in February 2026, which are not captured in the price line at all. Even generously adjusted, this is five years of capital destruction relative to almost any alternative, and it is the necessary starting point for any bull case.</p>
+  <p class="prose" style="margin-top:16px;">The shape matters more than the endpoints. For the first two and a half years — October 2021 through roughly March 2025 — BDX traded in a remarkably tight band between about $220 and $280, behaving exactly as a 0.28-beta hospital-supplies name should: it ignored the 2022 bear market almost entirely, and it ignored the 2023–24 melt-up equally. The damage is concentrated in a single eleven-month stretch. From the March 2025 close of <strong>$229.06</strong> the stock fell to <strong>$147.12</strong> by May 2026 — a <strong>−35.8%</strong> decline, including a −16.7% month in May 2025 that is the single worst month in the entire window. Measured from the August 2023 high close of <strong>$279.45</strong>, the peak-to-trough drawdown is <strong>−47.4%</strong>.</p>
+  <p class="prose" style="margin-top:16px;">What has happened since May 2026 is the actual investment question. The stock bottomed at $147.12, ground higher through June and July, and then gapped up after the August 6 earnings beat to close August at <strong>$188.11</strong> — a <strong>+27.9%</strong> move off the low in three months, in a stock with a beta of 0.28. That is not a defensive-name move; that is a re-rating attempt. The September pullback to $176.42 has given back roughly 40% of the August advance. The monthly RSI panel below the price chart shows the mechanism: the indicator collapsed into oversold territory through the first half of 2026 and has since snapped back toward and through neutral. Momentum has turned; whether it holds depends entirely on the November guidance.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Feb 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Five-year high water mark — $271.28</div>
+        <div class="tl-desc">The stock's peak monthly close early in the window, before the rate-shock year. From here the next twenty months are a sideways grind, not a decline.</div>
+        <div class="tl-impact neutral">Starting point of the flat regime</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle peak close — $279.45</div>
+        <div class="tl-desc">The highest monthly close in the five-year window. Everything after this is, in hindsight, a lower high. The peak-to-trough drawdown from here to May 2026 is −47.4%.</div>
+        <div class="tl-impact down">Peak before −47.4% drawdown</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr–May 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">The break — $207.09 → $172.59 in one month</div>
+        <div class="tl-desc">A −16.7% monthly collapse, the worst single month in the window and the moment the multi-year trading range failed. Note that the corresponding fiscal quarter (Q3 FY2025, ended June 30, 2025) showed continuing-operations revenue <em>declining</em> 5.3% year over year on the restated basis — the operating business was genuinely soft at exactly this point. <em>The specific catalyst was not verified from the sources fetched and is not asserted here.</em></div>
+        <div class="tl-impact down">−16.7% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Pre-separation high — $203.48</div>
+        <div class="tl-desc">A four-month rally into the Waters transaction took the stock back above $200 for the last time in this window. The market was, briefly, paying for the separation before it happened.</div>
+        <div class="tl-impact up">+13.8% off the October 2025 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Separation completes — close drops to $176.48</div>
+        <div class="tl-desc">The Biosciences &amp; Diagnostic Solutions combination with Waters closed on February 9, 2026. The −13.3% monthly move reflects the value distributed to shareholders in the transaction as well as market action; the unadjusted price series used on this chart does not correct for it. Treat the price line either side of this point as two different securities.</div>
+        <div class="tl-impact neutral">Structural discontinuity — see disclaimer</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle trough — $147.12</div>
+        <div class="tl-desc">The lowest monthly close in five years, −47.4% from the August 2023 peak and −38.6% from the start of this window. The intraday 52-week low of $140.11 was set around the same period. Monthly RSI reached deeply oversold levels here.</div>
+        <div class="tl-impact down">Five-year low close</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-earnings rally — $188.11</div>
+        <div class="tl-desc">The August 6 Q3 beat and upward guidance revision drove a +13.6% month and a +27.9% advance from the May low. Five analysts marked targets up within days, four of them without upgrading the rating.</div>
+        <div class="tl-impact up">+27.9% off the trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Current — $176.42, −$3.38 (−1.88%) on the day</div>
+        <div class="tl-desc">Roughly 40% of the August gain surrendered. The stock sits at the 55th percentile of its 52-week range, 10.9% below the $195.67 consensus target and 17.2% below the $213.08 52-week high.</div>
+        <div class="tl-impact neutral">Last completed market close</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> BDX is down <strong>7.39%</strong> over the trailing 52 weeks and <strong>26.4%</strong> over the five-year window shown, on price alone. A like-for-like S&amp;P 500 and NASDAQ-100 total-return comparison over the identical windows <strong>could not be verified from the sources fetched and is deliberately omitted rather than estimated</strong> — but the direction is not in question: a −26% five-year price return has lagged both indices badly over a period in which US equities compounded at a double-digit rate. The relevant comparison is arguably narrower anyway. Against the med-tech names fetched here, BD's $48.05B market cap on roughly $19B of continuing revenue is about 2.5× sales; West Pharmaceutical trades at roughly 7.3× sales on $3.33B of revenue growing 12.4%, and Baxter at roughly 1.1× sales on $11.47B growing 5.4%. BD sits between the two, which is exactly where a 4–5%-growth device company with a leveraged balance sheet and a newly simplified structure ought to sit. The bull case is not that the multiple is wrong; it is that the growth rate embedded in it is about to move.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A simplified four-segment BD trading at <strong>13.3× forward earnings</strong> with a 2.38% yield, a 54-year dividend record and a 0.28 beta is priced as a declining business, but all four segments grew in Q3 and the two highest-quality ones — Interventional (+6.4%) and BioPharma Systems (+6.6%) — grew fastest. Management beat its own Q3 expectations on revenue, margin and EPS and raised the FY2026 adjusted EPS floor to $12.62. The separation removed the most cyclical, most tariff-exposed part of the portfolio and funded roughly $4.9B of debt repayment and buyback in nine months. If November's FY2027 guidance frames mid-single-digit organic growth with margin expansion, the stock re-rates toward the $195–$204 target cluster without anything heroic happening.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Strip out currency and BD grew <strong>4.4% FXN</strong> in its best recent quarter, with its largest segment at <strong>+1.5% FXN</strong> over nine months. That is a business whose terminal growth rate is roughly nominal GDP, carrying roughly <strong>$16B of net debt</strong>, a <strong>0.87 current ratio</strong>, ROIC under 8% and a GAAP payout ratio above 100%. Seven of fourteen analysts rate it Hold, and four of the five most recent target raises came without a rating change — the sell side is marking to market, not converting. Five years of −26% price returns were not an accident of sentiment; they were a correct assessment of a company that grows slowly, acquires expensively and has now sold the business that gave it optionality. The last dividend increase was <strong>+0.96%</strong>.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;font-weight:700;color:var(--text);">Top 3 Risks</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">FY2027 guidance disappoints in November.</strong> The whole August rally is a bet on what management says about the standalone company. Anything framed as low-single-digit organic growth with flat margins removes the re-rating premise, and the stock has already given back 40% of that advance in anticipation.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Leverage constrains the response to a bad year.</strong> With roughly $16B of net debt, a sub-1.0 current ratio and $2.59B of TTM free cash flow against a $1.14B annual dividend obligation, BD has limited capacity to simultaneously defend the dividend, continue buying back stock, deleverage and acquire growth. Something gives, and the 54-year dividend streak is the least likely thing to be sacrificed.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Regulatory or recall event in Connected Care or Medical Essentials.</strong> Infusion pumps and medication-dispensing systems are among the most heavily regulated device categories in the US, and BD has been through a multi-year FDA remediation on Alaris before. A repeat in a segment producing a quarter of revenue would dwarf any of the operating variables discussed on this page.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid" style="grid-template-columns:1fr;">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Hospital consumables are a nominal-GDP business, and currency is currently hiding it</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">The single most important number on this page is the gap between reported and foreign-currency-neutral growth. Q3 fiscal 2026 revenue grew <strong>+5.4% reported but +4.4% FXN</strong>; over nine months, Medical Essentials grew <strong>+3.3% reported but +1.5% FXN</strong> and BioPharma Systems <strong>+4.1% reported but +1.6% FXN</strong>. A weak dollar is contributing roughly a point to two points of headline growth across the company, and it is contributing most in the two segments with the weakest underlying rate. Hospital procedure volumes grow with population, ageing and utilisation — call it low single digits — and group purchasing organisations exist specifically to suppress price. This is the structural ceiling every bull case on BD has to argue around, and it is why the multiple is 13× rather than 25×. The honest framing: BD's organic growth rate is roughly 3–4%, and every basis point above that has to come from mix, M&amp;A, or the currency.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">The injectable-drug boom is a components business, and BD owns a seat</div>
+        <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">Every self-administered biologic, every GLP-1 pen and every autoinjector requires a qualified primary container and delivery system — and once a component is written into a drug's regulatory filing, changing it requires a submission. The market values that dynamic generously: West Pharmaceutical Services carries a <strong>$24.19B market cap on $3.33B of revenue growing 12.4%</strong>, at <strong>44× earnings</strong>. BD's BioPharma Systems segment produced <strong>$1,689M over nine months</strong> and accelerated to <strong>+6.6% in Q3</strong> — half of West's revenue base, in the same category, valued inside a 13× conglomerate multiple. The separation of Biosciences shows management is willing to break the company apart when the discount becomes indefensible. That precedent is now on the record, and BioPharma Systems is the obvious next candidate if its acceleration holds.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:700;color:#fff;">Bull versus bear: the November print settles it</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+      <p class="card-note" style="font-size:14px;line-height:1.75;">The bear reads a company that lost 26% of its value over five years, grows at 4% ex-currency, earns under 8% on invested capital, carries $16B of net debt, and has just sold its most differentiated division to fund a buyback — a classic value trap where cheapness is the correct price of low growth and high leverage. The bull reads a stock that fell 47% peak to trough, bottomed in May 2026, rallied 28% on a single earnings beat, trades at 13.3× guided earnings with a 2.38% covered-on-adjusted-earnings dividend, and is about to publish its first clean full-year baseline as a simpler business. Both readings use the same facts. The discriminating variable is the FY2027 organic growth and margin guidance due in early November 2026: mid-single-digit organic with margin expansion validates the bull; low-single-digit and flat confirms the bear. Everything else on this page is positioning around that one disclosure.</p>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:12px;">Data as of September 10, 2026 (last completed market close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Sources: price, market cap, 52-week range, valuation, statistics, dividend, financials, forecast and company-profile data from stockanalysis.com (BDX overview, statistics, financials, quarterly financials, forecast, dividend and company pages — price source URL <strong>https://stockanalysis.com/stocks/bdx/</strong>, retrieved September 11, 2026, showing a September 10, 2026 4:00 PM EDT close of $176.42, −$3.38 / −1.88%); segment revenue, segment growth, separation status, guidance, capital allocation, headquarters and CEO attribution from BD investor relations (Q1 fiscal 2026 release dated February 2026 and Q3 fiscal 2026 release, investors.bd.com); global market-cap rank from companiesmarketcap.com; named analyst calls from the Benzinga BDX analyst-ratings page; peer figures for Baxter (BAX), Teleflex (TFX) and West Pharmaceutical (WST) from stockanalysis.com; 59 monthly unadjusted "Real Price" closes from digrin.com BDX price history.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Chart construction: the price series is <strong>60 real data points</strong> — 59 actual month-end closes from October 2021 through August 2026 taken from digrin.com's unadjusted price table, plus the September 10, 2026 close of $176.42 from stockanalysis.com as the final point. <strong>No interior months were reconstructed or estimated.</strong> The series is unadjusted for the February 9, 2026 distribution of Waters Corporation shares to BD shareholders, so the January-to-February 2026 decline overstates the economic loss to a continuing holder, and any total-return figure computed from this line understates the true return. Moving averages and RSI are computed in-page from the monthly series (1-, 3- and 10-month averages; 6-period RSI).</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Items marked <strong>(est.)</strong> are approximations not verified from a single fetched source — this includes the US and NYSE market-cap rank pills and the early-November 2026 next-earnings date. Items marked <strong>n/d</strong> are not disclosed by BD; items marked <strong>n/v</strong> were not verified from the sources fetched. BD does not disclose segment market shares or category TAM, and none have been estimated here. The <strong>Industry Avg and S&amp;P 500 columns in Section 04 are shown as "—" throughout</strong> because verified comparators could not be sourced; they have not been estimated. A like-for-like S&amp;P 500 or NASDAQ-100 total-return comparison over the identical five-year window is likewise omitted. The CFO name (Vitor Roque) comes from the stockanalysis.com company profile and was <strong>not</strong> corroborated by a BD-issued document in this pass — verify before relying on it. The published trailing P/E of 30.29× does not reconcile to price ÷ reported TTM GAAP EPS of $3.33 (53.0×); both figures are shown rather than one being silently chosen. Named institutional holders were not verified and are not listed. Verify all figures against BD's SEC filings before acting.</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for education and entertainment only. It is not investment advice, not a recommendation to buy or sell any security, and not a solicitation. The author may hold positions in securities mentioned. Investing involves risk, including the loss of principal. Do your own research.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 59 month-end closes Oct 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 10, 2026 close (stockanalysis.com) =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 10 26'];
+const prices = [239.59,237.14,251.48,254.14,271.28,266.00,247.19,255.80,246.53,244.31,252.42,222.83,235.97,249.34,254.30,252.22,234.55,247.54,264.31,241.76,264.01,278.62,279.45,258.53,252.78,236.18,243.83,238.81,235.55,247.45,234.60,231.97,233.71,241.06,242.41,241.10,233.59,221.90,226.87,247.60,225.53,229.06,207.09,172.59,172.25,178.25,192.98,187.17,178.71,194.02,194.07,203.48,176.48,157.23,149.04,147.12,151.33,165.62,188.11,176.42];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 4,  label: 'Feb 2022 — window high close $271.28',              color: '#94a3b8' },
+  { idx: 22, label: 'Aug 2023 — cycle peak $279.45',                     color: '#94a3b8' },
+  { idx: 43, label: 'May 2025 — worst month in window, −16.7%',          color: '#ef4444' },
+  { idx: 51, label: 'Jan 2026 — pre-separation high $203.48',            color: '#f59e0b' },
+  { idx: 52, label: 'Feb 2026 — Waters separation completes (Feb 9)',    color: '#3b82f6' },
+  { idx: 55, label: 'May 2026 — five-year trough $147.12',               color: '#ef4444' },
+  { idx: 58, label: 'Aug 2026 — post-Q3 rally $188.11 (+27.9% off low)', color: '#22c55e' },
+  { idx: 59, label: 'Sep 10, 2026 — last close $176.42',                 color: '#4DA3E8' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(77,163,232,0.22)');
+grad.addColorStop(1, 'rgba(77,163,232,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4DA3E8', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4DA3E8'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
