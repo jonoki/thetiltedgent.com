@@ -64,10 +64,11 @@ window.BJTable = (function () {
     var grid = el('div', 'bjt-grid');
     var felt = el('div', 'bjt-felt');
     var shoeLine = el('div', 'bjt-shoe'); felt.appendChild(shoeLine);
+    var rcBadge = el('div', 'bjt-rcbadge'); rcBadge.hidden = true; felt.appendChild(rcBadge);
     var gaugeRow = el('div', 'bjt-gaugerow');
-    gaugeRow.innerHTML = '<div class="bjt-tray" title="discard tray"><div class="stack"></div><span>discards</span></div><div class="bjt-gauge"><div class="segs"></div><div class="fill"></div><div class="cut"></div><div class="lbl"></div></div><div class="bjt-shoebox" title="shoe"><div class="stack"></div><span>shoe</span></div>';
+    gaugeRow.innerHTML = '<div class="bjt-tray" title="discard tray"><div class="stack"></div><span>discards</span></div><div class="bjt-gauge"><div class="segs"></div><div class="fill"></div><div class="cut"></div><div class="lbl"></div></div><div class="bjt-shoebox" title="shoe"><div class="stack"></div><span>shoe</span></div><div class="bjt-tcbox" hidden><b></b><span>true count</span></div>';
     felt.appendChild(gaugeRow);
-    var gauge = gaugeRow.querySelector('.bjt-gauge'), trayStack = gaugeRow.querySelector('.bjt-tray .stack'), shoeStack = gaugeRow.querySelector('.bjt-shoebox .stack');
+    var tcBox = gaugeRow.querySelector('.bjt-tcbox'), gauge = gaugeRow.querySelector('.bjt-gauge'), trayStack = gaugeRow.querySelector('.bjt-tray .stack'), shoeStack = gaugeRow.querySelector('.bjt-shoebox .stack');
     var table = el('div', 'bjt-table');
     table.innerHTML = '<div class="bjt-rail"></div><div class="bjt-surface">' +
       '<svg class="bjt-arcsvg" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true"><defs><path id="bjt-arc-outer" d="M 58 24 A 442 516 0 0 0 942 24"/></defs>' +
@@ -81,12 +82,13 @@ window.BJTable = (function () {
     var seatsBox = el('div', 'bjt-seats'); surface.appendChild(seatsBox);
     var msg = el('div', 'bjt-msg'); felt.appendChild(msg);
     var actions = el('div', 'bjt-actions'); felt.appendChild(actions);
+    var declog = el('div', 'bjt-declog'); felt.appendChild(declog);
     var betRow = el('div', 'bjt-bet'); felt.appendChild(betRow);
     grid.appendChild(felt);
 
     var side = el('div', 'bjt-side');
     var tabs = el('div', 'bjt-tabs'); var panes = {};
-    ['Count', 'Strategy', 'Counting guide', 'Stats', 'Edge'].forEach(function (name, i) {
+    ['Count', 'Strategy', 'Hand values', 'Counting guide', 'Stats', 'Edge'].forEach(function (name, i) {
       var b = el('button', 'bjt-tab' + (i === 0 ? ' on' : ''), name); b.type = 'button';
       b.addEventListener('click', function () { Array.prototype.forEach.call(tabs.children, function (x) { x.classList.remove('on'); }); b.classList.add('on'); Object.keys(panes).forEach(function (k) { panes[k].hidden = k !== name; }); });
       tabs.appendChild(b); panes[name] = el('div', 'bjt-pane'); panes[name].hidden = i !== 0;
@@ -172,7 +174,8 @@ window.BJTable = (function () {
     function cardHTML(c, hidden) {
       if (hidden || c.hidden) return '<span class="bjt-card back" aria-label="face-down card"></span>';
       var red = c.s === '♥' || c.s === '♦';
-      return '<span class="bjt-card' + (red ? ' red' : '') + '"><b>' + c.label + '</b><i>' + c.s + '</i><u>' + c.s + '</u><em>TG</em></span>';
+      var tg = S.showCount ? game.system.tags[c.v] : null, tagHTML = tg == null ? '' : '<s class="tag ' + (tg > 0 ? 'up' : tg < 0 ? 'dn' : 'z') + '">' + (tg > 0 ? '+' + tg : tg < 0 ? '−' + (-tg) : '0') + '</s>';
+      return '<span class="bjt-card' + (red ? ' red' : '') + '"><b>' + c.label + '</b><i>' + c.s + '</i><u>' + c.s + '</u><em>TG</em>' + tagHTML + '</span>';
     }
     function handHTML(h, showTotal) {
       if (h.removed) return '<div class="bjt-hand gone"><div class="cards"></div><div class="meta"><em class="bjt-status bust">Bust</em></div></div>';
@@ -192,6 +195,8 @@ window.BJTable = (function () {
       gauge.querySelector('.fill').style.width = (100 * dealt / totalCards) + '%';
       gauge.querySelector('.cut').style.left = (100 * S.penetration) + '%';
       gauge.querySelector('.lbl').textContent = S.showCount ? (Math.round(dealt / 52 * 2) / 2) + ' dealt · ' + decksLeft + ' left' : '';
+      rcBadge.hidden = !S.showCount; if (S.showCount) rcBadge.innerHTML = '<span>Running count</span><b>' + sgn(game.rc) + '</b>';
+      tcBox.hidden = !S.showCount; if (S.showCount) tcBox.querySelector('b').textContent = sgn(Math.round(game.trueCount() * 10) / 10);
       var trayN = Math.min(12, Math.round(dealt / (totalCards / 12))), shoeN = Math.min(12, Math.ceil(game.shoe.length / (totalCards / 12)));
       trayStack.innerHTML = new Array(trayN + 1).join('<b></b>'); shoeStack.innerHTML = new Array(shoeN + 1).join('<b></b>');
       arcText.textContent = 'BLACKJACK PAYS 3 TO 2  ·  DEALER MUST ' + (S.h17 ? 'HIT SOFT 17' : 'STAND ON ALL 17s') + '  ·  THE TILTED GENT';
@@ -255,6 +260,8 @@ window.BJTable = (function () {
       var sb = game.suggestedBet(S.unit);
       betAdvice.innerHTML = S.showCount ? '<div class="k">Ramp says</div><div class="v">bet <b>' + fmt(sb) + '</b> (' + (sb / S.unit) + ' unit' + (sb / S.unit === 1 ? '' : 's') + ')</div>' : '';
     }
+    function evPct(x) { return (x < 0 ? '−' : '+') + Math.abs(100 * x).toFixed(1) + '%'; }
+    function evMoney(x) { return '<b>' + (x < 0 ? '−' : '+') + '$' + Math.abs(x).toFixed(2) + '</b>'; }
     function say(text, cls) { msg.className = 'bjt-msg' + (cls ? ' ' + cls : ''); msg.innerHTML = text; }
 
     /* ---------- round flow ---------- */
@@ -267,10 +274,10 @@ window.BJTable = (function () {
       var bet = sum(S.mainChips); if (bet <= 0) return; lastBet = { main: S.mainChips.slice(), bonus: S.bonusChips.slice() }; S.unit = bet; saveSettings(S);
       var bonusStake0 = sum(S.bonusChips);
       var n = S.bots + 1, youIdx = S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor(n / 2) : n - 1, i;
-      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal', netBefore: game.stats.net, bonusStake: bonusStake0, tcAtBet: game.trueCount(), betAtStart: bet, costs: 0 };
+      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal', netBefore: game.stats.net, bonusStake: bonusStake0, tcAtBet: game.trueCount(), betAtStart: bet, costs: 0, bsCosts: 0, gains: 0, missed: 0 };
       for (i = 0; i < n; i++) round.seats.push({ n: i + 1, you: i === youIdx, hands: [{ cards: [], bet: i === youIdx ? bet : S.unitSize }] });
       round.you = round.seats[youIdx];
-      stratHi = null; highlightStrategy(); actions.innerHTML = ''; feedback.innerHTML = ''; say('Dealing…');
+      stratHi = null; hvHi = null; highlightStrategy(); actions.innerHTML = ''; declog.innerHTML = ''; feedback.innerHTML = ''; say('Dealing…');
       renderFelt(); renderBank();
       dealCards(0);
     }
@@ -287,6 +294,7 @@ window.BJTable = (function () {
     function afterDeal() {
       settleBonus();
       var up = round.dealer.cards[0];
+      round.dealEvU = B.dealEv(rulesNow(), round.you.hands[0].cards, up.v, round.tcAtBet);
       if (up.v === 11 && S.mode === 'play') { offerInsurance(); return; }
       checkDealerBJ();
     }
@@ -335,7 +343,7 @@ window.BJTable = (function () {
     }
     function askPlayer(seat, h, legal, up) {
       var adv = B.advise(game.T, h.cards, up, legal, game.trueCount(), S.useIndex);
-      stratHi = { k: B.handKey(h.cards), u: up }; if (stratHi.k[0] === 'p' && !legal.split) { var tt = B.total(h.cards); stratHi.k = (tt.soft ? 's' : 'h') + tt.t; } highlightStrategy();
+      hvHi = hvKey(h.cards, up); renderValues(); stratHi = { k: B.handKey(h.cards), u: up }; if (stratHi.k[0] === 'p' && !legal.split) { var tt = B.total(h.cards); stratHi.k = (tt.soft ? 's' : 'h') + tt.t; } highlightStrategy();
       say('Your move' + (seat.hands.length > 1 ? ' (hand ' + (round.handIdx + 1) + ' of ' + seat.hands.length + ')' : '') + '.' + (S.showAdvice ? ' <span class="adv">' + (adv.why === 'index' ? 'Index play' : 'Basic strategy') + ': ' + ACT_NAME[adv.act] + '.</span>' : ''), 'ask');
       actions.innerHTML = '';
       [['H', 'Hit', legal.hit], ['S', 'Stand', true], ['D', 'Double', legal.double], ['P', 'Split', legal.split], ['R', 'Surrender', legal.surrender]].forEach(function (a) {
@@ -349,7 +357,20 @@ window.BJTable = (function () {
       var st = game.stats; st.decisions++;
       if (correct === chosen) { st.correct++; feedback.innerHTML = '<span class="ok">✓ ' + what + ': ' + (ACT_NAME[chosen] || (chosen === 'I' ? 'take insurance' : 'no insurance')) + ' — correct.</span>'; }
       else { feedback.innerHTML = '<span class="bad">✗ ' + what + ': you chose ' + (ACT_NAME[chosen] || (chosen === 'I' ? 'insurance' : 'no insurance')) + '; ' + (why === 'index' ? 'the index play' : 'basic strategy') + ' says <b>' + (ACT_NAME[correct] || (correct === 'I' ? 'take insurance' : 'no insurance')) + '</b>.</span>'; }
-      renderStats();
+      renderStats(); renderDecLog();
+    }
+    function renderDecLog() {
+      var D = edgeLog().decisions, list = round ? D.filter(function (d) { return d.round === round; }) : [];
+      if (!list.length) { declog.innerHTML = ''; return; }
+      var h = '<div class="k">This hand</div>';
+      list.forEach(function (d, i) {
+        var okBS = d.chosen === d.bs, okCount = d.kind === 'ok' || d.kind === 'captured';
+        h += '<div class="row"><span class="n">' + (i + 1) + '</span><span class="d">' + d.desc + ' — <b>' + actName(d.chosen) + '</b></span>' +
+          '<span class="' + (okBS ? 'ok' : 'bad') + '">' + (okBS ? '✓' : '✗') + ' basic' + (okBS ? '' : ' (' + actName(d.bs) + ')') + '</span>' +
+          '<span class="' + (okCount ? 'ok' : 'bad') + '">' + (okCount ? '✓' : '✗') + ' count' + (okCount ? (d.kind === 'captured' ? ' (' + actName(d.bs) + ' by the book; +$' + d.gain.toFixed(2) + ' for deviating)' : '') : ' (' + actName(d.opt) + ')') + '</span>' +
+          (okCount ? '' : '<span class="ev">perfect play ' + actName(d.opt) + ' <b>' + evPct(d.evO) + '</b> (' + evMoney(d.evO * d.bet) + ') · your ' + actName(d.chosen) + ' <b>' + evPct(d.evC) + '</b> (' + evMoney(d.evC * d.bet) + ') · net ' + evMoney(-d.cost) + '</span>') + '</div>';
+      });
+      declog.innerHTML = h;
     }
     function applyAction(seat, h, act, legal) {
       actions.innerHTML = ''; h.active = true;
@@ -402,8 +423,8 @@ window.BJTable = (function () {
         });
       });
       round.stage = 'done'; var youNet = 0; round.you.hands.forEach(function (h) { var t = B.total(h.cards); }); youNet = st.net - (round.netBefore || 0);
-      recordHand(youNet); S.mainChips.length = 0; saveSettings(S); showPayout(youNet, 'main'); renderFelt(); renderStats(); renderEdge(); renderBank();
-      say('Dealer ' + (d.t > 21 ? 'busts' : 'has ' + d.t) + '. You: ' + lines.join(', ') + '.', 'info');
+      var rec = recordHand(youNet); S.mainChips.length = 0; saveSettings(S); showPayout(youNet, 'main'); renderFelt(); renderStats(); renderEdge(); renderBank();
+      say('Dealer ' + (d.t > 21 ? 'busts' : 'has ' + d.t) + '. You: ' + lines.join(', ') + '. <span class="evline">Deal was worth ' + evMoney(rec.dealEv) + (rec.cost > 0.005 ? ', decisions gave up ' + evMoney(-rec.cost) : '') + ', draw luck ' + evMoney(rec.drawLuck) + '.</span>', 'info');
       actions.innerHTML = '';
       var next = el('button', 'bjt-btn gold', 'Deal next hand'); next.type = 'button'; next.addEventListener('click', autoRebet); actions.appendChild(next);
       // count prompts, at the round boundary
@@ -428,63 +449,107 @@ window.BJTable = (function () {
 
 
     /* ---------- edge pane: what the shoe offered vs what your play captured ----------
-       Every decision is priced by the EV engine (infinite-deck, composition-independent); the cost of a play is
-       best EV minus the EV of what you did, in dollars of that hand's bet. Each hand also records the true count you
-       bet into; the edge at a count is modelled as base + ½% per Hi-Lo true-count point, which is the textbook figure. */
+       Every decision is priced by the EV engine at the true count in force (the count shifts the card distribution the
+       engine plays against), so basic strategy and the count-optimal play can be told apart: a decision is correct,
+       a strategy error (worse than basic strategy), a count deviation captured (better than basic strategy because of
+       the count) or a count deviation missed (basic strategy when the count said otherwise). Each hand records the true
+       count it was bet into and the EV of the two cards it was dealt, so luck splits into the deal and the draw. */
     var DECK_ADJ = { 1: 0.0048, 2: 0.0028, 3: 0.0018, 4: 0.0014, 5: 0.0012, 6: 0.0010, 7: 0.0009, 8: 0.0008 };
+    var TIE = 0.002;
     function rulesNow() { return { decks: S.decks, h17: S.h17, das: S.das, surrender: S.surrender, penetration: S.penetration }; }
-    function baseHouseEdge() { return B.evEngine(rulesNow()).baseEdge - (DECK_ADJ[S.decks] || 0.001); }
-    function edgeAt(tc) { var e = -baseHouseEdge() + 0.005 * tc; return Math.max(-0.06, Math.min(0.06, e)); } // player edge, signed
+    function houseEdgeAt(tc) { return B.evEngine(rulesNow(), tc).baseEdge - (DECK_ADJ[S.decks] || 0.001); }
+    function edgeAt(tc) { return -houseEdgeAt(tc); } // player edge, signed
     function edgeLog() { return game.edge || (game.edge = { hands: [], decisions: [] }); }
+    function classify(evs, chosen, bs, opt) {
+      var evC = evs[chosen] != null ? evs[chosen] : -9, evB = evs[bs] != null ? evs[bs] : -9, evO = evs[opt];
+      var cost = Math.max(0, evO - evC), d = { chosen: chosen, bs: bs, opt: opt, cost: cost, bsCost: 0, gain: 0, evO: evO, evC: evC, evB: evB };
+      if (chosen === opt || cost < TIE) { d.kind = evO - evB >= TIE && chosen !== bs ? 'captured' : 'ok'; if (d.kind === 'captured') d.gain = evO - evB; d.cost = 0; }
+      else if (chosen === bs || Math.abs(evC - evB) < TIE) { d.kind = 'missed'; }
+      else { d.kind = 'error'; d.bsCost = Math.max(0, evB - evC); }
+      return d;
+    }
     function chargeDecision(h, up, legal, chosen, adv, desc) {
-      var ev = B.evFor(rulesNow(), h.cards, up, legal), ref = adv.why === 'index' ? adv.act : ev.best;
-      if (adv.act === 'Ds') ref = 'D';
-      var refEv = ev.evs[ref] != null ? ev.evs[ref] : ev.bestEv, mine = ev.evs[chosen] != null ? ev.evs[chosen] : ev.bestEv;
-      var costU = Math.max(0, (adv.why === 'index' ? Math.max(refEv, ev.bestEv) : ev.bestEv) - mine); if (chosen === ref) costU = 0;
-      var cost = costU * h.bet; round.costs += cost;
-      edgeLog().decisions.push({ desc: desc, chosen: chosen, best: ref, costU: costU, cost: cost, bet: h.bet, why: adv.why });
+      var tc = game.trueCount(), ev = B.evFor(rulesNow(), h.cards, up, legal, tc);
+      var bs = B.advise(game.T, h.cards, up, legal, null, false).act; if (bs === 'Ds') bs = 'D';
+      var d = classify(ev.evs, chosen, bs, ev.best);
+      d.desc = desc; d.round = round; d.bet = h.bet; d.tc = tc; d.costU = d.cost; d.cost *= h.bet; d.bsCost *= h.bet; d.gain *= h.bet;
+      round.costs += d.cost; round.bsCosts += d.bsCost; round.gains += d.gain; round.missed += d.kind === 'missed' ? d.cost : 0;
+      edgeLog().decisions.push(d);
     }
     function chargeInsurance(took, tc) {
-      // Hi-Lo: the ten density is about 4/13 at TC 0 and reaches the 1/3 break-even near TC +3
-      var p10 = Math.max(0.2, Math.min(0.45, 4 / 13 + tc * 0.0085)), evHalf = 3 * p10 - 1, bet = round.you.hands[0].bet;
-      var cost = took ? Math.max(0, -evHalf) * bet / 2 : Math.max(0, evHalf) * bet / 2; round.costs += cost;
-      edgeLog().decisions.push({ desc: 'Insurance at TC ' + sgn(Math.round(tc * 2) / 2), chosen: took ? 'I' : 'N', best: evHalf > 0 ? 'I' : 'N', costU: cost / bet, cost: cost, bet: bet, why: 'insurance' });
+      var eng = B.evEngine(rulesNow(), tc), evI = eng.insuranceEv, bet = round.you.hands[0].bet;
+      var d = classify({ I: evI, N: 0 }, took ? 'I' : 'N', 'N', evI > 0 ? 'I' : 'N');
+      d.desc = 'Insurance at TC ' + sgn(Math.round(tc * 2) / 2); d.round = round; d.bet = bet; d.tc = tc; d.costU = d.cost; d.cost *= bet; d.bsCost *= bet; d.gain *= bet;
+      round.costs += d.cost; round.bsCosts += d.bsCost; round.gains += d.gain; round.missed += d.kind === 'missed' ? d.cost : 0;
+      edgeLog().decisions.push(d);
     }
     function recordHand(net) {
-      var tc = round.tcAtBet, bet = round.betAtStart, tcR = Math.floor(tc);
-      edgeLog().hands.push({ tc: tc, bet: bet, net: net, cost: round.costs, e: edgeAt(tc), ramp: rampUnits(tcR) * S.unitSize });
+      var tc = round.tcAtBet, bet = round.betAtStart, tcR = Math.floor(tc), e = edgeAt(tc);
+      var rec = { tc: tc, bet: bet, net: net, cost: round.costs, bsCost: round.bsCosts, gain: round.gains, missed: round.missed, e: e, ramp: rampUnits(tcR) * S.unitSize, unit: S.unitSize, dealEv: (round.dealEvU || 0) * bet };
+      rec.drawLuck = net - (rec.dealEv - rec.cost); rec.dealLuck = rec.dealEv - bet * e;
+      edgeLog().hands.push(rec); return rec;
     }
     function renderEdge() {
-      var g = panes['Edge'], L = edgeLog(), H = L.hands, base = baseHouseEdge(), n = H.length;
+      var g = panes['Edge'], L = edgeLog(), H = L.hands, D = L.decisions, base0 = houseEdgeAt(0), n = H.length;
       var money = function (x) { var ax = Math.abs(x); return (x < 0 ? '−' : '') + '$' + (ax < 10 ? ax.toFixed(2) : Math.round(ax).toLocaleString()); };
-      var sumBet = 0, offered = 0, cost = 0, rampEv = 0, rampBet = 0, flatEv = 0, net = 0, tcSum = 0, hi = { b: 0, n: 0 }, lo = { b: 0, n: 0 };
-      H.forEach(function (x) { sumBet += x.bet; offered += x.bet * x.e; cost += x.cost; rampEv += x.ramp * x.e; rampBet += x.ramp; flatEv += S.unitSize * x.e; net += x.net; tcSum += x.tc; if (x.tc >= 2) { hi.b += x.bet; hi.n++; } if (x.tc <= 0) { lo.b += x.bet; lo.n++; } });
-      var captured = offered - cost, yourEdge = sumBet ? captured / sumBet : 0, offeredEdge = sumBet ? offered / sumBet : 0, rampEdge = rampBet ? rampEv / rampBet : 0;
       var pc = function (x, d) { return (x >= 0 ? '+' : '−') + Math.abs(100 * x).toFixed(d == null ? 2 : d) + '%'; };
-      var h = '<p class="bjt-help">Two things decide your result at blackjack: what the shoe offers (the count) and what you do with it (bets and plays). This pane separates them. <b>Player</b> edge is shown positive, house edge negative.</p>';
+      var sumBet = 0, cost = 0, bsCost = 0, gain = 0, missed = 0, net = 0, tcSum = 0, dealEv = 0, dealLuck = 0, drawLuck = 0;
+      var W = { flat: { bet: 0, book: 0, you: 0 }, ramp: { bet: 0, book: 0, you: 0 }, mine: { bet: 0, book: 0, you: 0 } };
+      H.forEach(function (x) {
+        var cu = x.bet ? x.cost / x.bet : 0; sumBet += x.bet; cost += x.cost; bsCost += x.bsCost; gain += x.gain; missed += x.missed; net += x.net; tcSum += x.tc; dealEv += x.dealEv; dealLuck += x.dealLuck; drawLuck += x.drawLuck;
+        [['flat', x.unit], ['ramp', x.ramp], ['mine', x.bet]].forEach(function (w) { var o = W[w[0]], b = w[1]; o.bet += b; o.book += b * x.e; o.you += b * (x.e - cu); });
+      });
+      var yourBS = -base0 - (sumBet ? bsCost / sumBet : 0), avgTc = n ? tcSum / n : 0;
+      var h = '<p class="bjt-help">Three things decide your result: the rules, the shoe (the count) and what you do with it — bet sizing and playing. This pane keeps them apart. <b>Player</b> edge is shown positive, house edge negative.</p>';
       h += '<div class="bjt-stats">' +
-        tile('Base edge, these rules', pc(-base), 'dn', S.decks + ' deck' + (S.decks > 1 ? 's' : '') + ', ' + (S.h17 ? 'H17' : 'S17') + (S.das ? ', DAS' : '') + (S.surrender ? ', LS' : '') + ' · flat-betting basic strategy') +
-        tile('Shoe\'s offer at your bets', n ? pc(offeredEdge) : '—', offeredEdge > 0 ? 'up' : 'dn', n ? 'bet-weighted edge over ' + n + ' hands · avg TC ' + sgn(Math.round(tcSum / n * 10) / 10) : 'no hands yet') +
-        tile('Your actual edge', n ? pc(yourEdge) : '—', yourEdge > 0 ? 'up' : 'dn', n ? 'after ' + money(cost) + ' of decision cost' : 'play some hands') +
-        tile('Edge with the ramp', n ? pc(rampEdge) : '—', rampEdge > 0 ? 'up' : 'dn', n ? 'if every hand were bet by the book' : '') +
-        tile('Expected result', n ? money(captured) : '—', captured >= 0 ? 'up' : 'dn', n ? 'ramp + perfect play: ' + money(rampEv) + ' · flat 1 unit: ' + money(flatEv) : '') +
-        tile('Actual result', n ? money(net) : '—', net >= 0 ? 'up' : 'dn', n ? 'luck = ' + money(net - captured) + ' (noise, not skill)' : '') +
+        tile('Basic strategy, by the book', pc(-base0), 'dn', S.decks + ' deck' + (S.decks > 1 ? 's' : '') + ', ' + (S.h17 ? 'H17' : 'S17') + (S.das ? ', DAS' : '') + (S.surrender ? ', LS' : '') + ' · neutral shoe, flat bets') +
+        tile('Basic strategy, as you play it', n ? pc(yourBS) : '—', yourBS >= -base0 - 0.0005 ? '' : 'dn', n ? (bsCost > 0 ? 'strategy errors cost ' + money(bsCost) + ' on ' + money(sumBet) + ' bet' : 'no strategy errors') : 'play some hands') +
+        tile('Shoe this session', n ? pc(sumBet ? W.mine.book / sumBet : 0) : '—', W.mine.book > 0 ? 'up' : 'dn', n ? 'edge at your bets over ' + n + ' hands · avg TC ' + sgn(Math.round(avgTc * 10) / 10) : '') +
+        tile('Your actual edge', n ? pc(sumBet ? W.mine.you / sumBet : 0) : '—', W.mine.you > 0 ? 'up' : 'dn', n ? 'your bets, your plays' : '') +
         '</div>';
       if (n) {
-        var hiAvg = hi.n ? hi.b / hi.n : 0, loAvg = lo.n ? lo.b / lo.n : 0, spread = loAvg ? Math.round(hiAvg / loAvg * 10) / 10 : 0;
-        h += '<h4>Bet sizing</h4><p class="bjt-help">Average bet at TC ≤ 0: <b>' + (lo.n ? money(loAvg) : '—') + '</b> (' + lo.n + ' hands) · at TC ≥ +2: <b>' + (hi.n ? money(hiAvg) : '—') + '</b> (' + hi.n + ' hands)' + (hi.n && lo.n ? ' · realised spread <b>' + spread + '×</b>' : '') + '. The ramp asks for ' + game.system.betRamp[game.system.betRamp.length - 1][1] + '× at the top. Bet efficiency is the gap between "shoe\'s offer at your bets" and "edge with the ramp": if the second is much higher, you are not pressing the good counts (or you are pressing the bad ones).</p>';
-        var D = L.decisions, byKey = {}, tot = 0; D.forEach(function (d) { if (d.cost <= 0) return; var k = d.desc + '|' + d.chosen + '|' + d.best; (byKey[k] = byKey[k] || { desc: d.desc, chosen: d.chosen, best: d.best, cost: 0, n: 0 }); byKey[k].cost += d.cost; byKey[k].n++; tot += d.cost; });
+        h += '<h4>Expected value three ways</h4><div class="tw"><table class="bjt-tags bjt-ev3"><tr><th>Bet sizing</th><th>Wagered</th><th>Book play</th><th>Your play</th><th>Edge</th></tr>';
+        [['1 unit flat (' + money(S.unitSize) + ')', W.flat], ['Count-optimal ramp', W.ramp], ['Your sizing', W.mine]].forEach(function (r) { var o = r[1]; h += '<tr><td>' + r[0] + '</td><td>' + money(o.bet) + '</td><td class="' + (o.book >= 0 ? 'up' : 'dn') + '">' + money(o.book) + '</td><td class="' + (o.you >= 0 ? 'up' : 'dn') + '">' + money(o.you) + '</td><td>' + pc(o.bet ? o.you / o.bet : 0) + '</td></tr>'; });
+        h += '</table></div><p class="bjt-help">Same shoe, same counts, three ways of betting into it. <b>Book play</b> is the count-optimal play on every hand; <b>your play</b> charges each hand the EV your decisions gave up, scaled to that bet size. Counting pays in two places: the gap between the flat row and the ramp row is bet sizing; the gap between book play and your play is decisions.</p>';
+        h += '<h4>Where the money went</h4><div class="bjt-stats">' +
+          tile('Expected, your bets & plays', money(W.mine.you), W.mine.you >= 0 ? 'up' : 'dn', 'shoe ' + money(W.mine.book) + ' − decisions ' + money(cost)) +
+          tile('Deal luck', money(dealLuck), dealLuck >= 0 ? 'up' : 'dn', 'the two cards you were dealt vs what the count promised') +
+          tile('Draw luck', money(drawLuck), drawLuck >= 0 ? 'up' : 'dn', 'the cards after your decisions, and the dealer\'s') +
+          tile('Actual result', money(net), net >= 0 ? 'up' : 'dn', 'expected + deal luck + draw luck') +
+          '</div>';
+        h += '<h4>Decisions</h4><p class="bjt-help">' + D.length + ' priced. Count deviations captured <b class="up">' + money(gain) + '</b> · missed <b class="dn">' + money(missed) + '</b> · strategy errors <b class="dn">' + money(bsCost) + '</b>' + (cost > bsCost + missed + 1e-9 ? ' · other cost vs the count-optimal play ' + money(cost - bsCost - missed) : '') + '.</p>';
+        var byKey = {}; D.forEach(function (d) { if (d.kind === 'ok' || d.kind === 'captured') return; var k = d.desc + '|' + d.chosen + '|' + d.opt; (byKey[k] = byKey[k] || { desc: d.desc, chosen: d.chosen, best: d.opt, kind: d.kind, cost: 0, n: 0 }); byKey[k].cost += d.cost; byKey[k].n++; });
         var rows = Object.keys(byKey).map(function (k) { return byKey[k]; }).sort(function (a, b) { return b.cost - a.cost; }).slice(0, 8);
-        h += '<h4>What your mistakes cost</h4>';
-        if (!rows.length) h += '<p class="bjt-help">No costly decisions logged. ' + (D.length ? 'Every play so far was the best available.' : 'Play in "play" mode to have decisions priced.') + '</p>';
-        else { h += '<div class="tw"><table class="bjt-tags bjt-mist"><tr><th>Hand</th><th>You</th><th>Best</th><th>Times</th><th>Cost</th></tr>';
-          rows.forEach(function (r) { h += '<tr><td>' + r.desc + '</td><td>' + (ACT_NAME[r.chosen] || (r.chosen === 'I' ? 'insure' : 'no ins.')) + '</td><td>' + (ACT_NAME[r.best] || (r.best === 'I' ? 'insure' : 'no ins.')) + '</td><td>' + r.n + '</td><td>' + money(r.cost) + '</td></tr>'; });
-          h += '</table></div><p class="bjt-help">Total decision cost ' + money(tot) + ' across ' + D.length + ' decisions — ' + (sumBet ? (100 * tot / sumBet).toFixed(2) + '%' : '—') + ' of money bet. Errors are priced by their actual EV, so a wrong stand on 16 v 10 costs cents while a missed double on 11 v 6 costs real money.</p>'; }
+        if (rows.length) { h += '<div class="tw"><table class="bjt-tags bjt-mist"><tr><th>Hand</th><th>You</th><th>Best</th><th>Type</th><th>Times</th><th>Cost</th></tr>';
+          rows.forEach(function (r) { h += '<tr><td>' + r.desc + '</td><td>' + actName(r.chosen) + '</td><td>' + actName(r.best) + '</td><td>' + (r.kind === 'error' ? 'strategy' : 'missed index') + '</td><td>' + r.n + '</td><td>' + money(r.cost) + '</td></tr>'; });
+          h += '</table></div>'; }
+        h += '<p class="bjt-help">Errors are priced by their actual EV at the count, so a wrong stand on 16 v 10 costs cents while a missed double on 11 v 6 costs real money. Index plays are not a separate rulebook here: they are simply the plays the shifted deck makes best.</p>';
       }
-      h += '<p class="bjt-help bjt-fine">Model notes: the base edge and every decision price come from an infinite-deck, composition-independent EV engine for your rule set (adjusted ' + (100 * (DECK_ADJ[S.decks] || 0.001)).toFixed(2) + ' points for ' + S.decks + ' deck' + (S.decks > 1 ? 's' : '') + '; one split, no resplits). The edge at a count uses the standard Hi-Lo figure of about ½% per true-count point. Index plays you take are priced as correct. Good enough to tell you whether your betting and playing are capturing the count — not a simulator-grade number.</p>';
+      h += '<p class="bjt-help bjt-fine">Model notes: an infinite-deck EV engine for your rule set (adjusted ' + (100 * (DECK_ADJ[S.decks] || 0.001)).toFixed(2) + ' points for ' + S.decks + ' deck' + (S.decks > 1 ? 's' : '') + '; one split, no resplits), re-run at each half-point of true count with the card distribution the count implies (about t more high cards than low per deck at TC +t — Hi-Lo\'s information, not the shoe\'s exact make-up). Good enough to tell you whether your betting and playing are capturing the count — not a simulator-grade number.</p>';
       g.innerHTML = h;
     }
+    function actName(a) { return ACT_NAME[a] || (a === 'I' ? 'insure' : a === 'N' ? 'no ins.' : a); }
 
+    /* ---------- hand values pane: EV of every two-card start at the current count ---------- */
+    var hvHi = null;
+    function renderValues() {
+      var g = panes['Hand values'], tc = S.showCount ? B.tcBucket(game.trueCount()) : 0, eng = B.evEngine(rulesNow(), tc), ups = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      g.innerHTML = '';
+      g.appendChild(el('p', 'bjt-help', 'What each two-card hand is worth against each up card, played optimally, as a percentage of the bet — ' + (S.showCount ? 'at the current true count (' + sgn(tc) + ')' : 'at a neutral count (turn on the live count to see it move)') + '. Overall the shoe is worth <b>' + ((-houseEdgeAt(tc) >= 0 ? '+' : '−') + Math.abs(100 * houseEdgeAt(tc)).toFixed(2)) + '%</b> to you here.'));
+      function cell(v, key) { var c = v > 0.3 ? 'g3' : v > 0.1 ? 'g2' : v > 0 ? 'g1' : v > -0.15 ? 'r1' : v > -0.35 ? 'r2' : 'r3'; var n = Math.round(v * 100); return '<td class="' + c + (hvHi === key ? ' hi' : '') + '">' + (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + '</td>'; }
+      function tbl(title, rows) {
+        var h = '<h4>' + title + '</h4><div class="tw"><table class="bjt-strat bjt-hv"><tr><th></th>'; ups.forEach(function (u) { h += '<th>' + (u === 11 ? 'A' : u) + '</th>'; }); h += '</tr>';
+        rows.forEach(function (r) { h += '<tr><th>' + r.label + '</th>'; ups.forEach(function (u) { h += cell(eng.startEv(r.a, r.b, u), r.key + 'v' + u); }); h += '</tr>'; });
+        return h + '</table></div>';
+      }
+      var hard = [], soft = [], pairs = [], t;
+      for (t = 20; t >= 5; t--) hard.push({ label: String(t), a: t === 13 ? 10 : t - 2, b: t === 13 ? 3 : 2, key: 'h' + t }); // any non-pair, ace-free split of t prices the same (11 would read as an ace)
+      for (t = 20; t >= 13; t--) soft.push({ label: 'A,' + (t - 11), a: 11, b: t - 11, key: 's' + t });
+      [11, 10, 9, 8, 7, 6, 5, 4, 3, 2].forEach(function (r) { pairs.push({ label: (r === 11 ? 'A' : r) + ',' + (r === 11 ? 'A' : r), a: r, b: r, key: 'p' + r }); });
+      g.appendChild(el('div', null, tbl('Hard totals', hard) + tbl('Soft totals', soft) + tbl('Pairs', pairs)));
+      g.appendChild(el('p', 'bjt-help', 'A blackjack is worth +150 against everything but an ace or a ten (the dealer might have one too). Read the reds as the price of being dealt the hand: 16 v 10 costs about half your bet whatever you do, which is why surrender exists. The numbers change with the count — at +4 the 12s and 13s against small cards turn into stands and the doubles get fatter.'));
+    }
+    function hvKey(cards, up) { var t = B.total(cards); var k = cards.length === 2 && cards[0].v === cards[1].v ? 'p' + cards[0].v : (t.soft ? 's' : 'h') + t.t; return k + 'v' + up; }
     /* ---------- in-table count prompts ---------- */
     function promptCount(kind, done) {
       actions.innerHTML = '';
@@ -619,7 +684,7 @@ window.BJTable = (function () {
       if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; pauseBtn.textContent = 'Pause';
       game = new B.Game({ rules: { decks: S.decks, h17: S.h17, das: S.das, surrender: S.surrender, penetration: S.penetration }, system: S.system });
       round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; if (!S.unitSize) S.unitSize = suggestUnit(S.startBankroll); renderBank();
-      renderGuide(); renderStrategy(); renderStats(); renderEdge(); renderFelt();
+      renderGuide(); renderStrategy(); renderValues(); renderStats(); renderEdge(); renderFelt();
       say(S.mode === 'play' ? 'Set your bet and press Deal. Keys: H, S, D, P, R; space pauses.' : 'Count drill: press Deal and everyone plays basic strategy on their own — just keep the count. Space pauses; check your count from the Count tab.', 'info');
     }
     function renderAll() { renderFelt(); renderStats(); renderBank(); }
