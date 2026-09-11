@@ -69,8 +69,8 @@ window.BJTable = (function () {
     table.innerHTML = '<div class="bjt-rail"></div><div class="bjt-surface">' +
       '<svg class="bjt-arcsvg" viewBox="0 0 1000 560" preserveAspectRatio="none" aria-hidden="true"><defs><path id="bjt-arc-outer" d="M 58 24 A 442 516 0 0 0 942 24"/></defs>' +
       '<text class="arc1"><textPath href="#bjt-arc-outer" startOffset="50%" text-anchor="middle"></textPath></text>' +
-      '<text class="arc2" x="500" y="222" text-anchor="middle">INSURANCE PAYS 2 TO 1</text></svg>' +
-      '<div class="bjt-brand"><img src="../assets/ttg-mark-neon.svg" alt=""><span>THE TILTED GENT</span></div></div>';
+      '</svg>' +
+      '<div class="bjt-brand"><img src="../assets/ttg-mark-neon.svg" alt=""><span>THE TILTED GENT</span><small>INSURANCE PAYS 2 TO 1</small></div></div>';
     felt.appendChild(table);
     var surface = table.querySelector('.bjt-surface');
     var arcText = table.querySelector('.arc1 textPath');
@@ -213,7 +213,7 @@ window.BJTable = (function () {
       felt.classList.toggle('arc', wide);
       for (i = 0; i < n; i++) {
         var th = n === 1 ? 90 : 22 + i * (136 / (n - 1)), rad = th * Math.PI / 180;
-        var x = 50 + 41 * Math.cos(rad), y = 24 + 46 * Math.sin(rad);
+        var x = 50 + 41 * Math.cos(rad), y = 27 + 46 * Math.sin(rad);
         seats[i].style.left = wide ? x + '%' : ''; seats[i].style.top = wide ? y + '%' : '';
       }
     }
