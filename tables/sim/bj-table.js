@@ -10,7 +10,7 @@ window.BJTable = (function () {
   function sgn(n) { return (n > 0 ? '+' : '') + n; }
 
   var DEFAULTS = { decks: 6, h17: true, das: true, surrender: true, penetration: 0.75, bots: 2, seat: 'last', speed: 500, mode: 'play',
-                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0 };
+                   unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0, bankroll: 1000, startBankroll: 1000, bonus: 'none', mainChips: [], bonusChips: [] };
   function loadSettings() { try { var s = JSON.parse(localStorage.getItem('ttg-bjt') || 'null'); return s ? Object.assign({}, DEFAULTS, s) : Object.assign({}, DEFAULTS); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function saveSettings(s) { try { localStorage.setItem('ttg-bjt', JSON.stringify(s)); } catch (e) {} }
 
@@ -27,7 +27,7 @@ window.BJTable = (function () {
     function sel_(label, key, options) {
       var f = el('label', 'bjt-field'); f.appendChild(el('span', 'k', label));
       var s = el('select'); options.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; s.appendChild(op); }); s.value = String(S[key]);
-      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); if (key === 'bustRemove' || key === 'rcEvery' || key === 'tcEvery') { renderFelt(); return; } rebuild(); });
+      s.addEventListener('change', function () { S[key] = isNaN(+s.value) || key === 'seat' || key === 'mode' || key === 'system' ? s.value : +s.value; if (key === 'h17' || key === 'das' || key === 'surrender') S[key] = s.value === 'true'; saveSettings(S); if (key === 'bustRemove' || key === 'rcEvery' || key === 'tcEvery' || key === 'bonus') { if (key === 'bonus' && S.bonus === 'none') returnChips('bonus'); renderFelt(); renderBank(); return; } if (key === 'startBankroll') { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; saveSettings(S); } rebuild(); });
       f.appendChild(s); return f;
     }
     bar.appendChild(sel_('Decks', 'decks', [[1, '1 deck'], [2, '2 decks'], [4, '4 decks'], [6, '6 decks'], [8, '8 decks']]));
@@ -41,6 +41,8 @@ window.BJTable = (function () {
     bar.appendChild(sel_('Busted hands', 'bustRemove', [[2000, 'Removed after 2 s'], [5000, 'Removed after 5 s'], [0, 'Stay on the table']]));
     bar.appendChild(sel_('Ask my running count', 'rcEvery', [[0, 'Never'], [3, 'Every 3 hands'], [5, 'Every 5 hands'], [10, 'Every 10 hands'], [20, 'Every 20 hands']]));
     bar.appendChild(sel_('Ask my true count', 'tcEvery', [[0, 'Never'], [26, 'Every half deck dealt'], [52, 'Every deck dealt'], [104, 'Every 2 decks dealt']]));
+    bar.appendChild(sel_('Bonus bet', 'bonus', [['none', 'None'], ['21plus3', '21+3 (your two + dealer up)'], ['pairs', 'Perfect Pairs']]));
+    bar.appendChild(sel_('Starting bankroll', 'startBankroll', [[500, '$500'], [1000, '$1,000'], [2500, '$2,500'], [5000, '$5,000']]));
     var spd = el('label', 'bjt-field'); spd.appendChild(el('span', 'k', 'Deal speed'));
     var spdIn = el('input'); spdIn.type = 'range'; spdIn.min = '60'; spdIn.max = '1500'; spdIn.step = '20'; spdIn.value = S.speed;
     var spdOut = el('span', 'bjt-spd', S.speed + ' ms/card');
@@ -154,14 +156,14 @@ window.BJTable = (function () {
       var st = game.stats, g = panes['Stats'];
       var acc = st.decisions ? Math.round(100 * st.correct / st.decisions) : 0, cacc = st.countChecks ? Math.round(100 * st.countExact / st.countChecks) : 0;
       g.innerHTML = '<div class="bjt-stats">' +
-        tile('Hands', st.hands) + tile('Session result', fmt(st.net), st.net < 0 ? 'dn' : st.net > 0 ? 'up' : '') +
+        tile('Hands', st.hands) + tile('Session result', fmt(st.net), st.net < 0 ? 'dn' : st.net > 0 ? 'up' : '', 'rack $' + Math.round(S.bankroll).toLocaleString() + (st.bonusBets ? ' · bonus bets ' + fmt(st.bonusNet) : '')) +
         tile('Strategy accuracy', st.decisions ? acc + '%' : '—', acc >= 95 ? 'up' : acc >= 85 ? '' : 'dn', st.correct + ' of ' + st.decisions + ' decisions') +
         tile('Count checks', st.countChecks ? cacc + '% exact' : '—', cacc >= 90 ? 'up' : '', st.countChecks ? 'average miss ' + (st.countOff / st.countChecks).toFixed(1) : 'none yet') +
         tile('True-count checks', st.tcChecks ? Math.round(100 * (st.tcExact || 0) / st.tcChecks) + '% within ½' : '—', st.tcChecks && (st.tcExact || 0) / st.tcChecks >= 0.9 ? 'up' : '', st.tcChecks ? 'average miss ' + (st.tcOff / st.tcChecks).toFixed(1) : 'none yet') +
         tile('Win / loss / push', st.wins + ' / ' + st.losses + ' / ' + st.pushes) + tile('Shoes dealt', game.shoeNo) + '</div>' +
         '<p class="bjt-help">Basic strategy alone gets the house edge to about half a percent; the count only pays once your strategy accuracy is above 95% and your count checks are exact. Fix the strategy first.</p>' +
         '<button type="button" class="bjt-btn ghost" id="bjt-reset">Reset session</button>';
-      g.querySelector('#bjt-reset').addEventListener('click', function () { rebuild(true); });
+      g.querySelector('#bjt-reset').addEventListener('click', function () { S.bankroll = S.startBankroll; S.mainChips = []; S.bonusChips = []; saveSettings(S); rebuild(true); });
     }
     function tile(k, v, cls, s) { return '<div class="st' + (cls ? ' ' + cls : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
 
@@ -232,13 +234,13 @@ window.BJTable = (function () {
     function startRound() {
       if (timer) clearTimeout(timer); timer = null; pendingCheck = false;
       if (game.needShuffle) { game.newShoe(); say('New shoe. Count resets to ' + sgn(game.rc) + '.', 'info'); }
-      var bet = +betIn.value || S.unit; S.unit = S.unit; saveSettings(S);
+      var bet = sum(S.mainChips); if (bet <= 0) return; lastBet = { main: S.mainChips.slice(), bonus: S.bonusChips.slice() }; S.unit = bet; saveSettings(S);
       var n = S.bots + 1, youIdx = S.seat === 'first' ? 0 : S.seat === 'middle' ? Math.floor(n / 2) : n - 1, i;
-      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal' };
+      round = { dealer: { cards: [] }, seats: [], dealerDone: false, stage: 'deal', netBefore: game.stats.net };
       for (i = 0; i < n; i++) round.seats.push({ n: i + 1, you: i === youIdx, hands: [{ cards: [], bet: i === youIdx ? bet : S.unit }] });
       round.you = round.seats[youIdx];
-      stratHi = null; highlightStrategy(); actions.innerHTML = ''; say('Dealing…');
-      renderFelt();
+      stratHi = null; highlightStrategy(); actions.innerHTML = ''; feedback.innerHTML = ''; say('Dealing…');
+      renderFelt(); renderBank();
       dealCards(0);
     }
     function dealCards(step) {
@@ -252,6 +254,7 @@ window.BJTable = (function () {
       wait(function () { dealCards(step + 1); });
     }
     function afterDeal() {
+      settleBonus();
       var up = round.dealer.cards[0];
       if (up.v === 11 && S.mode === 'play') { offerInsurance(); return; }
       checkDealerBJ();
@@ -262,7 +265,7 @@ window.BJTable = (function () {
       actions.innerHTML = '';
       var yes = el('button', 'bjt-btn ghost', 'Take insurance'), no = el('button', 'bjt-btn gold', 'No insurance');
       yes.type = no.type = 'button';
-      yes.addEventListener('click', function () { grade(adviceTake ? 'I' : 'N', 'I', 'Insurance'); round.you.insured = true; checkDealerBJ(); });
+      yes.addEventListener('click', function () { grade(adviceTake ? 'I' : 'N', 'I', 'Insurance'); round.you.insured = true; S.bankroll -= round.you.hands[0].bet / 2; checkDealerBJ(); });
       no.addEventListener('click', function () { grade(adviceTake ? 'I' : 'N', 'N', 'Insurance'); checkDealerBJ(); });
       actions.appendChild(yes); actions.appendChild(no);
     }
@@ -321,14 +324,14 @@ window.BJTable = (function () {
       actions.innerHTML = ''; h.active = true;
       if (act === 'R') { h.status = 'sur'; h.statusText = 'Surrendered'; h.surrendered = true; finishHand(h); return; }
       if (act === 'P') {
-        var c2 = h.cards.pop(), h2 = { cards: [c2], bet: h.bet, split: true }; h.split = true;
+        var c2 = h.cards.pop(), h2 = { cards: [c2], bet: h.bet, split: true }; h.split = true; if (seat.you) S.bankroll -= h.bet;
         if (c2.v === 11) { h.fromAces = true; h2.fromAces = true; }
         seat.hands.splice(round.handIdx + 1, 0, h2);
         h.cards.push(game.draw()); renderFelt();
         wait(function () { h2.cards.push(game.draw()); renderFelt(); wait(function () { playNext(); }); });
         return;
       }
-      if (act === 'D') { h.bet *= 2; h.doubled = true; h.cards.push(game.draw()); renderFelt(); var t = B.total(h.cards); if (t.t > 21) { h.status = 'bust'; h.statusText = 'Bust'; } wait(function () { finishHand(h); }); return; }
+      if (act === 'D') { if (seat.you) { S.bankroll -= h.bet; } h.bet *= 2; h.doubled = true; h.cards.push(game.draw()); renderFelt(); var t = B.total(h.cards); if (t.t > 21) { h.status = 'bust'; h.statusText = 'Bust'; } wait(function () { finishHand(h); }); return; }
       if (act === 'H') { h.cards.push(game.draw()); renderFelt(); var t2 = B.total(h.cards); if (t2.t > 21) { h.status = 'bust'; h.statusText = 'Bust'; wait(function () { finishHand(h); }); return; } if (t2.t === 21) { wait(function () { finishHand(h); }); return; } wait(playNext); return; }
       finishHand(h); // stand
     }
@@ -364,21 +367,31 @@ window.BJTable = (function () {
           else { net = 0; txt = 'push'; }
           if (seat.you && h === seat.hands[0] && seat.insured) { net += dBJ ? h.bet : -h.bet / 2; txt += dBJ ? ' + insurance' : ' − insurance'; }
           if (!h.removed) { h.status = net > 0 ? 'win' : net < 0 ? 'lose' : 'push'; h.statusText = txt; }
-          if (seat.you) { st.net += net; st.hands++; if (net > 0) st.wins++; else if (net < 0) st.losses++; else st.pushes++; lines.push(txt + ' ' + (net ? (net > 0 ? '+' : '') + fmt(net).replace('$', '$') : '')); }
+          if (seat.you) { st.net += net; st.hands++; if (net > 0) st.wins++; else if (net < 0) st.losses++; else st.pushes++; lines.push(txt + ' ' + (net ? (net > 0 ? '+' : '') + fmt(net).replace('$', '$') : '')); var stake = h.bet + (h === seat.hands[0] && seat.insured ? h.bet / 2 : 0); S.bankroll += stake + net; }
         });
       });
-      renderFelt(); renderStats();
+      round.stage = 'done'; var youNet = 0; round.you.hands.forEach(function (h) { var t = B.total(h.cards); }); youNet = st.net - (round.netBefore || 0);
+      S.mainChips.length = 0; saveSettings(S); showPayout(youNet, 'main'); renderFelt(); renderStats(); renderBank();
       say('Dealer ' + (d.t > 21 ? 'busts' : 'has ' + d.t) + '. You: ' + lines.join(', ') + '.', 'info');
       actions.innerHTML = '';
-      var next = el('button', 'bjt-btn gold', 'Deal next hand'); next.type = 'button'; next.addEventListener('click', startRound); actions.appendChild(next);
+      var next = el('button', 'bjt-btn gold', 'Deal next hand'); next.type = 'button'; next.addEventListener('click', autoRebet); actions.appendChild(next);
       // count prompts, at the round boundary
       var wantRC = S.rcEvery > 0 && st.hands > 0 && st.hands % S.rcEvery === 0;
       var dealtNow = S.decks * 52 - game.shoe.length;
       var wantTC = S.tcEvery > 0 && dealtNow - (game.tcMark || 0) >= S.tcEvery;
       if (wantTC) game.tcMark = dealtNow;
-      if (wantRC || wantTC) { promptCount(wantRC ? 'rc' : 'tc', function () { if (wantRC && wantTC) promptCount('tc', function () { if (S.autoNext) wait(startRound, 600); }); else if (S.autoNext) wait(startRound, 600); }); return; }
-      if (S.autoNext) wait(startRound, Math.max(S.speed * 2, 900));
+      if (wantRC || wantTC) { promptCount(wantRC ? 'rc' : 'tc', function () { if (wantRC && wantTC) promptCount('tc', function () { rebet(); if (S.autoNext) wait(startRoundIfBet, 600); }); else { rebet(); if (S.autoNext) wait(startRoundIfBet, 600); } }); return; }
+      wait(function () { rebet(); if (S.autoNext) wait(startRoundIfBet, Math.max(S.speed * 2, 600)); }, 1500);
     }
+    function startRoundIfBet() { if (sum(S.mainChips) > 0) startRound(); }
+    function rebet() {
+      if (!lastBet || sum(S.mainChips) > 0 || betLocked()) return sum(S.mainChips) > 0;
+      var need = sum(lastBet.main) + (S.bonus !== 'none' ? sum(lastBet.bonus) : 0);
+      if (need > S.bankroll) { renderBank(); say('Not enough in the rack to repeat the bet. Size down, or rebuy.', 'info'); return false; }
+      lastBet.main.forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); if (S.bonus !== 'none') lastBet.bonus.forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; });
+      saveSettings(S); renderBank(); return true;
+    }
+    function autoRebet() { if (rebet()) startRound(); }
 
     /* ---------- in-table count prompts ---------- */
     function promptCount(kind, done) {
@@ -390,7 +403,7 @@ window.BJTable = (function () {
       var skip = el('button', 'bjt-btn ghost', 'Skip'); skip.type = 'button';
       var out = el('div', 'out');
       box.appendChild(inp); box.appendChild(ok); box.appendChild(skip); box.appendChild(out); actions.appendChild(box); inp.focus();
-      function finish() { var n = el('button', 'bjt-btn gold', 'Deal next hand'); n.type = 'button'; n.addEventListener('click', startRound); actions.appendChild(n); done(); }
+      function finish() { var n = el('button', 'bjt-btn gold', 'Deal next hand'); n.type = 'button'; n.addEventListener('click', autoRebet); actions.appendChild(n); done(); }
       ok.addEventListener('click', function () {
         if (inp.value === '') { inp.focus(); return; }
         var st = game.stats, yours = +inp.value;
@@ -404,12 +417,88 @@ window.BJTable = (function () {
       inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') ok.click(); });
     }
 
-    /* ---------- bet row + count check ---------- */
-    var betIn = el('input'); betIn.type = 'number'; betIn.min = '1'; betIn.step = '5'; betIn.value = S.unit;
-    var betLab = el('label', 'bjt-field'); betLab.appendChild(el('span', 'k', 'Your bet ($) for the next hand')); betLab.appendChild(betIn); betRow.appendChild(betLab);
-    var feedback = el('div', 'bjt-feedback'); betRow.appendChild(feedback);
-    var dealBtn = el('button', 'bjt-btn gold', 'Deal'); dealBtn.type = 'button'; dealBtn.addEventListener('click', function () { if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; startRound(); }); betRow.appendChild(dealBtn);
-    betIn.addEventListener('change', function () { S.unit = Math.max(1, +betIn.value || 25); saveSettings(S); });
+    /* ---------- chips, bankroll and the betting circles ---------- */
+    var DENOMS = [1, 5, 25, 100, 500];
+    function chipHTML(v, extra) { return '<span class="chip c' + v + (extra ? ' ' + extra : '') + '"><b>' + (v >= 1000 ? (v / 1000) + 'K' : v) + '</b></span>'; }
+    function stackHTML(chips, cls) { var h = '<span class="chipstack' + (cls ? ' ' + cls : '') + '">'; chips.forEach(function (v, i) { h += '<span class="chipwrap" style="bottom:' + (i * 3) + 'px" data-i="' + i + '">' + chipHTML(v) + '</span>'; }); return h + '</span>'; }
+    function toChips(amount) { var out = [], i; for (i = DENOMS.length - 1; i >= 0; i--) { while (amount >= DENOMS[i] - 1e-9) { out.push(DENOMS[i]); amount -= DENOMS[i]; } } if (amount > 0.01) out.push(1); return out; }
+    function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
+    var target = 'main';
+    function returnChips(which) { var arr = which === 'main' ? S.mainChips : S.bonusChips; S.bankroll += sum(arr); arr.length = 0; saveSettings(S); }
+    function betLocked() { return !!(round && round.stage !== 'done'); }
+
+    var bank = el('div', 'bjt-bank');
+    var rack = el('div', 'bjt-rack'); bank.appendChild(rack);
+    var circles = el('div', 'bjt-circles'); bank.appendChild(circles);
+    var feedback = el('div', 'bjt-feedback'); bank.appendChild(feedback);
+    var dealBtn = el('button', 'bjt-btn gold', 'Deal'); dealBtn.type = 'button';
+    dealBtn.addEventListener('click', function () { if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; if (sum(S.mainChips) <= 0) { feedback.innerHTML = '<span class="bad">Put chips in the betting circle first — click a chip in your rack.</span>'; return; } startRound(); });
+    var rebuy = el('button', 'bjt-btn ghost', 'Rebuy'); rebuy.type = 'button'; rebuy.hidden = true;
+    rebuy.addEventListener('click', function () { S.bankroll += S.startBankroll; saveSettings(S); renderBank(); feedback.innerHTML = '<span class="ok">Rebought for $' + S.startBankroll.toLocaleString() + '. The trainer keeps score of how often that happens.</span>'; });
+    var btnrow = el('div', 'bjt-bankbtns'); btnrow.appendChild(dealBtn); btnrow.appendChild(rebuy); bank.appendChild(btnrow);
+    betRow.appendChild(bank);
+
+    function renderBank() {
+      var locked = betLocked();
+      rack.innerHTML = '<div class="k">Your rack <b>$' + Math.round(S.bankroll).toLocaleString() + '</b>' + (function () { var d = S.bankroll + sum(S.mainChips) + sum(S.bonusChips) - S.startBankroll; return ' <i>(' + (d >= 0 ? '+' : '−') + '$' + Math.abs(Math.round(d)).toLocaleString() + ' on the session)</i>'; })() + '</div><div class="rackrow"></div>';
+      var row = rack.querySelector('.rackrow'), left = S.bankroll;
+      DENOMS.forEach(function (v) {
+        var n = Math.min(20, Math.floor(left / v)); if (v === 1) n = Math.min(20, Math.round(left)); // show the pile at each denomination
+        var pile = el('button', 'pile' + (S.bankroll < v ? ' empty' : ''), stackHTML(new Array(Math.max(1, Math.min(n, 8))).join(',').split(',').map(function () { return v; })) + '<small>$' + v + (n > 8 ? ' ×' + n : '') + '</small>');
+        pile.type = 'button'; pile.disabled = locked || S.bankroll < v; pile.title = 'Add a $' + v + ' chip to the ' + (target === 'bonus' ? 'bonus' : 'main') + ' bet';
+        pile.addEventListener('click', function () { var arr = target === 'bonus' ? S.bonusChips : S.mainChips; if (target === 'bonus' && S.bonus === 'none') { target = 'main'; arr = S.mainChips; } arr.push(v); S.bankroll -= v; saveSettings(S); renderBank(); });
+        row.appendChild(pile);
+      });
+      var mainSum = sum(S.mainChips), bonusSum = sum(S.bonusChips);
+      circles.innerHTML = '';
+      var mc = el('div', 'circle main' + (target === 'main' ? ' target' : '') + (locked ? ' locked' : ''), '<div class="k">Bet</div>' + stackHTML(S.mainChips, 'inbet') + '<div class="amt">' + (mainSum ? '$' + mainSum.toLocaleString() : 'place bet') + '</div>');
+      mc.addEventListener('click', function (e) { target = 'main'; var w = e.target.closest('.chipwrap'); if (w && !locked && S.mainChips.length) { S.bankroll += S.mainChips.pop(); saveSettings(S); } renderBank(); });
+      circles.appendChild(mc);
+      if (S.bonus !== 'none') {
+        var bc = el('div', 'circle bonus' + (target === 'bonus' ? ' target' : '') + (locked ? ' locked' : ''), '<div class="k">' + (S.bonus === '21plus3' ? '21+3' : 'Pairs') + '</div>' + stackHTML(S.bonusChips, 'inbet') + '<div class="amt">' + (bonusSum ? '$' + bonusSum.toLocaleString() : 'optional') + '</div>');
+        bc.addEventListener('click', function (e) { target = 'bonus'; var w = e.target.closest('.chipwrap'); if (w && !locked && S.bonusChips.length) { S.bankroll += S.bonusChips.pop(); saveSettings(S); } renderBank(); });
+        circles.appendChild(bc);
+      }
+      var clear = el('button', 'bjt-btn ghost small', 'Clear bets'); clear.type = 'button'; clear.disabled = locked || (!mainSum && !bonusSum);
+      clear.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); renderBank(); });
+      var rep = el('button', 'bjt-btn ghost small', 'Repeat last'); rep.type = 'button'; rep.disabled = locked || !lastBet || sum(lastBet.main) + sum(lastBet.bonus) > S.bankroll + mainSum + bonusSum;
+      rep.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); lastBet.main.forEach(function (v) { S.mainChips.push(v); S.bankroll -= v; }); if (S.bonus !== 'none') lastBet.bonus.forEach(function (v) { S.bonusChips.push(v); S.bankroll -= v; }); saveSettings(S); renderBank(); });
+      var bb = el('div', 'betbtns'); bb.appendChild(clear); bb.appendChild(rep); circles.appendChild(bb);
+      dealBtn.disabled = locked || mainSum <= 0;
+      rebuy.hidden = !(S.bankroll < 1 && mainSum <= 0);
+      if (S.showCount) { var sb = game.suggestedBet(S.unit); rack.querySelector('.k').innerHTML += ' <span class="ramp">ramp says $' + sb.toLocaleString() + '</span>'; }
+    }
+    var lastBet = null;
+    // payout animation: chips appear beside the circle, then flow to the rack (or the bet flows to the dealer)
+    function showPayout(net, kind) {
+      var c = circles.querySelector(kind === 'bonus' ? '.circle.bonus' : '.circle.main'); if (!c) return;
+      var fx = el('div', 'payfx ' + (net > 0 ? 'win' : net < 0 ? 'lose' : 'push'));
+      if (net > 0) fx.innerHTML = stackHTML(toChips(net), 'pay') + '<b>+$' + net.toLocaleString() + '</b>';
+      else if (net < 0) fx.innerHTML = '<b>−$' + Math.abs(net).toLocaleString() + '</b>';
+      else fx.innerHTML = '<b>push</b>';
+      c.appendChild(fx);
+      setTimeout(function () { fx.classList.add('go'); }, 900);
+      setTimeout(function () { if (fx.parentNode) fx.parentNode.removeChild(fx); }, 1700);
+    }
+
+    /* ---------- bonus side bets (evaluated on the initial deal) ---------- */
+    function bonusResult(kind, p1, p2, up) {
+      if (kind === 'pairs') {
+        if (p1.r !== p2.r) return 0;
+        if (p1.s === p2.s) return 25; var red = function (c) { return c.s === '♥' || c.s === '♦'; }; return red(p1) === red(p2) ? 12 : 6;
+      }
+      var cs = [p1, p2, up], rs = cs.map(function (c) { return c.r === 1 ? 14 : c.r; }).sort(function (a, b) { return a - b; });
+      var flush = cs[0].s === cs[1].s && cs[1].s === cs[2].s, trips = rs[0] === rs[2];
+      var straight = (rs[2] - rs[1] === 1 && rs[1] - rs[0] === 1) || (rs[0] === 2 && rs[1] === 3 && rs[2] === 14);
+      if (trips && flush) return 100; if (straight && flush) return 40; if (trips) return 30; if (straight) return 10; if (flush) return 5; return 0;
+    }
+    function settleBonus() {
+      var bet = sum(S.bonusChips); if (!bet || S.bonus === 'none') return;
+      var you = round.you, h = you.hands[0], mult = bonusResult(S.bonus, h.cards[0], h.cards[1], round.dealer.cards[0]);
+      var net = mult ? bet * mult : -bet; var st = game.stats; st.bonusNet = (st.bonusNet || 0) + net; st.bonusBets = (st.bonusBets || 0) + 1;
+      if (mult) { S.bankroll += bet + bet * mult; feedback.innerHTML = '<span class="ok">Bonus hits: ' + (S.bonus === 'pairs' ? 'pair pays ' : '21+3 pays ') + mult + ':1 — +$' + (bet * mult).toLocaleString() + '.</span>'; }
+      S.bonusChips.length = 0; saveSettings(S); showPayout(net, 'bonus'); renderBank();
+    }
 
     checkBtn.addEventListener('click', function () {
       var yours = +rcIn.value; if (isNaN(yours) || rcIn.value === '') { checkOut.innerHTML = '<span class="bad">Type your running count first.</span>'; return; }
@@ -432,11 +521,11 @@ window.BJTable = (function () {
     function rebuild(keepNothing) {
       if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; pauseBtn.textContent = 'Pause';
       game = new B.Game({ rules: { decks: S.decks, h17: S.h17, das: S.das, surrender: S.surrender, penetration: S.penetration }, system: S.system });
-      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game;
+      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; renderBank();
       renderGuide(); renderStrategy(); renderStats(); renderFelt();
       say(S.mode === 'play' ? 'Set your bet and press Deal. Keys: H, S, D, P, R; space pauses.' : 'Count drill: press Deal and everyone plays basic strategy on their own — just keep the count. Space pauses; check your count from the Count tab.', 'info');
     }
-    function renderAll() { renderFelt(); renderStats(); }
+    function renderAll() { renderFelt(); renderStats(); renderBank(); }
     rebuild();
   }
   return { mount: mount };
