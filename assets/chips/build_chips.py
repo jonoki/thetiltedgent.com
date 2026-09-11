@@ -42,7 +42,7 @@ def spots(a, b):
     return out
 
 CHIPS = [  # value, inlay gradient (centre, mid, edge), rim/body field (chip colour, darker toward the edge), edge-spot colours, value text colour
-    (1,   ('#6A6478', '#4A4458', '#2E2A38'), ('#5A5468', '#3A3446', '#221E2B'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
+    (1,   ('#FBF6EA', '#F1E6CF', '#D9CDB0'), ('#F4EBD6', '#E6D9BC', '#C9BB9A'), ('#0B0913', '#C21E38'), '#7A1122'),
     (5,   ('#D8334A', '#B71E36', '#8A1428'), ('#C42239', '#8F1A2B', '#5C0F1B'), ('#F1E6CF', '#0B0913'), '#F1E6CF'),
     (25,  ('#2F9862', '#1F7A4D', '#145233'), ('#237A4E', '#175A38', '#0D3A24'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
     (100, ('#2A2434', '#161120', '#08060E'), ('#1E1830', '#0E0B16', '#06050B'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
