@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VTR — Ventas, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2FB6A8;
+  --accent-dim: #2FB6A833;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">VTR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Real Estate / REIT — Healthcare Facilities</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $46.75B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #555</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#230 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#145 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Ventas, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$90.44</div>
+      <div class="price-change" style="color:var(--green);">+$1.12 (+1.25%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Chicago, Illinois</div>
+    <div class="meta-item"><span>Employees:</span> 542 (corporate; operators employ community staff)</div>
+    <div class="meta-item"><span>Founded:</span> 1998 (NYSE listing May 4, 1998)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+    <div class="meta-item"><span>Portfolio:</span> ~1,450 properties, US / Canada / UK</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Ventas is an S&amp;P 500 healthcare <span class="tip" title="Real Estate Investment Trust — a company that owns income-producing real estate and must distribute most of its taxable income to shareholders as dividends in exchange for not paying corporate income tax.">REIT</span> that owns roughly <strong>1,450 properties</strong> across the United States, Canada and the United Kingdom, of which <strong>more than 900 are senior housing communities</strong>. FY2025 revenue was <strong>$5.82B, up 18.99%</strong> from $4.89B in FY2024, and the most recent quarter (Q2 2026) ran at <strong>$1.73B, up 21.7% <span class="tip" title="Year-over-year — this period compared with the same period one year earlier.">YoY</span></strong>. At a $46.75B market capitalisation it is roughly the <strong>#555 most valuable listed company globally</strong> — and the second-largest healthcare REIT behind Welltower.</p>
+  <p class="prose" style="margin-top:16px;">The central debate is not whether senior housing demand is coming — the demographics are arithmetic, and management notes <strong>2 million Americans turn 80 in 2026</strong> against new construction starts at record lows. The debate is how much of that is already in the price. VTR has re-rated hard: the stock is up <strong>30.8% over the last 52 weeks</strong> and roughly <strong>+69% over five years</strong>, while <span class="tip" title="Senior Housing Operating Portfolio — communities where the REIT takes the operating economics (revenue minus expenses) rather than collecting a fixed lease payment. Higher upside, higher volatility.">SHOP</span> same-store cash <span class="tip" title="Net Operating Income — property revenue minus property operating expenses, before interest, depreciation, and corporate overhead. The core operating measure for real estate.">NOI</span> grew <strong>16.3%</strong> in Q2 2026. That growth rate is not a run-rate; it is an occupancy-recovery rate. The question this page works through is what the business earns once occupancy normalises — and whether a company issuing <strong>$2.6B of equity year-to-date</strong> to fund <strong>$4.5B of 2026 acquisitions</strong> is compounding per-share value or diluting it.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Debra A. Cafaro</div>
+      <div class="card-note">Chairman and CEO, verified as the executive quoted in the Q2 2026 earnings release (July 2026) and leading the Q2 call. One of the longest-tenured CEOs in the REIT sector; her framing of the current cycle is demographic — "the baby boomers begin turning 80 this year" against "new supply at historic lows."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Robert F. Probst</div>
+      <div class="card-note">Executive Vice President and CFO, verified from the Q2 2026 earnings call participant list. Owns the normalized <span class="tip" title="Funds From Operations — net income excluding property depreciation and gains/losses on sales. The standard REIT earnings measure, because depreciation badly understates the economics of appreciating real estate.">FFO</span> guidance framework ($3.85–$3.90 for 2026) and the balance-sheet narrative — net debt to further adjusted EBITDA at 4.7x, improved 90bps YoY.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Other Key Executive / Ownership</div>
+      <div class="card-value" style="font-size:20px;">Justin Hutchens</div>
+      <div class="card-note">EVP Senior Housing and Chief Investment Officer — runs both the SHOP operating platform and the acquisition pipeline, which matters because the two are the same strategy. <strong>Specific institutional holder stakes were not verified from the sources fetched and are therefore not listed.</strong> Shares outstanding: 516.39M (float 510.53M), up 10.07% YoY on equity issuance.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Ventas reports three segments. The revenue bar below is the verified Q2 2026 split from the earnings release; note that revenue mix and <em>NOI</em> mix are very different animals, because SHOP is a gross-revenue business (you book the resident's full monthly fee and all the operating costs) while triple-net leases book only the rent. Both splits are shown.</p>
+  <div class="seg-bar">
+    <div style="flex:78.8;background:#2FB6A8;">SHOP 78.8%</div>
+    <div style="flex:13.2;background:#3b82f6;color:#fff;">OM&amp;R 13.2%</div>
+    <div style="flex:7.2;background:#a78bfa;">NNN 7.2%</div>
+    <div style="flex:0.8;background:#475569;color:#fff;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2FB6A8;"></span> SHOP — $1,363.5M resident fees (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Outpatient Medical &amp; Research — $228.6M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Triple-Net Leased — $124.9M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#475569;"></span> Other / non-segment — ~$12.6M</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">By <strong>segment NOI</strong> the picture rebalances sharply: SHOP $403.5M (58.9%), OM&amp;R $151.5M (22.1%), triple-net $121.7M (17.8%), non-segment $8.5M — total $685.2M. Triple-net produces 7% of revenue and 18% of NOI because a lease payment is almost pure margin; SHOP produces 79% of revenue and 59% of NOI at a ~31% NOI margin. Management expects SHOP to represent about <strong>60% of the ~$60B enterprise by year-end 2026</strong>.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2FB6A8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Senior Housing Operating Portfolio (SHOP)</div>
+        <span class="biz-badge dominant">GROWTH ENGINE — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,363.5M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+32.0%</div><div class="biz-stat-label">Revenue YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">78.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Ventas takes the operating economics of these communities rather than a fixed rent, so it captures the full upside of an occupancy recovery — and the full downside of wage inflation. Q2 2026 was the strongest print in the current cycle: <strong>same-store cash NOI +16.3%</strong> (US SHOP +18%), <strong>same-store cash revenue +9%</strong>, <strong>average occupancy +300 <span class="tip" title="Basis points — one hundredth of a percentage point. 300 bps = 3.0 percentage points.">bps</span></strong> YoY (US +360bps), <strong><span class="tip" title="Revenue Per Occupied Room — the average monthly rate paid by a resident. The pricing half of the revenue equation; occupancy is the volume half.">RevPOR</span> +5%</strong>, and <strong>NOI margin +210bps to ~31%</strong>. The margin expansion is the tell: incremental flow-through on new revenue was <strong>~55%</strong>, meaning more than half of each additional dollar of rate or occupancy drops to NOI. Portfolio occupancy sits at <strong>87%</strong> (non-same-store communities at 83%), so there is measurable runway before the fixed-cost leverage exhausts itself — roughly <strong>10% of communities are already at or near 100% occupancy</strong>, and that 90%+ cohort delivered 25% NOI growth. Ventas is also converting triple-net assets into SHOP, which is why NNN revenue is shrinking while SHOP revenue grows faster than the underlying same-store number.</p>
+    <div class="biz-tam"><strong>Demand backdrop (company-sourced, not a third-party TAM):</strong> ~2 million Americans turn 80 in 2026; management cites ~1,200bps of net demand in its key markets over the next few years, with development starts at record lows because rents need to be 25–40% higher to justify new construction. Third-party market-size estimates were not verified from sources fetched and are omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Welltower (WELL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$169.49B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$12.76B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+37.6%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Healthpeak (DOC)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$14.28B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$2.95B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+5.5%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Private / regional owners</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Fragmented</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Outpatient Medical &amp; Research (OM&amp;R)</div>
+        <span class="biz-badge emerging">STABILISER — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$228.6M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.5%</div><div class="biz-stat-label">Revenue YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Medical office buildings — typically on or adjacent to hospital campuses — plus a university-affiliated life-science research portfolio. This is the ballast: multi-year leases, health-system credit tenants, and <strong>88% tenant retention</strong> in outpatient medical. Q2 2026 same-store cash NOI grew <strong>4.6%</strong>, though management flagged that adjusting for one-time cash fees the underlying rate was closer to <strong>3%</strong> — a useful reminder to read the reported segment number against the adjusted one. Occupancy improved <strong>50bps</strong> YoY. Margin profile is far higher than SHOP (NOI $151.5M on $228.6M of revenue, a ~66% NOI margin) because the tenant, not Ventas, pays most operating costs. The research sub-portfolio carries the most idiosyncratic risk in the segment: university and biotech tenants are sensitive to research funding cycles.</p>
+    <div class="biz-tam"><strong>Segment role:</strong> low-growth, low-volatility cash flow that supports the dividend while SHOP does the compounding. Third-party medical-office market-size estimates were not verified from sources fetched.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Healthpeak (DOC)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$14.28B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">6.00%</div><div class="comp-bubble-label">Div Yield</div></div>
+          <div><div class="comp-bubble-val">+4.5%</div><div class="comp-bubble-label">Rev YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Health systems (self-owned)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not listed</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Triple-Net Leased (NNN)</div>
+        <span class="biz-badge">SHRINKING BY DESIGN — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$124.9M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−18.2%</div><div class="biz-stat-label">Revenue YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Senior housing, skilled nursing and hospital assets leased to third-party operators who pay a fixed rent and bear all operating costs, taxes and insurance. Revenue fell <strong>18.2% YoY</strong> — from $152.7M to $124.9M — but that decline is almost entirely <em>deliberate</em>: Ventas has been converting triple-net senior housing assets into SHOP to capture the operating upside directly. On a <strong>same-store</strong> basis, which strips out those conversions, the segment grew cash NOI <strong>+3.1%</strong>, roughly the contractual escalator. This segment also carries the most binary credit risk in the company: if an operator's coverage deteriorates, rent is renegotiated or the asset comes back. The offset is that at $121.7M of NOI on $124.9M of revenue, it is the highest-margin line Ventas owns.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> the shrinking of this segment is the mechanical reason reported total revenue growth (+21.7%) understates nothing and SHOP revenue growth (+32%) overstates organic performance. Same-store cash NOI (+10.3% company-wide) is the honest number.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Omega Healthcare / CareTrust / NHI</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Welltower (WELL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$169.49B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">1.45%</div><div class="comp-bubble-label">Div Yield</div></div>
+          <div><div class="comp-bubble-val">106.8x</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">Replacement-cost gap</span>
+    <span class="moat-pill">Operator relationships</span>
+    <span class="moat-pill">Scale of data across 900+ communities</span>
+    <span class="moat-pill">Cost of capital (BBB+ / investment grade)</span>
+    <span class="moat-pill">Irreplaceable on-campus medical sites</span>
+    <span class="moat-pill">Supply moratorium by arithmetic</span>
+    <span class="moat-pill">S&amp;P 500 index membership</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The most durable advantage here is not brand or technology — it is that <strong>nobody can build the competition</strong>. Management states new senior housing rents would need to be <strong>25–40% higher</strong> to justify development economics at current construction and financing costs, and starts are at record lows. Ventas bought assets year-to-date at an average of <strong>$358,000 per unit</strong> — a discount to replacement cost — at an average <strong>6.6% first-year yield</strong>. That combination, a below-replacement-cost entry price into a market where new supply is uneconomic while demand is demographically guaranteed, is the entire investment case, and it is a genuine moat for as long as construction costs stay where they are. The secondary advantage is informational: operating 900+ communities directly (rather than leasing them out) generates pricing and occupancy data across markets that a single-market owner cannot replicate, and Ventas says <strong>90% of its acquisitions are relationship-driven</strong> rather than brokered — a sourcing edge that shows up as yield.</p>
+  <h3 style="margin-top:32px;margin-bottom:4px;font-size:18px;color:#fff;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><div><strong style="color:#fff;">Growth is funded by equity, not retained cash.</strong> Shares outstanding rose <strong>10.07% YoY</strong> and the company raised <strong>$2.6B of equity year-to-date</strong> to fund a 2026 investment target raised from $3.0B to $4.5B. Acquiring at a 6.6% yield with equity issued at a ~23x forward <span class="tip" title="Price to Funds From Operations — the REIT equivalent of a P/E ratio.">P/FFO</span> (an implied ~4.3% earnings yield) is accretive today. It stops being accretive the moment the multiple compresses — and a REIT that has trained investors to expect external growth cannot simply stop buying without a visible deceleration.</div></div>
+    <div class="risk-item"><div><strong style="color:#fff;">SHOP cuts both ways.</strong> Taking the operating economics means Ventas absorbs labour cost directly. Same-store cash revenue grew 9% while NOI grew 16.3% — that gap is operating leverage, and operating leverage reverses. A wage-inflation shock, an agency-staffing reversal, or an occupancy plateau would compress the ~31% NOI margin faster than it expanded.</div></div>
+    <div class="risk-item"><div><strong style="color:#fff;">The easy occupancy is largely harvested.</strong> Portfolio occupancy is already <strong>87%</strong> and ~10% of communities are at or near 100%. The 300bps of annual occupancy gain that drove Q2's print is arithmetically finite; management's own framing — a high-occupancy cohort growing NOI 25% — highlights that the remaining upside increasingly has to come from <em>rate</em> (RevPOR +5%) rather than fill, and rate growth is bounded by residents' ability to pay out of pocket.</div></div>
+    <div class="risk-item"><div><strong style="color:#fff;">Rate sensitivity and leverage.</strong> $12.92B of total debt against $198.96M of cash, net debt to further adjusted EBITDA of <strong>4.7x</strong>. That is a healthy ratio for a REIT and has improved 90bps YoY, but REIT equity remains a long-duration asset: the 2022–2023 drawdown in this stock (see Section 07) was a discount-rate event, not an operating one, and it can happen again regardless of how well the portfolio performs.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">REIT convention applies: <span class="tip" title="Generally Accepted Accounting Principles — standard US accounting rules. For REITs, GAAP earnings are distorted by large non-cash depreciation on buildings that typically appreciate.">GAAP</span> earnings are close to meaningless here because property depreciation is a non-cash charge against appreciating assets. Read the FFO lines first; the P/E rows are shown only to demonstrate why they should be ignored. Gross margin and current ratio are marked <strong>n/m</strong> (not meaningful) — REITs do not report cost of goods sold in a comparable way and carry deliberately thin working capital funded by revolvers.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>VTR</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Normalized <span class="tip" title="Funds From Operations — net income excluding property depreciation and gains/losses on property sales. The REIT standard earnings measure.">FFO</span> / Share (2026 guide)</td><td style="color:var(--green);">$3.85–$3.90</td><td>—</td><td>—</td><td>Midpoint $3.88, guided to 8–10% YoY growth. Q2 2026 actual: $0.97, +9% YoY.</td></tr>
+      <tr><td><span class="tip" title="Price to Funds From Operations — share price divided by FFO per share. The REIT equivalent of a P/E ratio.">P/FFO</span> (forward, on guidance midpoint)</td><td style="color:var(--amber);">23.3x</td><td>—</td><td>—</td><td>$90.44 ÷ $3.88. Not cheap in absolute terms; the question is whether 8–10% FFO growth persists past the occupancy recovery.</td></tr>
+      <tr><td><span class="tip" title="Adjusted Funds From Operations — FFO less recurring capital expenditure needed to maintain the properties. A closer proxy for distributable cash than FFO.">AFFO</span> / Share</td><td style="color:var(--text-dim);">Not disclosed in sources fetched</td><td>—</td><td>—</td><td>Ventas guides on normalized FFO; an AFFO figure was not verified from the pages fetched and is deliberately not estimated here.</td></tr>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings ratio — share price divided by earnings per share over the last twelve months.">P/E</span></td><td style="color:var(--text-dim);">164.4x (n/m)</td><td>—</td><td>26.11x</td><td>Distorted by depreciation. StockAnalysis showed 164.86x on its intraday quote; 164.4x at the $90.44 close ÷ $0.55 TTM EPS. Do not use.</td></tr>
+      <tr><td>Forward P/E</td><td style="color:var(--text-dim);">133.0x (n/m)</td><td>—</td><td>—</td><td>Same distortion. Consensus 2026 GAAP EPS is $0.61 against $3.88 of normalized FFO — the gap <em>is</em> depreciation.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap'.">PEG</span> Ratio</td><td style="color:var(--text-dim);">12.80 (n/m)</td><td>—</td><td>—</td><td>Inherits the GAAP-earnings distortion; not informative for a REIT.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share — net income attributable to shareholders divided by shares outstanding.">EPS</span> (<span class="tip" title="Trailing Twelve Months — the most recent four reported quarters.">TTM</span>)</td><td>$0.55</td><td>—</td><td>—</td><td>GAAP. Q2 2026 attributable net income was $0.14/sh vs $0.97 of normalized FFO.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year — this period versus the same period one year earlier.">YoY</span>)</td><td style="color:var(--green);">+21.7%</td><td>—</td><td>—</td><td>Q2 2026 vs Q2 2025. FY2025 was +18.99%. Inflated by triple-net-to-SHOP conversions, which move gross resident revenue on-book.</td></tr>
+      <tr><td>Same-Store Cash NOI Growth</td><td style="color:var(--green);">+10.3%</td><td>—</td><td>—</td><td>The clean organic number. SHOP +16.3%, OM&amp;R +4.6%, triple-net +3.1%.</td></tr>
+      <tr><td><span class="tip" title="Gross Margin — revenue minus cost of goods sold, as a percentage of revenue.">Gross Margin</span></td><td style="color:var(--text-dim);">n/m</td><td>—</td><td>—</td><td>Reported as 39.97% but not comparable across REITs or against operating companies. Use the segment NOI margins instead: SHOP ~31%, OM&amp;R ~66%.</td></tr>
+      <tr><td><span class="tip" title="Net Profit Margin — net income as a percentage of revenue.">Net Profit Margin</span></td><td style="color:var(--text-dim);">4.09%</td><td>—</td><td>—</td><td>Depressed by depreciation; economically uninformative for a REIT.</td></tr>
+      <tr><td><span class="tip" title="Dividend Yield — annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--amber);">2.30%</td><td>—</td><td>0.98%</td><td>$2.08 annualised ($0.52/quarter). Low for a REIT — Ventas is priced as a growth REIT, not an income vehicle. Peer Healthpeak yields 6.00%; Welltower 1.45%.</td></tr>
+      <tr><td>Dividend / FFO Payout Ratio</td><td style="color:var(--green);">53.6%</td><td>—</td><td>—</td><td>$2.08 ÷ $3.88 guided FFO. Conservative and well covered; the 379% GAAP payout ratio shown on screeners is an artefact of depreciation.</td></tr>
+      <tr><td><span class="tip" title="Short Interest — the percentage of shares outstanding that have been sold short by investors betting the price will fall.">Short Interest</span> / Float</td><td style="color:var(--amber);">4.59%</td><td>—</td><td>—</td><td>23.70M shares short. Elevated for a large-cap REIT but not a crowded short; consistent with a valuation debate rather than a solvency one.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity — total debt divided by shareholders' equity. Higher means more leverage.">Debt-to-Equity</span></td><td style="color:var(--green);">0.85</td><td>—</td><td>—</td><td>$12.92B total debt vs $15.21B book equity. Book equity understates asset value after depreciation, so effective leverage is lower than this implies.</td></tr>
+      <tr><td>Net Debt / Adjusted <span class="tip" title="Earnings Before Interest, Taxes, Depreciation and Amortisation — a proxy for operating cash generation.">EBITDA</span></td><td style="color:var(--green);">4.7x</td><td>—</td><td>—</td><td><strong>The metric that matters for a REIT balance sheet.</strong> Improved 90bps YoY. $4.9B of available liquidity.</td></tr>
+      <tr><td><span class="tip" title="Current Ratio — current assets divided by current liabilities; a short-term liquidity measure.">Current Ratio</span></td><td style="color:var(--text-dim);">n/m (0.29)</td><td>—</td><td>—</td><td>REITs run negative working capital by design and fund liquidity with revolving credit, not cash balances. Read the $4.9B liquidity line instead.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditure.">Free Cash Flow</span></td><td style="color:var(--red);">−$2.69B</td><td>—</td><td>—</td><td>Negative because screener FCF subtracts acquisition and development capex. Operating cash flow was <strong>+$1.80B</strong>; the deficit is the $3.4B of YTD investment, funded by equity and debt.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--text-dim);">2.01%</td><td>—</td><td>—</td><td>GAAP-depressed. An FFO-based return on equity would be roughly 6x this.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by the capital employed in the business.">ROIC</span></td><td style="color:var(--text-dim);">3.58%</td><td>—</td><td>—</td><td>Same distortion. Compare instead to the 6.6% first-year yield on 2026 acquisitions.</td></tr>
+      <tr><td><span class="tip" title="Beta — how much the stock moves relative to the broad market. Below 1.0 means less volatile than the index.">Beta</span></td><td style="color:var(--green);">0.72</td><td>—</td><td>1.01</td><td>Lower-volatility than the index on a realised basis — but see Section 07: the 2022 drawdown shows beta understates rate sensitivity.</td></tr>
+      <tr><td>52-Week Range</td><td>$66.54 – $101.60</td><td>—</td><td>—</td><td>Current $90.44 sits in the upper third; +30.79% over the trailing 52 weeks.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:20px;font-size:13px;"><strong>Industry-average column:</strong> a sourced healthcare-REIT average was not available from the pages fetched, so every cell is left as "—" rather than estimated. Individual peer figures (Welltower, Healthpeak) appear in Section 02 and are sourced.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Notable One-Off Items.</strong> Three distortions matter this quarter. First, <strong>triple-net-to-SHOP conversions</strong> inflate reported revenue growth: a converted community moves from booking ~$4M of rent to booking ~$25M of resident fees and ~$18M of costs. Headline revenue jumps; NOI barely moves. Second, management explicitly flagged that OM&amp;R's <strong>4.6% same-store cash NOI growth falls to roughly 3% excluding one-time cash fees</strong> — the reported number is not the run-rate. Third, the <strong>10.07% YoY increase in share count</strong> means per-share growth has been earned against a materially larger denominator; normalized FFO per share rose 9% in Q2 while total normalized FFO ($483.7M) rose faster. No restatements, impairment reversals or litigation settlements were identified in the sources fetched.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">23 analysts covering. MarketBeat's narrower panel (17 analysts) shows "Moderate Buy" — same direction, different sample.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$101.86</div>
+      <div class="card-note" style="color:var(--green);">+12.6% upside from the $90.44 close.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$86 – $113</div>
+      <div class="card-note">The low end sits <em>below</em> the current price — the bear case here is "fully valued," not "impaired."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">18 / 5 / 0</div>
+      <div class="card-note">14 Strong Buy + 4 Buy · 5 Hold · 0 Sell · 0 Strong Sell. No published sell rating on the name.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:78.3;background:#22c55e;"></div>
+    <div style="flex:21.7;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 18 (78.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 5 (21.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 0</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;text-transform:uppercase;">Key Recent Analyst Calls</div>
+  <div class="risk-list" style="margin-top:12px;">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Scotiabank</strong> — Nicholas Yulico, <span style="color:var(--amber);">Sector Perform</span>, target raised <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$93 → $95</span> (Sep 2, 2026). The most cautious of the recent revisions: a target below the consensus average and only modestly above the current price, consistent with a "good asset, priced for it" view.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wells Fargo</strong> — John Kilichowski, <span style="color:var(--green);">Overweight</span>, target raised <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$96 → $104</span> (Sep 1, 2026). An 8-point raise, the largest of the September revisions, following the Q2 SHOP print and the raised investment guidance.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Citigroup</strong> — Nick Joseph, <span style="color:var(--green);">Buy</span>, target raised <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$100 → $110</span> (Aug 4, 2026). The most aggressive post-earnings move — a 10-point raise immediately after the Q2 release and the lift in the 2026 investment target from $3.0B to $4.5B.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">BMO Capital Markets</strong> — Juan Sanabria, <span style="color:var(--green);">Outperform</span>, target raised <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$105 → $107</span> (Aug 11, 2026). Among the highest targets on the street; Barclays (Richard Hightower, Equal Weight, $99 → $102) and RBC (Michael Carroll, Outperform, $98 → $99) moved in the same window.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">Note the pattern: <strong>nine revisions in roughly six weeks and every single one was a raise.</strong> That is a consensus chasing a stock, not anticipating it — targets clustering at $95–$110 after the price has already run from $66.54 to $90.44. Read the rating labels rather than the target moves: Scotiabank and Barclays raised targets while keeping neutral ratings, which is the analytical equivalent of marking to market.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — normalized FFO $0.97/sh, SHOP same-store NOI +16.3%</div>
+        <div class="tl-desc">A beat across the operating lines: total same-store cash NOI +10.3%, SHOP occupancy +300bps, NOI margin +210bps to ~31%. Management raised the full-year investment target from $3.0B to $4.5B. The stock's monthly close moved from $93.51 (July) to $91.17 (August) — a beat that was largely in the price.</div>
+        <div class="tl-impact up">Reaction: operating beat, muted price response</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug–Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Nine consecutive analyst target raises, zero cuts</div>
+        <div class="tl-desc">Citigroup to $110, BMO to $107, Wells Fargo to $104, Mizuho to $104, Barclays to $102, Cantor to $102, RBC to $99, Scotiabank to $95. Average target now $101.86 against a $90.44 close. Positioning is one-sided; the marginal buyer has to come from somewhere other than sell-side upgrades.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$1.1B of remaining acquisitions to close against the raised $4.5B target</div>
+        <div class="tl-desc">$3.4B closed year-to-date across 27 transactions at a 6.6% average first-year yield and $358,000 per unit. Completing the balance requires either more equity issuance or more leverage. Watch the funding mix: equity at a 23x forward P/FFO is still accretive against a 6.6% yield, but the accretion math is the whole external-growth story and it is multiple-dependent.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — the occupancy-deceleration checkpoint</div>
+        <div class="tl-desc">The single most informative print of the year. Q2 delivered 300bps of YoY occupancy gain from an 87% base; Q3 will show whether that rate is holding, decelerating, or converting into rate (RevPOR) growth instead. Also the first read on whether the $4.5B investment programme is being funded without diluting the FFO-per-share trajectory.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026 / Feb 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 close against $3.85–$3.90 guidance, and the 2027 guide</div>
+        <div class="tl-desc">Hitting the midpoint means 8–10% normalized FFO per share growth on a share count up 10%. The 2027 initial guide, given with Q4 results, is the number that settles the core debate: does FFO growth stay high single-digit once the occupancy recovery normalises, or does it revert toward the 3% contractual escalator that the triple-net and OM&amp;R segments actually produce?</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026–2030</div>
+      <div class="tl-content">
+        <div class="tl-title">The 80-year-old cohort inflection</div>
+        <div class="tl-desc">Roughly 2 million Americans turn 80 in 2026, the first wave of a multi-year demographic step-up, against senior housing construction starts at record lows. Management cites approximately 1,200bps of net demand in key markets over the next few years. This is a slow catalyst, not a dated one — but it is the reason the market is willing to pay 23x forward FFO.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:1px;">VTR — MONTHLY CLOSES, OCT 2021 → SEP 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="seg-legend" style="margin-bottom:12px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2FB6A8;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:12px;max-width:760px;">RSI measures how much of the recent price movement has been upward versus downward, on a 0–100 scale. Readings above 70 mean the stock has risen persistently and may be stretched; below 30 means the opposite. It describes momentum, not value — a stock can stay "overbought" for a year.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">Over the 60 months from the October 2021 close of <strong>$53.37</strong> to the September 10, 2026 close of <strong>$90.44</strong>, VTR returned <strong>+69.4% on price alone</strong>, before a dividend that ran between $1.80 and $2.08 per share annually across the period. That headline conceals two entirely different regimes. From October 2021 to October 2022 the stock fell <strong>26.7% to $39.13</strong> — a pure discount-rate event, as the Federal Reserve repriced long-duration assets and REITs were among the most duration-sensitive equities in the market. Operations were fine; the multiple was not. It then chopped sideways for fourteen months, retesting <strong>$42.46 in October 2023</strong> as the 10-year Treasury peaked, before beginning a two-and-a-half-year advance that has more than doubled it off the low.</p>
+  <p class="prose" style="margin-top:16px;">The second regime is the one that matters for the current thesis. From <strong>$42.29 in February 2024</strong> to <strong>$93.51 in July 2026</strong>, the stock rose <strong>121%</strong> — driven by exactly the operating recovery Section 02 documents: SHOP occupancy climbing from post-pandemic lows, NOI margins expanding, and FFO per share reaccelerating into high single digits. Note the shape since: monthly closes of $93.51 (Jul), $91.17 (Aug), $90.44 (Sep 10). The stock stopped going up <em>after</em> the strongest quarterly operating print of the cycle. The 6-period monthly RSI has rolled over from overbought territory into the 50s, which is what a consolidation after a long advance looks like on this timeframe.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">Pre-tightening level — $53.37</div>
+        <div class="tl-desc">The starting point of this window. Occupancy was still recovering from the pandemic trough, rates were at zero, and REIT multiples reflected it.</div>
+        <div class="tl-impact neutral">Baseline</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle low — $39.13</div>
+        <div class="tl-desc">A 26.7% drawdown from the window start, and the low of the five-year period. Driven by the fastest rate-hiking cycle in forty years, not by an operating deterioration. This is the single best evidence that VTR's 0.72 beta understates its true rate sensitivity.</div>
+        <div class="tl-impact down">−26.7% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">The retest — $42.46</div>
+        <div class="tl-desc">A second bottom as the 10-year Treasury pushed toward its cycle peak. The stock had spent a full year going nowhere while SHOP occupancy was already recovering — a textbook case of operating improvement being entirely offset by multiple compression.</div>
+        <div class="tl-impact down">Flat for 12 months</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">First leg completes — $64.13</div>
+        <div class="tl-desc">Up 51% from the October 2023 retest in eleven months, as rate expectations turned and the SHOP recovery became undeniable in the reported numbers.</div>
+        <div class="tl-impact up">+51% from Oct 2023</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024 – Jan 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate backup interrupts — $58.89 → $60.42</div>
+        <div class="tl-desc">An 8% pullback from the September level as long rates backed up again. Short, and quickly recovered — but a reminder that this stock's drawdowns are usually macro, not operating.</div>
+        <div class="tl-impact down">−8% pullback</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2025 closes at $77.38 with ~$3.54 of normalized FFO/share</div>
+        <div class="tl-desc">The FY2025 normalized FFO per share base is implied at roughly $3.54 from management's statement that the $3.85–$3.90 2026 guide represents 8–10% growth (derived, not directly sourced). At $77.38 that was about 21.9x trailing FFO — the multiple has since expanded further.</div>
+        <div class="tl-impact up">+31% for calendar 2025</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle high zone — $93.51 monthly close; 52-week high $101.60</div>
+        <div class="tl-desc">The post-Q2 peak. The 52-week high of $101.60 was set intra-month, above any month-end close in the period. Note the divergence: the strongest SHOP quarter of the cycle marked the top of the move, not a breakout.</div>
+        <div class="tl-impact up">+139% from the Oct 2022 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Latest close — $90.44</div>
+        <div class="tl-desc">Down 3.3% from the July monthly close, up 30.8% over the trailing 52 weeks, and sitting in the upper third of the $66.54–$101.60 range. 23.3x forward FFO with a 2.30% dividend yield and a 53.6% FFO payout.</div>
+        <div class="tl-impact neutral">Consolidating near highs</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> VTR is up <strong>30.79% over the trailing 52 weeks</strong> (sourced) — a strong absolute number for a REIT, and one achieved with a realised beta of 0.72. Against its closest peer the comparison is less flattering: <strong>Welltower's market cap is up 49.6%</strong> over the comparable period with TTM revenue growing 37.6% versus VTR's 21.7%, so within healthcare REITs Ventas has been the second-best senior-housing vehicle rather than the best one. <strong>Precise S&amp;P 500 and NASDAQ-100 total-return figures for the same window were not verified from the sources fetched and are therefore not quoted here</strong> — the honest statement is that VTR's 52-week gain is sourced and the index comparison is not. What can be said structurally: VTR is an S&amp;P 500 constituent whose drawdowns (2022, early 2025) have been driven by long-rate moves rather than by the index's earnings cycle, so its correlation to the S&amp;P 500 is lower than its correlation to the 10-year Treasury.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The supply side is frozen — new senior housing needs rents 25–40% higher to pencil, and starts are at record lows — while 2 million Americans turn 80 in 2026 and that number climbs for a decade. Ventas is buying into that gap at $358,000 per unit and a 6.6% first-year yield, funding it with equity issued at a 23x FFO multiple, and compounding SHOP NOI at 16% with 55% incremental flow-through and 300bps of annual occupancy gain still running. Net debt to adjusted EBITDA at 4.7x and a 53.6% FFO payout leave room to keep doing it. If 8–10% FFO-per-share growth persists through 2027, the current multiple is not demanding.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Almost all of the growth is recovery, not run-rate. Occupancy is already 87% and ~10% of communities are effectively full; strip out the occupancy catch-up and the underlying escalators in OM&amp;R (~3% ex-fees) and triple-net (3.1%) are low single digit. Meanwhile the share count grew 10.07% in a year, GAAP earnings are $0.55 against a $90.44 price, and the entire external-growth engine depends on the multiple staying high enough to make equity-funded acquisitions accretive. Nine straight analyst target raises with zero cuts, and a stock that has gone sideways since its best-ever quarter, is what a fully-discounted story looks like. The 2022 drawdown showed what a 200bp move in long rates does to this equity regardless of operations.</p>
+    </div>
+  </div>
+  <h3 style="margin-top:32px;margin-bottom:4px;font-size:18px;color:#fff;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Occupancy normalisation.</strong> The 16.3% SHOP same-store NOI growth is powered by 300bps of annual occupancy gain from a base that is now 87%. That arithmetic cannot repeat many more times. Once fill-up is done, growth reverts toward RevPOR (currently +5%) less expense inflation — a materially lower number that the current 23.3x forward FFO multiple does not obviously accommodate.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Equity-funded external growth is multiple-dependent.</strong> Shares outstanding up 10.07% YoY and $2.6B raised year-to-date. Acquiring at 6.6% yields with equity priced at a ~4.3% earnings yield works only while the stock trades at a premium. A de-rating makes the growth engine dilutive rather than accretive, and does so precisely when the stock is already falling — the classic REIT reflexivity trap.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Long-rate sensitivity, understated by beta.</strong> Realised beta of 0.72 says low volatility; the October 2021–October 2022 drawdown of 26.7%, driven entirely by discount rates while operations improved, says otherwise. With $12.92B of debt and a 2.30% dividend yield that competes directly with Treasury yields, a sustained rise in long rates compresses the multiple and the relative attractiveness of the payout simultaneously.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:10px;">EMERGING TAILWIND</div>
+      <div class="card-value" style="font-size:18px;">The 80-year-old wave meets a construction freeze</div>
+      <div class="card-note">Two curves cross in 2026. Roughly <strong>2 million Americans turn 80 this year</strong>, the leading edge of the baby-boom cohort entering the age band where senior housing demand actually forms — and it rises annually for most of the coming decade. On the other side, senior housing construction starts sit at record lows because, per management, rents would need to be <strong>25–40% higher</strong> to justify development at current construction and financing costs. Ventas quantifies the result as roughly <strong>1,200bps of net demand</strong> in its key markets over the next few years. A supply response typically takes 30–36 months from decision to lease-up even once it becomes economic, which means the window is measured in years, not quarters.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:10px;">ONGOING HEADWIND</div>
+      <div class="card-value" style="font-size:18px;">REITs are still a rates trade first</div>
+      <div class="card-note">Healthcare REITs are long-duration equities whose competition is the long end of the Treasury curve. VTR's <strong>2.30% dividend yield</strong> is unusually low for the sector — Healthpeak yields <strong>6.00%</strong>, Welltower <strong>1.45%</strong> — which means Ventas is being valued on growth, not income, and is therefore <em>more</em> sensitive to the discount rate than a high-yield peer, not less. The 2021–2022 episode is the empirical proof: the stock lost 26.7% while its properties got busier. With $12.92B of debt and $4.9B of liquidity the balance sheet is not the issue; the multiple is.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--blue);background:var(--blue-dim);padding:3px 10px;border-radius:4px;display:inline-block;margin-bottom:10px;">BULL VS BEAR — THE FRAMING</div>
+      <div class="card-value" style="font-size:18px;">Recovery growth versus run-rate growth</div>
+      <div class="card-note">Every number on this page resolves to one question: is 8–10% normalized FFO per share growth the business, or the recovery? The bull reads 16.3% SHOP NOI growth, 55% incremental flow-through and a decade of demographics and concludes the run-rate is high single digit for years. The bear reads 87% occupancy, a 3.1% triple-net escalator, ~3% ex-fee OM&amp;R growth and a 10% larger share count and concludes the run-rate is closer to 4–5% once fill-up ends — at which point 23.3x forward FFO is roughly double what that deserves. <strong>The October 28 Q3 print and the 2027 guide in February are where this gets settled</strong>, and both are dated and falsifiable.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">Price, market cap, 52-week range, sector/industry labels, statistics, financials, dividend data and analyst consensus from <strong>stockanalysis.com</strong> — price source: <a href="https://stockanalysis.com/stocks/vtr/" style="color:var(--accent);">https://stockanalysis.com/stocks/vtr/</a> (previous close, i.e. the September 10, 2026 close, captured September 11, 2026). Segment revenue and NOI, same-store cash NOI growth, SHOP occupancy and RevPOR, normalized FFO, 2026 guidance, net debt to further adjusted EBITDA, liquidity and executive names from the <strong>Ventas Q2 2026 earnings release (ir.ventasreit.com, July 29, 2026)</strong> and the <strong>Q2 2026 earnings call transcript (fool.com, August 7, 2026)</strong>. Named analyst calls, firms, analysts and price targets from <strong>marketbeat.com</strong>. Global market-cap rank from <strong>companiesmarketcap.com</strong>. Peer figures for Welltower and Healthpeak, and the S&amp;P 500 P/E, dividend yield and beta proxies (SPY ETF), from <strong>stockanalysis.com</strong>.</p>
+  <p style="margin-top:10px;max-width:900px;margin-left:auto;margin-right:auto;">Chart data: 60 real month-end closes, October 2021 through August 2026, from the unadjusted "Real Price" column at <strong>digrin.com/stocks/detail/VTR/price</strong>; the final data point (labelled "Sep 26") is the September 10, 2026 closing price of $90.44 from stockanalysis.com, which is a partial-month value, not a month-end close. <strong>No interior months were reconstructed or estimated.</strong> Moving averages and RSI are computed in-page from those closes. US and NYSE market-cap ranks are marked "(est.)" because only the global rank was sourced. The FY2025 normalized FFO per share figure of ~$3.54 is <strong>derived</strong> from management's statement that 2026 guidance of $3.85–$3.90 represents 8–10% growth, not directly sourced. Healthcare-REIT industry averages were not available from the sources fetched and are shown as "—" rather than estimated. AFFO per share was not disclosed in the sources fetched. Institutional holder detail was not verified and is not listed. Third-party TAM and market-share estimates were not verified and are omitted; all demand statistics are company-sourced and labelled as such.</p>
+  <p style="margin-top:12px;">This document is for informational and educational purposes only and is not investment advice, a recommendation, or an offer to buy or sell any security. Past performance does not predict future results. Figures may contain errors or omissions and may be stale. Do your own research and consult a qualified financial adviser before making investment decisions.</p>
+</div>
+
+</div>
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Oct 2021 – Aug 2026: unadjusted "Real Price" month-end closes, digrin.com
+// Final point (Sep 26): September 10, 2026 close of $90.44 (stockanalysis.com) — partial month
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [53.37,46.92,51.12,53.02,54.00,61.76,55.55,56.74,51.43,53.78,47.86,40.17,39.13,46.53,45.05,51.81,48.65,43.35,48.05,43.14,47.27,48.52,43.68,42.13,42.46,45.84,49.84,46.39,42.29,43.54,44.28,50.26,51.26,54.44,62.11,64.13,65.49,64.07,58.89,60.42,69.18,68.76,70.08,64.28,63.15,67.18,68.08,69.99,73.79,80.63,77.38,77.67,86.16,81.78,87.86,84.42,88.80,93.51,91.17,90.44];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — pre-tightening $53.37',                color: '#94a3b8' },
+  { idx: 12, label: 'Oct 2022 — cycle low $39.13 (−26.7%)',            color: '#ef4444' },
+  { idx: 24, label: 'Oct 2023 — rate-peak retest $42.46',              color: '#ef4444' },
+  { idx: 35, label: 'Sep 2024 — first leg completes $64.13',           color: '#22c55e' },
+  { idx: 38, label: 'Dec 2024 — rate backup pullback $58.89',          color: '#f59e0b' },
+  { idx: 50, label: 'Dec 2025 — FY25 close $77.38, ~$3.54 FFO/sh',     color: '#3b82f6' },
+  { idx: 57, label: 'Jul 2026 — cycle high close $93.51 (post-Q2)',    color: '#22c55e' },
+  { idx: 59, label: 'Sep 10 2026 — latest close $90.44',               color: '#2FB6A8' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(47,182,168,0.22)');
+grad.addColorStop(1, 'rgba(47,182,168,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2FB6A8', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2FB6A8'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
