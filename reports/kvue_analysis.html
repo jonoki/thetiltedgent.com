@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KVUE — Kenvue Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #47C99C;
+  --accent-dim: #47C99C33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">KVUE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Staples / Household &amp; Personal Products</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $34.17B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #742</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#300 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#145 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Kenvue Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$17.79</div>
+      <div class="price-change" style="color:var(--green);">+$0.04 (+0.23%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Friday Sep 11 was still in progress when this page was built and is excluded</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1 Kenvue Way, Summit, New Jersey 07901</div>
+    <div class="meta-item"><span>Employees:</span> ~22,000</div>
+    <div class="meta-item"><span>Founded:</span> 2022 · NYSE IPO May 4, 2023 at $22.00</div>
+    <div class="meta-item"><span>Next Earnings:</span> Not verified — see Section 06</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Kenvue is the consumer-health business Johnson &amp; Johnson separated out in 2023 — the Tylenol, Neutrogena, Band-Aid, Listerine, Aveeno, Zyrtec and Johnson's portfolio, carved away from J&amp;J's pharmaceutical and medtech engine and floated on the NYSE on <strong>May 4, 2023 at $22.00 a share</strong>. It sells over-the-counter medicines, skin and hair care and everyday health staples in essentially every market on earth, with roughly <strong>22,000 employees</strong> run out of Summit, New Jersey. FY2025 revenue was <strong>$15.12B, down 2.1%</strong> from $15.46B in FY2024; the trailing-twelve-month figure has since recovered to <strong>$15.41B, up 1.8%</strong>. A market capitalisation of <strong>$34.17B</strong> places Kenvue around <strong>#742 globally</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is unusual, because for a Kenvue shareholder today the fundamentals are arguably the second-order question. On <strong>November 2, 2025</strong> Kenvue and Kimberly-Clark signed a definitive merger agreement; both shareholder bases approved it on <strong>January 29, 2026</strong>; the US <span class="tip" title="Hart-Scott-Rodino — the US pre-merger antitrust waiting period. Expiry means the FTC/DOJ did not block the deal at that stage.">Hart-Scott-Rodino</span> waiting period expired on <strong>February 4, 2026</strong>; and the companies expect to close in <strong>Q4 2026</strong>, subject to remaining foreign regulatory approvals. Kenvue shareholders are contracted to receive <strong>0.14625 Kimberly-Clark shares plus $3.50 in cash</strong> per Kenvue share, ending up with roughly <strong>46%</strong> of the combined company on a fully diluted basis. That means KVUE today trades substantially as a merger-arbitrage instrument stapled to Kimberly-Clark's share price, with an overlay of unresolved litigation. This report covers the operating business honestly — because if the deal breaks, that business is what is left — while being explicit about which numbers are really driving the quote.</p>
+  <p class="prose" style="margin-top:16px;"><strong>A note on what this page does not claim.</strong> Two live issues touch Kenvue directly, and both are reported here only as the sources fetched actually state them. First, the acetaminophen litigation: a Yahoo Finance article dated <strong>September 7, 2026</strong> states that <em>"the Second Circuit vacated the prior acetaminophen judgment in July 2026 and remanded the litigation for further proceedings."</em> That is a procedural development — a vacated judgment and a remand — and this page does not characterise any outcome, liability or damages beyond it. Second, the same article states Kenvue <strong>retains responsibility for talc-related liabilities outside the US and Canada</strong>. Neither Kenvue's Q2 2026 earnings release nor its Q2 trade-press coverage, as fetched, addressed the acetaminophen litigation at all.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Kirk L. Perry</div>
+      <div class="card-note">Chief Executive Officer and Director, per the stockanalysis.com company profile. Quoted in the Q2 2026 release: <em>"We delivered our third consecutive quarter of net and organic sales growth, with broad-based gains across every segment and region."</em> Trade coverage of the same quarter quotes him describing the transformation as <em>"firmly on track"</em> while the Kimberly-Clark merger advances.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Heather R. Howlett</div>
+      <div class="card-note">Listed as <strong>Interim</strong> Chief Financial Officer on the company profile — worth flagging, because an interim finance chief heading into a Q4 merger close is itself a governance data point. Other named officers on the same profile: Matthew Orlando (General Counsel), Meredith Stevens (Chief Operations Officer), Michael P. Wondrasch (Chief Technology and Data Officer). The Q2 2026 press release as fetched carried no CFO quote.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">97.6% inst.</div>
+      <div class="card-note">Largest holders by value (MarketBeat): <strong>Vanguard $4.05B</strong>, <strong>FMR LLC $2.75B</strong>, <strong>State Street $2.05B</strong>, MFS $1.18B, Geode $856.8M, Independent Franchise Partners $830.5M, Norges Bank $756.9M. Institutional ownership of <strong>97.64%</strong> is extreme even for a large-cap staple, and the presence of an active concentrated manager like Independent Franchise Partners alongside the index complex is typical of a deal-pending name.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Kenvue reports three segments: <strong>Self Care</strong>, <strong>Skin Health and Beauty</strong> and <strong>Essential Health</strong>. Because the company withdrew forward guidance on account of the pending merger, the most recent hard segment disclosure is the <strong>Q2 2026 quarter ended June 28, 2026</strong>, and that is what the mix bar below uses — reported figures from the earnings release, not estimates. Total Q2 2026 net sales were <strong>$3,955M, up 3.0%</strong> reported and <strong>up 1.6% organic</strong>. First-half 2026 net sales were <strong>$7,864M</strong> against $7,580M a year earlier.</p>
+  <div class="seg-bar">
+    <div style="flex:40.2;background:#47C99C;">SELF CARE 40.2%</div>
+    <div style="flex:28.1;background:#a78bfa;">SKIN HEALTH &amp; BEAUTY 28.1%</div>
+    <div style="flex:31.7;background:#3b82f6;">ESSENTIAL HEALTH 31.7%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#47C99C;"></span> Self Care — $1,589M (Q2 2026), +2.2% reported / +0.6% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Skin Health and Beauty — $1,113M (Q2 2026), +5.1% reported / +3.7% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Essential Health — $1,253M (Q2 2026), +2.3% reported / +1.1% organic</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">A word on <strong>organic growth</strong>, because Kenvue's story lives in the gap between the two numbers. Organic strips out currency and portfolio changes, and Kenvue further decomposes it into <em>value realisation</em> (price/mix) and <em>volume</em>. Across all three segments in Q2 2026, reported growth exceeded organic growth by 1.2–1.6 points — that is foreign-exchange translation flattering the headline. The interesting internal split is that Self Care grew on price and <em>lost</em> volume, while Essential Health grew on volume and <em>gave back</em> price. Only Skin Health and Beauty grew on both.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #47C99C;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Self Care</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,589M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+2.2%</div><div class="biz-stat-label">Reported YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+0.6%</div><div class="biz-stat-label">Organic YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">40.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The highest-margin and highest-risk part of Kenvue. Self Care is over-the-counter medicine: cough, cold and allergy (<strong>Zyrtec</strong>, <strong>Benadryl</strong>, Sudafed), analgesics (<strong>Tylenol</strong>, Motrin), digestive health (Pepcid, Imodium), smoking cessation (Nicorette) and eye care (Visine). Brand equity in this category is enormous — consumers reach for a name on a pharmacy shelf under mild duress and rarely price-shop — which is why gross margins across Kenvue run near <strong>58%</strong>. The Q2 2026 decomposition is the tell on where that equity currently sits: <strong>value realisation +1.2%</strong>, <strong>volume −0.6%</strong>. Kenvue is holding price and losing units. In a category where private-label pharmacy brands sit on the same shelf at half the price, a persistent negative volume line is the number to watch. The offsetting development in the quarter was <strong>FDA approval of Tylenol® with Naproxen</strong>, a fixed-dose combination product the company says carries exclusivity protection through <strong>2029</strong> — a genuine, dated, verifiable piece of pipeline in a segment where innovation is usually incremental.</p>
+    <div class="biz-tam"><strong>Industry size (TAM):</strong> not verified from sources fetched — omitted rather than estimated</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Haleon plc (HLN)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Reckitt Benckiser (RKT.L)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Perrigo / private label</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:10px;font-size:13px;">Competitor financials and category shares were not fetched for this report and are marked "n/v" (not verified) rather than estimated. The named peers are the other global OTC franchises Kenvue competes with on the same pharmacy shelf.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Skin Health and Beauty</div>
+        <span class="biz-badge growth">FASTEST GROWING — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,113M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5.1%</div><div class="biz-stat-label">Reported YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+3.7%</div><div class="biz-stat-label">Organic YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The segment that has done the most to rehabilitate the Kenvue story. Face, body, hair and sun care under <strong>Neutrogena</strong>, <strong>Aveeno</strong>, OGX and Rogaine. Skin Health and Beauty was the portfolio's problem child through 2024 — Neutrogena in particular lost relevance to prestige and derm-adjacent challengers — and the recovery is the clearest evidence that operational fixes are landing. Q2 2026 organic growth of <strong>+3.7%</strong> came from <em>both</em> sides of the equation: <strong>value realisation +2.7%</strong> and <strong>volume +1.0%</strong>, the only segment in the portfolio to post positive volume. Trade coverage of the quarter reports hair care and face care leading across all regions, with <strong>OGX Pro Growth + Peptide</strong> and <strong>Neutrogena Ultra Sheer Sun</strong> named as innovation drivers, and Neutrogena posting household-penetration gains for a <strong>third consecutive quarter across all age groups</strong>. Household penetration — the share of households buying the brand at least once — is the right metric here, because it measures whether the brand is recruiting new users rather than squeezing existing ones.</p>
+    <div class="biz-tam"><strong>Industry size (TAM):</strong> not verified from sources fetched — omitted rather than estimated</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">L'Oréal S.A. (OR.PA)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Beiersdorf (Nivea, Eucerin)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Unilever (CeraVe peer set)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:10px;font-size:13px;">Competitor financials not fetched for this report; marked "n/v" rather than estimated.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Essential Health</div>
+        <span class="biz-badge emerging">VOLUME-LED — MARKET SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,253M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+2.3%</div><div class="biz-stat-label">Reported YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+1.1%</div><div class="biz-stat-label">Organic YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">31.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Oral care, baby care, women's health and wound care — <strong>Listerine</strong>, <strong>Band-Aid</strong>, <strong>Johnson's</strong>, Stayfree, Carefree. These are the household-staple SKUs: low unit price, high repeat, heavy exposure to retailer shelf economics and private label. The Q2 2026 decomposition inverts Self Care's: <strong>volume +1.9%</strong> but <strong>value realisation −0.8%</strong>, meaning Kenvue moved more units by conceding price. Trade coverage states wound care and baby care offset <em>declines in oral care</em>, with <strong>Band-Aid Pro Heal 5 Day Protect</strong>, a <strong>global Listerine restage</strong> and Listerine On-The-Go sachets cited as the momentum drivers. A "restage" is consumer-goods language for relaunching an existing brand with new packaging, formulation and advertising — expensive, and a signal that the incumbent position was eroding enough to warrant the spend.</p>
+    <div class="biz-tam"><strong>Industry size (TAM):</strong> not verified from sources fetched — omitted rather than estimated</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Colgate-Palmolive (CL)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Procter &amp; Gamble (PG)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Kimberly-Clark (KMB)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="biz-desc" style="margin-top:10px;font-size:13px;">Note the third bubble: Kimberly-Clark is simultaneously an adjacent-category competitor and Kenvue's prospective acquirer. Competitor financials not fetched; marked "n/v".</p>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">CENTURY-OLD BRAND EQUITY</span>
+    <span class="moat-pill">PHARMACY SHELF SPACE</span>
+    <span class="moat-pill">FDA MONOGRAPH / REGULATORY MOAT</span>
+    <span class="moat-pill">GLOBAL DISTRIBUTION SCALE</span>
+    <span class="moat-pill">58% GROSS MARGIN</span>
+    <span class="moat-pill">NON-DISCRETIONARY DEMAND</span>
+    <span class="moat-pill">0.43 BETA</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is that Kenvue owns a set of nouns. Band-Aid is what people call an adhesive bandage; Tylenol is what a large share of Americans call acetaminophen. That linguistic capture translates directly into pricing power and shelf position — retailers cannot build a pain-relief aisle without the anchor brand, which in turn funds the advertising that maintains the capture. The financial signature of the moat is visible in the numbers: a <strong>58.4% <span class="tip" title="Gross Margin — revenue minus cost of goods sold, as a percent of revenue. What is left over to fund marketing, R&amp;D and overhead before those costs are deducted.">gross margin</span></strong> on products that are chemically commoditised, a <strong>19.6% operating margin</strong>, a <strong><span class="tip" title="Beta — sensitivity of the stock to the broader market. Below 1.0 means the shares historically moved less than the index.">beta</span> of 0.43</strong> reflecting demand that does not track the business cycle, and <strong><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by the debt and equity capital deployed in the business.">ROIC</span> of 12.35%</strong> against a capital base that is mostly goodwill and brands rather than factories. The regulatory layer reinforces it: OTC drug approval is slow and expensive, and Kenvue's new fixed-dose Tylenol/naproxen combination carries protection through 2029.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Litigation overhang the company does not control.</strong> The acetaminophen litigation is live: per a September 7, 2026 Yahoo Finance article, the Second Circuit <em>vacated</em> the prior acetaminophen judgment in July 2026 and <em>remanded</em> for further proceedings. That is a reopening, not a resolution, and nothing on this page should be read as predicting an outcome. Separately, the same source states Kenvue retains talc-related liabilities outside the US and Canada. For a company with $34B of market value and $1.66B of TTM net income, an open-ended legal tail is a structurally different kind of risk from a competitive one — it is not manageable by operating better.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Volume is not growing in the biggest segment.</strong> Self Care, 40% of the mix, posted <strong>−0.6% volume</strong> in Q2 2026 and grew only because price went up 1.2%. Price-led growth in a category with credible private-label substitutes has a ceiling, and consumers trading down at the pharmacy shelf is exactly the behaviour that shows up as negative volume first and negative organic growth second.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Merger execution and break risk.</strong> The Kimberly-Clark transaction has shareholder approval and US antitrust clearance but still needs <strong>foreign regulatory approvals</strong> to close in Q4 2026. Because the consideration is <strong>mostly stock</strong> — 0.14625 KMB shares plus $3.50 cash — KVUE holders carry Kimberly-Clark's equity risk without owning it yet, and a break would return them to a standalone consumer-health company that has spent a year not guiding, not investing for independence, and losing management attention to integration planning.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong>Margin pressure from tariffs and input inflation.</strong> The Q2 2026 release attributes gross-margin decline to <em>"inflation, tariffs, as well as unfavorable transactional foreign exchange."</em> The Yahoo Finance piece quantifies roughly <strong>$80M in annualised tariff exposure</strong>. Against a $250M restructuring programme targeting ~$200M of annualised savings, the tariff line eats a meaningful fraction of the self-help before it reaches the P&amp;L.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>KVUE</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td>Trailing <span class="tip" title="Price-to-Earnings — share price divided by earnings per share over the last twelve months. How many dollars you pay per dollar of current profit.">P/E</span></td><td style="color:var(--text);">20.93</td><td>—</td><td>—</td><td>$17.79 ÷ $0.85 TTM EPS = 20.9×. Ties out. Not cheap on trailing GAAP, but trailing GAAP is depressed by restructuring and separation costs.</td></tr>
+      <tr><td>Forward <span class="tip" title="Forward P/E — share price divided by the consensus estimate of next-twelve-month earnings per share.">P/E</span></td><td style="color:var(--green);">14.70</td><td>—</td><td>—</td><td>The 6.2-turn gap between trailing and forward is the entire "the earnings are understated" argument compressed into one number.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth — the P/E divided by the expected earnings growth rate. Around 1.0 is conventionally seen as fair.">PEG</span> Ratio</td><td style="color:var(--amber);">1.24</td><td>—</td><td>—</td><td>Slightly above 1.0. Reasonable for a staple, but the growth denominator here is largely cost-out, not volume.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> (<span class="tip" title="Trailing Twelve Months — the most recent four reported quarters, rather than a fiscal year.">TTM</span>)</td><td style="color:var(--text);">$0.85</td><td>—</td><td>—</td><td>Recovering: FY2023 $0.90 → FY2024 $0.54 → FY2025 $0.76 → TTM $0.85. The FY2024 trough was the separation-cost year.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-Year — compared with the same period one year earlier.">YoY</span>)</td><td style="color:var(--amber);">+1.8%</td><td>—</td><td>—</td><td>TTM. Q2 2026 was +3.0% reported, +1.6% organic — third consecutive quarter of growth after FY2025's −2.1%.</td></tr>
+      <tr><td><span class="tip" title="Gross Margin — revenue minus cost of goods sold, as a percent of revenue.">Gross Margin</span></td><td style="color:var(--green);">58.44%</td><td>—</td><td>—</td><td>Expanded from 55.96% in FY2023. Q2 2026 was 58.2% reported / 60.2% adjusted, with tariffs and FX cited as the drag.</td></tr>
+      <tr><td><span class="tip" title="Net Profit Margin — net income as a percent of revenue. What is left after every cost, including tax and interest.">Net Profit Margin</span></td><td style="color:var(--text);">10.76%</td><td>—</td><td>—</td><td>Back near the FY2023 level of 10.77% after dipping to 6.67% in FY2024. Operating margin is 19.55%.</td></tr>
+      <tr><td><span class="tip" title="Dividend Yield — annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--green);">4.72%</td><td>—</td><td>—</td><td>$0.84 annualised. A high yield, but see the payout note below — it is not comfortably covered by GAAP earnings.</td></tr>
+      <tr><td><span class="tip" title="Short Interest — the proportion of freely tradable shares that have been sold short, i.e. bet against.">Short Interest</span> / Float</td><td style="color:var(--green);">2.75%</td><td>—</td><td>—</td><td>Low. Consistent with a deal-pending name where merger-arb positioning dominates and outright bears have little room.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity — total debt divided by shareholders' equity. A gearing measure.">Debt-to-Equity</span></td><td style="color:var(--amber);">0.82</td><td>—</td><td>—</td><td>Enterprise value of $41.64B against a $34.17B market cap implies roughly $7.5B of net debt. EV/EBITDA of 11.94.</td></tr>
+      <tr><td><span class="tip" title="Current Ratio — current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td style="color:var(--amber);">1.01</td><td>—</td><td>—</td><td>Barely above 1.0. Thin for a company paying out nearly all of its earnings in dividends.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow — operating cash flow minus capital expenditure. Cash actually available for dividends, buybacks and debt paydown.">Free Cash Flow</span></td><td style="color:var(--amber);">$1.91B</td><td>—</td><td>—</td><td>Against roughly $1.61B of annual dividend obligation at $0.84 × 1.92B shares. Covered by FCF, unlike by GAAP EPS.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity — net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--green);">15.58%</td><td>—</td><td>—</td><td>Respectable, and flattered somewhat by the 0.82 debt-to-equity. ROA is 6.99%.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital — after-tax operating profit divided by total debt and equity capital employed.">ROIC</span></td><td style="color:var(--green);">12.35%</td><td>—</td><td>—</td><td>Above a plausible cost of capital for a 0.43-beta staple. This is the number that says the brands are real assets.</td></tr>
+      <tr><td><span class="tip" title="Beta — sensitivity of the share price to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span> (5Y)</td><td style="color:var(--green);">0.43</td><td>—</td><td>—</td><td>Very low. Partly genuine staple defensiveness, partly the merger-arb pin that has decoupled the shares from the index since November 2025.</td></tr>
+      <tr><td>52-Week Range</td><td style="color:var(--text);">$14.02 – $20.13</td><td>—</td><td>—</td><td>The $17.79 close sits at the 60th percentile of the range. The $14.02 low was struck in the October 2025 drawdown.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:20px;"><strong>Why the Industry Avg and S&amp;P 500 columns are blank.</strong> Sourced peer-group and index averages for these specific ratios were not obtained from the pages fetched for this report. Per the no-fabrication rule they are left as "—" rather than filled with plausible-looking estimates. Every figure in the KVUE column comes from stockanalysis.com's statistics and financials pages or from Kenvue's own Q2 2026 earnings release.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Notable One-Off Items.</strong> Three distortions matter here. First, the <strong>2026 Restructuring Initiative</strong>, approved February 17, 2026, carries approximately <strong>$250M of pre-tax charges</strong> for fiscal 2026 against approximately <strong>$200M of annualised savings</strong> — so FY2026 GAAP earnings are depressed by a programme whose benefit lands later, which is a large part of why forward P/E (14.7×) sits so far below trailing (20.9×). Second, the gap between <strong>$0.24 reported diluted EPS</strong> and <strong>$0.31 adjusted diluted EPS</strong> in Q2 2026 is roughly 29% — a wide GAAP-to-adjusted spread that deserves scrutiny rather than automatic acceptance. Third, the <strong>payout ratio of 98.82%</strong> means the dividend is effectively consuming all of GAAP earnings; it is covered on a free-cash-flow basis ($1.91B FCF vs ~$1.61B of dividends) but there is no GAAP cushion, and the dividend's future is in any case a Kimberly-Clark decision if the merger closes. <strong>FY2024 net income of $1,030M</strong> against $1,664M in FY2023 was the separation-cost trough and should not be read as a demand event.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">HOLD</div>
+      <div class="card-note">14 analysts per stockanalysis.com; 15 per MarketBeat. Both land on Hold.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$19.50</div>
+      <div class="card-note"><span style="color:var(--green);">+9.6% upside</span> from the $17.79 close. MarketBeat's parallel figure is $19.27.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$18.00 – $23.00</div>
+      <div class="card-note">The low target sits <em>above</em> the current price — an unusually tight, deal-anchored distribution.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">2 / 12 / 0</div>
+      <div class="card-note">Buy (1 Strong Buy + 1 Buy) / Hold 12 / Sell 0, per stockanalysis.com. MarketBeat shows 3 Buy / 12 Hold / 0 Sell.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:14.3;background:#22c55e;"></div>
+    <div style="flex:85.7;background:#f59e0b;"></div>
+  </div>
+  <p class="prose" style="font-size:13px;">Buy 2 (14.3%) · Hold 12 (85.7%) · Sell 0 (0%)</p>
+  <p class="prose" style="margin-top:24px;"><strong>Read the distribution, not the average.</strong> Twelve of fourteen analysts on Hold with a low target <em>above</em> the market price is not indecision — it is the signature of a stock that has stopped being valued on its own earnings. With the exchange ratio fixed at 0.14625 Kimberly-Clark shares plus $3.50 cash, the honest KVUE price target is a Kimberly-Clark price target plus $3.50, and most of the desk simply will not take a directional view on an arbitrage. Note also that <strong>three of the named targets below are identical at $19.00</strong>, which is what deal-anchored consensus looks like.</p>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;text-transform:uppercase;">Key Recent Analyst Calls</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong>UBS Group</strong> — Peter Grom, <strong>Neutral</strong>, price target lowered to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$19.00</span> (August 11, 2026). Cut days after the Q2 2026 print, keeping the rating unchanged — a target trim, not a view change.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong>Barclays</strong> — Lauren Lieberman, <strong>Equal Weight</strong>, price target raised to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$19.00</span> (July 21, 2026). A boost into the quarter that still landed on the same $19 anchor as UBS.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong>Citigroup</strong> — Filippo Falorni, <strong>Neutral</strong>, price target lowered to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$19.00</span> (April 15, 2026). Third independent desk at $19.00.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong>Jefferies</strong> — Keith Devas, <strong>downgrade to Hold</strong>, price target <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$18.00</span> (January 30, 2026). The downgrade came the day after the shareholder votes approved the merger — i.e. the upside had been contracted away. Canaccord Genuity's Susan Anderson set the same $18.00 on February 18, 2026.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All named calls above were taken from the MarketBeat price-target page for KVUE fetched for this report. No call not seen on a fetched page is listed.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Expected close of the Kimberly-Clark merger</div>
+        <div class="tl-desc">The single event that determines what a KVUE share is worth. Shareholder approvals (January 29, 2026) and US antitrust clearance (HSR expiry February 4, 2026) are done; what remains is <strong>foreign regulatory approvals and customary conditions</strong>. Consideration: 0.14625 Kimberly-Clark shares plus $3.50 cash per KVUE share, leaving Kenvue holders with roughly 46% of the combined company fully diluted.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Not verified</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — date unconfirmed</div>
+        <div class="tl-desc">stockanalysis.com's next-earnings field still reads <strong>August 6, 2026</strong>, which is stale — Q2 2026 has already been reported. A Q3 report would normally fall in late October or early November 2026, but the company is <strong>not providing forward guidance because of the pending transaction</strong>, and a Q4 close could make a standalone Q3 report the last one. No date is asserted here because none was verified.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Acetaminophen litigation — remanded for further proceedings</div>
+        <div class="tl-desc">Per a Yahoo Finance article dated September 7, 2026: <em>"The Second Circuit vacated the prior acetaminophen judgment in July 2026 and remanded the litigation for further proceedings."</em> That is the full extent of what the sources fetched for this report state. No outcome, liability, timeline or damages figure is characterised here, because none was verified. The same article notes Kenvue retains talc-related liabilities outside the US and Canada.</div>
+        <div class="tl-impact neutral">Key near-term event — outcome not characterised</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — third consecutive quarter of organic growth</div>
+        <div class="tl-desc">Net sales $3,955M, up 3.0% reported and 1.6% organic, with all three segments and every region positive. Diluted EPS $0.24 (up 9%), adjusted $0.31 (up 7%). Gross margin 58.2% reported / 60.2% adjusted, with inflation, tariffs and transactional FX cited as the drag. The shares have fallen from $18.88 at the end of August to $17.79 on September 10.</div>
+        <div class="tl-impact down">Reaction already happened — shares lower since</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q2 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FDA approves Tylenol® with Naproxen</div>
+        <div class="tl-desc">A fixed-dose combination OTC analgesic, with exclusivity protection the company says runs through <strong>2029</strong>. Meaningful because Self Care — 40% of net sales — is currently growing on price while losing volume; a genuinely new, protected SKU is one of the few levers that can restore volume growth in that segment.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2026 Restructuring Initiative — savings begin to land</div>
+        <div class="tl-desc">Approved February 17, 2026 to "optimize its operating model, transform its supply chain, reduce complexity, and drive operational efficiencies." Roughly <strong>$250M in pre-tax charges</strong> for fiscal 2026 against approximately <strong>$200M in annualised savings</strong>. Against approximately $80M of annualised tariff exposure, the net self-help is smaller than the gross headline.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> Stock Price Analysis — Full Trading History Since Spin-Off</div>
+  <p class="prose"><strong>This chart is not five years long, and it cannot be.</strong> Kenvue listed on the NYSE on <strong>May 4, 2023</strong> when Johnson &amp; Johnson floated the consumer-health business. There are therefore only <strong>41 month-end observations</strong> in existence — May 2023 through September 2026 — and that is exactly what is plotted. No months have been reconstructed, back-filled or invented to reach a round number of 60.</p>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">KVUE Monthly Closes — May 2023 to September 2026</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">41 real month-end closes (full listed history) · unadjusted prices · 1/3/10-month moving averages</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);align-self:center;">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:20px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#47C99C;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+      <div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px;max-width:640px;">RSI measures how much of recent price movement has been upward versus downward, on a 0–100 scale. Above 70 suggests the shares have risen quickly enough to be described as overbought; below 30, the reverse. On monthly data it is a slow, coarse signal — it flags exhaustion, not entries.</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);align-self:center;">⚠ AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>The trajectory.</strong> Kenvue's first month-end close as a public company was <strong>$25.09</strong> in May 2023, and it peaked at <strong>$26.42</strong> in June 2023 — the high-water mark of the entire history, set in month two. From there the story is a long derating: $18.60 by October 2023, a partial recovery to <strong>$24.08</strong> in November 2024, then a slide that accelerated through the second half of 2025 to an all-time monthly-close low of <strong>$14.37</strong> in October 2025. The November 2, 2025 Kimberly-Clark merger agreement put a floor under the shares, which have since traded in a narrow <strong>$17.24–$19.24</strong> band for ten months. From the May 2023 close of $25.09 to the September 10, 2026 close of <strong>$17.79</strong>, the price return is <strong>−29.1%</strong>; from the $22.00 IPO price, <strong>−19.1%</strong>. Dividends have offset part of that — the shares currently yield 4.72% — but on price alone the spin-off has destroyed value for anyone who held from day one.</p>
+  <p class="prose" style="margin-top:16px;">The moving-average structure tells the same story more compactly. The 10-month average sat above the price for most of 2023 and again from mid-2025 onward; the crossover in late 2025 is the merger, not a fundamental inflection. Since December 2025 the 1-, 3- and 10-month averages have converged into a tight cluster around $18 — which is what a stock pinned by a fixed exchange ratio looks like on a chart. The RSI panel shows the same compression: after a deeply oversold reading in the autumn-2025 washout, the indicator has oscillated around neutral without reaching either threshold, because a merger-arbitrage instrument does not trend.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">May 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">NYSE debut — $25.09 first month-end close</div>
+        <div class="tl-desc">Johnson &amp; Johnson floats the consumer-health business at $22.00 on May 4, 2023. The shares close the month above the offer price and peak at $26.42 in June — the highest month-end close Kenvue has ever printed.</div>
+        <div class="tl-impact up">All-time high set in month two</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">First derating — $18.60</div>
+        <div class="tl-desc">A 26% slide from the June peak in four months as the market repriced a slow-growth spin-off carrying separation costs. This is the pattern that would repeat: Kenvue's equity has never sustained a multiple premium.</div>
+        <div class="tl-impact down">−29.6% from the June 2023 peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Post-spin recovery high — $24.08</div>
+        <div class="tl-desc">The best level since mid-2023, reached on a fourteen-month climb from the July 2024 low of $18.18. FY2024 revenue was essentially flat at $15.46B, so this was multiple expansion on an improvement narrative rather than growth.</div>
+        <div class="tl-impact up">+32.5% off the July 2024 low</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Sharpest monthly decline in the history — $16.23</div>
+        <div class="tl-desc">A <strong>−21.6%</strong> month from August's $20.71, the largest single-month drawdown Kenvue has recorded. No cause is asserted here: the sources fetched for this report do not document what drove that specific month, and this page does not guess.</div>
+        <div class="tl-impact down">−21.6% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">All-time monthly-close low — $14.37</div>
+        <div class="tl-desc">The trough of the drawdown, 45.6% below the June 2023 peak. The 52-week low of $14.02 was struck in this window. Q3 2025 revenue of $3,764M was down 3.5% year-over-year — the weakest quarterly comparison in the dataset.</div>
+        <div class="tl-impact down">−45.6% from the all-time high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Kimberly-Clark merger agreement — $17.35</div>
+        <div class="tl-desc">The definitive merger agreement is announced on November 2, 2025. The shares rebound 20.7% from October's close and have not revisited the low since. From this point the chart stops being a referendum on consumer health and starts being a function of Kimberly-Clark's share price.</div>
+        <div class="tl-impact up">+20.7% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Deal clears its two biggest hurdles — $19.12</div>
+        <div class="tl-desc">Both shareholder bases approve on January 29, 2026; the HSR antitrust waiting period expires February 4, 2026. The shares close February at $19.12, the high of the merger-pending era and within 6% of the $19.50 consensus target — the market pricing a high probability of close.</div>
+        <div class="tl-impact up">Deal risk repriced lower</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$17.79 — inside a ten-month range</div>
+        <div class="tl-desc">Down from $19.24 in July and $18.88 in August. The September 9 session alone was <strong>−3.48%</strong> on elevated volume, and the last three sessions to the September 10 close all traded above 16 million shares. The stock sits 11.7% below the February 2026 high and 23.8% above the October 2025 low.</div>
+        <div class="tl-impact neutral">Partial month — Sep 10 close</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Kenvue has underperformed both its benchmark and its sector by a wide margin since listing. Over the trailing twelve months the shares are <strong>−3.57%</strong> on stockanalysis.com's measure and <strong>−5.68%</strong> on companiesmarketcap's, against an <strong>S&amp;P 500</strong> that has not had a down year in that window — so the relative shortfall is materially larger than the absolute one. On a full-history basis the gap is stark: −29.1% on price from the first month-end close while the index compounded. Against the <strong>NASDAQ-100</strong>, the comparison is barely worth drawing — a 0.43-beta consumer staple carrying litigation and a pending merger has essentially nothing in common with that index's return driver. Within Consumer Staples, Kenvue's 2025 calendar-year decline of <strong>−20.21%</strong> was far worse than the sector's, and the 2026 year-to-date gain of <strong>+3.7%</strong> is merger mechanics rather than operating recovery. The one number that flatters Kenvue on a relative basis is drawdown behaviour going forward, not backward: with the exchange ratio fixed, KVUE's remaining path is tethered to Kimberly-Clark, which is why the beta reads 0.43 and why the analyst target range has collapsed to $18–$23.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The operating business is genuinely turning: three consecutive quarters of organic growth, gross margin up from 55.96% in FY2023 to 58.44% TTM, ROIC of 12.35%, and Skin Health and Beauty finally growing on both price and volume with Neutrogena gaining household penetration for a third straight quarter. Forward P/E of 14.7× against trailing 20.9× says the market already accepts that restructuring charges are masking earnings power. And the downside is unusually well-defined: a signed merger with shareholder approval, US antitrust clearance and a Q4 2026 target close, at 0.14625 Kimberly-Clark shares plus $3.50 cash, with an analyst low target of $18.00 sitting <em>above</em> the current $17.79 price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>You are buying a legal tail with a consumer-goods business attached. The acetaminophen judgment was vacated and remanded in July 2026 — the litigation is open, not closed — and Kenvue retains ex-US/Canada talc liabilities. Meanwhile 40% of revenue (Self Care) is growing on price while losing volume, Essential Health is buying volume by conceding price, the payout ratio is 98.82% with a current ratio of 1.01, and ~$80M of annualised tariff exposure eats a large slice of the $200M restructuring benefit. If the merger breaks on a foreign regulatory objection, holders are returned to a standalone company that has spent a year not guiding and not being managed for independence, with the $14.02 low only twelve months behind it.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong>Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Merger completion risk.</strong> Remaining <strong>foreign regulatory approvals</strong> are the last gate before the Q4 2026 target close. Because the consideration is predominantly Kimberly-Clark stock, holders also carry KMB equity risk between now and closing without any ability to hedge it inside the KVUE position.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>Acetaminophen litigation, reopened.</strong> The Second Circuit vacated the prior judgment in July 2026 and remanded for further proceedings. This report takes no view on where that leads — but an unresolved, reopened mass-tort matter attached to the company's single most recognisable brand is a risk that no amount of margin expansion offsets.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Volume erosion in Self Care.</strong> Negative volume (−0.6%) in the largest segment, sustained by +1.2% price, is the classic setup for private-label share gain. If the Tylenol/naproxen launch does not restore units, the segment's 0.6% organic growth has more room to fall than to rise.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid var(--red);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Consumer-health consolidation has reached its endgame</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+    </div>
+    <p class="biz-desc">Kenvue exists because Johnson &amp; Johnson decided in 2023 that consumer health did not belong inside a pharmaceutical company. Three years later, Kimberly-Clark has decided it does belong inside a household-products company — the merger agreement signed November 2, 2025 values the combination such that Kenvue holders take roughly <strong>46%</strong> of the combined entity. That round trip is the industry's verdict on standalone consumer health at Kenvue's scale: <strong>$15.1B of revenue growing at roughly 1–2% organic</strong> does not support the marketing, innovation and litigation-absorption budget that global OTC and skin-care brands require on their own. The strategic-review question the market asked through 2024 and 2025 has been answered, and the answer was sale rather than separation. Note precisely what this page does <em>not</em> say: no separation or break-up of the Kenvue portfolio into its three segments is documented in any source fetched for this report — the transaction on the table is a whole-company merger.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Tariffs and input inflation are compressing a margin that was just repaired</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+    </div>
+    <p class="biz-desc">Kenvue spent two years rebuilding gross margin from <strong>55.96% (FY2023)</strong> to <strong>58.37% (FY2025)</strong> — a 241-basis-point repair achieved through pricing and supply-chain work. Q2 2026 gave some of it back: reported gross margin of <strong>58.2%</strong>, with the release attributing the decline to <em>"inflation, tariffs, as well as unfavorable transactional foreign exchange."</em> The quantified tariff drag is roughly <strong>$80M annualised</strong>, against a <strong>$250M</strong> restructuring charge intended to produce <strong>$200M</strong> of annualised savings. In other words, close to half the self-help programme's run-rate benefit is being consumed by trade policy the company cannot influence. For a business whose products are manufactured and sold across every major region, transactional FX compounds the problem: the gap between reported and organic growth in Q2 2026 was positive (currency helped the top line) while FX simultaneously hurt the margin — a translation tailwind masking a transaction headwind.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid var(--green);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">What the two cases actually hinge on</div>
+        <span class="biz-badge growth">EMERGING TAILWIND</span>
+      </div>
+    </div>
+    <p class="biz-desc">Strip the noise and the bull and bear cases for KVUE at $17.79 turn on one binary and one trend. <strong>The binary</strong> is whether the Kimberly-Clark merger closes in Q4 2026 as planned. If it does, the KVUE price today is simply a discounted claim on 0.14625 KMB shares plus $3.50 — the analyst low target of $18.00 above the market price implies the desk thinks that discount is modest and the probability high. If it breaks on a foreign regulatory objection, the floor that has held since November 2025 disappears and the $14.02 fifty-two-week low becomes relevant again. <strong>The trend</strong> is volume. Kenvue grew net sales 3.0% in Q2 2026, but only <strong>Skin Health and Beauty</strong> grew units; Self Care lost 0.6% of volume and Essential Health bought its 1.9% volume gain with 0.8% of price. A consumer-staples business that grows by charging more for fewer units is not compounding — it is harvesting. The bull needs the Tylenol/naproxen launch and the Neutrogena penetration gains to convert into positive volume across the portfolio. The bear only needs the status quo to persist, plus one adverse turn in a litigation that was reopened in July 2026.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;margin-bottom:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Price, market cap, 52-week range, sector/industry classification, valuation ratios, margins, returns, balance-sheet ratios, free cash flow, short interest, and the annual and quarterly income statements are from <strong>stockanalysis.com/stocks/kvue/</strong> (price source: <a href="https://stockanalysis.com/stocks/kvue/" style="color:var(--accent);">https://stockanalysis.com/stocks/kvue/</a>), its <em>/statistics/</em>, <em>/financials/</em>, <em>/financials/?p=quarterly</em>, <em>/forecast/</em>, <em>/company/</em> and <em>/history/</em> pages. The <strong>$17.79</strong> header price is the settled close of <strong>Thursday, September 10, 2026</strong>, corroborated against the quote page's "Previous Close" field and the daily history table's change arithmetic (+$0.04 / +0.23% from $17.75); the Friday September 11 session was still in progress when this page was built and is excluded.</p>
+  <p style="max-width:900px;margin:0 auto 12px;">Segment net sales, organic growth decomposition, adjusted EPS, gross margin, the 2026 Restructuring Initiative, the Tylenol® with Naproxen FDA approval and the merger timeline are from Kenvue's <strong>Q2 2026 earnings release</strong> (investors.kenvue.com and kenvue.com/media). Merger consideration terms, ownership split, regulatory status, the acetaminophen appellate development, the talc liability retention, and the ~$80M tariff figure are from a <strong>Yahoo Finance</strong> article dated <strong>September 7, 2026</strong>. Segment brand and innovation detail is from <strong>happi.com</strong> (August 9, 2026). Named analyst calls are from the <strong>MarketBeat</strong> KVUE price-target page. Institutional holdings are from <strong>MarketBeat</strong>. Global market-cap rank (#742) is from <strong>companiesmarketcap.com</strong>; the US and NYSE ranks are marked "(est.)" because they were not directly sourced.</p>
+  <p style="max-width:900px;margin:0 auto 12px;"><strong>Explicit gaps, not estimates.</strong> The chart plots <strong>41 real month-end closes</strong> (May 2023 – September 2026) from <strong>digrin.com</strong>'s unadjusted "Real Price" column — Kenvue's entire listed history, because the company only began trading on May 4, 2023. <strong>No months were reconstructed or invented</strong>, and there is no five-year series to show. The final chart point is the September 10, 2026 close of $17.79 (partial month) and equals the header price. Industry-average and S&amp;P 500 benchmark columns in the metrics table are left as "—" because sourced values were not obtained. Competitor market shares, revenues and growth rates are marked "n/v" and segment TAM figures are omitted, in both cases rather than estimated. FY2025 segment-level revenue was not obtained and is not stated; segment figures on this page are Q2 2026 as reported. The next earnings date is flagged as unverified because the available field was stale. The acetaminophen and talc matters are reported <em>only</em> as the fetched sources state them; no outcome, liability or timeline is characterised.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. Merger arbitrage carries risks distinct from ordinary equity investment, including total loss of the spread and adverse movement in the acquirer's shares. Past performance does not predict future results. Do your own research and consult a licensed financial professional before making investment decisions.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 41 month-end closes, May 2023 → Sep 2026 (unadjusted "Real Price", digrin.com) =====
+// Kenvue listed on the NYSE on May 4, 2023, so 41 months is the ENTIRE available history — not a truncated 5-year series.
+// Final point is the Sep 10, 2026 close of $17.79 (partial month) — matches the header price.
+const labels = ['May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [25.09,26.42,23.68,23.05,20.08,18.60,20.44,21.53,20.76,19.00,21.46,18.82,19.30,18.18,18.49,21.95,23.13,22.93,24.08,21.35,21.29,23.60,23.98,23.60,23.87,20.93,21.44,20.71,16.23,14.37,17.35,17.25,17.40,19.12,17.24,17.53,17.28,19.11,19.24,18.88,17.79];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'May 2023 — NYSE debut month $25.09',                  color: '#94a3b8' },
+  { idx: 1,  label: 'Jun 2023 — all-time monthly high $26.42',             color: '#22c55e' },
+  { idx: 5,  label: 'Oct 2023 — first derating $18.60',                    color: '#ef4444' },
+  { idx: 18, label: 'Nov 2024 — post-spin recovery high $24.08',           color: '#22c55e' },
+  { idx: 28, label: 'Sep 2025 — largest monthly drop, -21.6%, $16.23',     color: '#ef4444' },
+  { idx: 29, label: 'Oct 2025 — all-time monthly low $14.37',              color: '#ef4444' },
+  { idx: 30, label: 'Nov 2025 — Kimberly-Clark merger agreement $17.35',   color: '#3b82f6' },
+  { idx: 33, label: 'Feb 2026 — votes + HSR clearance, $19.12',            color: '#f59e0b' },
+  { idx: 40, label: 'Sep 10, 2026 — $17.79 (partial month)',               color: '#47C99C' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(71,201,156,0.20)');
+grad.addColorStop(1, 'rgba(71,201,156,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#47C99C', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#47C99C'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
