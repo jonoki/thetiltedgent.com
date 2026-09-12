@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KR — The Kroger Co. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3FA0F0;
+  --accent-dim: #3FA0F033;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">KR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Staples / Grocery Stores</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $34.91B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #735</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: rank not verified</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: rank not verified</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Kroger Co.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$56.95</div>
+      <div class="price-change" style="color:var(--green);">+$0.51 (+0.90%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">Note: KR reported Q2 fiscal 2026 results before the open on Fri Sep 11 and was trading higher intraday; that session was still open and is deliberately excluded.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1014 Vine Street, Cincinnati, Ohio</div>
+    <div class="meta-item"><span>Employees:</span> ~403,000</div>
+    <div class="meta-item"><span>Founded:</span> 1883</div>
+    <div class="meta-item"><span>Fiscal Year End:</span> Late January (FY2026 ends Jan 30, 2027)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 FY2026 — early December 2026 (est.; date not confirmed on sources fetched)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose"><strong>A note on the calendar before anything else.</strong> Kroger's fiscal year ends on the Saturday nearest January 31, so every "fiscal 2025" figure below refers to the 52 weeks ended <strong>January 31, 2026</strong>, and "fiscal 2026" is the year ending <strong>January 30, 2027</strong> — the year currently in progress. Data aggregators disagree with the company's own labelling (StockAnalysis calls the year ended Jan 31, 2026 "FY 2026"); this page uses Kroger's convention and states the period-end date wherever it matters.</p>
+  <p class="prose" style="margin-top:16px;">Kroger is the largest pure-play food and drug retailer in the United States, running combination food-and-drug stores, multi-department stores, marketplace stores and price-impact warehouses under roughly two dozen banners, plus supermarket fuel centres, pharmacies and a manufacturing arm. Fiscal 2025 (ended Jan 31, 2026) revenue was <strong>$147.64B, up 0.35%</strong> from $147.12B; trailing-twelve-month revenue through the May 2026 quarter was <strong>$148.65B, up 1.14%</strong>. At $34.91B of market value it ranks roughly <strong>#735 globally by market capitalisation</strong> — a company with the revenue of a superpower and the market cap of a mid-cap software firm.</p>
+  <p class="prose" style="margin-top:16px;">That gap is the whole story, and it is not a flaw. <strong>Grocery is a ~2% net margin business by design.</strong> Kroger's fiscal 2025 operating margin was <strong>3.20%</strong> and its <span class="tip" title="Net income divided by revenue — what is left for shareholders after every cost, including tax and interest.">net profit margin</span> on a trailing basis is <strong>0.73%</strong>. Those are not signs of a broken company; they are the physics of selling perishable food at high volume and low mark-up. The right way to underwrite Kroger is not margin expansion but <strong>identical sales excluding fuel, gross margin rate ex-fuel, the OG&amp;A rate, and how much of the share count management retires each year.</strong> The central debate on this page is whether the current combination — identical sales decelerating to <strong>+0.2%</strong> while <span class="tip" title="Businesses other than selling groceries: retail media, data, personal finance, insurance — higher-margin income that rides on top of the store network.">alternative profit</span> and digital carry the margin — is a durable model or a treadmill that stops working the moment traffic turns negative.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Gregory S. Foran</div>
+      <div class="card-note">CEO, verified from the StockAnalysis company profile for KR. Foran is the operator brought in after the March 2025 departure of long-time CEO Rodney McMullen; his public framing of the plan is "to become America's favorite grocer," which in practice has meant store-level execution, cost-out and a hard look at capital already spent.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">David Kennerley</div>
+      <div class="card-note">EVP and Chief Financial Officer, verified from the StockAnalysis company profile and quoted by name in the Q2 fiscal 2026 release. Owns the "adjusted FIFO operating profit" framing Kroger guides on, and the leverage target of 2.30–2.50x net total debt to adjusted EBITDA. Ronald L. Sargent is listed as Chairman.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">613.0M shares</div>
+      <div class="card-note">Shares outstanding of <strong>613.00M</strong>, single class. Specific institutional holder names and stakes <strong>were not verified from the sources fetched</strong> (the holders page returned a 404) and are therefore not listed here rather than guessed. What is verified: <span class="tip" title="Shares sold short as a percentage of shares available to trade.">short interest</span> of 27.70M shares, 4.52% of float.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Kroger reports as a <strong>single operating segment</strong> and does not publish a profit split by business line. The only clean revenue disaggregation available from the sources fetched is the one that matters most to how the company is actually run: <strong>merchandise versus fuel</strong>. In the second quarter of fiscal 2026 (13 weeks ended <strong>August 15, 2026</strong>), total sales were <strong>$34.6B</strong> of which <strong>$29.957B</strong> was sales excluding fuel — implying roughly <strong>$4.6B, or 13.4%</strong>, from supermarket fuel centres. Every business-line share below is flagged as not disclosed rather than estimated.</p>
+  <div class="seg-bar">
+    <div style="flex:86.6;background:#3FA0F0;">MERCHANDISE EX-FUEL 86.6%</div>
+    <div style="flex:13.4;background:#f59e0b;">FUEL 13.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3FA0F0;"></span> Sales excluding fuel — $29.96B (Q2 FY2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Supermarket fuel — ~$4.6B implied (Q2 FY2026)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Why Kroger strips fuel out of its headline sales metric: fuel carries structurally lower margins than merchandise, and its dollar sales swing with the price of gasoline rather than with anything management controls. A quarter can look strong or weak on total sales purely because pump prices moved. <strong>Identical sales excluding fuel</strong> is the number to read.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #3FA0F0;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Supermarket Retail (ex-fuel) — the core</div>
+        <span class="biz-badge dominant">CORE ENGINE — SEGMENT PROFIT NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$29.96B</div><div class="biz-stat-label">Q2 FY26 Sales ex-Fuel</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+0.2%</div><div class="biz-stat-label">Identical Sales ex-Fuel</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">86.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Identical sales excluding fuel</strong> (sales from stores open without expansion or relocation for five full quarters, stripping out fuel) rose just <strong>0.2% in Q2 FY2026, against +3.4% a year earlier</strong>; year-to-date the figure is <strong>+0.6% versus +3.3%</strong>. That deceleration is the single most important fact on this page, and management attributed it to identifiable, mostly transitory drags: a <strong>cyclospora outbreak in fresh produce cost roughly 30 basis points</strong> as shoppers avoided fruit generally, not only the implicated items; <strong>declining egg prices took another ~30bps</strong>; and pharmacy carried an <strong>unfavourable 138bp impact from Inflation Reduction Act drug-price negotiation</strong>, with generic conversion costing 50bps more. Strip those out and the underlying number is respectable — but "strip those out" is the bull's sentence, not the tape's. Margin profile: <span class="tip" title="Gross profit as a percentage of sales, measured on a FIFO inventory basis and excluding fuel, rent, depreciation and amortization — the cleanest read on merchandising margin.">FIFO gross margin rate ex-fuel</span> rose <strong>13bps</strong>, helped by eCommerce profitability, media growth, favourable pharmacy mix, sourcing and tariff refunds, offset by higher shrink, transportation costs and price investment.</p>
+    <div class="biz-tam"><strong>Category size:</strong> US grocery retail TAM was not verified from the sources fetched and is omitted rather than estimated. Kroger does not disclose its national market share.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Albertsons (ACI)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$5.81B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$83.23B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+2.7%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Sprouts Farmers Mkt (SFM)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$6.75B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$9.00B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+7.2%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Walmart / Costco / Amazon</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not Fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Digital / eCommerce</div>
+        <span class="biz-badge growth">PROFITABLE — 2ND CONSECUTIVE QUARTER (INCL. MEDIA)</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">+20%</div><div class="biz-stat-label">Adj. eCommerce Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+17%</div><div class="biz-stat-label">Growth, Q3 FY25</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Segment Profit</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Adjusted eCommerce sales grew <strong>20% year over year</strong> in Q2 FY2026 — the adjustment strips out exited fulfilment operations, the sale of Vitacost and the discontinued Ship Marketplace, so the comparison is like-for-like. Two things make this the most interesting line in the business. First, growth of 20% against a company-wide identical-sales figure of 0.2% means digital is essentially the only source of volume growth Kroger has. Second, management stated that <strong>eCommerce reached profitability for the second consecutive quarter when retail media revenue is included</strong> — a materially different claim from "eCommerce is profitable," and the qualifier deserves to be read carefully. Delivery and pickup economics in grocery are brutal: picking a 40-item basket of perishables is labour-intensive, substitution and refund rates are high, and basket margins are thin before any fulfilment cost. Kroger's answer has been to route the shortfall through advertising dollars rather than through the basket.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> if "profitable including retail media" ever reverts to "approaching profitability," the margin bridge that is currently offsetting flat identical sales comes apart.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Instacart / Amazon Fresh</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not Fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Walmart pickup &amp; delivery</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not Fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Alternative Profit — Kroger Precision Marketing (retail media)</div>
+        <span class="biz-badge emerging">HIGH-MARGIN OVERLAY — REVENUE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">+24%</div><div class="biz-stat-label">Media Profit Growth, Q2 FY26</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Media Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Kroger Precision Marketing profit grew 24%</strong> in Q2 FY2026 — note that the company disclosed the growth in <em>profit</em>, not revenue, which is itself informative about which number management thinks flatters the story. Retail media is the structural answer to a 2% net margin: Kroger already knows, at household level, what tens of millions of loyalty-card shoppers buy, and it sells that targeting to the consumer-packaged-goods companies whose products sit on its own shelves. The incremental margin on an ad impression is close to 100%, against roughly 2% on a can of soup. This is the one line in the business that can move consolidated operating profit without moving a single pallet, and it is why "grocery is low-margin" is an incomplete description of what Kroger now is. It is also why the gross margin rate ex-fuel rose 13bps in a quarter when identical sales were essentially zero.</p>
+    <div class="biz-tam"><strong>Disclosure gap:</strong> Kroger does not break out alternative-profit revenue or margin. Third-party retail-media TAM estimates were not verified from sources fetched and are omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Walmart Connect / Amazon Ads</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not Fetched</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #ef4444;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pharmacy &amp; Health</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">POLICY HEADWIND — 138BP DRAG</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">−138bp</div><div class="biz-stat-label">IRA Impact on Ident. Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−140bp</div><div class="biz-stat-label">IRA Drag on Pharmacy Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">&gt;50bp</div><div class="biz-stat-label">Generic Conversion Drag</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Pharmacy is the clearest example of why Kroger's headline comp understates the underlying business. The <strong>Inflation Reduction Act</strong> (US legislation that lets Medicare negotiate prices on selected high-cost drugs) mechanically lowers the dollar value of scripts Kroger dispenses without changing the number of prescriptions filled or the customers walking through the door. The company quantified the hit at an <strong>unfavourable 138 basis points on identical sales</strong>, with accelerating conversion of branded drugs to generics costing over 50bps more. Pharmacy is also a traffic driver and a margin <em>mix</em> benefit — management cited "favourable pharmacy mix" as one of the positives in the gross margin bridge. So the same business is simultaneously depressing the sales line and helping the margin line, which is exactly the kind of thing a single headline comp figure buries.</p>
+    <div class="biz-tam"><strong>Read-through:</strong> the IRA drag is a price effect, not a demand effect. It annualises out; it does not compound.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Supermarket Fuel</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">EXCLUDED FROM COMP BY DESIGN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$4.6B</div><div class="biz-stat-label">Q2 FY26 Sales (implied)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Fuel Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Gallons</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Fuel centres exist to convert a grocery loyalty programme into a reason to drive onto the lot. Kroger states plainly that it excludes fuel from identical sales because of its "historically low margins relative to non-fuel merchandise." The $4.6B figure above is <strong>implied arithmetic</strong> — total Q2 sales of $34.6B less the disclosed $29.957B of sales excluding fuel — not a disclosed line item. Note the effect on reported consolidated gross margin: the headline gross margin came in at <strong>22.4% of sales versus 22.5%</strong> a year ago, a 10bp decline that management attributed partly to fuel mix and higher shrink. The ex-fuel FIFO measure went the other way, up 13bps. Anyone reading only the consolidated gross margin got the direction of the quarter wrong.</p>
+    <div class="biz-tam"><strong>Implied, not disclosed:</strong> $34.6B total sales − $29.957B ex-fuel sales = ~$4.64B. Gallons and cents-per-gallon margin were not disclosed on the sources fetched.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">DENSITY &amp; SCALE</span>
+    <span class="moat-pill">84M+ HOUSEHOLD DATA</span>
+    <span class="moat-pill">RETAIL MEDIA FLYWHEEL</span>
+    <span class="moat-pill">OWN-BRAND PORTFOLIO</span>
+    <span class="moat-pill">PHARMACY NETWORK</span>
+    <span class="moat-pill">REAL-ESTATE FOOTPRINT</span>
+    <span class="moat-pill">FOOD MANUFACTURING</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is not price — Walmart, Costco and Aldi all beat Kroger on basket cost in most markets — it is <strong>the conversion of purchase data into a second, high-margin revenue stream</strong>. A regional grocer with 200 stores cannot sell meaningful targeted advertising; Kroger, with a loyalty programme covering the large majority of its sales, can tell a cereal manufacturer precisely which households bought the competitor's product last month and charge for the privilege of reaching them. That is why Kroger Precision Marketing profit grew <strong>24%</strong> in a quarter when identical sales grew <strong>0.2%</strong>. The second advantage is more prosaic and more durable: <strong>route density</strong>. Distribution cost per case falls with store density in a region, which is why Kroger's strategy has consistently been to buy share in markets it already occupies — most recently the <strong>$1.65B Giant Eagle acquisition announced July 1, 2026</strong>, covering roughly 197 supermarkets and 11 pharmacies in the Ohio Valley and mid-Atlantic, regions adjacent to Kroger's Cincinnati base.</p>
+  <p class="prose" style="margin-top:24px;"><strong>Key vulnerabilities:</strong></p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-value" style="font-size:16px;">Structural share loss to mass and discount</div>
+      <div class="card-note">Kroger competes for the same grocery dollar as Walmart, Costco, Amazon and the hard discounters, all of which have either lower cost structures, higher-margin adjacent businesses, or both. Identical sales of +0.2% against a broadly stable consumer is not obviously a pricing decision; it can equally be read as share leaking away one trip at a time. Kroger does not disclose national share, so the leak is not directly observable in its filings.</div>
+    </div>
+    <div class="card">
+      <div class="card-value" style="font-size:16px;">Capital allocation credibility</div>
+      <div class="card-note">In Q3 fiscal 2025 Kroger took a <strong>$2.6B impairment against its automated fulfilment network</strong> — the Ocado-built customer fulfilment centres — producing a GAAP loss of <strong>$2.02 per share</strong> against adjusted EPS of $1.05, a $3.00-per-share charge. That was a write-off of a multi-year strategic bet, and it is the reason trailing GAAP earnings look far worse than the business does. Investors are now being asked to fund a $1.65B acquisition from the same management framework.</div>
+    </div>
+    <div class="card">
+      <div class="card-value" style="font-size:16px;">Regulatory exposure on the margin line</div>
+      <div class="card-note">The Inflation Reduction Act drug-pricing provisions are already costing <strong>138 basis points</strong> of identical sales. Pharmacy reimbursement, labour law and antitrust review of store acquisitions are all live policy risks for a company whose entire net margin is roughly 2% — a policy change that moves costs by 1% of sales moves half the earnings.</div>
+    </div>
+    <div class="card">
+      <div class="card-value" style="font-size:16px;">Food-safety and fresh execution</div>
+      <div class="card-note">The <strong>cyclospora outbreak</strong> in fresh produce cost roughly 30 basis points of identical sales in a single quarter and, per the CFO, is expected to keep consumers "cautious about buying produce" — which is why full-year guidance came down. Fresh is where grocers differentiate and where reputational damage is fastest and least controllable. Shrink (spoilage and theft) was separately flagged as a gross-margin headwind.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Figures below are as at the September 10, 2026 close of <strong>$56.95</strong>. Where a ratio is price-dependent it has been recomputed at that close rather than carried over from a page quoting an intraday print; the sourced value is noted in the Context column when it differs. Industry column is the StockAnalysis Grocery Stores industry aggregate. S&amp;P 500 benchmark values were <strong>not sourced from the pages fetched</strong> and are left as "—" rather than estimated.</p>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>KR</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for each dollar of past profit.">Trailing P/E</span></td>
+        <td style="color:var(--amber);">33.1</td><td>37.7</td><td>—</td>
+        <td>Badly distorted. TTM earnings include the $2.6B automation impairment; on FY2026 guided adjusted EPS the multiple is ~11x. Do not underwrite on this number.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Share price divided by the earnings analysts expect over the next twelve months.">Forward P/E</span></td>
+        <td style="color:var(--green);">10.9</td><td>—</td><td>—</td>
+        <td>$56.95 ÷ $5.20 midpoint of reaffirmed FY2026 adjusted EPS guidance ($5.10–$5.30). StockAnalysis lists 10.76 at a higher intraday price.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1 is conventionally cheap.">PEG Ratio</span></td>
+        <td style="color:var(--text-dim);">1.53</td><td>—</td><td>—</td>
+        <td>Sourced from StockAnalysis. A growth-adjusted multiple is a weak tool for a low-single-digit-growth staple; treat as context only.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — profit attributable to each share over the last four reported quarters.">EPS (TTM)</span></td>
+        <td style="color:var(--text-dim);">$1.72</td><td>—</td><td>—</td>
+        <td>Down 56.4% year over year, entirely because of the Q3 FY2025 impairment. Adjusted EPS in Q2 FY2026 alone was $1.09.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year-over-Year: this period compared with the same period a year earlier.">YoY</span>)</td>
+        <td style="color:var(--text-dim);">+1.14%</td><td>—</td><td>—</td>
+        <td>TTM through the May 2026 quarter. FY2025 (ended Jan 31, 2026) grew 0.35%. Grocery revenue growth is shelf-price inflation plus square footage, little else.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue — what is left to cover every operating cost.">Gross Margin</span></td>
+        <td style="color:var(--text-dim);">23.90%</td><td>—</td><td>—</td>
+        <td>Consolidated. The operative measure is FIFO gross margin rate <em>excluding fuel</em>, which rose 13bps in Q2 FY2026 while the consolidated figure fell 10bps.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net income divided by revenue — the share of every sales dollar that reaches shareholders after all costs and tax.">Net Profit Margin</span></td>
+        <td style="color:var(--green);">0.73%</td><td>0.56%</td><td>—</td>
+        <td>This is what grocery looks like. A normalised year is nearer 1.5–2%; FY2024 (ended Feb 1, 2025) was 1.80% on $2.645B of net income. Low margin is the business model, not a defect.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td>
+        <td style="color:var(--green);">2.74%</td><td>1.36%</td><td>—</td>
+        <td>$0.39 quarterly × 4 ÷ $56.95. The dividend was raised 11% with Q2 FY2026 — the 20th consecutive annual increase.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Shares sold short as a percentage of the freely tradeable share count — a rough gauge of bearish positioning.">Short Interest / Float</span></td>
+        <td style="color:var(--text-dim);">4.52%</td><td>—</td><td>—</td>
+        <td>27.70M shares short. Elevated for a consumer staple but not a crowded short.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Total debt divided by shareholders' equity — how much borrowed money supports each dollar of owner capital.">Debt-to-Equity</span></td>
+        <td style="color:var(--red);">4.13</td><td>—</td><td>—</td>
+        <td>Looks alarming and partly is an artefact: buybacks and the impairment have shrunk book equity. Management's own leverage measure, net total debt to adjusted EBITDA, was <strong>1.91x</strong> against a 2.30–2.50x target — i.e. under-levered by its own standard.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current assets divided by current liabilities — a crude test of ability to meet near-term obligations.">Current Ratio</span></td>
+        <td style="color:var(--text-dim);">0.70</td><td>—</td><td>—</td>
+        <td>Below 1.0 and entirely normal for a grocer: inventory turns in days and customers pay at the till, while suppliers are paid on terms. Negative working capital is a feature here, not a warning.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Free Cash Flow: operating cash flow less capital expenditure — cash actually available for dividends, buybacks and debt.">Free Cash Flow</span></td>
+        <td style="color:var(--text-dim);">$2.87B</td><td>—</td><td>—</td>
+        <td>TTM. FY2026 guidance reaffirmed at $2.7–$2.9B on capex of $3.8–$4.0B. Against a $34.9B market cap that is an ~8% free cash flow yield.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on Equity: net income as a percentage of shareholders' equity.">ROE</span></td>
+        <td style="color:var(--text-dim);">14.44%</td><td>—</td><td>—</td>
+        <td>Flattered by the same small equity base that inflates debt-to-equity. Read alongside ROIC, not instead of it.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on Invested Capital: after-tax operating profit as a percentage of all capital employed, debt and equity together.">ROIC</span></td>
+        <td style="color:var(--text-dim);">14.24%</td><td>—</td><td>—</td>
+        <td>The honest return measure, and a respectable one for a retailer — thin margins turned many times a year.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Sensitivity of the share price to moves in the broad market. Below 1 means it typically moves less than the index.">Beta</span></td>
+        <td style="color:var(--green);">0.41</td><td>—</td><td>1.00</td>
+        <td>Textbook defensive staple. People buy groceries in recessions, which is why KR has historically been bought as ballast rather than for growth.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td style="color:var(--text-dim);">$54.15 – $76.58</td><td>—</td><td>—</td>
+        <td>The close of $56.95 sits just 5.2% above the 52-week low and 25.6% below the high. The 52-week price change is <strong>−12.78%</strong>.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items.</strong> Three matter. <strong>(1)</strong> The <strong>$2.6B impairment of the automated fulfilment network</strong> taken in Q3 fiscal 2025 (quarter ended November 8, 2025) produced a GAAP net loss of $1.321B, or <strong>−$2.02 per share</strong>, against adjusted EPS of $1.05 — a roughly $3.00-per-share charge. It is the sole reason FY2025 net income fell to $1.009B from $2.645B and the sole reason the trailing P/E reads 33x instead of ~11x. <strong>(2)</strong> <strong>Merger-related litigation and settlement charges of $29M year-to-date</strong> in fiscal 2026 relating to the terminated Albertsons transaction. <strong>(3)</strong> A <span class="tip" title="Last-In-First-Out: an inventory accounting method that charges the most recently purchased (usually most expensive) goods to cost of sales during inflation.">LIFO</span> charge of <strong>$39M</strong> in Q2 FY2026 versus $62M a year earlier — smaller, but it is why Kroger guides on <em>FIFO</em> operating profit and why comparing GAAP gross margins across inflationary periods is treacherous.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">StockAnalysis consensus across 24 analysts. MarketBeat separately shows "Moderate Buy" across 19 analysts (10 buy / 9 hold / 0 sell) — the two panels differ, which is normal.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$70.27</div>
+      <div class="card-note"><span style="color:var(--green);">+23.4% upside</span> from the $56.95 close. MarketBeat's panel averages $71.31.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$57 – $86</div>
+      <div class="card-note">A 51% spread between low and high — unusually wide for a staple, and a direct reflection of disagreement about whether 0.2% comps are transitory.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">11 / 13 / 1</div>
+      <div class="card-note">Strong Buy 11 · Hold 13 · Sell 1 (StockAnalysis forecast panel; totals 25 against a stated 24 analysts). The plurality of the Street is on the sidelines, not bullish.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:11;background:#22c55e;"></div>
+    <div style="flex:13;background:#f59e0b;"></div>
+    <div style="flex:1;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Strong Buy — 11</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 13</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 1</div>
+  </div>
+  <p style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>Citigroup</strong> — Paul Lejuez, Sep 1, 2026. Reiterated <span style="color:var(--amber);">Neutral</span>, price target cut to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$57.00</span> from $61.00. The lowest target on the panel and effectively a call that the shares are already at fair value; the cut landed ten days before the Q2 print.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong>UBS Group</strong> — Michael Lasser, Sep 4, 2026. Reiterated <span style="color:var(--amber);">Neutral</span>; no target disclosed on the page fetched. Lasser is among the most-followed US hardlines and food-retail analysts, and a reiterated Neutral a week before earnings signals low conviction either way.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Deutsche Bank</strong> — Sep 9, 2026. Target set at <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$68.00</span> (analyst name and rating not shown on the page fetched). Roughly 19% above the Sep 10 close — constructive but well below the Street's high.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Goldman Sachs</strong> — Jun 19, 2026. Reiterated <span style="color:var(--green);">Buy</span>, price target <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$82.00</span>. Near the top of the range and the clearest articulation of the bull case: cash generation and buyback plus retail media re-rate the multiple even on flat comps.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong>Telsey Advisory</strong> — Joseph Feldman, Jun 22, 2026. <span style="color:var(--green);">Outperform</span>, target trimmed to <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$78.00</span> from $82.00. Same day, <strong>Morgan Stanley</strong> (Simeon Gutman) cut to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$67.00</span> from $73.00 at Equal Weight — both reacting to the June Q1 report.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 fiscal 2026 results — EPS beat, sales guidance cut</div>
+        <div class="tl-desc">Reported before the open on the trading day <em>after</em> the close used on this page. Total sales $34.6B; identical sales excluding fuel <strong>+0.2%</strong> versus +3.4% a year earlier; adjusted EPS <strong>$1.09</strong> versus $1.04, up 5%; GAAP EPS $1.05 versus $0.91; operating profit $971M versus $863M; adjusted FIFO operating profit $1,076M versus $1,091M. Full-year identical sales guidance cut to <strong>0.2%–0.8%</strong> from 1.0%–2.0%, while adjusted EPS ($5.10–$5.30), adjusted FIFO operating profit ($5.0–$5.2B), free cash flow ($2.7–$2.9B) and capex ($3.8–$4.0B) were all reaffirmed.</div>
+        <div class="tl-impact neutral">Reaction not captured — that session was still open at the data cut-off</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Albertsons v. Kroger — Delaware Court of Chancery</div>
+        <div class="tl-desc">The $25B Kroger–Albertsons merger was blocked by the courts and terminated; Albertsons then sued Kroger for breach of the merger agreement, seeking the <strong>$600M termination fee plus damages</strong>, alleging Kroger did not take adequate steps to resolve antitrust concerns and that the divestiture package offered to C&amp;S Wholesale Grocers was inadequate. As of the reporting fetched, the case is in <strong>active discovery disputes</strong>: on <strong>June 26, 2026</strong> Vice Chancellor Lori Will rejected Albertsons' attempt to compel disclosure of Kroger's communications with its law firms, limiting discovery to documents reflecting actual legal advice; an earlier ruling rejected Albertsons' bid for communications about former CEO Rodney McMullen's departure. Kroger has recorded <strong>$29M of merger-related litigation and settlement charges year-to-date</strong> in fiscal 2026. <em>No trial date, verdict or settlement was stated on any page fetched — treat the outcome as open.</em></div>
+        <div class="tl-impact neutral">Key overhang — binary, unquantified</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Giant Eagle acquisition announced — $1.65B</div>
+        <div class="tl-desc">$1.25B cash plus $400M of assumed liabilities for the Pennsylvania-based grocer founded in 1931, which operates roughly <strong>197 supermarkets and 11 pharmacies</strong> across the Ohio Valley and mid-Atlantic with about <strong>$9B of annual sales</strong>. Expected to close in <strong>2027</strong>, pending regulatory approval and limited Giant Eagle store divestitures. Strategically it is the opposite of the Albertsons deal: small, adjacent to Kroger's existing density, and sized to clear antitrust review.</div>
+        <div class="tl-impact up">Density-accretive if it closes</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q2 FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback: $1.0B repurchased in the quarter, ~$800M remaining</div>
+        <div class="tl-desc">Kroger repurchased <strong>$1.0B of stock in Q2 alone</strong> and <strong>$1.2B year-to-date</strong> under the <strong>$2B authorisation announced in December 2025</strong>, leaving approximately $800M available. At the $56.95 close, $1.0B retires roughly <strong>17.6M shares — about 2.9% of the 613.0M outstanding — in a single quarter</strong>. With net total debt to adjusted EBITDA at 1.91x against a 2.30–2.50x target, there is balance-sheet room to keep going, and the exhaustion of the current authorisation is itself a near-term catalyst for a new one.</div>
+        <div class="tl-impact up">Mechanical EPS support</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2H FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cyclospora recovery and the produce comp</div>
+        <div class="tl-desc">The produce contamination outbreak cost roughly <strong>30 basis points</strong> of Q2 identical sales, and CFO David Kennerley said consumers "will remain cautious about buying produce" — the explicit reason full-year comp guidance came down. Whether fresh traffic normalises in Q3 and Q4 is the most checkable claim on the whole thesis, because it determines whether 0.2% was an event or a trend.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Dec 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 fiscal 2026 results</div>
+        <div class="tl-desc">Date not confirmed on the sources fetched; Kroger reported the equivalent quarter on December 4, 2025. This is the first print that will show whether produce traffic recovered, whether eCommerce stayed profitable "including retail media" for a third consecutive quarter, and whether the reaffirmed $5.10–$5.30 adjusted EPS range still holds with the comp guide cut. It also laps the $2.6B impairment, which will make the year-over-year GAAP comparison look spectacular for reasons that mean nothing.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);letter-spacing:1px;">KR — MONTHLY CLOSES, OCT 2021 → SEP 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3FA0F0;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:14px;max-width:780px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Above 70 the stock has risen relentlessly and is described as "overbought"; below 30 it has fallen relentlessly and is "oversold". It is a momentum gauge, not a valuation signal — an overbought stock can keep rising and an oversold one can keep falling. Computed here on monthly closes, so each point summarises half a year of trading.</p>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Five years of KR is a story in three acts. From the <strong>October 2021 close of $40.02</strong> the stock ran to <strong>$57.37 by March 2022</strong> — a 43% move in five months — as food inflation went vertical and grocers were repriced as the rare businesses that <em>benefit</em> from rising shelf prices. That was act one, and it was not about Kroger. Act two was the merger limbo: from the October 2022 announcement of the Albertsons deal the stock spent more than two years dead money, bottoming at a <strong>$43.14 monthly close in February 2023</strong> and still only $61.15 by December 2024, because no one could underwrite a company whose shape depended on a regulator. Act three began when the deal died: freed of the overhang, KR ran to a <strong>$72.21 close in April 2025</strong> and a cycle-high <strong>$72.36 in March 2026</strong> on the strength of buybacks, retail media and defensive rotation. From that high it has fallen <strong>21.3%</strong> to the September 10, 2026 close of <strong>$56.95</strong>, with the decisive break in June 2026 — a <strong>$68.24 close in February to $55.53 in June</strong>, an 18.6% drawdown in four months as the Q1 report reset expectations and the Giant Eagle deal reopened the capital-allocation question.</p>
+  <p class="prose" style="margin-top:16px;">Total price return over the five years to September 10, 2026 is <strong>+42.3%</strong> ($40.02 → $56.95), before dividends — which, at a yield that has run in the 2–3% area with 20 consecutive annual increases, add meaningfully to the total. Over the trailing twelve months the picture is far worse: the 52-week price change is <strong>−12.78%</strong>, and the close sits just <strong>5.2% above the 52-week low of $54.15</strong> and <strong>25.6% below the high of $76.58</strong>.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Relative performance.</strong> Precise S&amp;P 500 and NASDAQ-100 total-return figures for the matching periods <strong>were not sourced from the pages fetched and are therefore not quoted here</strong> — stating them from memory would be exactly the kind of number that should not appear on a page like this. What can be said from verified data: KR's <span class="tip" title="A measure of how much a stock moves relative to the overall market. 0.41 means it has historically moved less than half as much as the index.">beta</span> of <strong>0.41</strong> means the stock is structurally decoupled from index moves, so index-relative performance tells you less about Kroger than it does about the market's appetite for defensives. Within its own industry the read is cleaner and unflattering: the StockAnalysis Grocery Stores group trades at a <strong>37.7x</strong> average P/E against KR's 33.1x, and Sprouts Farmers Market — one-sixteenth of Kroger's revenue — grew <strong>+7.2%</strong> against Kroger's <strong>+1.14%</strong> and commands a market cap of $6.75B on $9.00B of sales, a price-to-sales ratio roughly three times Kroger's 0.24x. Albertsons, the closest true comparable at $83.23B of revenue, is valued at just $5.81B. The market is paying for grocery growth and refusing to pay for grocery scale.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Mar 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Food-inflation repricing — $57.37 monthly close</div>
+        <div class="tl-desc">Up from $46.80 in February, a 22.6% single-month move, as grocers were bid as inflation beneficiaries and defensive ballast simultaneously. This was the five-year high until 2025 and it had almost nothing to do with volume growth.</div>
+        <div class="tl-impact up">+22.6% in one month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Merger-limbo trough — $43.14 monthly close</div>
+        <div class="tl-desc">The low of the five-year window on a monthly-close basis, 24.8% below the March 2022 peak. With the Albertsons transaction under regulatory attack, the equity was un-modellable: nobody knew the store count, the divestiture package or the capital structure on the far side.</div>
+        <div class="tl-impact down">−24.8% from Mar 2022 peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Merger blocked and terminated; Albertsons sues — $61.15 close</div>
+        <div class="tl-desc">Courts blocked the $25B deal, Albertsons walked and immediately filed in Delaware seeking the $600M break fee plus damages. Counter-intuitively, the stock had already recovered to $61.15 by month-end: removing two years of uncertainty was worth more than the deal itself.</div>
+        <div class="tl-impact up">Overhang removed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Defensive rotation high — $72.21 close</div>
+        <div class="tl-desc">A 67.4% advance from the February 2023 trough in 26 months, driven by buybacks, the retail-media narrative and a market rotating into low-beta staples. Also the first full quarter after CEO Rodney McMullen's March 2025 departure.</div>
+        <div class="tl-impact up">+67.4% off the trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">$2.6B automation impairment digested — $62.48 close</div>
+        <div class="tl-desc">Reported December 4, 2025 for the quarter ended November 8: a $2.6B write-down of the automated fulfilment network, a GAAP loss of $2.02 per share against $1.05 adjusted, alongside identical sales of +2.6% ex-fuel and 17% eCommerce growth. The stock fell from $67.28 in November to $62.48 — a 7.1% monthly decline that was notably smaller than the size of the charge, because the Street treated it as a sunk-cost admission rather than new information about the run-rate.</div>
+        <div class="tl-impact down">−7.1% in the month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle high — $72.36 close</div>
+        <div class="tl-desc">The highest monthly close of the five-year window, marginally above April 2025. Everything that has happened since has been a retracement of this level.</div>
+        <div class="tl-impact up">5-year high on monthly closes</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">The break — $55.53 close</div>
+        <div class="tl-desc">Down 10.7% in a single month from $62.15 in May and 23.3% from the March high. Q1 fiscal 2026 results in mid-June triggered target cuts from Morgan Stanley ($73→$67) and Telsey ($82→$78) on June 22; the $1.65B Giant Eagle acquisition was announced July 1. Within the month the stock gapped from a $61.82 close on June 17 to $56.61 on June 18.</div>
+        <div class="tl-impact down">−10.7% in the month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Basing near the lows — $56.95 close</div>
+        <div class="tl-desc">The September 10 close of $56.95 sits 5.2% off the 52-week low, with the stock having chopped in a $55–$59 band since late June. Citigroup's September 1 target cut to $57 essentially marked the stock to the tape. The Q2 print the following morning is the first new information in three months.</div>
+        <div class="tl-impact neutral">Range-bound into the catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying $148.65B of the most recession-resistant revenue in the economy for $34.91B, at roughly <strong>11x reaffirmed FY2026 adjusted EPS guidance</strong> and an <strong>~8% free cash flow yield</strong>, with a 2.74% dividend raised for 20 consecutive years. The GAAP optics are wrecked by a one-time $2.6B impairment that says nothing about the run-rate. Underneath, the parts that matter are working: FIFO gross margin ex-fuel up 13bps, eCommerce up 20% and profitable including media, retail-media profit up 24%, adjusted EPS up 5%. Management is retiring <strong>~2.9% of the share count per quarter</strong> at these prices with leverage at 1.91x against a 2.30–2.50x target — meaning the buyback can get bigger, not smaller. Flat comps plus aggressive buybacks plus mix shift into high-margin media is a perfectly serviceable mid-single-digit EPS compounder, and it is not priced as one.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Identical sales of <strong>+0.2%</strong> against +3.4% a year ago, with full-year guidance cut to <strong>0.2%–0.8%</strong> from 1.0%–2.0%, is a company losing volume. Management's explanations — cyclospora, egg prices, the IRA — are each real and each conveniently transitory, but the pattern of needing three separate excuses is itself the signal. The OG&amp;A rate rose <strong>33bps</strong> on wage and healthcare investment that will not reverse, and adjusted FIFO operating profit actually <em>fell</em> year over year ($1,076M vs $1,091M) — the EPS growth came from the share count, not the business. On a ~0.7% net margin there is no cushion: a 1% cost shock halves earnings. And the Albertsons suit for the $600M break fee plus damages is an unquantified liability against $2.87B of annual free cash flow, with a management team that just wrote off $2.6B of its last strategic bet and is now spending $1.65B on the next one.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:32px;"><strong>Top 3 risks:</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong>Identical sales do not recover.</strong> If the +0.2% comp reflects share loss to Walmart, Costco and the discounters rather than produce contamination and drug pricing, the entire model breaks — because on a 2% net margin there is no operating leverage to offset volume decline, and the buyback only works while free cash flow holds.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong>The Albertsons litigation lands badly.</strong> Albertsons is seeking the $600M termination fee plus unspecified damages in the Delaware Court of Chancery, with the case still in discovery and no trial date stated on any source fetched. An adverse outcome would consume a meaningful fraction of a year's free cash flow and, worse, would validate the allegation that Kroger did not genuinely pursue antitrust clearance — which has implications for how regulators and counterparties treat the Giant Eagle deal.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong>Capital allocation repeats itself.</strong> The $2.6B automation write-off in Q3 fiscal 2025 was a full impairment of a multi-year strategic investment. The same framework is now deploying $1.65B on Giant Eagle, closing in 2027 with divestitures attached. Integration risk in grocery is not theoretical — it is labour contracts, banner conversions and distribution rerouting, all executed on a 2% margin with no room for error.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div class="card-label" style="color:var(--red);">CRITICAL CONSTRAINT</div>
+      <div class="card-value" style="font-size:18px;">The 2% margin ceiling</div>
+      <div class="card-note">Kroger's trailing net profit margin is <strong>0.73%</strong> and the entire Grocery Stores industry averages <strong>0.56%</strong>. Even in a clean year — FY2024, ended Feb 1, 2025 — Kroger netted $2.645B on $147.12B, or <strong>1.80%</strong>. This is not underperformance; it is the structure of selling perishable goods at high frequency against competitors who will match any price cut. It means every operating decision is a decision about a handful of basis points, and it is why <strong>gross margin rate ex-fuel</strong> and the <strong>OG&amp;A rate</strong> are the two numbers management talks about first. In Q2 FY2026 those went in opposite directions: gross margin +13bps, OG&amp;A +33bps. That 20bp net deterioration on ~$30B of ex-fuel sales is roughly $60M a quarter — real money against $1.076B of adjusted FIFO operating profit.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div class="card-label" style="color:var(--amber);">ONGOING HEADWIND</div>
+      <div class="card-value" style="font-size:18px;">Policy inside the comp</div>
+      <div class="card-note">The Inflation Reduction Act's Medicare drug-price negotiation is costing Kroger <strong>138 basis points of identical sales</strong> — more than seven times the 0.2% comp it actually printed. Accelerating generic conversion adds over <strong>50bps</strong>. Neither reflects a single lost customer; both are price effects on a pharmacy business that remains a traffic driver and, per management, a favourable <em>margin</em> mix. The analytical point generalises: in a business this thin, the reported top line is a poor proxy for the health of the franchise, and the gap between "sales down" and "business worse" has rarely been wider than it is in grocery right now.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div class="card-label" style="color:var(--green);">EMERGING TAILWIND</div>
+      <div class="card-value" style="font-size:18px;">Retail media as the second P&amp;L</div>
+      <div class="card-note">Kroger Precision Marketing profit grew <strong>24%</strong> in a quarter when identical sales grew <strong>0.2%</strong>, and eCommerce reached profitability for a second consecutive quarter <em>when media revenue is included</em>. <strong>Bull framing:</strong> a near-100%-incremental-margin advertising business bolted onto 403,000 employees' worth of physical distribution is a genuine re-rating candidate — it is why the gross margin rate ex-fuel rose in a flat-volume quarter, and it is the only mechanism by which a 2%-margin retailer becomes something else. <strong>Bear framing:</strong> media is currently plugging a hole rather than compounding on top of a healthy core; if the qualifier "including retail media" is doing the work in the eCommerce profitability claim, then the flywheel is a crutch. Both readings are consistent with the same disclosed facts, which is precisely why the Street is split 11 Strong Buy to 13 Hold.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/kr/history/?range=1M&amp;period=Daily</strong> — settled close of $56.95 on Thursday, September 10, 2026 (prior close $56.44, +0.90%), corroborated by the "Previous Close" field on https://stockanalysis.com/stocks/kr/ and by MarketBeat's stated −2.73% daily change implying a $56.94 prior close. The Friday, September 11, 2026 session was still open at the time of writing and was deliberately excluded. Fundamentals, statistics, financials and forecast data from stockanalysis.com/stocks/kr/. Q2 fiscal 2026 operating detail from Kroger's own results release (PR Newswire, September 11, 2026) and stocktitan.net; additional Q2 colour from grocerydive.com. Q3 fiscal 2025 impairment detail from massmarketretailers.com. Analyst calls from marketbeat.com/stocks/NYSE/KR/price-target/. Global market-cap rank #735 from companiesmarketcap.com/kroger/marketcap/. Albertsons litigation status and Giant Eagle deal terms from 247wallst.com (September 3, 2026). Industry averages from stockanalysis.com/stocks/industry/grocery-stores/.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 60 real month-end closes, October 2021 through September 2026, from the unadjusted "Real Price" column at digrin.com/stocks/detail/KR/price. <strong>No interior months were reconstructed or estimated.</strong> The final data point has been replaced with the verified September 10, 2026 settled close of $56.95 (digrin's in-progress September figure of $58.49 reflected the still-open September 11 session and was not used). US and NYSE market-cap ranks could not be verified and are marked as such rather than estimated. Institutional holder detail could not be retrieved (holders page returned 404) and is omitted. S&amp;P 500 and NASDAQ-100 benchmark returns were not sourced from the pages fetched and are not quoted. The ~$4.6B fuel revenue figure is implied arithmetic from disclosed totals, not a disclosed line item. Segment-level market shares and TAM estimates are not disclosed by Kroger and are omitted rather than estimated. Competitor figures for Walmart, Costco, Amazon and Instacart were not fetched and are marked "n/v".</p>
+  <p style="max-width:900px;margin:0 auto;">This material is for informational and educational purposes only and is not investment advice, a recommendation, or an offer to buy or sell any security. Past performance does not predict future results. Figures may contain errors or become stale. Do your own research and consult a licensed financial professional before making any investment decision.</p>
+</div>
+
+</div>
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Source: unadjusted "Real Price" column, digrin.com/stocks/detail/KR/price
+// Final point replaced with the verified settled close of Sep 10, 2026 ($56.95).
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [40.02,41.53,45.26,43.59,46.80,57.37,53.96,52.97,47.33,46.44,47.94,43.75,47.29,49.19,44.58,44.63,43.14,49.37,48.63,45.33,47.00,48.64,46.39,44.75,45.37,44.27,45.71,46.14,49.61,57.13,55.38,52.37,49.93,54.50,53.21,57.30,55.77,61.08,61.15,61.64,64.82,67.69,72.21,68.23,71.73,70.10,67.84,67.41,63.63,67.28,62.48,62.85,68.24,72.36,68.07,62.15,55.53,57.74,57.54,56.95];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 5,  label: 'Mar 2022 — food-inflation repricing $57.37',        color: '#22c55e' },
+  { idx: 16, label: 'Feb 2023 — merger-limbo trough $43.14',             color: '#ef4444' },
+  { idx: 38, label: 'Dec 2024 — merger blocked, Albertsons sues $61.15', color: '#3b82f6' },
+  { idx: 42, label: 'Apr 2025 — defensive-rotation high $72.21',         color: '#22c55e' },
+  { idx: 50, label: 'Dec 2025 — $2.6B automation impairment $62.48',     color: '#ef4444' },
+  { idx: 53, label: 'Mar 2026 — 5-year high $72.36',                     color: '#22c55e' },
+  { idx: 56, label: 'Jun 2026 — Q1 reset, −10.7% $55.53',                color: '#ef4444' },
+  { idx: 59, label: 'Sep 10, 2026 — settled close $56.95',               color: '#3FA0F0' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(63,160,240,0.20)');
+grad.addColorStop(1, 'rgba(63,160,240,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3FA0F0', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3FA0F0'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
