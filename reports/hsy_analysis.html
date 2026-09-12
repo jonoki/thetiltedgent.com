@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HSY — The Hershey Company | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #D08A45;
+  --accent-dim: #D08A4533;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">HSY</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Staples / Confectioners</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $35.0B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: ~#720 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#215 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#120 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Hershey Company</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$174.34</div>
+      <div class="price-change" style="color:var(--green);">+$2.15 (+1.25%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">The Sep 11 session was still in progress when data was pulled and is excluded.</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 19 East Chocolate Avenue, Hershey, Pennsylvania</div>
+    <div class="meta-item"><span>Employees:</span> 19,595</div>
+    <div class="meta-item"><span>Founded:</span> 1894</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 29, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">The Hershey Company makes and sells confectionery and snack products in the United States and internationally, through three reported segments: <strong>North America Confectionery</strong>, <strong>North America Salty Snacks</strong> and <strong>International</strong>. The brand stable runs from Hershey's and Reese's to Kisses, Kit Kat and, on the salty side, SkinnyPop, Dot's Pretzels and the recently acquired LesserEvil. FY2025 net sales were <strong>$11.69B, up 4.4%</strong> on FY2024's $11.20B, and the trailing-twelve-month figure through Q2 2026 is <strong>$12.16B, up 7.7%</strong>. At a $35.0B market capitalisation the company sits roughly <strong>#720 globally</strong> — second in the listed confectioners industry behind Mondelez at $79.6B, and ahead of every other public pure-play by an order of magnitude.</p>
+  <p class="prose" style="margin-top:16px;">The central debate here is not demand. It is <strong>input cost</strong>. Hershey's <span class="tip" title="Revenue minus the direct cost of making the product, divided by revenue — what is left to cover everything else.">gross margin</span> went from <strong>47.4% in FY2024 to 33.55% in FY2025</strong> — a 1,387 basis point collapse that took <span class="tip" title="Earnings per share — net profit divided by shares outstanding.">EPS</span> from $10.92 to $4.34 in a single year on <em>rising</em> revenue. That is a cocoa story, and cocoa is now working the other way: Q2 2026 reported gross margin was <strong>45.32%</strong>, up 1,480bp year over year. The question this page puts to the reader is how much of the recovery is already in the $174 share price, and how much of the remaining upside depends on a commodity nobody at Hershey controls. A second, quieter question sits underneath it: the Hershey Trust casts roughly <strong>79% of the votes</strong>, which permanently removes the takeover bid that normally puts a floor under a beaten-up staples name.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Kirk C. Tanner</div>
+      <div class="card-note">President, Chief Executive Officer and Director. Verified from the StockAnalysis company profile and quoted by name in the Q2 2026 earnings release, where he framed the year as "a strong first half" leaving Hershey "well positioned to navigate dynamic markets." He inherited the cocoa shock rather than created it.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Steve Voskuil</div>
+      <div class="card-note">Senior Vice President and Chief Financial Officer, identified as the speaking CFO on the Q2 2026 earnings call. He is the source of the two most load-bearing statements on this page: "good visibility into cocoa deflation next year" and the caution that the business is not "solely resting on cocoa deflation by itself."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Controlling Shareholder</div>
+      <div class="card-value" style="font-size:20px;">Hershey Trust</div>
+      <div class="card-note">Hershey Trust Company, as trustee for the Milton Hershey School Trust, held <strong>54,612,012 Class B shares</strong> at December 31, 2025 and was entitled to cast <strong>approximately 79% of all votes</strong>. Individual institutional stakes (index funds and the like) were not verified from the sources fetched and are therefore not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Hershey reports three segments. The mix below is the <strong>Q2 2026 quarter</strong> (quarter ended June 28, 2026), taken directly from the earnings release — a full-year FY2025 segment split was not verified from the sources fetched, so the quarter is used rather than an estimate. The shape is unusual for a company of this size: one segment is nearly four-fifths of sales and effectively all of the profit.</p>
+  <div class="seg-bar">
+    <div style="flex:78.0;background:#D08A45;">N.A. CONFECTIONERY 78.0%</div>
+    <div style="flex:13.9;background:#3b82f6;color:#fff;">SALTY 13.9%</div>
+    <div style="flex:8.1;background:#a78bfa;">INTL 8.1%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#D08A45;"></span> North America Confectionery — $2,173.6M (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> North America Salty Snacks — $387.8M (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> International — $225.9M (Q2 2026)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Consolidated Q2 2026 net sales were <strong>$2,787.3M, +6.6% reported</strong> and <strong>+3.6% organic constant-currency</strong>. The composition of that organic growth is the whole story of this company right now: roughly <strong>12 points of net price realisation</strong>, about <strong>−8 points of volume</strong> from <span class="tip" title="How much volume falls when price rises — the consumer's sensitivity to a price increase.">elasticity</span>, and <strong>+2.7 points</strong> from the LesserEvil acquisition.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #D08A45;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Confectionery</div>
+        <span class="biz-badge dominant">CORE ENGINE — MARKET SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,173.6M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+4.2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">78.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Hershey's, Reese's, Kisses, Kit Kat (US licence), Jolly Rancher, Twizzlers and the seasonal franchises. This is where the cocoa shock landed and where the recovery is landing now. Segment income was <strong>$705.8M in Q2 2026, up 40.1%</strong>, with segment margin of <strong>32.5% — an 830 basis point expansion</strong>. The mechanism is blunt: <strong>14 points of net price realisation</strong> against a <strong>10-point volume decline</strong>. Hershey raised prices hard into a cocoa spike and consumers bought less candy but paid enough more that revenue and profit both rose. Management's read on the trade is that "elasticities have been… on track or slightly better" than planned, and that "as commodity inflation eases and pricing elasticities normalize, we expect volume trends to improve over time." That sentence is the bridge from a price-led quarter to a volume-led 2027, and it is unproven.</p>
+    <div class="biz-tam"><strong>Category size:</strong> US/global confectionery TAM not disclosed by the company and not verified from the sources fetched — omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Mondelez International (MDLZ)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$79.64B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$39.68B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+6.9%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Mars Wrigley / Ferrero / Lindt</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Private / Foreign</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Tootsie Roll (TR)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$2.89B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Salty Snacks</div>
+        <span class="biz-badge emerging">DIVERSIFICATION LEG — MARGIN GOING BACKWARDS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$387.8M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+22.9%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">SkinnyPop, Dot's Pretzels, Pirate's Booty and LesserEvil — the deliberate hedge against being a pure chocolate company. The headline growth is flattering and the underlying number is not: of the <strong>+22.9% reported growth, roughly 22 points came from the LesserEvil acquisition</strong>, leaving <strong>+0.6% organic constant currency</strong>. Meanwhile segment income <em>fell</em> <strong>5.9% to $62.6M</strong> and segment margin contracted <strong>500 basis points to 16.1%</strong>. So the segment built to diversify away from cocoa is currently diluting group margin while the cocoa segment expands it — the opposite of the intended design. Salty snacks is a scale-and-shelf-space business where Frito-Lay's route network is the structural advantage, and Hershey does not have one.</p>
+    <div class="biz-tam"><strong>Watch item:</strong> organic growth of +0.6% with a 500bp margin decline is the weakest line in the whole P&amp;L. If it does not inflect, the diversification thesis is expensive optionality rather than a second engine.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">PepsiCo (Frito-Lay)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Utz Brands (UTZ)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$2.05B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$1.45B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">+2.0%</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid var(--purple);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International</div>
+        <span class="biz-badge emerging">SUB-SCALE — LOSS-MAKING IN Q2 2026</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$225.9M</div><div class="biz-stat-label">Q2'26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+5.7%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Confectionery and snacks outside North America — a genuinely small business for a brand this famous, and the clearest evidence that Hershey's moat is geographic rather than universal. Q2 2026 net sales grew <strong>5.7% reported / 2.1% organic constant currency</strong>, helped by roughly <strong>10 points of net price realisation</strong> from "strategic pricing actions across key markets." But the segment swung to a <strong>$5.1M loss</strong>, a <strong>$24.9M deterioration</strong> year over year, for a segment margin of <strong>−2.3%</strong>. Outside its home market Hershey is a challenger brand against Mondelez, Nestlé, Ferrero and Mars, without the shelf dominance or the seasonal ritual that makes the US business so defensible.</p>
+    <div class="biz-tam"><strong>Structural note:</strong> at 8.1% of sales and negative margin, international is not currently a growth offset to North American volume elasticity.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Nestlé / Ferrero / Mars</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Not fetched</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Mondelez International (MDLZ)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$79.64B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$39.68B</div><div class="comp-bubble-label">Rev TTM</div></div>
+          <div><div class="comp-bubble-val">22.89</div><div class="comp-bubble-label">P/E</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">Century-old brand equity</span>
+    <span class="moat-pill">US shelf &amp; checkout dominance</span>
+    <span class="moat-pill">Seasonal ritual franchises</span>
+    <span class="moat-pill">Pricing power (14pts realised)</span>
+    <span class="moat-pill">Trust-controlled: no forced sale</span>
+    <span class="moat-pill">Scale procurement &amp; hedging desk</span>
+    <span class="moat-pill">ROE 32.8% / ROIC 17.7%</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The core advantage is that Hershey's, Reese's and Kisses are not really products, they are defaults. That shows up arithmetically: in Q2 2026 North America Confectionery pushed through <strong>14 points of net price realisation</strong> and lost only <strong>10 points of volume</strong>, expanding segment margin by 830bp in the process. A brand without a moat that raises price 14% in a discretionary snack category does not come out of it with higher profit. Layer on the Halloween/Easter/Christmas franchises — demand that recurs on the calendar rather than on the promotion cycle — and you have a business that can absorb an extraordinary input shock and still be standing. The evidence for the moat is precisely the fact that FY2025 gross margin fell 1,387bp and the company still earned <strong>$883M of net income</strong> on record revenue.</p>
+  <p class="prose" style="margin-top:24px;"><strong style="color:#fff;font-size:16px;">Key Vulnerabilities</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">A.</span><div><strong style="color:#fff;">Single-commodity exposure with no substitute.</strong> Chocolate requires cocoa, cocoa grows in a narrow equatorial band concentrated in West Africa, and there is no reformulation that keeps the product recognisably Hershey's. FY2025 proved the sensitivity: gross margin 47.42% → 33.55%, EPS $10.92 → $4.34, on revenue that <em>grew</em> 4.4%. The entire earnings line is a leveraged bet on one soft commodity.</div></div>
+    <div class="risk-item"><span class="risk-num">B.</span><div><strong style="color:#fff;">Pricing power is a stock, not a flow.</strong> Fourteen points of price in a quarter is a drawdown on brand equity, not an annuity. The −8 point consolidated volume decline is the receipt. If cocoa deflates and competitors pass it through faster, Hershey either gives price back (margin) or holds it and keeps bleeding volume (share). Management's own framing — volumes improve only "as commodity inflation eases and pricing elasticities normalize" — concedes the trade.</div></div>
+    <div class="risk-item"><span class="risk-num">C.</span><div><strong style="color:#fff;">The diversification leg is underperforming.</strong> North America Salty Snacks grew <strong>+0.6% organic</strong> while segment margin fell 500bp to 16.1%, with essentially all reported growth bought via LesserEvil. A hedge that is margin-dilutive and organically flat is not yet functioning as a hedge, and it competes against a route-to-market (Frito-Lay) that Hershey cannot replicate.</div></div>
+    <div class="risk-item"><span class="risk-num">D.</span><div><strong style="color:#fff;">GLP-1 and the "less snacking" secular question.</strong> Confectionery is the archetypal impulse category, and the structural demand debate around appetite-suppressant drugs sits over the whole group. Nothing in the fetched sources quantifies an impact on Hershey specifically, so no number is asserted here — but it is the reason a 3.3% dividend yield in a defensive staple is not being bid away.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>HSY</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="tip" title="Price-to-Earnings — share price divided by the last twelve months of earnings per share.">Trailing P/E</span></td>
+        <td style="color:var(--amber);">23.69</td><td>23.26</td><td>—</td>
+        <td>Essentially in line with the confectioners weighted average. Note the denominator is depressed TTM earnings, not normalised earnings — the multiple flatters nothing here.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Share price divided by analysts' estimate of next year's earnings per share.">Forward P/E</span></td>
+        <td style="color:var(--green);">18.68</td><td>—</td><td>—</td>
+        <td>The gap to trailing is the cocoa recovery. Consensus 2026 EPS of $8.49 implies +34.5% growth; 2027 at $9.87 implies a further +16.2%.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="P/E divided by the expected earnings growth rate — below 1.0 is conventionally considered cheap relative to growth.">PEG Ratio</span></td>
+        <td style="color:var(--green);">0.97</td><td>—</td><td>—</td>
+        <td>Below 1.0, but only because the growth denominator is a rebound off a crushed base. Treat it as a recovery multiple, not a growth multiple.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Earnings per share over the trailing twelve months.">EPS</span> (<span class="tip" title="Trailing twelve months — the most recent four reported quarters.">TTM</span>)</td>
+        <td>$7.32</td><td>—</td><td>—</td>
+        <td>Versus $4.34 for FY2025 and $10.92 for FY2024. The TTM figure is mid-recovery: $174.34 ÷ $7.32 = 23.8×, which ties to the trailing P/E.</td>
+      </tr>
+      <tr>
+        <td>Revenue Growth (<span class="tip" title="Year over year — compared with the same period a year earlier.">YoY</span>)</td>
+        <td style="color:var(--green);">+7.69%</td><td>—</td><td>—</td>
+        <td>TTM. But 12 points of that is price and −8 is volume: this is inflation pass-through, not unit demand growth.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Revenue minus cost of goods sold, as a percentage of revenue.">Gross Margin</span></td>
+        <td style="color:var(--amber);">38.38%</td><td>—</td><td>—</td>
+        <td>The single most important line on this page. TTM 38.38% sits between FY2025's 33.55% trough and FY2024's 47.42%. Q2 2026 alone printed 45.32% reported (41.6% excluding derivative mark-to-market gains, +350bp).</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td>
+        <td style="color:var(--green);">12.24%</td><td>9.61%</td><td>—</td>
+        <td>Above the industry aggregate even at a depressed point in the cycle — a fair proxy for the structural quality of the franchise.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td>
+        <td style="color:var(--green);">3.34%</td><td>2.96%</td><td>—</td>
+        <td>$5.81 per share annualised. Payout ratio is 79.37% on depressed TTM earnings — elevated, but it falls mechanically if the 2026/2027 EPS recovery lands.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Shares sold short as a percentage of shares outstanding — a gauge of bearish positioning.">Short Interest</span> / Float %</td>
+        <td style="color:var(--amber);">4.55%</td><td>—</td><td>—</td>
+        <td>9.14M shares short. Meaningful for a mega-cap staple, and worth reading against a float structurally reduced by the Trust's 54.6M Class B shares.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Total debt divided by shareholders' equity — how much of the business is funded by borrowing.">Debt-to-Equity</span></td>
+        <td style="color:var(--amber);">1.30</td><td>—</td><td>—</td>
+        <td>$5.92B total debt against $791M cash; enterprise value $40.10B. Leverage is real but serviced by $2.23B of free cash flow.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Current assets divided by current liabilities — short-term liquidity cover.">Current Ratio</span></td>
+        <td style="color:var(--red);">1.18</td><td>—</td><td>—</td>
+        <td>Quick ratio just 0.51 — inventory-heavy, which is exactly what you expect from a business that forward-buys cocoa.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Cash from operations minus capital expenditure — the cash actually available to shareholders and lenders.">Free Cash Flow</span></td>
+        <td style="color:var(--green);">$2.23B</td><td>—</td><td>—</td>
+        <td>Comfortably covers the ~$1.17B dividend run-rate implied by $5.81 × 200.9M shares. The dividend is not at risk on these numbers.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on equity — net income divided by shareholders' equity.">ROE</span></td>
+        <td style="color:var(--green);">32.81%</td><td>—</td><td>—</td>
+        <td>Flattered by leverage and buyback-shrunk equity, but high even so — and this is the trough of the earnings cycle.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Return on invested capital — operating profit after tax divided by all the capital in the business, debt and equity.">ROIC</span></td>
+        <td style="color:var(--green);">17.66%</td><td>—</td><td>—</td>
+        <td>Comfortably above any plausible cost of capital. The franchise earns its keep; the commodity determines how much.</td>
+      </tr>
+      <tr>
+        <td><span class="tip" title="Sensitivity of the stock to the overall market — 1.0 moves with the index, below 1.0 moves less.">Beta</span></td>
+        <td style="color:var(--green);">0.10</td><td>—</td><td>1.00</td>
+        <td>Near zero. HSY's risk is idiosyncratic and agricultural, not cyclical — it does not trade on the macro tape, it trades on cocoa and on its own guidance.</td>
+      </tr>
+      <tr>
+        <td>52-Week Range</td>
+        <td>$161.43 – $239.48</td><td>—</td><td>—</td>
+        <td>The current $174.34 sits just 8.0% off the 52-week low and 27.2% below the high set in the February 2026 spike. 52-week change: −6.23%.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:22px;"><strong style="color:#fff;">Notable One-Off Items.</strong> Three distortions matter. <strong>(1) Derivative mark-to-market.</strong> Q2 2026 reported gross margin of 45.32% includes commodity derivative gains; excluding them, non-GAAP gross margin was <strong>41.6%, +350bp</strong> rather than +1,480bp. The reported number overstates the operating recovery by roughly a factor of four, and any trailing-margin comparison that ignores this is wrong. <strong>(2) LesserEvil.</strong> The acquisition contributed ~2.7 points to consolidated organic growth and ~22 points to Salty Snacks growth — strip it out and Salty Snacks grew 0.6%. <strong>(3) Tariffs.</strong> Management stated that "the full brunt of tariffs" from 2025 laps in Q3 2026, meaning part of the coming year's year-over-year earnings improvement is a base effect rather than operating progress. Industry-average and S&amp;P 500 columns are left blank where no sourced figure was available; the two industry figures shown are StockAnalysis confectioners-industry aggregates (5 companies, $117.56B combined market cap), not a curated peer set.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--amber);">Buy / Hold</div>
+      <div class="card-note">StockAnalysis reports "Buy" across 23 analysts; MarketBeat reports "Hold" across the same count. The disagreement is a scoring artefact — with 14 Holds against 8 Buys, the honest label is <em>lukewarm</em>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$205.52</div>
+      <div class="card-note">+17.9% above the $174.34 close. MarketBeat's parallel figure is $204.78. Both imply the Street expects the cocoa recovery to re-rate the multiple, not just the earnings.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:20px;">$170 – $250</div>
+      <div class="card-note">The low end is <em>below</em> the current price (−2.5%) and the high is +43.4%. A 47%-wide dispersion on a consumer staple is itself the signal: this is not being priced as a bond proxy.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:20px;">8 / 14 / 1</div>
+      <div class="card-note">6 Strong Buy + 2 Buy · 14 Hold · 0 Sell + 1 Strong Sell, across 23 analysts (StockAnalysis).</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:34.8;background:var(--green);"></div>
+    <div style="flex:60.9;background:var(--amber);"></div>
+    <div style="flex:4.3;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--green);"></span> Buy / Strong Buy — 8 (34.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--amber);"></span> Hold — 14 (60.9%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:var(--red);"></span> Sell / Strong Sell — 1 (4.3%)</div>
+  </div>
+  <p class="prose" style="margin-top:24px;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:1px;color:var(--text-dim);">KEY RECENT ANALYST CALLS</p>
+  <div class="risk-list">
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">TD Cowen</strong> — Robert Moskow, <span style="color:var(--green);">Buy reiterated</span>, <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">PT not disclosed</span> (September 1, 2026). The most recent action on the tape and the only recent reiteration on the bullish side.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">RBC Capital Markets</strong> — Nik Modi, <span style="color:var(--amber);">Sector Perform</span>, target <em>lowered</em> to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$206</span> (August 21, 2026). A cut that still sits ~18% above spot — the pattern across the Street is lower targets, unchanged direction.</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Barclays</strong> — Andrew Lazar, <span style="color:var(--amber);">Equal Weight</span>, target <em>lowered</em> to <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$200</span> (August 3, 2026). Came days after the Q2 print, i.e. with the 45.3% gross margin already in hand.</div></div>
+    <div class="risk-item"><span style="color:var(--green);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Piper Sandler</strong> — Michael Lavery, <span style="color:var(--green);">Overweight</span>, target <em>lowered</em> to <span style="font-family:'JetBrains Mono',monospace;color:var(--green);">$200</span> (July 9, 2026). Bullish rating, trimmed target — the clearest single expression of "we like the franchise, we are less sure what we will pay for it."</div></div>
+    <div class="risk-item"><span style="color:var(--amber);font-size:18px;line-height:1;">●</span><div><strong style="color:#fff;">Sanford C. Bernstein</strong> — <span style="color:var(--amber);">Market Perform reiterated</span>, <span style="font-family:'JetBrains Mono',monospace;color:var(--amber);">$201</span> (July 31, 2026), the day after the Q2 release.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All five calls above were read directly from the MarketBeat price-target page. Note the shape of them: four of the five most recent actions are <em>target cuts</em>, yet the average target still implies ~18% upside. The Street is marking down its optimism without abandoning it.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — margin inflection confirmed</div>
+        <div class="tl-desc">Net sales $2,787.3M (+6.6% reported, +3.6% organic cc); reported gross margin 45.3% versus 30.5% a year earlier, 41.6% excluding derivative gains. North America Confectionery segment income +40.1% with margin +830bp. Full-year guidance narrowed upward: net sales growth 4.5%–5.0%, adjusted EPS growth 32.5%–35.0% ($8.36–$8.52).</div>
+        <div class="tl-impact up">Reaction already happened — guidance raised</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2025 tariff burden laps</div>
+        <div class="tl-desc">Management stated "the full brunt of tariffs" from 2025 will be lapped in Q3 2026, removing a year-over-year drag. This is a mechanical tailwind to reported growth rather than an operating improvement, and investors should discount it accordingly when the Q3 print lands.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct–Dec 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Halloween and holiday season — the volume test</div>
+        <div class="tl-desc">The first full seasonal cycle at post-increase shelf prices. With Q2 volume down ~10 points in North America Confectionery on 14 points of price, the seasonal sell-through is the cleanest available read on whether elasticity is stabilising or still deteriorating. Retailer merchandising decisions for the season are made well before the quarter reports.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings</div>
+        <div class="tl-desc">The next scheduled datapoint. Two things to watch: the non-GAAP gross margin excluding derivatives (the honest operating number), and whether Salty Snacks organic growth escapes the +0.6% trap. Management has guided to "just below 400 basis points" of second-half gross margin improvement — slightly trimmed from the prior projection.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Cocoa deflation flows into cost of goods</div>
+        <div class="tl-desc">The CFO said the company has "good visibility into cocoa deflation next year" even if futures hold at current levels, and that "our hedging strategies we use will allow flexibility to participate in further deflation as the markets normalize." Because Hershey forward-buys, the P&amp;L lags the spot market — so a 2026 commodity move is a 2027 margin event. Consensus already embeds $9.87 of 2027 EPS.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Milton Hershey School Trust share sales</div>
+        <div class="tl-desc">The Trust sold 30,000 common shares on July 13–14, 2026, trimming its directly-held common position by roughly 2% while leaving the ~54.6M Class B block untouched. These are diversification sales from the trustee, not a control change — but they are disclosed, recurring, and a modest supply overhang on the common.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:6px;">HSY — MONTHLY CLOSES, OCTOBER 2021 → SEPTEMBER 2026 &nbsp;<span style="color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:18px;">Solid line = monthly close (unadjusted). Dashed overlays = 1-month (amber), 3-month (blue) and 10-month (red) moving averages. Dots mark annotated inflection points — hover for detail.</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+  </div>
+  <div class="chart-container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);margin-bottom:6px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY &nbsp;<span style="color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</span></div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:18px;">RSI compares the size of recent gains to the size of recent losses on a 0–100 scale. Above 70 the stock has risen quickly and may be stretched ("overbought"); below 30 it has fallen quickly and may be washed out ("oversold"). It measures momentum, not value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the October 2021 close of <strong>$175.35</strong> to the September 10, 2026 close of <strong>$174.34</strong>, HSY has delivered a price return of <strong>−0.6%</strong> — effectively nothing. Add roughly five years of a dividend now yielding 3.3% and the total return is modestly positive, but the shape matters more than the endpoint. The stock nearly did two full cycles inside that window: a run from $175 to an April 2023 close of <strong>$273.06 (+55.7%)</strong> as investors bid up defensive staples through the inflation scare, then a <strong>45.3% drawdown</strong> to the January 2025 close of <strong>$149.25</strong> as cocoa detonated the margin structure. The subsequent recovery to a February 2026 close of <strong>$236.28</strong> gave back more than half of itself by mid-year. Five years of round-tripping is an unusual outcome for a low-<span class="tip" title="Sensitivity to the overall market.">beta</span> staple, and it is entirely explained by the commodity.</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">Starting point — $175.35</div>
+        <div class="tl-desc">The window opens with HSY trading almost exactly where it closes five years later. Everything in between is the round trip.</div>
+        <div class="tl-impact neutral">Baseline</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle peak — $273.06</div>
+        <div class="tl-desc">The top of the defensive-staples bid. FY2023 would go on to earn $9.06 of EPS on 44.77% gross margin — the last clean year before the cocoa shock. At the peak the stock carried roughly 30× those earnings.</div>
+        <div class="tl-impact up">+55.7% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">The margin cliff begins to price in — $169.35</div>
+        <div class="tl-desc">FY2024 closed with gross margin still at a record 47.42% and EPS at $10.92 — and the stock 38% off its high. The market was discounting the 2025 cost pass-through a full year before it hit the income statement.</div>
+        <div class="tl-impact down">−38.0% from Apr 2023</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle trough — $149.25</div>
+        <div class="tl-desc">The low monthly close of the five-year window, a 45.3% drawdown from the April 2023 peak. FY2025 would confirm the fear: gross margin 33.55%, EPS $4.34, net income $883M.</div>
+        <div class="tl-impact down">−45.3% from peak</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Worst reported quarter — $165.95</div>
+        <div class="tl-desc">Q2 2025 (quarter ended June 29, 2025) printed gross margin of 30.45%, operating income of $200M and net income of $63M — EPS of $0.31 against $2.26 a year later. This is the base off which every "+1,480bp" comparison in 2026 is measured.</div>
+        <div class="tl-impact down">Earnings trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Recovery spike — $236.28</div>
+        <div class="tl-desc">A +21.3% move in a single month off the January close of $194.75, taking the stock to within striking distance of the 52-week high of $239.48. The specific catalyst was not verified from the sources fetched and is deliberately not asserted here; what is verifiable is that the move preceded the Q1 and Q2 2026 margin prints and has since more than half reversed.</div>
+        <div class="tl-impact up">+58.3% from Jan 2025 trough</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Current — $174.34</div>
+        <div class="tl-desc">Down 26.2% from the February close despite two consecutive quarters of sharp margin expansion and raised full-year guidance. The stock is trading 8.0% above its 52-week low with a 52-week change of −6.23%.</div>
+        <div class="tl-impact down">−26.2% from Feb 2026</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Precise index return figures for the S&amp;P 500 and the NASDAQ-100 over this window were not verified from the sources fetched and so are not quoted. What can be stated from sourced data: HSY returned roughly <strong>−0.6% in price over five years</strong> and <strong>−6.23% over the trailing twelve months</strong>, against a period in which US large-cap equity indices posted substantial gains. On any reasonable reading, HSY has underperformed both the S&amp;P 500 (its NYSE benchmark) and the NASDAQ-100 by a wide margin over both horizons. The more useful comparison is within the category: Mondelez trades at a 22.89 trailing P/E on +6.9% TTM revenue growth against HSY's 23.69 on +7.69% — the two large listed confectioners are being valued almost identically, which tells you the market is pricing a shared cocoa cycle rather than a Hershey-specific problem. HSY's <span class="tip" title="Sensitivity to the overall market — 1.0 moves with the index.">beta</span> of <strong>0.10</strong> is the statistical confirmation: this stock has essentially decoupled from the index and trades on its own cost curve.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The worst input-cost shock in the company's modern history has already passed through the P&amp;L, and the stock is 27% below its February high while gross margin expands. FY2025's $4.34 EPS is the trough; consensus sees $8.49 in 2026 and $9.87 in 2027, putting HSY on 18.7× forward earnings with a 3.34% dividend covered 1.9× by $2.23B of free cash flow. The CFO has stated the company has "good visibility into cocoa deflation" into 2027 with hedges structured to "participate in further deflation" — and because Hershey forward-buys, that benefit lands in the income statement with a lag the market has not yet had to see. A franchise earning 17.7% ROIC at the bottom of its cycle, priced at the industry-average multiple on depressed earnings, is the definition of a cyclical recovery in a non-cyclical wrapper.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Strip out the derivative gains and Q2's heroic 45.3% gross margin becomes 41.6% — an improvement, but a fraction of the headline, and still below FY2024's 47.42%. The growth is price, not units: 12 points of pricing against −8 points of volume is a shrinking business charging more, and that trade has a limit. The diversification leg is failing on its own terms — Salty Snacks grew 0.6% organically with margin down 500bp — while International lost money outright. Fourteen of 23 analysts sit on Hold and four of the five most recent actions were target cuts. And the one thing that usually rescues a stalled staple, a takeover, is structurally impossible: the Trust casts ~79% of the votes. You are underwriting a commodity forecast with no strategic put.</p>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:28px;"><strong style="color:#fff;font-size:16px;">Top 3 Risks</strong></p>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Cocoa reverses again.</strong> The entire 2026–27 earnings recovery rests on a soft commodity subject to West African weather, disease and political risk. FY2025 showed the downside sensitivity precisely: a 1,387bp gross margin hit took EPS down 60% in one year on rising revenue. Hedging smooths the path, it does not change the destination — and the same forward-buying that delays the pain also delays the relief.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Elasticity breaks.</strong> Volume is already down roughly 8 points consolidated and 10 points in North America Confectionery. If the consumer response to shelf prices worsens — or if competitors pass cocoa deflation through to price faster than Hershey does — the company faces a genuine choice between defending margin and defending share, and the Halloween/holiday season is where that shows up first.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">No takeover floor, and a permanent governance discount.</strong> Hershey Trust Company held 54,612,012 Class B shares at December 31, 2025 — each carrying 10 votes to the common's 1 — entitling it to cast approximately 79% of all votes. Common holders elect only one-sixth of the Board as a class. No acquirer can buy this company without the Trust's consent, and Pennsylvania's interest in the Milton Hershey School has historically weighed against a sale. Practically, that means the strategic bid that normally arrives for an underperforming $35B staple will not arrive, and minority holders have limited recourse if capital allocation disappoints.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left: 3px solid var(--red);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Cocoa — the input that rewrote the income statement</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+      </div>
+    </div>
+    <p class="biz-desc">No commentary on this page asserts a cocoa price level, because none was verified from the pages fetched. What <em>is</em> verified is the effect, and it is extraordinary for a company of this vintage: consolidated gross margin fell from <strong>47.42% in FY2024 to 33.55% in FY2025</strong>, operating margin from 26.72% to 12.58%, and diluted EPS from <strong>$10.92 to $4.34</strong> — all on net sales that <em>grew</em> 4.4% to $11.69B. The quarterly path makes the shape clearer still: gross margin ran 33.66% (Q1'25), <strong>30.45% (Q2'25)</strong>, 32.61% (Q3'25), 37.04% (Q4'25), 39.39% (Q1'26) and <strong>45.32% (Q2'26)</strong>. That is a V, and the right-hand side of it is steeper than the left. Management's own framing of the supply backdrop is that "inventories are healthier, supply is more diversified, and the industry is much more agile" after the historic surpluses of the 2023–24 cycle.</p>
+    <div class="biz-tam"><strong>The discipline:</strong> reported Q2 2026 gross margin of 45.32% includes derivative mark-to-market gains. Excluding them it is 41.6% (+350bp). Use the second number.</div>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid var(--amber);">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Hedging, forward coverage and the timing of relief</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+      </div>
+    </div>
+    <p class="biz-desc">Hershey forward-buys cocoa, which is why its cost of goods and the spot market are never the same thing at the same time. The company did not publish specific forward-coverage percentages or hedge horizons in the Q2 2026 release, and none are invented here. The statements that <em>were</em> made on the call are these: the CFO said the company has <strong>"good visibility into cocoa deflation next year"</strong> even if futures stay where they are, and separately that there is "good visibility into cocoa deflation for 2027" — while cautioning that the business is not <strong>"solely resting on cocoa deflation by itself."</strong> On structure, management said <strong>"our hedging strategies we use will allow flexibility to participate in further deflation as the markets normalize"</strong> — i.e. the book is not locked so tightly that a falling market passes the company by. Two second-order effects follow. First, the hedging lag means 2026's commodity conditions are largely a 2027 margin event, so the consensus $9.87 of 2027 EPS is the number actually carrying the thesis. Second, mark-to-market on those same derivatives is now a visible, volatile line inside reported gross margin — it added roughly 370bp in Q2 2026 alone. Pricing remains the other lever: ~14 points of net price realisation in North America Confectionery and ~10 points internationally, with second-half gross margin improvement guided to "just below 400 basis points," a modest trim from the prior projection.</p>
+    <div class="biz-tam"><strong>Not verified:</strong> specific hedge ratios, tonnage under contract, or forward coverage percentages — not disclosed in the release and not stated on the pages fetched.</div>
+  </div>
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">The Trust, the votes, and the missing takeover premium</div>
+        <span class="biz-badge emerging">STRUCTURAL — CUTS BOTH WAYS</span>
+      </div>
+    </div>
+    <p class="biz-desc">Hershey's dual-class structure is not a founder's vanity arrangement; it is a charitable trust's endowment. At December 31, 2025, Hershey Trust Company — wholly owned by the Milton Hershey School Trust — held <strong>54,612,012 Class B shares</strong> as trustee and was <strong>"entitled to cast approximately 79% of all of the votes"</strong> on matters requiring both classes to vote together. Class B carries <strong>10 votes per share</strong> against common's 1, converts to common share-for-share at any time, and receives dividends 10% <em>lower</em> than the common. Common holders, voting separately as a class, elect one-sixth of the Board. In July 2026 the Trust sold 30,000 common shares (roughly 2% of its ~1.3M directly-held common position) while leaving the Class B block entirely intact — the pattern of a diversifying endowment, not a retreating control holder.<br><br><strong style="color:var(--green);">Bull reading:</strong> a permanent, mission-driven anchor shareholder insulates management from activist pressure to over-lever, over-promise or cut the brand investment that makes 14 points of pricing possible. It is a real reason this company could absorb a 1,387bp margin shock without panic restructuring, and the dividend has a protector with an institutional need for it. <strong style="color:var(--red);">Bear reading:</strong> takeover optionality is effectively zero. A $35B staple trading at a 27% discount to its own six-month-ago price, with an underperforming snacks arm and a loss-making international segment, would normally attract a strategic or a private-equity bid — and any such approach dies on the Trust's 79%. History reinforces this: Pennsylvania's attorney-general has an established interest in the Milton Hershey School's endowment, which has historically made a sale of the company a public-policy question rather than a purely commercial one. Minority holders here own the economics of a great franchise and almost none of the control, and must therefore be paid in cash flow rather than in the hope of a premium.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price, market cap, 52-week range, sector/industry labels, valuation and profitability metrics, analyst consensus and industry aggregates: <strong>stockanalysis.com/stocks/hsy/</strong> (price source: <strong>https://stockanalysis.com/stocks/hsy/history/?period=Daily</strong>, settled close of Thursday September 10, 2026 — $174.34, corroborated by the quote page's "Previous Close" field; the September 11 session was still in progress and was excluded). Segment results, pricing, gross margin and FY2026 guidance: Hershey Q2 2026 earnings release, SEC EDGAR exhibit 99.1 (filed July 2026). Management quotations on cocoa deflation, hedging flexibility, elasticity, second-half gross margin and tariff lapping: Hershey Q2 2026 earnings call transcript (fool.com, July 30, 2026). Class B share count and ~79% voting entitlement, votes per share, conversion and board-election rights: The Hershey Company SEC filing, capital stock note, as of December 31, 2025. Trust share sale of July 13–14, 2026: fool.com filings coverage. Named analyst calls and targets: marketbeat.com/stocks/NYSE/HSY/price-target/. Peer market caps and revenue (MDLZ, UTZ, TR): stockanalysis.com. Global market-cap rank: companiesmarketcap.com, marked (est.) because the site's figure was stamped August 2026 at a higher share price; US and NYSE ranks are estimates and are marked as such.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 60 monthly closes, October 2021 through August 2026 from digrin.com (unadjusted "Real Price" column), with the final point set to the September 10, 2026 settled close of $174.34 from stockanalysis.com. <strong>No interior months were reconstructed or estimated</strong> — every interior value is a reported month-end close. Industry-average and S&amp;P 500 columns in the metrics table are left as "—" wherever no sourced figure was available; the two industry figures shown (P/E 23.26, net margin 9.61%, dividend yield 2.96%) are StockAnalysis confectioners-industry aggregates across 5 listed companies and are not a curated peer set. Total addressable market figures and segment market shares are <strong>not disclosed by the company and were not sourced</strong>; they are marked "n/d" rather than estimated. No cocoa price level is asserted anywhere on this page because none was verified from the pages fetched. Competitor figures for Mars, Ferrero, Lindt, Nestlé and PepsiCo/Frito-Lay were not fetched and are shown as "n/d".</p>
+  <p style="max-width:900px;margin:0 auto;">This document is for informational and educational purposes only. It is not investment advice, an offer, or a solicitation to buy or sell any security. The author may hold positions in securities mentioned. Figures are drawn from third-party sources believed reliable but not independently audited, and may contain errors or become stale without notice. Past performance does not indicate future results. Do your own research and consult a licensed financial professional before making any investment decision.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Oct 2021–Aug 2026 = unadjusted monthly "Real Price" closes (digrin.com).
+// Final point = settled close of Thu Sep 10, 2026 ($174.34, stockanalysis.com history).
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 10 26'];
+const prices = [175.35,177.49,193.47,197.07,202.26,216.63,225.77,211.71,215.16,227.96,224.67,220.47,238.77,235.17,231.57,224.60,238.32,254.41,273.06,259.70,249.70,231.31,214.86,200.08,187.35,187.92,186.44,193.54,187.92,194.50,193.92,197.83,183.83,197.48,193.06,191.78,177.58,176.13,169.35,149.25,172.71,171.03,167.19,160.69,165.95,186.13,183.75,187.05,169.63,188.08,181.98,194.75,236.28,207.89,185.74,194.03,175.45,175.05,176.21,174.34];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window opens $175.35',                  color: '#94a3b8' },
+  { idx: 18, label: 'Apr 2023 — cycle peak $273.06 (+55.7%)',           color: '#22c55e' },
+  { idx: 38, label: 'Dec 2024 — FY24 GM 47.4%, stock already −38%',     color: '#f59e0b' },
+  { idx: 39, label: 'Jan 2025 — cycle trough $149.25 (−45.3%)',         color: '#ef4444' },
+  { idx: 44, label: 'Jun 2025 — Q2 GM 30.45%, EPS $0.31 (earnings low)',color: '#ef4444' },
+  { idx: 52, label: 'Feb 2026 — recovery spike $236.28 (+21.3% MoM)',   color: '#22c55e' },
+  { idx: 59, label: 'Sep 10 2026 — settled close $174.34',              color: '#D08A45' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(208,138,69,0.22)');
+grad.addColorStop(1, 'rgba(208,138,69,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#D08A45', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#D08A45'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: true, labels: { color: '#94a3b8', boxWidth: 14, font: { family: "'JetBrains Mono', monospace", size: 10 } } },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
