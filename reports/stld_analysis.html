@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STLD — Steel Dynamics, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #4FA3E3;
+  --accent-dim: #4FA3E333;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">STLD</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Materials / Steel</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $33.98B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #735</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#300 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NASDAQ: ~#150 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Steel Dynamics, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$237.08</div>
+      <div class="price-change">−$3.61 (−1.50%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · last completed market close</div>
+      <div class="price-date">After-hours quote not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Fort Wayne, Indiana</div>
+    <div class="meta-item"><span>Employees:</span> 14,400</div>
+    <div class="meta-item"><span>Founded:</span> 1993 (IPO Nov 21, 1996)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 19, 2026 (Q3 2026)</div>
+    <div class="meta-item"><span>Index membership:</span> S&amp;P 500 constituent — <strong style="color:var(--amber);">not</strong> a NASDAQ-100 member</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Steel Dynamics is the third-largest US-listed steel producer by market capitalisation and one of the largest <strong>EAF</strong> (electric arc furnace — a mill that melts recycled scrap with electricity rather than smelting iron ore in a blast furnace) steelmakers in North America. It runs four reporting segments: steel operations, metals recycling, steel fabrication and, since the start-up of its recycled aluminium flat-rolled mill, aluminium operations. FY2025 revenue was <strong>$18.18B, up 3.63%</strong> on FY2024's $17.54B, but FY2025 net income fell <strong>22.9% to $1.19B</strong> — the trough year of the current cycle. Trailing-twelve-month revenue through June 2026 is <strong>$20.54B, up 19.8%</strong>, and <span class="tip" title="Trailing twelve months — the most recent four reported quarters added together">TTM</span> net income is <strong>$1.61B, up 54.4%</strong>. The company ranks roughly <strong>#735 globally by market capitalisation</strong> at $33.98B.</p>
+  <p class="prose" style="margin-top:16px;">The central debate on this page is simple to state and hard to answer: <strong>where in the cycle are we, and what is the right multiple to pay for it?</strong> Steel Dynamics earned <span class="tip" title="Earnings per share — net income divided by diluted shares outstanding">EPS</span> of <strong>$20.92 in FY2022</strong> and <strong>$7.99 in FY2025</strong> — a 61.8% peak-to-trough collapse in three years, on a revenue decline of only 18.3%. That is the arithmetic of a spread business: a mill buys scrap, converts it, and sells steel, and almost all of the operating leverage sits in the gap between the two prices, not in volume. Q2 2026 delivered record shipments and a sharply wider spread, and the stock has responded — up <strong>80.5% over 52 weeks</strong>. The bull case annualises Q2. The bear case notes that the same annualisation in mid-2022 would have implied an EPS run-rate the company then missed for three consecutive years. Sections 04 and 07 take that apart with the actual numbers rather than the narrative.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Mark D. Millett</div>
+      <div class="card-note">Co-founder, Chairman and CEO. One of the three ex-Nucor engineers who started the company in 1993; a metallurgist by training who has run it through the Sinton greenfield mill and the move into aluminium. Verified from the StockAnalysis company profile and quoted directly in the Q2 2026 release.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Theresa Wagler</div>
+      <div class="card-note">Executive Vice President and CFO. Named as CFO on the Q2 2026 earnings call, where she flagged that working capital "increased more than anticipated in the second quarter due to company-wide pricing increases" and guided it to become a source of funds in H2 2026 — the tell that management expects the price ramp to plateau.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">82.4% inst.</div>
+      <div class="card-note">Vanguard ($2.88B), BlackRock (12.40M shares, <strong>8.65%</strong>, $2.84B) and State Street ($1.23B) head the register, followed by Geode ($620M), Capital Research Global Investors ($614M) and Norges Bank ($565M). Index ownership at this level means the marginal buyer is usually a sector or momentum flow, not a fundamental one.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Steel Dynamics reports four segments. Segment <em>revenue</em> was not available on the sources fetched, so the mix bar below uses <strong>Q2 2026 segment operating income</strong> — which is arguably the more honest disaggregation for a spread business anyway, because it shows where the money is actually made rather than where the tonnage flows. The three profitable segments are shown proportionally; aluminium operations posted an operating <em>loss</em> and is shown separately beneath.</p>
+  <div class="seg-bar">
+    <div style="flex:84.4;background:#4FA3E3;">STEEL OPERATIONS 84.4%</div>
+    <div style="flex:10.0;background:#f59e0b;">FABRICATION 10.0%</div>
+    <div style="flex:5.6;background:#22c55e;">RECYCLING 5.6%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#4FA3E3;"></span> Steel Operations — $721M operating income (Q2 2026)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Steel Fabrication — $85M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Metals Recycling — $48M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Aluminium Operations — <strong style="color:var(--red);">−$33M</strong> (excluded from bar)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The four segments sum to <strong>$821M</strong> of operating income against <strong>$700M</strong> consolidated — the roughly $121M gap is corporate cost and intersegment elimination, which matters because the recycling and fabrication segments both sell internally to steel operations. Read segment profit as directional, not additive.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #4FA3E3;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Steel Operations</div>
+        <span class="biz-badge dominant">CORE SPREAD ENGINE — SHARE NOT DISCLOSED BY COMPANY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">3.7Mt</div><div class="biz-stat-label">Q2'26 Shipments (record)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$1,298</div><div class="biz-stat-label">Avg Realised $/ton</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$721M</div><div class="biz-stat-label">Q2'26 Op Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">84.4%</div><div class="biz-stat-label">Op Income Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Flat-rolled (hot rolled, cold rolled, coated), plus long products — specialty bar, structural, rail and engineered bar — serving construction, automotive, energy and manufacturing end markets. This is where the entire investment case lives, and it is a <strong>spread</strong> business: Q2 2026 average realised selling price was <strong>$1,298 per ton, up $105 sequentially</strong>, while average ferrous scrap cost was <strong>$412 per ton, up $16 sequentially</strong>. The implied simple metal spread (realised price less scrap input, <em>before</em> conversion cost) is therefore about <strong>$886/ton, versus roughly $797/ton in Q1 2026 — an $89, or 11.2%, sequential widening</strong>. Applied across 3.7 million tons, that $89 is worth roughly $330M of gross incremental margin in a single quarter; segment operating income in fact rose <strong>30% sequentially</strong>. That asymmetry — price moves in hundreds of dollars a ton, scrap in tens — is why steel equities are high-beta and why a single quarter tells you almost nothing about a mid-cycle run-rate. Conversion cost per ton is not separately disclosed in the release fetched; the residual between the $886 spread and the segment's 15.7% consolidated gross margin is where it sits.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> US-listed steel industry aggregate revenue <strong>$247.72B</strong> across 21 companies, combined market cap <strong>$226.06B</strong> (StockAnalysis industry screen). A global steel TAM figure was not verified from sources fetched and is omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Nucor (NUE)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$57.96B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$36.10B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">ArcelorMittal (MT)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$56.71B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$62.85B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Cleveland-Cliffs (CLF)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$6.75B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$19.20B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Steel Fabrication Operations</div>
+        <span class="biz-badge growth">BACKLOG +45% YoY — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">161,010</div><div class="biz-stat-label">Q2'26 Tons Shipped</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$85M</div><div class="biz-stat-label">Q2'26 Op Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+45%</div><div class="biz-stat-label">Backlog <span class="tip" title="Year-over-year — versus the same period one year earlier">YoY</span></div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.0%</div><div class="biz-stat-label">Op Income Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Steel joists and decking for non-residential construction — warehouses, data centres, manufacturing plants. This is the segment most people under-rate, because in the 2021–22 cycle it was the single largest profit contributor for several quarters: joist pricing lags mill pricing on the way up and holds on the way down, so fabrication margin peaks roughly a year after steel margin. At <strong>$85M on 161,010 tons</strong> it is running at roughly <strong>$528 of operating income per ton</strong> — an order of magnitude above the steel segment's per-ton profit, which is the whole point of owning the downstream. The <strong>45% year-over-year backlog increase</strong> is the most forward-looking number the company disclosed this quarter, and it points at data-centre and reshored-manufacturing construction rather than at conventional commercial real estate.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> non-residential construction joist and deck market size not disclosed by the company and not verified from sources fetched — omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Nucor (Vulcraft/Verco)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$57.96B</div><div class="comp-bubble-label">Mkt Cap (grp)</div></div>
+          <div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Segment Rev</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Reliance, Inc. (RS)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$20.03B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$15.81B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Metals Recycling Operations</div>
+        <span class="biz-badge dominant">VERTICAL SUPPLY — SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$48M</div><div class="biz-stat-label">Q2'26 Op Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">flat</div><div class="biz-stat-label">Sequential</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">n/d</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">5.6%</div><div class="biz-stat-label">Op Income Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Ferrous and non-ferrous scrap processing — shredded and prime ferrous, plus aluminium, copper, brass and stainless. Operating income of <strong>$48M was stable sequentially</strong> while the steel segment's profit rose 30%, which is exactly the behaviour you want: recycling is a hedge and a supply-security asset, not a profit engine. It feeds the EAF melt shops directly and now feeds the aluminium recycling centres too, which is why the segment's strategic value is larger than its 5.6% share of profit suggests. When scrap prices spike, recycling margin expands and steel margin compresses; the two offset.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> North American scrap processing market size not verified from sources fetched — omitted.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Ternium (TX)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$11.31B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$16.00B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Gerdau (GGB)</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">$9.47B</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">$13.42B</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #ef4444;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Aluminium Operations</div>
+        <span class="biz-badge emerging">RAMPING — STILL LOSS-MAKING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">53,000</div><div class="biz-stat-label">Q2'26 Metric Tons</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">+136%</div><div class="biz-stat-label">vs Q1'26 (22,500t)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−$33M</div><div class="biz-stat-label">Q2'26 Op Loss</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">H1 2027</div><div class="biz-stat-label">2nd Cast House Full Util.</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The recycled aluminium flat-rolled mill is the company's largest capital project and the swing factor in 2027 earnings. Shipments <strong>more than doubled sequentially to 53,000 metric tons from 22,500</strong>, and the operating loss narrowed <strong>48% to $33M</strong> — a ramp curve that is tracking, not stalling. Two caveats are worth holding: the quarter included a <strong>$16M non-cash impairment</strong> tied to relocating a recycled-aluminium class centre, and management flagged <strong>$10–20M of incremental capex</strong> from construction cost inflation on that relocation. The second cast house is guided to full utilisation in <strong>H1 2027</strong>, which is when this segment should stop being an earnings drag. Until then every quarter of steel profit is being taxed by an aluminium loss, and the market is being asked to underwrite a ramp it cannot yet see the steady-state margin of.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> North American aluminium flat-rolled (can sheet, automotive, industrial) market size not verified from sources fetched — omitted rather than estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Novelis / Constellium / Kaiser</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Revenue</div></div>
+          <div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">YoY</div></div>
+        </div>
+      </div>
+      <div class="comp-bubble">
+        <div class="comp-bubble-name">Note</div>
+        <div class="comp-bubble-stats">
+          <div><div class="comp-bubble-val" style="font-size:11px;font-family:'DM Sans',sans-serif;font-weight:400;color:var(--text-muted);">Aluminium rolling peers were not fetched this session; their figures are left unverified rather than estimated.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">EAF COST POSITION</span>
+    <span class="moat-pill">VERTICAL SCRAP SUPPLY</span>
+    <span class="moat-pill">DOWNSTREAM FABRICATION</span>
+    <span class="moat-pill">NON-UNION LABOUR MODEL</span>
+    <span class="moat-pill">LOW LEVERAGE (D/E 0.47)</span>
+    <span class="moat-pill">CARBON INTENSITY EDGE</span>
+    <span class="moat-pill">GREENFIELD EXECUTION RECORD</span>
+  </div>
+  <p class="prose" style="margin-top:20px;">The durable advantage is structural cost, and it has three parts that compound. First, the <strong>EAF</strong> route: melting scrap with electricity has a far lower fixed-cost base than integrated blast-furnace steelmaking, which means the marginal ton can be switched off in a downturn without the fixed-cost bleed that has repeatedly crushed integrated producers — the reason a 61.8% <span class="tip" title="Earnings per share — net income divided by diluted shares outstanding">EPS</span> drawdown from 2022 to 2025 still left the company earning <strong>$7.99 a share and a 6.52% net margin</strong> in its worst year, versus an industry aggregate profit margin of 2.95%. Second, <strong>vertical integration into scrap</strong> means the largest input cost is partly internalised, dampening the spread volatility that defines the business. Third, <strong>downstream fabrication</strong> converts commodity tons into differentiated, longer-cycle products at roughly ten times the per-ton operating profit, and its backlog is up 45% year-over-year. Add a balance sheet carrying <span class="tip" title="Debt-to-equity — total borrowings divided by shareholders' equity; a leverage measure">debt-to-equity</span> of just <strong>0.47</strong> with a <span class="tip" title="Current ratio — current assets divided by current liabilities; a short-term liquidity measure">current ratio</span> of <strong>3.18</strong>, and this is a cyclical that can fund a multi-billion-dollar greenfield aluminium mill through the trough of its own cycle. That is the moat. It is a cost-and-balance-sheet moat, not a pricing-power moat — and the distinction matters enormously for what multiple it deserves.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Vulnerability 01</div>
+      <div class="card-value" style="font-size:17px;">Price-taker in a commodity</div>
+      <div class="card-note">Steel Dynamics sets no prices. Hot-rolled coil is a globally arbitraged commodity and realised price moved $105/ton in a single quarter. The company's 14.65% <span class="tip" title="Gross margin — revenue less cost of goods sold, as a percentage of revenue">gross margin</span> is a residual of two markets it does not control, which is why FY2022's 27.48% gross margin was not a capability but a moment.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Vulnerability 02</div>
+      <div class="card-value" style="font-size:17px;">Trade-policy dependence</div>
+      <div class="card-note">Management's own outlook cites "domestic trade actions" as a pillar of its constructive view. Section 232 steel and aluminium tariffs are a policy variable, not a moat: they can be narrowed, exempted or litigated. A material softening would compress domestic premia directly into the metal spread.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Vulnerability 03</div>
+      <div class="card-value" style="font-size:17px;">Aluminium ramp execution</div>
+      <div class="card-note">The aluminium segment is still losing $33M a quarter and has already taken a $16M impairment plus $10–20M of incremental capex on a facility relocation. Full second-cast-house utilisation is guided to H1 2027. Greenfield mills historically slip; Sinton itself took longer than planned to reach run-rate.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Vulnerability 04</div>
+      <div class="card-value" style="font-size:17px;">End-market concentration in construction</div>
+      <div class="card-note">Fabrication's 45% backlog growth is largely a data-centre and reshoring story. Non-residential construction is interest-rate sensitive and lumpy; a pause in hyperscaler capex would hit the highest-margin-per-ton segment first and with a lag long enough to surprise.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead>
+      <tr><th>Metric</th><th>STLD</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings — share price divided by earnings per share over the last twelve months">Trailing P/E</span></td><td style="color:var(--green);">21.52</td><td>30.94</td><td>25.93</td><td>Cheap against both — but a low P/E on peak-ish cyclical earnings is the classic value trap signature. $237.08 ÷ $11.02 TTM EPS = 21.5×.</td></tr>
+      <tr><td><span class="tip" title="Forward price-to-earnings — share price divided by consensus forecast earnings per share">Forward P/E</span></td><td style="color:var(--green);">11.45</td><td>—</td><td>—</td><td>StockAnalysis's figure. It implies roughly $20.71 of forward EPS, above consensus 2026 ($16.85 → 14.1×) and 2027 ($18.95 → 12.5×). Treat 12–14× as the honest range.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth — the P/E divided by the expected earnings growth rate; below 1.0 is conventionally considered cheap">PEG Ratio</span></td><td style="color:var(--green);">0.64</td><td>—</td><td>—</td><td>Below 1.0, but PEG is close to meaningless for a cyclical: the "growth" is a recovery off a trough, not a compounding rate.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months">EPS (TTM)</span></td><td>$11.02</td><td>—</td><td>—</td><td>Against FY2022's $20.92 peak and FY2025's $7.99 trough. The five-year average (2021–25) is $13.79 — mid-cycle P/E on that basis is 17.2×.</td></tr>
+      <tr><td>Revenue Growth (<span class="tip" title="Year-over-year — versus the same period one year earlier">YoY</span>)</td><td style="color:var(--green);">+19.8%</td><td>—</td><td>—</td><td>TTM. Q2 2026 alone was +33.4%. Price-led, not volume-led — shipments set a record but realised price did the heavy lifting.</td></tr>
+      <tr><td><span class="tip" title="Gross margin — revenue less cost of goods sold, divided by revenue">Gross Margin</span></td><td style="color:var(--amber);">14.65%</td><td>—</td><td>—</td><td>Recovering from FY2025's 13.16% but far below FY2022's 27.48%. Q2 2026 alone was 15.74%. This single line is the cycle.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin — net income divided by revenue">Net Profit Margin</span></td><td style="color:var(--green);">7.83%</td><td>2.95%</td><td>—</td><td>Comfortably above the steel industry aggregate of 2.95% — the clearest single evidence that the EAF cost position is real and not just cycle timing.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield — annual dividend per share divided by share price">Dividend Yield</span></td><td style="color:var(--amber);">0.89%</td><td>—</td><td>—</td><td>$2.12 annualised, 19.24% payout. Low yield by design: management returns cash mainly through buybacks ($200M in Q2 2026 alone).</td></tr>
+      <tr><td><span class="tip" title="Short interest — shares sold short, expressed as a percentage of shares outstanding">Short Interest</span> / Float %</td><td style="color:var(--green);">2.72%</td><td>—</td><td>—</td><td>3.90M shares short. Unremarkable — no crowded short to squeeze, and no crowded short warning you off either.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-equity — total borrowings divided by shareholders' equity">Debt-to-Equity</span></td><td style="color:var(--green);">0.47</td><td>—</td><td>—</td><td>$4.39B total debt against $567.71M cash and $2.0B of liquidity. Conservative for a company mid-way through a greenfield aluminium build.</td></tr>
+      <tr><td><span class="tip" title="Current ratio — current assets divided by current liabilities">Current Ratio</span></td><td style="color:var(--green);">3.18</td><td>—</td><td>—</td><td>Very strong. Note this is inflated by working capital that the CFO expects to unwind into cash in H2 2026.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow — operating cash flow less capital expenditure; the cash actually available to shareholders and lenders">Free Cash Flow</span></td><td style="color:var(--amber);">$955.56M</td><td>—</td><td>—</td><td>TTM. Depressed by the aluminium capex programme and by the Q2 working-capital build. Operating cash flow was $428M in Q2 against $124M of capex.</td></tr>
+      <tr><td><span class="tip" title="Return on equity — net income divided by shareholders' equity">ROE</span></td><td style="color:var(--green);">17.57%</td><td>—</td><td>—</td><td>Healthy, and this is off a trough-to-recovering earnings base. In FY2022 it was multiples of this. Judge it as a mid-cycle number, not a ceiling.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital — after-tax operating profit divided by the total debt and equity employed in the business">ROIC</span></td><td style="color:var(--green);">12.44%</td><td>—</td><td>—</td><td>Above any plausible cost of capital, and dragged down by ~$4B of aluminium assets not yet earning. The ex-aluminium ROIC is structurally higher.</td></tr>
+      <tr><td><span class="tip" title="Beta — how volatile the stock is relative to the overall market; 1.0 moves with the market">Beta</span></td><td style="color:var(--red);">1.52</td><td>—</td><td>1.00</td><td>52% more volatile than the market, which understates it — the 52-week range spans a 2.2× move from low to high.</td></tr>
+      <tr><td>52-Week Range</td><td>$129.41 – $288.74</td><td>—</td><td>—</td><td>$237.08 sits 83.2% above the low and 17.9% below the high. 52-week price change: <strong style="color:var(--green);">+80.54%</strong>.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items.</strong> Q2 2026 net income of $534M includes a <strong>$16M non-cash impairment charge</strong> in aluminium operations related to the relocation of a recycled-aluminium class centre — roughly $0.11 per share pre-tax, so the "clean" quarter was marginally better than $3.69. Management also flagged <strong>$10–20M of incremental capital expenditure</strong> on that relocation from construction cost inflation, which is a future cash item rather than a charge already taken. Beyond that, no restructuring, litigation or tax one-offs were disclosed in the Q2 2026 release fetched. The larger distortion in the numbers is not an accounting item at all: it is the <strong>aluminium segment's $33M quarterly operating loss</strong>, which is depressing consolidated margins by roughly 50 basis points while the mill ramps. Any analyst annualising Q2 should decide explicitly whether they are annualising with that drag or without it — the two answers differ by well over $1 of annual EPS.</p>
+  <p class="prose" style="margin-top:14px;">Industry-average and S&amp;P 500 cells left as "—" are ones this session could not source from a live page. They are not estimated. The industry P/E of 30.94 is a <em>weighted</em> average across 21 US-listed steel companies and is distorted upward by loss-making and near-loss-making constituents — a 2.95% aggregate industry profit margin against Steel Dynamics' 7.83% tells you why.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-label">Consensus Rating</div>
+      <div class="card-value" style="color:var(--green);">Buy</div>
+      <div class="card-note">14 analysts (StockAnalysis). MarketBeat shows "Moderate Buy" across 12 ratings — same direction, different panel.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Average Price Target</div>
+      <div class="card-value">$271.21</div>
+      <div class="card-note"><strong style="color:var(--green);">+14.4%</strong> upside from $237.08. MarketBeat's narrower panel averages $258.45 (+9.0%).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Target Range</div>
+      <div class="card-value" style="font-size:19px;">$221 – $310</div>
+      <div class="card-note">Low is 6.8% <em>below</em> the current price; high is 30.8% above. A 40% spread between bull and bear targets is itself the cyclical-uncertainty signal.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rating Breakdown</div>
+      <div class="card-value" style="font-size:19px;">9 / 4 / 1</div>
+      <div class="card-note">7 Strong Buy + 2 Buy · 4 Hold · 0 Sell + 1 Strong Sell (as of August 2026). The lone Strong Sell is unusual for a name with this momentum.</div>
+    </div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:64.3;background:var(--green);"></div>
+    <div style="flex:28.6;background:var(--amber);"></div>
+    <div style="flex:7.1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 9 (64.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 4 (28.6%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (7.1%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;margin-bottom:12px;">KEY RECENT ANALYST CALLS</div>
+  <div class="prose" style="max-width:900px;">
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);">●</span> <strong>J.P. Morgan</strong> — Bennett Moore, <span style="color:var(--amber);">Neutral</span>, PT raised <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$260 → $273</span> (Sept 9, 2026). The most recent call in the file, and notable for its shape: the target went <em>above</em> the average while the rating stayed Neutral — the analyst is marking to the spread, not endorsing the multiple.</div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);">●</span> <strong>Wells Fargo</strong> — Timna Tanners, <span style="color:var(--green);">Overweight</span>, PT cut <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$275 → $255</span> (Aug 24, 2026). Tanners is among the most closely followed steel analysts on the street; an Overweight with a <em>lowered</em> target below the consensus average is a call on valuation discipline within a constructive cycle view.</div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--amber);">●</span> <strong>UBS</strong> — Andrew Jones, <span style="color:var(--amber);">Neutral</span>, PT raised <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$165 → $276</span> (Aug 10, 2026). A 67% target increase in one step. That is not a change of view so much as a capitulation to the tape, and it is worth reading as a marker of how far consensus was behind this move.</div>
+    <div style="padding:10px 0;border-bottom:1px solid var(--border);"><span style="color:var(--green);">●</span> <strong>Goldman Sachs</strong> — initiated <span style="color:var(--green);">Buy</span>, PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$300</span> (July 29, 2026). The street-high target and the most bullish framing on the aluminium optionality.</div>
+    <div style="padding:10px 0;"><span style="color:var(--amber);">●</span> <strong>Morgan Stanley</strong> — Carlos De Alba, <span style="color:var(--amber);">Equal Weight</span>, PT cut <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$270 → $260</span> and <strong>Bank of America</strong> — Lawson Winder, <span style="color:var(--amber);">Neutral</span>, PT cut <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$280 → $260</span> (July 22 and July 9, 2026). Two large-bank Neutrals converging on $260 post-Q2 — the modal view is that the stock is roughly fairly priced for a good cycle.</div>
+  </div>
+  <p class="prose" style="margin-top:20px;font-size:13px;">Calls above were read directly from a fetched MarketBeat price-target page and the StockAnalysis forecast page. Firm names, analyst names, dates and targets are as shown there.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — record shipments, spread expansion</div>
+        <div class="tl-desc">EPS $3.69 on revenue of $6.1B, up 33.4% year-over-year. Record steel shipments of 3.7 million tons, realised price up $105/ton sequentially against a $16/ton rise in scrap. Steel operating income $721M, up 30% sequentially. Aluminium loss narrowed 48% to $33M. $200M of buybacks and $77M of dividends in the quarter.</div>
+        <div class="tl-impact up">Reaction: stock rallied through July and August — Jul 2026 monthly close $251.26</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 9, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">J.P. Morgan raises target to $273, stays Neutral</div>
+        <div class="tl-desc">The latest of a string of target revisions clustered between $255 and $300 since the Q2 print. The clustering itself is informative: the street agrees on the near-term earnings power and disagrees on what multiple to put on it.</div>
+        <div class="tl-impact neutral">Key near-term event — sentiment marker, not a fundamental change</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date — $0.53 quarterly ($2.12 annualised)</div>
+        <div class="tl-desc">A 0.89% yield at a 19.24% payout ratio. Immaterial to total return here; the buyback is the real capital-return channel and ran at $200M in Q2 alone.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 19, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 earnings — the first test of the spread plateau</div>
+        <div class="tl-desc">The single most important date on this page. Management guided to stable pricing through the remainder of 2026 with further increases "likely within six to nine months," and the CFO expects working capital to turn into a source of cash in H2. Watch three numbers: realised price per ton versus Q2's $1,298, the aluminium operating loss versus −$33M, and free cash flow conversion.</div>
+        <div class="tl-impact neutral">Key near-term event — highest-variance catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fabrication backlog conversion</div>
+        <div class="tl-desc">The steel fabrication order backlog is up nearly 45% year-over-year. Because joist and deck pricing lags mill pricing, this segment's margin should peak later than the steel segment's — potentially cushioning consolidated earnings if hot-rolled pricing rolls over first. Historically fabrication has been the last segment to turn down in a cycle.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H1 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Aluminium second cast house reaches full utilisation</div>
+        <div class="tl-desc">Guided by management on the Q2 call. This is the point at which a segment currently subtracting roughly $130M of annualised operating income should stop doing so. The incremental $10–20M of capex and the $16M relocation impairment are the near-term costs of getting there. Slippage would be the most likely source of a 2027 estimate cut.</div>
+        <div class="tl-impact up">Potential upside catalyst — with execution risk attached</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Section 232 trade policy</div>
+        <div class="tl-desc">Management's stated outlook explicitly rests on "domestic trade actions" alongside manufacturing reshoring and infrastructure funding. Any change to the scope, rate or exemption regime of Section 232 steel and aluminium tariffs feeds through to domestic price premia and therefore directly into the metal spread. Specific tariff rates and pending proceedings were not verified from the sources fetched this session and are not asserted here.</div>
+        <div class="tl-impact neutral">Key near-term event — policy variable, direction unverified</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:18px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">STLD Monthly Closes — Oct 2021 to Sep 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#4FA3E3;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);letter-spacing:1px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;max-width:760px;">RSI compares the size of recent monthly gains to recent monthly losses on a 0–100 scale. Above 70 the stock has been rising faster than it usually does and is described as "overbought"; below 30 the reverse, "oversold". It measures momentum, not value — it says nothing about what the company is worth, only how stretched the recent move has been.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the October 2021 close of <strong>$66.08</strong> to <strong>$237.08</strong> on September 10, 2026, Steel Dynamics returned <strong>+258.8% on price alone</strong> — roughly a 3.6× move, before dividends. That number is real and it is also a trap, because the path bears almost no resemblance to a compounding line. The stock traded sideways-to-down for the whole of 2024 and the first three quarters of 2025, spending fifteen months oscillating between roughly $114 and $148 while earnings fell from $9.84 to $7.99 a share. Essentially the entire five-year return was generated in two discrete bursts: the 2022–23 post-pandemic steel-price spike, and the eleven months from October 2025 to the present. Between those bursts, nothing. This is what owning a spread business looks like — long flat stretches punctuated by violent repricings when the spread moves.</p>
+  <p class="prose" style="margin-top:16px;">Momentum is currently elevated but not extreme. The 6-period monthly RSI reads about <strong>63</strong>, having printed <strong>88.7 in May 2026</strong> at the $260.15 monthly high — that May reading was as stretched as the indicator has been in five years, and the subsequent June pullback to $229.46 was the correction. Price sits above the 3-month moving average ($240 is marginally above, so the two are effectively converged) and comfortably above the 10-month at roughly <strong>$216</strong>, which is the trend line that has defined the up-move since late 2025. A monthly close below that 10-month average would be the first technical evidence that the cycle has turned; it has not happened yet.</p>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 2021</div>
+      <div class="tl-content">
+        <div class="tl-title">Start of window — $66.08</div>
+        <div class="tl-desc">Mid-way through the post-pandemic restocking boom. FY2021 would go on to print $15.56 of EPS on a 29.13% gross margin, and the stock was being valued as if that were unsustainable. It was, but not yet.</div>
+        <div class="tl-impact neutral">Baseline</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Window low — $55.52</div>
+        <div class="tl-desc">Hot-rolled coil prices had rolled over from their late-2021 peak and the market marked the whole sector down on normalisation fears. This proved to be the single best entry point in the five-year window.</div>
+        <div class="tl-impact down">−16.0% from Oct 2021</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2022</div>
+      <div class="tl-content">
+        <div class="tl-title">Ukraine supply shock — $85.75</div>
+        <div class="tl-desc">The invasion removed significant European and Black Sea steel supply and domestic prices spiked. The stock rose 54% in three months. FY2022 would deliver record revenue of $22.26B and EPS of $20.92 — the peak of the cycle, in hindsight visible only in hindsight.</div>
+        <div class="tl-impact up">+54.4% from Jan 2022</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Spread normalisation — $91.90</div>
+        <div class="tl-desc">After peaking at $126.11 in February 2023, the stock gave back 27% as steel pricing normalised. FY2023 EPS fell to $14.64 from $20.92 — a 30% decline on a revenue drop of only 15.6%, the operating leverage working in reverse exactly as it had worked forward.</div>
+        <div class="tl-impact down">−27.1% from Feb 2023 high</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">False dawn — $148.23</div>
+        <div class="tl-desc">A rate-cut-optimism rally took the stock to what was then an all-time high. Earnings did not follow: FY2024 EPS came in at $9.84, down a third year-over-year. The stock spent the next nine months giving the move back.</div>
+        <div class="tl-impact up">Local peak, not confirmed by earnings</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2024</div>
+      <div class="tl-content">
+        <div class="tl-title">Cycle trough — $114.07</div>
+        <div class="tl-desc">The low point of the 2024–25 destocking cycle. Gross margin bottomed at 11.14% in Q1 2025 and quarterly EPS at $1.44. Anyone who bought here has roughly doubled their money in twenty-one months without the company doing anything different.</div>
+        <div class="tl-impact down">−23.0% from Mar 2024</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">All-time monthly high — $260.15</div>
+        <div class="tl-desc">Nine consecutive months of gains from September 2025's $139.43. Monthly RSI hit 88.7, the most stretched reading in the five-year window. The intraday 52-week high of $288.74 was set in this vicinity.</div>
+        <div class="tl-impact up">+86.6% from Sep 2025</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Consolidation — $237.08</div>
+        <div class="tl-desc">Four months of chop between roughly $229 and $260 following the May peak, with a strong Q2 print in July failing to produce a new high. The market has priced the good quarter and is now waiting for October 19 to tell it whether the spread holds.</div>
+        <div class="tl-impact neutral">−8.9% from May 2026 high · +258.8% over five years</div>
+      </div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:24px;"><strong>Relative performance.</strong> Over the trailing 52 weeks Steel Dynamics returned <strong>+80.54%</strong>. Steel Dynamics is an <strong>S&amp;P 500 constituent</strong> and is <strong>not</strong> a member of the NASDAQ-100 — verified against a current NASDAQ-100 component list, on which STLD does not appear, despite its NASDAQ listing. The S&amp;P 500 is therefore the correct benchmark, and the NASDAQ-100 comparison the task brief raised as secondary is not applicable as an index-membership matter. Comparable 52-week total-return figures for the S&amp;P 500 and for a steel sector index were not verified from live sources this session and are deliberately not asserted; what can be said from sourced data is that the S&amp;P 500 trades at a <span class="tip" title="Price-to-earnings — share price divided by earnings per share over the last twelve months">P/E</span> of <strong>25.93</strong> (Sept 10, 2026) against Steel Dynamics' 21.52, so the stock has produced a large relative return while <em>de-rating</em> relative to the index — which is the correct and expected behaviour for a cyclical whose earnings are recovering faster than its price. That de-rating is the bull case and the bear case simultaneously.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The metal spread is widening decisively — realised price up $105/ton against $16/ton of scrap inflation — while shipments hit a record 3.7 million tons, and the highest-margin downstream segment carries a backlog up 45% year-over-year. The aluminium mill stops being a roughly $130M annualised drag when the second cast house reaches full utilisation in H1 2027, converting a loss centre into an earnings contributor without further capital. At $237.08 the stock trades on 14.1× consensus 2026 EPS and 12.5× 2027, with a 0.47 debt-to-equity ratio, $2.0B of liquidity and $200M a quarter of buyback. Net margin of 7.83% against a 2.95% industry aggregate says the EAF cost advantage is structural, not cyclical.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>This is a price-taker whose EPS fell 61.8% — from $20.92 to $7.99 — in three years on an 18.3% revenue decline, and the market is being asked to capitalise the best quarter of the recovery. The 21.5× trailing multiple is not cheap on mid-cycle earnings: the 2021–25 average EPS of $13.79 implies 17.2×, and true trough EPS implies close to 30×. Management's own constructive outlook rests explicitly on "domestic trade actions" — a policy variable that can reverse. The aluminium ramp has already produced a $16M impairment and $10–20M of cost inflation, and greenfield mills slip. Buying a cyclical at a low P/E on peak margins is the oldest mistake in the sector.</p>
+    </div>
+  </div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Metal spread compression.</strong> The entire earnings recovery is one variable: the gap between realised steel price and scrap cost, which widened roughly $89/ton sequentially in Q2. Applied to 3.7 million tons, each $50/ton of spread compression is worth roughly $185M of quarterly operating income — around $1.00 of annualised EPS. Steel pricing has historically reversed faster than it rose.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Aluminium ramp slippage.</strong> A segment losing $33M a quarter with a guided H1 2027 inflection, already carrying a $16M impairment and $10–20M of incremental capex. Every quarter of delay is roughly $33M of foregone operating income plus the credibility cost — and analyst 2027 estimates of $18.95 EPS almost certainly assume the ramp lands on schedule.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Trade policy and construction demand together.</strong> The bull case needs Section 232 protection to hold <em>and</em> non-residential construction — particularly data centres and reshored manufacturing — to keep absorbing tons. Those two supports are more correlated than they look: both depend on the same policy and capital-spending environment, so they are likely to weaken together rather than offset each other.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card-grid">
+    <div class="card" style="border-left:3px solid var(--red);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);background:var(--red-dim);padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:10px;">CRITICAL CONSTRAINT</div>
+      <div class="card-value" style="font-size:18px;">The spread is the business</div>
+      <div class="card-note">Q2 2026: realised price $1,298/ton, ferrous scrap $412/ton, implied simple spread roughly $886/ton against roughly $797 in Q1. That $89 sequential widening drove a 30% jump in steel segment operating income on essentially the same tonnage. Run the arithmetic backwards and the same sensitivity destroys earnings: FY2022 gross margin of 27.48% became FY2025's 13.16%, and EPS went from $20.92 to $7.99. No amount of operational excellence changes the fact that two prices the company does not set determine most of its profit.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--amber);background:var(--amber-dim);padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:10px;">ONGOING HEADWIND</div>
+      <div class="card-value" style="font-size:18px;">Policy-dependent pricing</div>
+      <div class="card-note">Management's outlook for "strong domestic steel and aluminium consumption through the remainder of 2026 and into 2027" is attributed to three things: domestic trade actions, manufacturing reshoring and infrastructure funding. Two of those three are government policy. Section 232 tariffs on steel and aluminium underpin the domestic price premium that the metal spread depends on — and the specific rates, exemptions and pending proceedings were not verified from sources fetched this session, so nothing further is asserted here. What can be said is that the company itself names trade policy as load-bearing.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--green);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);background:var(--green-dim);padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:10px;">EMERGING TAILWIND</div>
+      <div class="card-value" style="font-size:18px;">Reshoring and data-centre steel</div>
+      <div class="card-note">Steel fabrication backlog up nearly 45% year-over-year is the cleanest forward indicator in the release. Joists and decking go into warehouses, factories and data-centre shells, and that backlog converts over the following two to four quarters at roughly $528 of operating income per ton — far above the commodity steel segment. This is real, it is visible, and it is the part of the demand picture least dependent on the spot steel price.</div>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue);">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--blue);background:var(--blue-dim);padding:3px 8px;border-radius:4px;display:inline-block;margin-bottom:10px;">BULL VS BEAR — THE FRAME</div>
+      <div class="card-value" style="font-size:18px;">What are you actually paying for?</div>
+      <div class="card-note">At $237.08 you pay 21.5× trailing, 14.1× consensus 2026, 12.5× consensus 2027 — and <strong>17.2× the 2021–25 average EPS of $13.79</strong>. The bull is buying a mid-cycle multiple on a business whose structural cost position is demonstrably better than the industry's, with a free option on aluminium from H1 2027. The bear is buying 17× normalised earnings in a price-taking commodity with a 1.52 beta, four months after a momentum peak, on policy-supported prices. Both are looking at the same numbers. The difference is entirely the denominator each one believes in — and that, not the tape, is the decision this report is asking you to make.</div>
+    </div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);margin-bottom:10px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price, market cap, 52-week range, sector/industry labels, valuation and balance-sheet statistics, annual and quarterly financials, and analyst forecast data from <strong>stockanalysis.com/stocks/stld/</strong> (price source: the $237.08 settled close of Thursday September 10, 2026, cross-checked against the daily history table where the September 11 row was still in progress and the trailing P/E of 21.52 ties to $237.08 ÷ $11.02 TTM EPS). Named analyst calls, institutional ownership and total institutional ownership percentage from <strong>marketbeat.com</strong>. Q2 2026 segment operating income, shipments, realised price per ton, scrap cost per ton, buybacks, cash flow and liquidity from the <strong>Steel Dynamics Q2 2026 earnings release (ir.steeldynamics.com)</strong>; aluminium ramp detail, capex and CFO commentary from a Q2 2026 earnings-call summary. Monthly closes from <strong>digrin.com</strong> unadjusted "Real Price" series; the final point (September 2026) was replaced with the September 10 settled close of $237.08 so the chart terminates at the header price. Global market-cap rank from <strong>companiesmarketcap.com</strong>. S&amp;P 500 P/E from <strong>multpl.com</strong>. NASDAQ-100 membership checked against <strong>slickcharts.com/nasdaq100</strong>, on which STLD does not appear.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">All 60 monthly chart points are real month-end closes — none were reconstructed or interpolated. The implied metal spread of roughly $886/ton (Q2 2026) and $797/ton (Q1 2026) is <strong>calculated</strong> by this report as average realised selling price less average ferrous scrap cost, both of which are company-disclosed; it is a simple spread before conversion cost, which the company does not separately disclose. The Q1 2026 aluminium operating loss of roughly $63M is <strong>derived</strong> from the disclosed 48% sequential improvement. US and NASDAQ market-cap ranks are marked "(est.)" and are approximations. Segment <em>revenue</em> was not available from sources fetched — the revenue-mix bar uses segment operating income and is labelled as such. TAM figures, industry averages beyond the sourced steel-industry aggregates, competitor growth rates and aluminium-peer financials were not verified and are shown as "n/v", "n/d" or omitted rather than estimated. Section 232 tariff rates and proceedings were not verified from sources fetched and are referenced only as the company's own stated outlook attribution.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only and does not constitute investment advice, a recommendation, or an offer to buy or sell any security. The author may hold positions in securities mentioned. Cyclical companies are inherently difficult to value and past earnings are a poor guide to future earnings. Do your own research and consult a licensed financial professional before making any investment decision.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Source: digrin.com unadjusted "Real Price" month-end series; final point replaced
+// with the settled close of Thursday September 10, 2026 ($237.08) per StockAnalysis.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [66.08,59.80,62.07,55.52,70.58,83.43,85.75,85.38,66.15,77.88,80.72,70.95,94.05,103.93,97.70,120.64,126.11,113.06,103.95,91.90,108.93,106.58,106.59,107.22,106.51,119.13,118.10,120.69,133.82,148.23,130.12,133.87,129.50,133.22,119.51,126.08,130.50,145.27,114.07,128.20,135.07,125.08,129.71,123.07,128.01,127.56,130.92,139.43,156.80,167.83,169.45,179.57,193.13,180.00,228.66,260.15,229.46,251.26,232.62,237.08];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Oct 2021 — window start $66.08',                 color: '#94a3b8' },
+  { idx: 3,  label: 'Jan 2022 — window low $55.52',                    color: '#ef4444' },
+  { idx: 6,  label: 'Apr 2022 — Ukraine supply shock $85.75',          color: '#22c55e' },
+  { idx: 19, label: 'May 2023 — spread normalisation $91.90',          color: '#ef4444' },
+  { idx: 29, label: 'Mar 2024 — false dawn $148.23',                   color: '#f59e0b' },
+  { idx: 38, label: 'Dec 2024 — cycle trough $114.07',                 color: '#ef4444' },
+  { idx: 55, label: 'May 2026 — all-time monthly high $260.15',        color: '#22c55e' },
+  { idx: 59, label: 'Sep 10 2026 — settled close $237.08',             color: '#4FA3E3' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(79,163,227,0.22)');
+grad.addColorStop(1, 'rgba(79,163,227,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#4FA3E3', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#4FA3E3'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
