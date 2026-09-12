@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHM — PulteGroup, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #F25C4D;
+  --accent-dim: #F25C4D33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+<div class="container">
+
+<div style="text-align:left;padding:10px 0;font-size:11px;color:var(--amber);font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);">⚠ Static data as of September 10, 2026 — prices, metrics, and analyst targets will not update automatically</div>
+
+<!-- ============ HEADER ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block" style="flex-wrap:wrap;">
+        <span class="ticker-badge">PHM</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Residential Construction</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $21.82B</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #1,080</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">US: ~#340 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">NYSE: ~#190 (est.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">PulteGroup, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$116.41</div>
+      <div class="price-change">−$2.52 (−2.12%)</div>
+      <div class="price-date">Close, Thursday September 10, 2026 · settled close used throughout this report</div>
+      <div class="price-date" style="margin-top:6px;">52-week range: $108.49 – $144.50 · 52-wk change −12.5%</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Atlanta, Georgia</div>
+    <div class="meta-item"><span>Employees:</span> 6,506</div>
+    <div class="meta-item"><span>Founded:</span> 1950</div>
+    <div class="meta-item"><span>Next Earnings:</span> Oct 22, 2026 (before open)</div>
+    <div class="meta-item"><span>Dividend:</span> $0.26/qtr · 0.88% yield</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">PulteGroup is the third-largest homebuilder in the United States by closings, operating a deliberately un-focused brand portfolio — <strong>Centex</strong> for entry-level, <strong>Pulte Homes</strong> for move-up, <strong>Del Webb</strong> for active adults, plus <strong>DiVosta</strong> and <strong>John Wieland</strong> regionally — alongside a captive mortgage, title and insurance arm. FY2025 revenue was <strong>$17.31B, down 3.5%</strong> year over year, and the trailing twelve months through June 30, 2026 have deteriorated further to <strong>$16.41B, down 7.3%</strong>. The company is a component of the S&P 500 and ranks roughly <strong>#1,080 globally</strong> by market capitalisation.</p>
+  <p class="prose" style="margin-top:16px;">The central debate is simple and it is not about PulteGroup's execution. The company is still earning a <span class="tip" title="Return on equity — net income divided by shareholder equity. How much profit the company generates on each dollar of book value.">ROE</span> near 15% and a 25% home sale gross margin in what is unambiguously a bad housing tape. The question is whether that 25% is a durable trough or a way-station on the road down. <strong>Home sale gross margin has fallen from 27.0% in Q2 2025 to 25.0% in Q2 2026, and the mechanism is explicit: incentives ran 10.4% of sales price in Q2 2026 versus 8.7% a year earlier.</strong> That 170-basis-point incentive step-up is roughly the entire margin decline. If the 30-year mortgage rate falls, that spread is handed straight back to the income statement. If it does not, incentives are simply the new cost of selling a house and the stock is a value trap wearing an 11.9× multiple.</p>
+
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:19px;">Ryan R. Marshall</div>
+      <div class="card-note">President &amp; CEO. A PulteGroup lifer, he has run the company since 2016 and is the architect of the "return-focused operating model" — the doctrine that the builder should manage to margin and return on invested capital rather than chase unit volume through the cycle. Verified from stockanalysis.com company profile and the Q2 2026 earnings release.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:19px;">James L. Ossowski</div>
+      <div class="card-note">Executive Vice President &amp; CFO. Long-tenured internal finance executive; owns the capital-allocation framework that has retired roughly 3% of shares outstanding in the first half of 2026 alone while holding net debt-to-capital at 3.3%. Verified from stockanalysis.com company profile.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:19px;">~89.9% institutional</div>
+      <div class="card-note">Index-dominated register: Vanguard Group (~$2.67B), Franklin Resources (~$1.59B), State Street (~$1.07B), FMR/Fidelity (~$783M), Geode (~$609M), plus value specialist Greenhaven Associates at 5.46M shares (2.9%). Holder data from MarketBeat; one listed entry (a state pension fund shown at ~19.8%) looks like a data artefact and is not relied on here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">PulteGroup reports two segments — <strong>Homebuilding</strong> (subdivided by geography into six regions) and <strong>Financial Services</strong>. Homebuilding is ~97.6% of revenue. Because the geographic split is not the analytically interesting one for this company, the cards below use the disaggregation PulteGroup itself emphasises: <strong>buyer group</strong>. Pulte is the only large builder with a genuinely three-legged buyer mix, and that mix is the reason its margin has held up better than volume-first peers. Buyer-group revenue shares below are <em>estimated</em> by applying the company's disclosed FY2025 closings mix and per-group average selling prices; only the mix percentages and average prices are disclosed figures.</p>
+
+  <div class="seg-bar">
+    <div style="flex:28.7;background:#F25C4D;">FIRST-TIME 28.7%</div>
+    <div style="flex:46.3;background:#3b82f6;">MOVE-UP 46.3%</div>
+    <div style="flex:22.6;background:#f59e0b;">ACTIVE ADULT 22.6%</div>
+    <div style="flex:2.4;background:#22c55e;">FS 2.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#F25C4D;"></span> First-Time (Centex) — 38% of closings</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Move-Up (Pulte Homes) — 40% of closings</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Active Adult (Del Webb) — 22% of closings</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Financial Services — 2.4% of revenue</div>
+  </div>
+
+  <div class="biz-card" style="border-left:4px solid #3b82f6;margin-top:28px;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Move-Up — Pulte Homes</div>
+        <span class="biz-badge emerging">40% OF CLOSINGS · HIGHEST ASP</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$7.6B</div><div class="biz-stat-label">Est. FY Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$671K</div><div class="biz-stat-label">Avg Price</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~4.2%</div><div class="biz-stat-label">US New-Home Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">46.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The flagship brand and the largest revenue contributor. Move-up buyers are trading an existing home with embedded equity into a larger one, which makes them the cohort most exposed to the <strong>rate lock-in problem</strong>: a household sitting on a 3% mortgage has to give it up to buy. That is why the move-up channel has been the slowest to thaw this cycle even though the buyer is financially the strongest of the three. Margin profile is the richest in the portfolio — bigger houses carry more optional structural and design-centre content, which historically runs at above-corporate gross margin. Pulte's counter to lock-in is the build-to-order model: 45% of Q2 2026 orders were build-to-order, and management has targeted roughly <strong>60% by 2027</strong>, which trades cycle-time for margin and reduces the spec inventory that has to be discounted into a soft market.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> US new single-family construction put-in-place ≈ $400B+ annually (est.); move-up is the largest slice by dollar value</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennar (LEN)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~19%</div><div class="comp-bubble-label">Top-6 Share (est.)</div></div><div><div class="comp-bubble-val">~$35B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">Negative</div><div class="comp-bubble-label">YoY Growth (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Toll Brothers (TOL)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Luxury</div><div class="comp-bubble-label">Positioning</div></div><div><div class="comp-bubble-val">~$11B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">Flat</div><div class="comp-bubble-label">YoY Growth (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">NVR, Inc. (NVR)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Asset-light</div><div class="comp-bubble-label">Model</div></div><div><div class="comp-bubble-val">~$10B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">Flat</div><div class="comp-bubble-label">YoY Growth (est.)</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left:4px solid #F25C4D;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">First-Time — Centex</div>
+        <span class="biz-badge dominant">38% OF CLOSINGS · MOST RATE-SENSITIVE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$4.7B</div><div class="biz-stat-label">Est. FY Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$438K</div><div class="biz-stat-label">Avg Price</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~4.2%</div><div class="biz-stat-label">US New-Home Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Centex is where the incentive load actually lives. A first-time buyer has no existing-home equity to roll into a down payment, the thinnest income buffer and the highest sensitivity to the monthly payment — which is why the industry's marginal sale in this cohort is bought with a <strong>mortgage rate buydown</strong> (the builder pre-pays points to the lender so the customer's headline rate falls). At an average selling price of $438,000, every 100 basis points on a 30-year mortgage moves the payment by roughly $250–300 a month, a sum that decides whether a household qualifies at all. Notably, PulteGroup's first-time exposure at 38% of closings is <em>lower</em> than the entry-level-heavy builders, and its $438K entry price is materially above theirs — Pulte is selling a nicer starter home to a slightly better-capitalised buyer, which is part of why its gross margin sits 400+ basis points above D.R. Horton's.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Entry-level is the deepest demographic pool but the shallowest affordability pool; ~38% of Pulte closings (disclosed, FY2025)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">D.R. Horton (DHI)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">#1</div><div class="comp-bubble-label">By Closings</div></div><div><div class="comp-bubble-val">~$36B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">20.7%</div><div class="comp-bubble-label">Home Sale GM</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">KB Home (KBH)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Entry</div><div class="comp-bubble-label">Positioning</div></div><div><div class="comp-bubble-val">~$6.5B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">Negative</div><div class="comp-bubble-label">YoY Growth (est.)</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Meritage Homes (MTH)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Entry/Spec</div><div class="comp-bubble-label">Positioning</div></div><div><div class="comp-bubble-val">~$6.3B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">Negative</div><div class="comp-bubble-label">YoY Growth (est.)</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left:4px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Active Adult — Del Webb</div>
+        <span class="biz-badge growth">22% OF CLOSINGS · STRUCTURAL DIFFERENTIATOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">~$3.7B</div><div class="biz-stat-label">Est. FY Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$597K</div><div class="biz-stat-label">Avg Price</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">Category leader</div><div class="biz-stat-label">55+ Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Del Webb is the single most defensible asset PulteGroup owns and the reason its cycle beta is lower than a pure entry-level builder's. Active-adult buyers are disproportionately <strong>cash or high-down-payment purchasers</strong> selling a paid-off or low-balance home in a high-cost market and relocating to a lower-cost one. They are the cohort least dependent on the 30-year mortgage rate, which is exactly what you want owning 22% of your closings when rates are the binding constraint on everyone else. The brand also carries amenity-driven pricing power — golf, clubhouses, pickleball, programming — that competitors cannot replicate without decades of community-scale land assembly. Demographically the 65+ cohort is the fastest-growing age band in the US through the 2030s, so this is a secular tailwind sitting inside a cyclical business. The catch: these are very large, very long-duration master-planned communities, which is precisely why Pulte <em>owns</em> more of its land than peers (see Section 03).</p>
+    <div class="biz-tam"><strong>Industry size:</strong> 55+ active-adult housing — Del Webb is the recognised category brand; no peer discloses a comparable share (TAM not sourced, not estimated)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennar (Everything's Included)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Partial</div><div class="comp-bubble-label">55+ Overlap</div></div><div><div class="comp-bubble-val">~$35B</div><div class="comp-bubble-label">Est. Revenue</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">55+ Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Regional 55+ developers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Fragmented</div><div class="comp-bubble-label">Structure</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left:4px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Financial Services — Pulte Mortgage, Title &amp; Insurance</div>
+        <span class="biz-badge growth">$37M Q2 PRE-TAX INCOME</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$96.9M</div><div class="biz-stat-label">Q2 2026 Rev</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">−14%</div><div class="biz-stat-label">Pre-tax YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~2.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~6%</div><div class="biz-stat-label">Est. Pre-tax Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Small on the revenue line, disproportionately important to the story. Q2 2026 pre-tax income was <strong>$37 million versus $43 million</strong> a year earlier. The captive lender is not really a profit centre — it is the <strong>delivery mechanism for the incentive</strong>. When PulteGroup quotes an incentive load of 10.4% of sales price, a large share of that is a forward commitment or rate buydown funded through the mortgage arm and recognised as a reduction to home sale gross margin, not as a financial-services cost. That accounting is why the homebuilding gross margin line is where the pain shows and why the financial-services segment looks comparatively stable. It also means captive penetration is a lever: the more closings that finance in-house, the more precisely Pulte can price the incentive to the individual buyer instead of broadcasting a list-price cut that reprices the whole community. Captive penetration rates were not disclosed in the sources fetched and are not estimated here.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Builder-captive mortgage origination — not separately sized in sources fetched</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">DHI Mortgage</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Captive</div><div class="comp-bubble-label">Model</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Growth</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennar Financial Services</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Captive</div><div class="comp-bubble-label">Model</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Revenue</div></div><div><div class="comp-bubble-val">n/d</div><div class="comp-bubble-label">Growth</div></div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT & VULNERABILITIES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <div class="moat-list">
+    <span class="moat-pill">DEL WEBB BRAND</span>
+    <span class="moat-pill">3-LEG BUYER MIX</span>
+    <span class="moat-pill">25.0% HOME SALE GM</span>
+    <span class="moat-pill">12.3% DEBT/CAPITAL</span>
+    <span class="moat-pill">228K LOTS CONTROLLED</span>
+    <span class="moat-pill">CAPTIVE MORTGAGE</span>
+    <span class="moat-pill">RETURN-FOCUSED MODEL</span>
+  </div>
+  <p class="prose" style="margin-top:22px;">The core advantage is <strong>margin, not scale</strong>. PulteGroup closes roughly 29,000 homes a year to D.R. Horton's ~90,000, yet earns a home sale gross margin of 25.0% against Horton's 20.7% — a 430-basis-point spread that is worth roughly $1.2B of annual gross profit on Pulte's revenue base. That gap is bought with the buyer mix (an active-adult cash buyer does not need a rate buydown), the brand architecture (three distinct nameplates let Pulte discount Centex without cheapening Del Webb), and a refusal to chase volume. Marshall's "return-focused operating model" is the label; the observable evidence is a <span class="tip" title="Return on invested capital — operating profit after tax divided by the capital employed in the business. The cleanest measure of whether a business earns more than its cost of capital.">ROIC</span> of 14.5% and a net debt-to-capital ratio of 3.3% at a point in the cycle when the industry is discounting hard.</p>
+
+  <p class="prose" style="margin-top:20px;"><strong>A correction to a common framing:</strong> Pulte's optioned land share is frequently cited as a differentiator. The Q2 2026 investor materials put total lots controlled at <strong>228,000, of which 55% are under option and 45% are owned</strong>. That is a <em>lower</em> optioned share than D.R. Horton, which controls 441,900 of 568,500 lots (≈78%) off balance sheet, largely through Forestar. So the honest read is the reverse of the usual story: <strong>PulteGroup carries meaningfully more dirt on its own balance sheet than the largest peer does.</strong> There is a defensible reason — Del Webb master-planned communities are multi-decade, amenity-heavy land assemblies that simply cannot be optioned in the way a 150-lot entry-level subdivision can — but it is a real difference in downside flexibility, and it is the thing to watch if the cycle gets worse rather than better. At roughly 228,000 lots against ~29,000 annual closings, Pulte controls about <strong>7.9 years</strong> of supply, with roughly 3.5 years of it owned outright.</p>
+
+  <h4 style="margin-top:32px;font-size:17px;color:#fff;">Key Vulnerabilities</h4>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">→</span><div><strong style="color:#fff;">The incentive load is the whole margin story, and it is not under management's control.</strong> Incentives ran 10.4% of sales price in Q2 2026 against 8.7% a year earlier. That 170bp step-up almost exactly accounts for the 200bp decline in home sale gross margin (27.0% → 25.0%). Incentives did tick down sequentially from 10.9% in Q1, which is the bull's evidence that this has peaked — but the level is set by the 30-year mortgage rate and the competitive behaviour of builders with worse land positions, not by anything Pulte decides.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong style="color:#fff;">Backlog value is shrinking while units grow.</strong> Backlog is 10,966 homes (up 2%) worth $6.8B (down 1%). Units up, dollars down means the average backlog home is getting cheaper — mix, price, or incentive, and probably all three. At ~29,000 annual closings, 10,966 units is under five months of production. Thin backlogs give a builder very little visibility and very little pricing leverage into the next two quarters.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong style="color:#fff;">Land ownership cuts both ways.</strong> With 45% of 228,000 lots owned, PulteGroup has roughly 3.5 years of supply capitalised on the balance sheet and is guiding to <strong>$5.4B of land spend in 2026</strong>. In an improving market that is operating leverage. In 2007–2009, land on the balance sheet is what killed builders. Net debt-to-capital of 3.3% means the company can absorb a great deal before this becomes existential — but it is the structural difference between Pulte and the option-heavy model, and it should be priced as such.</div></div>
+    <div class="risk-item"><span class="risk-num">→</span><div><strong style="color:#fff;">SG&amp;A deleverage is compounding the revenue decline.</strong> SG&amp;A rose to 10.1% of home sale revenues in Q2 2026 from 9.1% a year earlier. Community count is up 8% year over year to 1,074 while closings fell 8% — the company is carrying the fixed cost of more sales offices across fewer sales. Full-year guidance of 9.5%–9.7% implies management expects this to improve in the back half, but it is a bet on volume, not on cost action.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 KEY FINANCIAL METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <table class="fin-table">
+    <thead><tr><th>Metric</th><th>PHM</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for a dollar of profit.">Trailing P/E</span></td><td style="color:var(--green);">11.9</td><td>—</td><td>—</td><td>$116.41 ÷ $9.80 TTM EPS. Homebuilders structurally trade at low single-digit-to-low-teens multiples because earnings are cyclical; a low P/E here is not automatically cheap.</td></tr>
+      <tr><td><span class="tip" title="Forward price-to-earnings: share price divided by the consensus estimate of next year's earnings per share.">Forward P/E</span></td><td style="color:var(--green);">~10.8</td><td>—</td><td>—</td><td>On the ~$10.80 forward EPS implied by stockanalysis.com's 10.91× at $117.85, restated to the Sep 10 close. Consensus 2026 EPS is $10.19, falling 10.9%, then recovering to $11.25 in 2027.</td></tr>
+      <tr><td><span class="tip" title="Price/earnings-to-growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td style="color:var(--amber);">1.37</td><td>—</td><td>—</td><td>Above 1.0 despite the low P/E, because the growth input is negative-to-flat. PEG is a poor tool for a cyclical — it flatters at the top and penalises at the bottom.</td></tr>
+      <tr><td><span class="tip" title="Earnings per share over the trailing twelve months, on a diluted basis.">EPS (TTM)</span></td><td>$9.80</td><td>—</td><td>—</td><td>Down from $11.12 in FY2025 and $14.69 in FY2024. Peak-to-trough EPS decline of 33% so far.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year: the change versus the same period one year earlier.">Revenue Growth (YoY)</span></td><td style="color:var(--red);">−7.3%</td><td>—</td><td>—</td><td>TTM through Jun 30, 2026. Q2 2026 alone was −9.6%; Q1 was −12.4%. Closings down 8% and ASP down 3% compound.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of building the homes, as a percentage of revenue. For a builder this is the single most-watched line.">Gross Margin</span></td><td style="color:var(--amber);">25.6%</td><td>—</td><td>—</td><td>Consolidated. <strong>Home sale gross margin specifically was 25.0% in Q2 2026</strong> vs 27.0% a year earlier; guided to 24.5%–25.0% for Q3 and the full year. Peer D.R. Horton: 20.7%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: bottom-line profit as a percentage of revenue, after all costs, interest and tax.">Net Profit Margin</span></td><td style="color:var(--green);">11.6%</td><td>—</td><td>—</td><td>Still double-digit in a bad tape. FY2024 was 17.2%; the compression is entirely gross margin and SG&amp;A deleverage, not a tax or interest event.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td style="color:var(--amber);">0.88%</td><td>—</td><td>—</td><td>$0.26/quarter, $1.04 annualised, raised 18% year over year. Payout ratio of just 10.6% — the dividend is an afterthought here; the buyback is the capital return.</td></tr>
+      <tr><td><span class="tip" title="Short interest: the number of shares sold short, expressed as a percentage of shares outstanding. High readings signal bearish positioning.">Short Interest / Float %</span></td><td style="color:var(--amber);">4.52%</td><td>—</td><td>—</td><td>8.47M shares short. Elevated but not a crowded short; roughly four days of average volume.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-equity: total debt divided by shareholders' equity. A measure of balance-sheet leverage.">Debt-to-Equity</span></td><td style="color:var(--green);">0.19</td><td>—</td><td>—</td><td>Debt-to-capital 12.3%, <strong>net</strong> debt-to-capital 3.3% with $1.34B cash. This is one of the least-levered balance sheets in the S&amp;P 500 industrials/consumer complex.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td style="color:var(--green);">7.27</td><td>—</td><td>—</td><td>Inflated by design — homes and land under development sit in current inventory. The quick ratio of 0.61 is the more honest liquidity read, and it is fine given the cash position.</td></tr>
+      <tr><td><span class="tip" title="Free cash flow: cash from operations minus capital expenditure. The cash actually available to shareholders and creditors.">Free Cash Flow</span></td><td>$1.51B</td><td>—</td><td>—</td><td>TTM. Management guides to ~$1.0B of operating cash flow for FY2026 while spending $5.4B on land — a builder generates cash by shrinking and burns it by growing.</td></tr>
+      <tr><td><span class="tip" title="Return on equity: net income divided by shareholders' equity.">ROE</span></td><td style="color:var(--green);">14.9%</td><td>—</td><td>—</td><td>Down from the low-20s at the cycle peak but still comfortably above cost of equity. Buybacks are shrinking the denominator, which flatters this.</td></tr>
+      <tr><td><span class="tip" title="Return on invested capital: after-tax operating profit divided by total capital employed (debt plus equity).">ROIC</span></td><td style="color:var(--green);">14.5%</td><td>—</td><td>—</td><td>Nearly equal to ROE because there is almost no leverage. This is the number Marshall's operating model is built to protect, and it is holding.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means more volatile than the index.">Beta</span></td><td style="color:var(--amber);">1.20</td><td>—</td><td>1.00</td><td>Understates the real exposure. PHM does not trade on the market — it trades on the 10-year Treasury and the 30-year mortgage rate.</td></tr>
+      <tr><td>52-Week Range</td><td>$108.49 – $144.50</td><td>—</td><td>—</td><td>Current $116.41 sits 7.3% above the 52-week low and 19.4% below the high. The stock has given back the entire spring rally.</td></tr>
+    </tbody>
+  </table>
+  <p class="prose" style="margin-top:24px;"><strong>Notable one-off items:</strong> Nothing in the TTM numbers is materially distorted by a non-recurring charge — no large impairment, litigation settlement or restructuring appears in the sources fetched. Industry-average and S&amp;P 500 columns are left blank rather than estimated; no fetched page provided verified peer-set or index averages for these ratios. The one comparison that <em>is</em> sourced is the direct D.R. Horton read-across on home sale gross margin (25.0% vs 20.7%) and land control (55% optioned vs 78%). The genuinely important "one-off" is a judgement call rather than an accounting one: <strong>the 10.4% incentive load is either a temporary cyclical cost or the permanent new cost of selling a house.</strong> Management treats it as cyclical. The market, at 11.9× trailing earnings, is not fully convinced.</p>
+</div>
+
+<!-- ============ 05 ANALYST CONSENSUS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">15–16 covering analysts (S&amp;P Global via stockanalysis.com; MarketBeat labels it "Moderate Buy").</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$141.86</div><div class="card-note"><span style="color:var(--green);">+21.9% upside</span> from the $116.41 Sep 10 close. Median target $145.50.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$100 – $166</div><div class="card-note">A 66% spread between low and high — the Street does not agree on whether this is a trough or a top.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">9 / 5 / 1</div><div class="card-note">7 Strong Buy + 2 Buy · 5 Hold · 0 Sell + 1 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:9;background:var(--green);"></div>
+    <div style="flex:5;background:var(--amber);"></div>
+    <div style="flex:1;background:var(--red);"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 9</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 5</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1</div>
+  </div>
+
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:32px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS Group — John Lovallo</strong> · Buy reiterated · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">PT $166</span> · July 23, 2026. The Street high, set the day after Q2 results. The bull case in its purest form: orders up 6%, gross margin inflecting sequentially, and a balance sheet that lets the company buy back 3% of itself in six months while the multiple sits near 11×.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">RBC Capital Markets — Mike Dahl</strong> · Sector Perform · <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">PT $115 → $116</span> · July 23, 2026. Same day, same print, opposite conclusion — and a target essentially at the current price. Dahl is the most consistently sceptical housing analyst on the Street; a $116 target on a $116 stock says "fairly valued for a business whose margin is still falling."</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wolfe Research — Trevor Allinson</strong> · Peer Perform → Outperform · <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">PT $129</span> · August 24, 2026. An upgrade on relative value rather than a housing call — note the target is well below consensus, which is an unusual combination and reads as "least-bad builder" rather than "buy the group."</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Benchmark Company</strong> · Upgrade to Strong Buy · <span style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;">PT not disclosed on the page fetched</span> · September 3, 2026. The most recent rating action in the sources fetched, coming as the stock broke below $125. Citigroup's Anthony Pettinari also reiterated a Market Outperform on August 18, 2026, without a published target on that page.</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All calls above were read from a fetched MarketBeat price-target page. Ratings actions without a published price target are shown as such rather than filled in.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (before open, 8:30am ET call)</div>
+        <div class="tl-desc">The single most important print of the year for this thesis. Three numbers matter: the incentive load (10.4% in Q2, 10.9% in Q1 — a third consecutive decline would establish a trend), home sale gross margin against the 24.5%–25.0% guide, and net new orders, which grew 6% in Q2 and need to keep growing to validate the 8% community-count expansion. ASP is guided to $550,000–$560,000, up from $544,000.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep–Dec 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Federal Reserve policy path and the 30-year mortgage rate</div>
+        <div class="tl-desc">Nothing PulteGroup does matters as much as this. The entire 170-basis-point incentive step-up that took gross margin from 27.0% to 25.0% exists because the mortgage rate is where it is. A sustained move lower converts incentive spend directly back into gross margin with no operational change required; a move higher deepens the buydown and the margin guide goes with it.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback execution — $1.8B remaining authorisation</div>
+        <div class="tl-desc">PulteGroup repurchased 3.1M shares for $373M in Q2 at an average of $119.42, and 5.5M shares for $681M year to date — roughly 3% of shares outstanding in six months. With $1.8B still authorised against a $21.8B market cap, the company can retire another ~8% at current prices. Buyback yield already runs at 5.0%, which is where the real shareholder return lives given the 0.88% dividend.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Florida Panhandle division launched — 1,326 homesites contracted</div>
+        <div class="tl-desc">A new operating division in Bay County, Florida. Small in isolation, but it is evidence that management is still investing into weakness rather than retrenching — consistent with the $5.4B full-year land spend guide and with community count growth of 3%–5% guided for the back half. Whether that is conviction or over-extension depends entirely on where rates go.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — the margin stabilised, the revenue did not</div>
+        <div class="tl-desc">Net income $472M ($2.48 diluted EPS) on home sale revenues of $3.8B, down 11%. Closings fell 8% to 6,997 at a $544,000 ASP (−3%). The offsets: net new orders <em>rose</em> 6% to 7,536 homes worth $4.1B, gross margin improved 60 basis points sequentially to 25.0%, and the cancellation rate held at 11%. The stock was near $127 at the end of July and has since traded down to $116.41 — the market has not paid for the sequential improvement.</div>
+        <div class="tl-impact down">Reaction already happened — stock −8% since</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027 target</div>
+      <div class="tl-content">
+        <div class="tl-title">Build-to-order mix shift toward ~60%</div>
+        <div class="tl-desc">Build-to-order was 45% of Q2 2026 orders; management targets roughly 60% by 2027, with spec inventory held at 1.3 homes per community. Build-to-order carries higher gross margin and far less discount risk because there is no finished unsold house forcing a price cut — but it lengthens cycle time and gives up the ability to capture a rate-driven demand spike. It is a structurally margin-accretive, volume-dilutive choice, and it is the clearest expression of the return-focused model.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 5-YEAR PRICE ANALYSIS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:0.5px;">PHM — 60 MONTHLY CLOSES, OCT 2021 → SEP 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:18px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#F25C4D;"></span> Monthly close</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);">⚠ STATIC DATA AS OF SEPTEMBER 10, 2026</div>
+    </div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+    <p style="font-size:12px;color:var(--text-dim);margin-top:14px;line-height:1.7;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Above 70, the stock has been bought hard enough that buyers may be exhausted ("overbought"); below 30, sold hard enough that sellers may be ("oversold"). It describes momentum, not value — a cheap stock can stay oversold for a year. This is a 6-month RSI on monthly closes, so it reads the medium-term swing rather than day-to-day noise. PHM's current reading of <strong style="color:var(--purple);">42.4</strong> is squarely neutral-to-soft: the stock is not washed out, which is itself informative for anyone waiting to buy capitulation.</p>
+  </div>
+
+  <p class="prose" style="margin-top:32px;">Over the five years from the October 2021 close of $48.08 to the September 10, 2026 close of $116.41, PHM returned <strong>+142.1%</strong> on price alone, before the ~1% dividend and before the compounding effect of a buyback that has retired a meaningful share count. That is a very good five years — and it is almost entirely a 2022–2024 story. The stock peaked at a monthly close of <strong>$143.53 in September 2024</strong> and has not made a new high in two years; it is 18.9% below that peak today. A 142% five-year return that stopped dead twenty-four months ago is the signature of a cyclical that has already discounted its recovery.</p>
+
+  <p class="prose" style="margin-top:16px;">The shape is worth reading carefully. The 2022 collapse to <strong>$37.50 in September 2022</strong> — a 34% drawdown from the December 2021 close — was the market pricing a rate shock. The recovery from there to $143.53 was a 283% move in exactly two years, driven by the realisation that builders could buy the rate down and keep selling houses. Since then the stock has traced three lower highs: $143.53 (Sep 2024), $137.20 (Feb 2026) and $137.21 (Jun 2026). Each rally has failed at roughly the same level and each has been sold as incentives climbed again. The 10-month moving average sits near $124 and price is below it, as it has been for most of the last four months.</p>
+
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Cycle euphoria high — $57.16</div><div class="tl-desc">Peak free-money housing. Mortgage rates near 3%, PulteGroup's FY2022 gross margin heading for 30.2%, and no incentive load worth discussing.</div><div class="tl-impact up">Cycle top</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock trough — $37.50 (−34.4% from Dec 2021)</div><div class="tl-desc">The fastest tightening cycle in forty years repriced every housing asset. The stock bottomed on the assumption the industry would break. It did not — and this is the low that anchors every bull case since.</div><div class="tl-impact down">−34.4%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2023</div><div class="tl-content"><div class="tl-title">Fed pivot melt-up — $103.22 (+175% from the trough)</div><div class="tl-desc">The December 2023 pivot signal set off the sharpest builder rally of the cycle. PHM gained 17.2% in that single month. Rate-cut expectations, not fundamentals, did the work.</div><div class="tl-impact up">+175% off the low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">Five-year high — $143.53, the month of the first cut</div><div class="tl-desc">The stock topped in the same month the Fed delivered its first cut. Classic "buy the rumour, sell the fact": the cut arrived, long rates did not follow, and the mortgage rate barely moved. Every high since has been lower.</div><div class="tl-impact up">Cycle high</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">Affordability trough — $98.03 (−31.7% from the high)</div><div class="tl-desc">The market priced the incentive problem properly for the first time. Home sale gross margin was still 27%+ at this point; the stock was already discounting that it would not stay there.</div><div class="tl-impact down">−31.7%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb &amp; Jun 2026</div><div class="tl-content"><div class="tl-title">The double rejection — $137.20 and $137.21</div><div class="tl-desc">Two rallies to within a cent of each other, eleven percent below the 2024 high, both sold. When a stock fails twice at the identical level, the level is where supply lives.</div><div class="tl-impact neutral">Failed breakout ×2</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 10, 2026</div><div class="tl-content"><div class="tl-title">$116.41 — the entire summer rally given back</div><div class="tl-desc">Down 15.2% from the June close and 7.4% in the first eight sessions of September, including a −3.5% day on Sep 8 and a −2.1% day on Sep 10. The stock sits 7.3% above its 52-week low of $108.49 with an RSI of 42 — sliding, but not capitulating.</div><div class="tl-impact down">−2.12% on the day</div></div></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>Relative performance.</strong> Over the trailing twelve months PHM is <strong>−12.5%</strong>. The more useful comparison is the direct one within the sector: over the identical five-year window, D.R. Horton went from $89.27 (Oct 2021) to $135.57 (Sep 10, 2026), a <strong>+51.9%</strong> price return against PHM's <strong>+142.1%</strong>. PulteGroup has beaten the largest builder in the country by roughly 90 percentage points over five years, and the reason is visible in one line of the income statement: a home sale gross margin of 25.0% versus 20.7%. The margin gap <em>is</em> the relative performance. Against the S&amp;P 500, the index level series was not fetched for this report, so no precise relative figure is stated here rather than estimated — directionally, PHM's five-year return is well ahead of the index while its trailing-twelve-month return is well behind it, which is exactly what a cyclical looks like two years past its peak. Sector index (S&amp;P Homebuilders / ITB) returns were likewise not sourced and are not approximated.</p>
+</div>
+
+<!-- ============ 08 SUMMARY & RISKS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying the best-margin large homebuilder in America at 11.9× trailing and ~10.8× forward earnings, with a net debt-to-capital ratio of 3.3% and $1.8B of buyback authorisation against a $21.8B market cap. The margin decline has a single, identifiable, reversible cause — a 170-basis-point incentive step-up — and incentives already fell sequentially from 10.9% to 10.4% in Q2. Orders are growing 6%, community count 8%, and Del Webb gives 22% of closings to a buyer who does not need a mortgage rate to cooperate. If the 30-year rate falls even 75 basis points, incentives compress, gross margin steps back toward 27%, and the earnings base moves from ~$10 to something with a 13 in front of it. The Street's $141.86 average target implies 21.9% upside and the high is $166.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Revenue is down 7.3% and falling faster each quarter (−12.4% in Q1, −9.6% in Q2). EPS has already fallen 33% from the FY2024 peak of $14.69 and consensus has it down another 10.9% in 2026. The company is responding to a demand problem by building <em>more</em> communities — count up 8% while closings fell 8% — which is why SG&amp;A deleveraged 100 basis points. Backlog dollars are shrinking even as units grow. And 45% of 228,000 lots sit on the balance sheet against a $5.4B land spend guide, meaning the company is capitalising more dirt into a market where it is discounting 10.4% to move product. A low P/E on a cyclical two years past its peak, with earnings still falling, is the textbook value trap — RBC's $116 target on a $116 stock is not a bearish call, it is a "this is already fair" call.</p>
+    </div>
+  </div>
+  <h4 style="margin-top:32px;font-size:17px;color:#fff;">Top 3 Risks</h4>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The incentive load does not come down.</strong> At 10.4% of sales price on a $544,000 average home, PulteGroup is giving back roughly $57,000 per closing. If the 30-year mortgage rate stays where it is or rises, that number goes up, not down, and the 24.5%–25.0% gross margin guide becomes a ceiling rather than a floor.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Owned land in a deteriorating market.</strong> Roughly 3.5 years of owned lot supply plus $5.4B of 2026 land spend is the bet that this is a trough. If it is a mid-cycle pause rather than a bottom, impairments become a live question — the mechanism that destroyed homebuilder equity in 2007–2009. The 3.3% net debt-to-capital ratio buys a great deal of time, but it does not change the direction of the exposure.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Community count growth into falling absorption.</strong> Q2 2026 absorption was roughly 2.34 net orders per community per month (7,536 ÷ 1,074 ÷ 3). Guiding community count up another 3%–5% in the back half only works if absorption holds. If it does not, the company carries the fixed cost of more sales offices across the same or fewer sales, and SG&amp;A deleverage compounds the gross margin problem instead of offsetting it.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="card" style="border-left:4px solid var(--red);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">Affordability is the binding constraint, and it is a rate problem</div>
+      <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span>
+    </div>
+    <p class="biz-desc" style="margin-top:12px;">PulteGroup's own language in the Q2 release is unusually blunt: "market conditions remain highly competitive as macroeconomic uncertainty, volatile interest rates and strained affordability weigh on housing demand." The arithmetic behind that sentence is the incentive line. Incentives went from 8.7% of sales price in Q2 2025 to 10.4% in Q2 2026 — on a $544,000 house, from roughly $47,000 to roughly $57,000 of builder-funded concession per closing. That is not a marketing choice; it is the price of bridging the gap between what a household can pay monthly and what the house costs at prevailing mortgage rates. Average selling price fell 3% year over year to $544,000 even as the mix shifted toward the higher-priced move-up and active-adult brands, which means realised pricing is weaker than the headline suggests. Nothing about this improves without the 30-year mortgage rate moving.</p>
+  </div>
+  <div class="card" style="border-left:4px solid var(--amber);margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">The industry is competing on land structure, and Pulte has chosen the harder road</div>
+      <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-top:12px;">The defining structural shift in US homebuilding over the last decade has been the migration of land off the balance sheet. D.R. Horton now controls 78% of its 568,500 lots under option, largely through its Forestar affiliate, which lets it shrink production fast without eating an impairment. PulteGroup controls 228,000 lots with <strong>55% optioned and 45% owned</strong> — a materially heavier balance sheet. This is a deliberate consequence of the business mix rather than an oversight: a Del Webb community is a multi-decade, amenity-anchored land assembly that no land banker will option on normal terms. The trade is real margin today (25.0% vs 20.7% home sale gross margin) against real flexibility in a downturn. Investors should understand they are buying that trade, not avoiding it — and should treat the common claim that Pulte's optioned share is a structural advantage over peers as simply incorrect on the current disclosure.</p>
+  </div>
+  <div class="card" style="border-left:4px solid var(--green);">
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;align-items:center;">
+      <div style="font-size:18px;font-weight:700;color:#fff;">What the bull and the bear are actually arguing about</div>
+      <span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span>
+    </div>
+    <p class="biz-desc" style="margin-top:12px;">Strip away the noise and the disagreement reduces to one variable with two readings of the same fact. The fact: incentives fell from 10.9% of sales price in Q1 2026 to 10.4% in Q2, and home sale gross margin rose 60 basis points sequentially to 25.0%. <strong>The bull reads that as the inflection</strong> — the worst is priced, orders are already growing 6%, community count is growing 8%, and a buyer paying 11.9× trailing earnings for a business still earning 14.5% ROIC at the bottom of its cycle is being paid to wait, with a 5% buyback yield doing the waiting. <strong>The bear reads it as one quarter of noise</strong> inside a two-year downtrend in which revenue growth has gone −1.4%, −4.3%, −1.6%, −6.3%, −12.4%, −9.6% and gross margin has gone 30.2% → 29.5% → 29.2% → 26.9% → 25.6%. Both are looking at the same income statement. The tiebreaker is the 30-year mortgage rate, and neither analyst controls it — which is the honest reason the Street's targets run from $100 to $166 on a $116 stock.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-weight:700;color:var(--text-muted);font-size:12px;">Data as of September 10, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</p>
+  <p style="margin-top:14px;max-width:900px;margin-left:auto;margin-right:auto;">Price, market cap, 52-week range, sector/industry labels, valuation ratios, margins, balance-sheet and cash-flow data, and analyst consensus from <strong>stockanalysis.com/stocks/phm/</strong> (price source: <strong>https://stockanalysis.com/stocks/phm/history/?range=3M&amp;period=Daily</strong>, settled close of $116.41 on Thursday September 10, 2026, verified against the Sep 9 close of $118.93 for the −2.12% daily change). Operating metrics — closings, average selling price, net new orders, backlog, home sale gross margin, SG&amp;A, financial services, share repurchases, debt-to-capital — from PulteGroup's Q2 2026 earnings release filed with the SEC (Exhibit 99.1 to the Form 8-K dated July 22, 2026). Incentive load, cancellation rate, lots controlled and option/owned split, buyer-group mix, land spend, build-to-order mix, remaining buyback authorisation and FY2026 guidance from coverage of PulteGroup's Q2 2026 investor slide deck (investing.com). Named analyst calls from MarketBeat's PHM price-target page; institutional holders from MarketBeat. Global market-cap rank from companiesmarketcap.com. Monthly price history from digrin.com (unadjusted "Real Price" month-end closes, Oct 2021 – Aug 2026); the final chart point is the verified September 10, 2026 settled close and represents a partial month. No chart months were reconstructed or interpolated.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;"><strong>Estimated or unverified figures are labelled as such in the text.</strong> Buyer-group revenue shares are derived by the author from disclosed FY2025 closings mix and per-group average selling prices, not reported by the company. Competitor revenue figures, market shares and TAM estimates are approximations and are marked "(est.)". US and NYSE market-cap ranks are estimated. Industry-average and S&amp;P 500 columns in the metrics table are left blank because no fetched source provided verified values — they are not estimated. S&amp;P 500 and sector-index relative returns were not sourced and are not approximated. D.R. Horton comparison figures are drawn from the companion DHI report built from that company's own fiscal Q3 2026 disclosures.</p>
+  <p style="margin-top:12px;max-width:900px;margin-left:auto;margin-right:auto;">This document is for informational and educational purposes only. It is not investment advice, a recommendation, or a solicitation to buy or sell any security. Homebuilder equities are cyclical and highly sensitive to interest rates; past performance is not indicative of future results. Do your own research and consult a licensed financial professional before making investment decisions.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 monthly closes, Oct 2021 → Sep 2026 =====
+// Oct 2021 – Aug 2026 are unadjusted month-end "Real Price" closes (digrin.com).
+// The final point (Sep 2026) is the verified Sep 10, 2026 settled close of $116.41 — a partial month.
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26'];
+const prices = [48.08,50.03,57.16,52.69,49.66,41.90,41.76,45.26,39.63,43.62,40.66,37.50,39.99,44.78,45.53,56.89,54.67,58.28,67.15,66.08,77.68,84.39,82.06,74.05,73.59,88.42,103.22,104.56,108.38,120.62,111.42,117.32,110.10,132.00,131.65,143.53,129.53,135.27,108.90,113.78,103.28,102.80,102.58,98.03,105.46,112.92,132.02,132.13,119.87,127.19,117.26,125.09,137.20,117.61,122.36,118.18,137.21,126.47,126.32,116.41];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 2,  label: 'Dec 2021 — free-money peak $57.16',              color: '#94a3b8' },
+  { idx: 11, label: 'Sep 2022 — rate-shock trough $37.50 (−34.4%)',   color: '#ef4444' },
+  { idx: 26, label: 'Dec 2023 — Fed pivot melt-up $103.22',           color: '#22c55e' },
+  { idx: 35, label: 'Sep 2024 — 5-yr high $143.53, month of 1st cut', color: '#f59e0b' },
+  { idx: 43, label: 'May 2025 — affordability trough $98.03',         color: '#ef4444' },
+  { idx: 52, label: 'Feb 2026 — first rejection at $137.20',          color: '#3b82f6' },
+  { idx: 56, label: 'Jun 2026 — second rejection at $137.21',         color: '#3b82f6' },
+  { idx: 59, label: 'Sep 10 2026 — $116.41, 7% off 52-wk low',        color: '#ef4444' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma20  = sma(prices, 1);
+const ma50  = sma(prices, 3);
+const ma200 = sma(prices, 10);
+const rsi   = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(242,92,77,0.22)');
+grad.addColorStop(1, 'rgba(242,92,77,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#F25C4D', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#F25C4D'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma20, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma50, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma200, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
