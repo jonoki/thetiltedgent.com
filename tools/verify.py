@@ -11,6 +11,7 @@ def check(path):
     out['doctype'] = t.count('<!DOCTYPE'); out['html'] = len(re.findall(r'<html[\s>]', t)); out['head'] = len(re.findall(r'<head[\s>]', t))
     out['body'] = len(re.findall(r'<body[\s>]', t)); out['/body'] = t.count('</body>'); out['/html'] = t.count('</html>')
     out['canvas'] = t.count('<canvas')
+    out['style_open'] = len(re.findall(r'<style[\s>]', t)); out['style_close'] = t.count('</style>')   # CAT shipped with no </style> and rendered blank for five weeks
     out['lines'] = t.count('\n')
     # header price
     m = re.search(r'class="price-current"[^>]*>\s*\$?([\d,]+\.\d+)', t)
@@ -52,7 +53,7 @@ def check(path):
     date = re.search(r'Static data as of ([A-Za-z]+ \d+, \d{4})', t)
     out['date'] = date.group(1) if date else None
     out['sitenav'] = t.count('tg-sitenav')
-    ok = all(out[k] == 1 for k in ['doctype', 'html', 'head', 'body', '/body', '/html']) and out['canvas'] == 2 \
+    ok = all(out[k] == 1 for k in ['doctype', 'html', 'head', 'body', '/body', '/html']) and out['canvas'] == 2 and out['style_open'] == out['style_close'] \
         and out['price_match'] and out['n_labels'] == out['n_prices'] and out['sitenav'] == 0 and out.get('range_ok', True)
     out['OK'] = ok
     return out

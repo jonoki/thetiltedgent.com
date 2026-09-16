@@ -12,7 +12,7 @@ Three states, because the refresh run found three genuinely different outcomes:
 """
 import re, sys, datetime, os
 
-ANCHOR_RE = re.compile(r'<!-- =+ 01 COMPANY OVERVIEW')   # the '=' run length varies by era
+ANCHOR_RE = re.compile(r'<!-- =+ 01 (COMPANY )?OVERVIEW')   # the '=' run length and title vary by era
 
 CSS = """
 /* ---- what changed since the last edition ---- */
@@ -128,6 +128,57 @@ R = {
     "anything KLA disclosed."],
    "Corrected: the Section 02 segment revenue splits, the China revenue share and the services share, "
    "all now from the 10-K. <b>Re-verified as unchanged:</b> the process-control moat and the competitive structure."),
+
+ # ---- 16 Sep 2026 batch ----
+ 'nvda': ('2026-08-24', 208.48, '2026-09-15', 212.17, 'print',
+   'NVIDIA reported Q2 FY2027 on August 26 — and the stock round-tripped the beat, closing September 15 just 1.8% above the prior edition.',
+   ["<b>Q2 FY2027</b> (quarter ended July 26): revenue $96.2B (+106% YoY, +18% QoQ); Data Center $89.0B (+117%); "
+    "Edge Computing $7.2B (+27%); gross margin 75.0% on both bases; GAAP EPS $2.46, non-GAAP $2.22; $26.0B "
+    "returned to shareholders with about $99B of repurchase authorization remaining. <b>Q3 guidance</b> is "
+    "$108.0B ±2% with gross margin 74.0% ±50bp — the first guided step-down — and assumes zero China data-center "
+    "compute revenue. The release now discloses the GAAP-over-non-GAAP gap as gains on equity securities "
+    "($7.8B in Q2, $15.9B in Q1), replacing the previous edition's inference.",
+    "Shares rose 8.7% to $227.98 on August 27, closed August at $220.78, and drifted to $212.17 by September 15. "
+    "Trailing P/E 26.8x, forward 17.6x, PEG 0.34; consensus target $327.65 with post-print raises as high as $515."],
+   "Updated at this edition: header, chart (the Aug 26 point is now the true month-end close), sections 01, 02, 04 "
+   "including One-Off Items, 05, 06, 07 and 08. <b>Not re-verified:</b> the Vanguard holding line, the customer-"
+   "concentration percentages from the January 2026 10-K, hyperscaler capex figures, all \"est.\" comparison columns, "
+   "and the China policy narrative. The Q3 FY2027 earnings date was not on any NVIDIA page fetched."),
+
+ 'hd': ('2026-08-03', 340.02, '2026-09-15', 305.48, 'print',
+   'Home Depot beat and reaffirmed on August 18 — and the stock has fallen about 10% since, back to within 6% of its May low.',
+   ["<b>Q2 FY2026</b> (reported August 18): sales $47.9B (+5.7%), comparable sales +1.7% (US +1.3%), comparable "
+    "transactions −1.0%, average ticket +2.8%, net earnings $4.8B, diluted EPS $4.79 (adjusted $4.92 vs $4.68); "
+    "operating margin 14.3%. FY2026 guidance reaffirmed: sales +2.5–4.5%, comps flat to +2%, adjusted EPS flat to "
+    "+4% from $14.69. A $2.33 dividend was declared August 20 — the 158th consecutive quarterly payment. CEO Ted "
+    "Decker began a temporary medical leave on August 12; Ann-Marie Campbell and Richard McPhail share interim "
+    "oversight and Greg Brenneman chairs the board.",
+    "<em>The valuation reset:</em> trailing P/E 24.2x → 21.4x, forward 22.2x → 19.7x, yield 2.74% → 3.05%, "
+    "D/E 4.59 → 3.80. Consensus is still Buy (36 analysts, 21 buy / 15 hold / 0 sell) with the average target up to "
+    "$377.19 — now 23.5% above the price. The five-year chart is now built from real month-end closes rather than "
+    "the previous edition's reconstructed series."],
+   "Updated at this edition: header, banner, chart series and warnings, sections 01 through 08, industry commentary "
+   "and sourcing. <b>Not re-verified:</b> the July 30 realignment details, the June 23 Wolfe downgrade, the "
+   "Oppenheimer attribution of the $310 low target, the July litigation item, institutional ownership, the Section 02 "
+   "segment allocation and all \"est.\" comparison figures. The Q3 earnings date (November 17) is MarketBeat's estimate, "
+   "not company-confirmed."),
+
+ 'unh': ('2026-08-03', 416.83, '2026-09-15', 375.93, 'price',
+   'UNH fell 9.8% between editions on no new company news — the multiple compressed, the business did not move.',
+   ["Trailing P/E 26.7x → 24.2x, forward 19.5x → 17.5x, PEG 1.53 → 1.21, yield 2.23% → 2.47%, market cap $378.5B → "
+    "$337.4B. The 52-week range is now $255.97–$461.62 as the August 2025 lows rolled out of the window. Consensus "
+    "target is unchanged at $475.23 (27 analysts, 16 buy / 7 hold / 4 sell), so the implied upside widened from +14% to "
+    "+26% purely on price; Zacks (September 14) and Erste (August 27) moved to Hold, while Wells Fargo ($526) and "
+    "Bernstein ($512) added targets in September — all as listed on MarketBeat and TipRanks.",
+    "<em>Company news since August 3:</em> the Q3 2026 report date is confirmed for October 13 (IR events page, "
+    "announced September 15), replacing the previous \"~Oct 14 est.\"; a dividend authorization on August 12; no "
+    "guidance change and no DOJ or CMS release on the company's newsroom. The five-year chart is now built from real "
+    "month-end closes, which changes the shape of the 2025–26 drawdown materially — Section 07 was rewritten to match."],
+   "Updated at this edition: header, banner, chart, sections 01, 04, 05, 06, 07 and 08, industry commentary and "
+   "disclaimer; the embedded site nav was removed. <b>Not re-verified:</b> the Q2 segment figures (unchanged since the "
+   "July 16 print), the industry and S&P comparison columns, and the five-year index-return comparisons. Note: "
+   "StockAnalysis's history table shows the August 3 close as $415.36, not the $416.83 the previous edition printed; "
+   "the prior-edition price above is the figure that was published."),
 }
 
 
