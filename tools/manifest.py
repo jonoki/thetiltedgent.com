@@ -265,6 +265,20 @@ def extract(path, repo, cards):
     if len(metrics) < 5:
         warn.append(f'few_metrics:{len(metrics)}')
 
+    # the "what changed since the last edition" box, when the report has one
+    delta_state = None
+    editions = [[as_of, price, 'initial publication']]
+    dbox = re.search(
+        r'<section class="tg-d tg-d--(?P<state>price|print|fix)"'
+        r'[^>]*data-prior-as-of="(?P<pd>[\d-]+)"'
+        r'[^>]*data-prior-price="(?P<pp>[\d.]+)"', t)
+    if dbox:
+        delta_state = dbox.group('state')
+        editions = [[dbox.group('pd'), num(dbox.group('pp')), 'previous edition'],
+                    [as_of, price, 'refreshed']]
+        if as_of and dbox.group('pd') >= as_of:
+            warn.append('delta_box_prior_edition_not_earlier')
+
     struct = {
         'doctype': t.count('<!DOCTYPE'),
         'html': len(re.findall(r'<html[\s>]', t)),
@@ -319,9 +333,11 @@ def extract(path, repo, cards):
         'bytes': size,
         'blob_sha': sha,
         'structure_ok': not any(w.startswith(('document_skeleton', 'canvas_count')) for w in warn),
-        # prior editions, so a "what changed since last time" box has something
-        # to diff against without re-reading old HTML: [as_of, price, note]
-        'editions': [[as_of, price, 'initial publication']],
+        # [as_of, price, note] per published edition, newest last. The prior
+        # entry is read back out of the report's own delta box, so the box and
+        # the manifest cannot disagree — there is no separate state file.
+        'editions': editions,
+        'delta_state': delta_state,
         'warnings': warn or None,
     }
     rec.update(km)
@@ -394,9 +410,10 @@ def main():
     print(f'wrote {out_path}  ({len(reports)} reports indexed, {n:,} bytes)', file=sys.stderr)
     shard_dir = os.path.join(os.path.dirname(out_path), 'reports')
     for key, rs in sorted(by_sector.items()):
+        # deliberately no generated_at: a shard should change only when its
+        # content changes, otherwise every rebuild rewrites all eleven
         sn = write(os.path.join(shard_dir, key + '.json'), {
             'schema_version': SCHEMA_VERSION,
-            'generated_at': doc['generated_at'],
             'sector_key': key,
             'count': len(rs),
             'reports': rs,
