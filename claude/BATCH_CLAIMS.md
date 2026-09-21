@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-m · claimed 2026-09-21 (local Claude Code session)
+GEN GPC BEN AKAM LNT TSCO J FTV ZBRA NVR
+
 ### sess-2026-09-21-l · claimed 2026-09-21 (local Claude Code session)
 EFX CDW EVRG TSN FIS ESS ZBH CHRW FDXF DD
 
