@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NI — NiSource Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">NI</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Utilities / Regulated Gas &amp; Electric</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $19.43B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #22D3EE44;padding:3px 10px;border-radius:4px;">S&amp;P 500 constituent — added November 2, 2000</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">NiSource Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$40.52</div>
+      <div class="price-change">−$0.06 (−0.15%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $40.52 (0.00%) per StockAnalysis quote page</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 801 East 86th Avenue, Merrillville, Indiana</div>
+    <div class="meta-item"><span>Employees:</span> 7,668 (StockAnalysis profile; company says ~7,700)</div>
+    <div class="meta-item"><span>Founded:</span> 1912 (renamed from NIPSCO Industries, April 1999)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">NiSource is a regulated gas and electric utility holding company: roughly <strong>3.3 million natural-gas customers and 500,000 electric customers across six states</strong>, run through two reporting segments — <strong>Columbia Operations</strong> (gas distribution in Ohio, Pennsylvania, Virginia, Kentucky and Maryland) and <strong>NIPSCO Operations</strong> (gas and electric in northern Indiana). The company was known as NIPSCO Industries until April 1999. TTM revenue is <strong>$6.88B, up 12.25%</strong>, and FY2025 GAAP EPS was <strong>$1.95</strong> (adjusted $1.90). A regulated utility does not sell a product so much as rent out a <span class="tip" title="Rate base: the depreciated value of the pipes, wires and plants a regulator lets a utility earn a return on. Grow the rate base and, at a fixed allowed return, you grow earnings.">rate base</span> — $21.3B at year-end 2024 — at a return a state commission sets.</p>
+  <p class="prose" style="margin-top:16px;">That is why the story of 2026 is not in the income statement. The plan management sells is aggressive for a utility: a <strong>$28.6B 2026–2030 capital programme</strong> ($21.0B base, $7.6B for data-center infrastructure), <strong>9–11% consolidated rate-base growth</strong> and a <strong>9–10% adjusted EPS CAGR from 2026 to 2033</strong>, powered by special contracts with Amazon and Alphabet in Indiana. The stock priced that plan in fully — a <strong>$48.28 month-end close in April 2026</strong> — and then Indiana changed the odds. In August the governor fired a utility commissioner, the commission held technical conferences on the formal investigations it had opened in July into allowed <span class="tip" title="Return on Equity allowed by the regulator — the profit rate a utility may earn on the equity-funded part of its rate base.">ROE</span> and cost-recovery trackers, it had already rejected NIPSCO's full infrastructure tracker request, and two research houses cut their view of Indiana as a regulatory jurisdiction. The stock closed September 21 at <strong>$40.52</strong>, down 16.1% from April and 1.1% above its 52-week low. The central question: is the growth plan still worth paying for if the regulator that sets the return on half the rate base has become less predictable?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Lloyd M. Yates</div>
+      <div class="card-note">President, CEO and Director (StockAnalysis profile; quoted in the company's Q2 2026 release). He signed the 2024 Blackstone deal — "The transaction strengthens our balance sheet, supports our financing plan and provides greater flexibility to execute on high-quality capital investments" — and on the Q2 call described 2026 as "an unusually active year with a record number of tornadoes."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Shawn Anderson</div>
+      <div class="card-note">EVP and CFO (StockAnalysis profile). He owns the financing plan that makes or breaks the growth story: a <strong>14–16% FFO-to-debt</strong> target through 2030 to hold investment-grade ratings, while capex runs well ahead of operating cash flow. On Q2 he attributed the EPS decline to results "offset by higher O&amp;M, reflecting higher-than-usual storm activity."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">97.90% institutional</div>
+      <div class="card-note">Institutional ownership per StockAnalysis; insiders 0.26%. Named top holders were not sourced this session. At the subsidiary level, an affiliate of <strong>Blackstone Infrastructure Partners</strong> owns <strong>19.9% of NIPSCO</strong> — a stake it bought for $2.16B, closed January 2, 2024.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">For a utility the useful map is not revenue but <strong>rate base by jurisdiction</strong> — where the earning assets sit and which regulator sets their return. The mix below is the company's own year-end 2024 split of its <strong>$21.3B regulated electric and gas rate base</strong> (fact sheet dated October 29, 2025). Dollar amounts are our arithmetic: $21.3B × each published share. Indiana (NIPSCO electric plus gas) is 50.6%; Columbia's five gas utilities are 49.4%. <strong>A premise check:</strong> the NIPSCO minority stake sale is not a 2026 event — the 19.9% sale to Blackstone was announced June 2023 and closed January 2, 2024. Its relevance now is that NiSource owns 80.1% of the Indiana business that is both its growth engine and its regulatory problem.</p>
+  <div class="seg-bar">
+    <div style="flex:33.6;background:#22D3EE;">NIPSCO ELEC 33.6%</div>
+    <div style="flex:23.6;background:#22c55e;">COL. OHIO 23.6%</div>
+    <div style="flex:17.0;background:#f59e0b;">NIPSCO GAS 17.0%</div>
+    <div style="flex:15.1;background:#a78bfa;">COL. PA 15.1%</div>
+    <div style="flex:10.7;background:#94a3b8;">VA/KY/MD</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> NIPSCO Electric — 33.6% (~$7.16B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Columbia Gas of Ohio — 23.6% (~$5.03B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> NIPSCO Gas — 17.0% (~$3.62B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Columbia Gas of Pennsylvania — 15.1% (~$3.22B)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Columbia Virginia 6.6% · Kentucky 2.8% · Maryland 1.3% (~$2.28B combined)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Half the rate base answers to one commission in Indianapolis. That concentration is the single most important fact in this section — and it is the half with the data-center growth attached.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">NIPSCO Operations (Indiana electric &amp; gas)</div>
+        <span class="biz-badge dominant">80.1% OWNED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">50.6%</div><div class="biz-stat-label">Rate Base Mix</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~1.3M</div><div class="biz-stat-label">Customers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.75%</div><div class="biz-stat-label">Allowed ROE (Elec.)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Allowed ROE (Gas)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Roughly 500,000 electric and the balance gas customers across northern Indiana. The electric utility's last base-rate case (Cause 46120) ended in a settlement the IURC approved on <strong>June 26, 2025</strong>: a ~$257M increase against a $368.7M request, at a <strong>9.75% allowed ROE</strong> versus the 10.5% NIPSCO asked for and the 9.8% it had before. The gas utility's last case (Cause 45967, order July 31, 2024) granted $120.9M, $41M below the request; its allowed ROE was not confirmed on a page fetched this session. This segment is where the upside and the risk both live: it hosts the data-center build-out, it carries the Blackstone minority, and in 2026 it absorbed the <strong>April 2 lockout of ~1,600 United Steelworkers-represented employees</strong> ($21.4M of "workforce continuity" cost excluded from Q2 adjusted EPS) and an IURC order that rejected its full gas-modernization tracker request.</p>
+    <div class="biz-tam"><strong>Blackstone deal:</strong> 19.9% for $2.15B (+$250M equity commitment) — implied $10.8B equity value / $14.3B enterprise value for 100% of NIPSCO at announcement (June 2023).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Electric rate case 46120</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$257M</div><div class="comp-bubble-label">Granted</div></div><div><div class="comp-bubble-val">$368.7M</div><div class="comp-bubble-label">Asked</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Gas rate case 45967</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$120.9M</div><div class="comp-bubble-label">Granted</div></div><div><div class="comp-bubble-val">−$41M</div><div class="comp-bubble-label">vs Ask</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Columbia Operations (gas distribution, five states)</div>
+        <span class="biz-badge dominant">WHOLLY OWNED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">49.4%</div><div class="biz-stat-label">Rate Base Mix</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~2.4M</div><div class="biz-stat-label">Customers</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Allowed ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">5</div><div class="biz-stat-label">States</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Columbia Gas of Ohio, Pennsylvania, Virginia, Kentucky and Maryland — pipes in the ground, replaced on long programmatic schedules and recovered through rates and riders. It is the boring half, and in 2026 that is a compliment: management cited recent approvals in Ohio and Pennsylvania, received Ohio tracker approvals, and has <strong>Virginia and Kentucky rate cases filed with decisions expected in the first half of 2027</strong>. The company says ~85% of its capital is recovered within 12 months across the portfolio, which is the mechanism that keeps a gas utility's earned return close to its allowed one. Jurisdiction-level allowed ROEs for Columbia were not sourced this session and are not estimated.</p>
+    <div class="biz-tam"><strong>Why it matters now:</strong> Columbia is the diversification that Indiana's regulatory reset makes valuable — five commissions, none of which is the one under political scrutiny.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">GenCo — data-center generation for hyperscalers</div>
+        <span class="biz-badge growth">GROWTH ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$7.6B</div><div class="biz-stat-label">2026–30 Capex</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">up to 3 GW</div><div class="biz-stat-label">Amazon</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15 yrs</div><div class="biz-stat-label">Contract Term</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$1.4B</div><div class="biz-stat-label">Customer Savings</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">NIPSCO Generation ("GenCo") is a separate affiliate built so that, in Utility Dive's words, "NIPSCO's existing customers don't pay for infrastructure needed to serve hyperscalers." The first contract, approved by the IURC on November 19, 2025, supplies Amazon with up to 3 GW (2.4 GW by end-2032) over 15 years, backed by about $7B of investment: two 1.3-GW gas-fired plants and a 400-MW, four-hour battery. An Alphabet contract (~340 MW) was approved in July 2026 and a <strong>400-MW Amazon increase was filed July 17</strong>, with a final order sought by November. Together management puts savings for existing customers at ~$1.4B over the contract terms, and says it is in active negotiations on another 3 GW with 2 GW of prospects behind that. This is the piece that lifts consolidated EPS growth from the 6–8% base plan to 9–10%.</p>
+    <div class="biz-tam"><strong>Risk shape:</strong> contracted, but concentrated — two counterparties, one state, and construction risk on large gas plants.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two utility metrics that actually matter</h3>
+  <p class="prose">Utility earnings are rate base × equity share × allowed ROE, minus the lag between spending and recovery. Judge NiSource on how fast the base grows and what return regulators let it earn.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Rate Base (YE2024)</div>
+      <div class="card-value">$21.3B</div>
+      <div class="card-note">Regulated electric and gas, per the company fact sheet. Guided to grow <span style="color:var(--green);">9–11% a year 2026–2033</span> on a consolidated basis including GenCo assets; <strong>8–10% through 2030</strong> for the base plan alone.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Allowed ROE — NIPSCO Electric</div>
+      <div class="card-value">9.75%</div>
+      <div class="card-note">June 2025 settlement. After August 2026, investors are "braced for low-9% authorized ROEs" in Indiana (Indiana Capital Chronicle / IPM). Every 25bp on a ~$7.2B electric rate base is real money — but the equity ratio in NIPSCO's capital structure was not sourced, so no dollar sensitivity is shown.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Earned ROE (consolidated)</div>
+      <div class="card-value" style="color:var(--amber);">8.55%</div>
+      <div class="card-note">StockAnalysis TTM, on GAAP book equity. Below the 9.75% allowed electric return — the gap is regulatory lag, holding-company debt and 2026's storm and lockout costs.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Capital Plan 2026–2030</div>
+      <div class="card-value">$28.6B</div>
+      <div class="card-note">$21.0B base + $7.6B data-center; management lists a further ~$2B of upside. TTM capex of $3.76B against $2.30B of operating cash flow means the gap is funded with debt and equity issuance.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Franchise monopoly service territories</span>
+    <span class="moat-pill">$21.3B regulated rate base</span>
+    <span class="moat-pill">~85% capital recovery within 12 months</span>
+    <span class="moat-pill">Six-state regulatory diversification</span>
+    <span class="moat-pill">15-year hyperscaler contracts</span>
+    <span class="moat-pill">Ring-fenced GenCo structure</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is legal, not competitive: nobody else is allowed to lay a gas main to a house in Columbus or a wire to a data center in northern Indiana. That makes demand safe and returns negotiated. The flip side is that the moat has exactly one gatekeeper per state, and the gatekeeper is political. NiSource cannot lose customers to a rival; it can lose return to a commission. 2026 is the year the market remembered that the second risk is the one that matters.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Indiana regulatory reset.</strong> On August 3, 2026 Governor Mike Braun fired Commissioner Andy Zay; the IURC opened investigations into ROE under multi-year rate plans (Cause 46428) and into the use of trackers (Cause 46429) in July, with technical conferences on August 7. On August 10 Wolfe Research cut Indiana to "below average," writing that "political intervention in the regulatory process and volatility in the regulatory environment has meaningfully increased the risk and ROEs needed for investing in Indiana utilities," and Jefferies said "investor confidence in Indiana has materially deteriorated." Half of NiSource's rate base sits there.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Tracker denial.</strong> The IURC rejected NIPSCO's full infrastructure tracker request (reported as a $741M plan). Management says the order "doesn't preclude us from seeking recovery ... in future regulatory proceedings." Trackers are what keep regulatory lag short; losing one means spending now and waiting for a rate case to earn on it.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capex outruns cash.</strong> TTM free cash flow is <strong>−$1.46B</strong>, debt/EBITDA 5.74x, interest coverage 2.27x and shares outstanding +2.48% YoY. The plan depends on continued equity issuance and on the 14–16% FFO-to-debt band holding. Sources disagree on the annual equity need (one call summary says $400–600M, another ~$250M), so no figure is relied on here.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Labour and weather shocks hit the quarter.</strong> The April 2026 lockout of ~1,600 USW-represented NIPSCO employees and record tornado activity turned Q2 adjusted EPS to $0.16 from $0.22. Both are non-recurring in intent; the clerical unit had not ratified a contract as of the last report fetched.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong> (NI is a constituent and, as an NYSE listing, is not a NASDAQ-100 name). Utility metrics lead: rate base and allowed ROE drive earnings, and a negative free cash flow is the design of a capex-heavy utility, not a warning on its own. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>NI</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Rate base: the asset value regulators let the utility earn a return on.">Rate Base</span></td><td>$21.3B</td><td>—</td><td>—</td><td>Year-end 2024, regulated electric and gas. Guided +9–11% a year 2026–2033 (consolidated, incl. GenCo assets).</td></tr>
+      <tr><td><span class="tip" title="The return on equity a state regulator authorises in a rate case.">Allowed ROE (NIPSCO Electric)</span></td><td>9.75%</td><td>—</td><td>—</td><td>IURC order June 26, 2025 (Cause 46120). Gas and Columbia jurisdictions not sourced. Indiana ROE investigation (Cause 46428) pending.</td></tr>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>21.55</td><td>—</td><td>—</td><td>$40.52 ÷ $1.88 TTM GAAP EPS = 21.55. StockAnalysis shows 21.54.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by expected next-year earnings per share.">Forward P/E</span></td><td>19.8</td><td>—</td><td>—</td><td>$40.52 ÷ $2.05 consensus FY2026 EPS = 19.77 (guidance midpoint $2.045 gives 19.81). StockAnalysis's next-twelve-month figure is 18.61.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by expected earnings growth.">PEG Ratio</span></td><td>1.84</td><td>—</td><td>—</td><td>StockAnalysis. Above 1 even with management's 9–10% EPS growth target — the market is not paying for the full plan.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months, GAAP diluted.">EPS (TTM)</span></td><td>$1.88</td><td>—</td><td>—</td><td>GAAP, down 0.82% YoY on storm and lockout costs. FY2025 GAAP $1.95, adjusted $1.90; 2026 adjusted guidance $2.02–$2.07 reaffirmed August 5.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+12.25%</td><td>—</td><td>—</td><td>TTM revenue $6.88B. Much of utility revenue is pass-through gas and fuel cost, so revenue growth is a weak signal of earnings growth.</td></tr>
+      <tr><td><span class="tip" title="Operating income as a percentage of revenue.">Operating Margin</span></td><td>26.97%</td><td>—</td><td>—</td><td>TTM. Gross margin 50.97% is shown by StockAnalysis but is of limited meaning for a utility whose cost of gas is passed through.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue.">Net Profit Margin</span></td><td>13.15%</td><td>—</td><td>—</td><td>TTM net income $906M.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity actually earned on book equity over the last twelve months.">ROE (earned)</span></td><td>8.55%</td><td>—</td><td>—</td><td>Below the 9.75% allowed on NIPSCO electric. ROIC 4.13%, ROA 3.24%.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price.">Dividend Yield</span></td><td>2.96%</td><td>—</td><td>—</td><td>$1.20 annualised ($0.30 quarterly) on $40.52. Payout ratio 63.69%; dividend growth +7.14% YoY. Next ex-date October 30, 2026.</td></tr>
+      <tr><td><span class="tip" title="Total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>1.47</td><td>—</td><td>—</td><td>Total debt $17.44B vs cash $70M. Debt/EBITDA 5.74x; interest coverage 2.27x. Enterprise value $36.80B.</td></tr>
+      <tr><td><span class="tip" title="Funds From Operations divided by debt — the credit agencies' core utility leverage metric.">FFO/Debt (target)</span></td><td>14–16%</td><td>—</td><td>—</td><td>Management's target through 2030 to hold investment-grade ratings. Actual current FFO/debt not sourced.</td></tr>
+      <tr><td><span class="tip" title="Operating cash flow minus capital expenditure.">Free Cash Flow</span></td><td>−$1.46B</td><td>—</td><td>—</td><td>TTM: $2.30B operating cash flow less $3.76B capex. Negative every year FY2021–FY2025 — by design for a rate-base grower, but it must be financed.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities.">Current Ratio</span></td><td>0.50</td><td>—</td><td>—</td><td>Low but typical of utilities that fund working capital with commercial paper; quick ratio 0.22.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of float.">Short Interest (% float)</span></td><td>3.07%</td><td>—</td><td>—</td><td>14.65M shares; 2.38 days to cover.</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to market moves; below 1 means historically less volatile.">Beta</span></td><td>0.54</td><td>—</td><td>—</td><td>5-year. The Indiana move is idiosyncratic, which a low market beta does not capture.</td></tr>
+      <tr><td>52-Week Range</td><td>$40.09 – $49.21</td><td>—</td><td>—</td><td>$40.52 is 1.1% above the low and 17.7% below the high. 50-day MA $42.92, 200-day MA $44.95.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Q2 2026 GAAP EPS was <strong>$0.09</strong> versus adjusted <strong>$0.16</strong>. The gap is mainly <strong>$21.4M of workforce-continuity cost</strong> during the April 2026 NIPSCO lockout and <strong>$5.4M</strong> of consulting and severance for the "Value Captured" initiative, both excluded from adjusted EPS; a $16.0M weather variance also sits in the reconciliation. Storm O&amp;M from the record tornado season was <em>not</em> excluded and is the main reason adjusted EPS fell from $0.22. Year to date, adjusted EPS is <strong>$1.22 vs $1.19</strong> — the seasonal first half, when gas utilities earn most of their profit, is still slightly ahead.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">15 analysts polled by S&amp;P Global via StockAnalysis.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$49.86</div><div class="card-note"><span style="color:var(--green);">+23.05% upside</span> from $40.52. Median $50.50 (+24.63%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$43 – $55</div><div class="card-note">+6.12% to +35.74%. Even the lowest target is above the price — the sell side has trimmed targets but not yet caught down to the stock.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">12 / 3 / 0</div><div class="card-note">9 Strong Buy + 3 Buy, 3 Hold, 0 Sell (September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:80;background:#22c55e;"></div>
+    <div style="flex:20;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 12 (80%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 3 (20%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">J.P. Morgan — Eli Jossen</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$53 → $52</span> (Sep 2, 2026). The most recent call: a trim, not a retreat.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Mizuho — Gabe Moreen</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$50 → $48</span> (Aug 26, 2026). A cut two weeks after the Indiana downgrades.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wells Fargo — Shahriar Pourreza</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$52</span> maintained (Aug 21, 2026). <strong>Ladenburg Thalmann — Paul Fremont</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$51.50 → $51</span> (Aug 17, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Evercore ISI — Nicholas Amicucci</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$52</span> maintained (Aug 17, 2026). Separately, on the jurisdiction rather than the stock, <strong>Wolfe Research</strong> and <strong>Jefferies</strong> both published negative Indiana regulatory assessments on August 10, 2026.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The first print after the Indiana reset. Watch whether $2.02–$2.07 and the 9–10% CAGR survive, any change to the capital plan's Indiana share, and how management frames recovery of the rejected tracker spend.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date</div>
+        <div class="tl-desc">$0.30 quarterly; $1.20 annualised, a 2.96% yield at $40.52.</div>
+        <div class="tl-impact neutral">Scheduled</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">By Nov 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">IURC order on the 400-MW Amazon amendment</div>
+        <div class="tl-desc">Filed July 17, with management seeking a final order by November; it is already in guidance. Approval would be the first clean signal that the new commission still backs the GenCo model; delay or conditions would say the opposite.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">Indiana ROE and tracker investigations (Causes 46428 / 46429)</div>
+        <div class="tl-desc">The overhang itself. Technical conferences were held August 7. The outcome sets the allowed return and recovery speed on half of NiSource's rate base as Indiana moves toward multi-year, performance-based ratemaking.</div>
+        <div class="tl-impact down">Key downside risk</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H1 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Columbia Virginia and Kentucky rate case decisions</div>
+        <div class="tl-desc">Filed; decisions expected in the first half of 2027. Small in rate-base terms (6.6% and 2.8%), but they are the next read on the non-Indiana half.</div>
+        <div class="tl-impact neutral">Scheduled</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 3–10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Commissioner fired, Q2 miss, Indiana downgrades — reaction already happened</div>
+        <div class="tl-desc">Aug 3: Governor Braun fired Commissioner Zay. Aug 5: Q2 adjusted EPS $0.16 vs $0.22; the stock closed at $42.91, down 3.6% on the day. Aug 7: ROE and tracker technical conferences. Aug 10: Wolfe and Jefferies cut their Indiana views. August closed at $40.92.</div>
+        <div class="tl-impact down">Reaction already happened: August −7.9%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">NIPSCO locks out ~1,600 USW-represented employees</div>
+        <div class="tl-desc">After talks failed over contractor use, mandatory overtime and outage work rules. The physical unit later ratified; the clerical unit did not. $21.4M of cost was excluded from Q2 adjusted EPS. The stock closed April at $48.28 — the five-year high — so the market looked through it.</div>
+        <div class="tl-impact neutral">Reaction: none visible</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">NI — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$24.23</strong> to the September 21, 2026 settled close of <strong>$40.52</strong>, NI gained <strong>67.2% on price</strong> — before dividends, which rose from $0.895 a share in FY2021 to $1.20 on a trailing basis. For a regulated utility that is a strong half-decade, and almost all of it came in two bursts: the 2024 re-rating after the Blackstone deal closed and the data-center story took hold, and the late-2025 to April-2026 run after the Amazon contract was approved. The last five months have handed back the second burst.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows how unusual 2024–2026 was for a utility: it sat above 70 for most of mid-2024 through 2025, peaking at <strong>93.3 in November 2024</strong>. It has now fallen to <strong>33.8</strong>, close to the 29.5 reading at the September 2023 low, the most oversold point in the window. The 10-month moving average is about <strong>$44.79</strong>, roughly 10% above the price: the long-term trend has turned down, and momentum has not yet stabilised.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">$25.19 — the worst month of the window</div><div class="tl-desc">A 14.6% fall from $29.51 in August. No company-specific cause was identified in the sources fetched; the stock then went sideways between roughly $25 and $28.50 for a year and a half.</div><div class="tl-impact down">−14.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2023</div><div class="tl-content"><div class="tl-title">$24.68 — five-year low after 2021, RSI 29.5</div><div class="tl-desc">Three months after the June 2023 agreement to sell 19.9% of NIPSCO to Blackstone at an implied $10.8B equity value. The sale closed January 2, 2024, bringing $2.16B in.</div><div class="tl-impact down">Most oversold reading</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Nov 2024</div><div class="tl-content"><div class="tl-title">The re-rating — $28.81 to $38.09</div><div class="tl-desc">+32.2% in five months, with the RSI above 85 from August to November. The balance-sheet repair was done, and the market began to price NiSource as a growth utility rather than a gas-pipe repair shop.</div><div class="tl-impact up">+32.2% in five months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025</div><div class="tl-content"><div class="tl-title">Amazon contract approved — $44.13</div><div class="tl-desc">The IURC approved the GenCo–Amazon agreement on November 19, 2025: up to 3 GW, about $7B of investment, 15 years.</div><div class="tl-impact up">GenCo model approved</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2026</div><div class="tl-content"><div class="tl-title">Five-year high — $48.28</div><div class="tl-desc">Reached in the month of the NIPSCO lockout. StockAnalysis records the highest daily close as $48.50 on April 28, 2026.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">The Indiana repricing — $47.55 to $40.92</div><div class="tl-desc">July −6.6% (includes the July 31 ex-dividend; no single cause identified in the sources fetched), August −7.9% through the commissioner firing, the Q2 miss and the Indiana downgrades.</div><div class="tl-impact down">−13.9% in two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $40.52</div><div class="tl-desc">Down 14.8% from the June close and 1.1% above the $40.09 52-week low. September has traded between $40.52 and $41.90 on a closing basis.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year S&amp;P 500 and sector-index returns were not obtained from the sources fetched, so no numeric comparison is given. What can be stated: NI is <strong>up 67.2% on price over five years</strong> and up <strong>0.50% over the trailing 52 weeks</strong> (StockAnalysis) — the last year's gains fully given back. Peer utility valuations were not sourced and no peers are named.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay 19.8x this year's consensus EPS for a utility guiding to 9–10% EPS growth through 2033 and 9–11% rate-base growth, with a 2.96% yield growing ~7% a year. The data-center growth is contracted for 15 years with two investment-grade hyperscalers, built through a ring-fenced affiliate that saves existing customers ~$1.4B. Half the rate base is in five non-Indiana gas jurisdictions with ~85% of capital recovered within 12 months. The stock has fallen 16% from its April high on a regulatory scare, not a broken contract, and every one of 15 analysts has a target above today's price. If Indiana's investigations land at a low-9% ROE rather than something worse, the damage is a few basis points of return on part of the base.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The plan only works if regulators let NiSource earn on $28.6B of spending quickly, and the regulator for half of the rate base has just been reshaped for "affordability." The commission rejected NIPSCO's full tracker, is re-examining ROEs and trackers, and a commissioner was fired. Free cash flow is −$1.46B, debt/EBITDA 5.74x, interest cover 2.27x and the share count is growing 2.5% a year, so any slippage in allowed return or recovery speed goes straight to per-share growth and to equity needs. A 21.5x trailing multiple is a growth-utility multiple, and the growth now depends on Indianapolis.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Indiana allowed-return and recovery reset.</strong> Causes 46428 and 46429 could lower the 9.75% electric ROE and slow recovery on 50.6% of the rate base.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Financing a negative-FCF plan.</strong> $3.76B of TTM capex against $2.30B of operating cash flow, 5.74x debt/EBITDA and a 14–16% FFO/debt band to defend. A ratings slip or a higher cost of equity compresses the arithmetic behind the 9–10% CAGR.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">GenCo execution and concentration.</strong> Two 1.3-GW gas plants and a 400-MW battery to build on time and on budget for a small number of counterparties; the 400-MW Amazon amendment still needs an IURC order.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Affordability politics vs. utility capex</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Indiana is a clean case study of a wider tension: utilities want to spend heavily on grids, gas pipe and generation for new load, while governors and commissions face customer bills. In August 2026 Indiana's governor replaced a commissioner and, per IPM, appointed a successor who emphasised affordability; the IURC opened ROE and tracker investigations as the state moves to multi-year, performance-based rates. Wolfe Research said political intervention "has meaningfully increased the risk and ROEs needed for investing in Indiana utilities." For NiSource the transmission from politics to earnings is direct: allowed ROE times equity ratio times rate base.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Operating shocks: storms and labour</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Record tornado activity in 2026 drove outage response costs that were not adjusted out of Q2, and the April NIPSCO lockout added $21.4M of cost that was. Neither changes the rate base; both show how thin a quarter's margin is when the allowed return is fixed and the costs are not.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Data-center load as a utility growth engine</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">The GenCo structure is NiSource's answer to the affordability problem: hyperscalers pay for the plants built for them, and existing customers get ~$1.4B of savings over the contract terms. <strong>The bull framing:</strong> that design is exactly what an affordability-focused commission should want, so the Amazon amendment and future contracts (3 GW in negotiation, 2 GW more in prospects) keep moving. <strong>The bear framing:</strong> the same commission that approved GenCo has just shown it will reopen returns and trackers, and a 15-year contract is only as stable as the regulatory regime around it. The November order on the Amazon amendment is the first test.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/ni/history/</strong> — the September 21, 2026 settled close of $40.52 (open 40.64, high 40.76, low 40.31, Adj. Close 40.52, −0.15% on the prior close of $40.58). Confirmed by the quote page stockanalysis.com/stocks/ni/ ("$40.52 at close, September 21, 2026, 4:00 PM EDT").</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, financials, forecast and named analyst actions); NiSource Q2 2026 and full-year 2025 results releases (nisource.com); NiSource fact sheet dated October 29, 2025 (s1.q4cdn.com) for rate base and jurisdiction mix; Q2 2026 earnings-call summaries (fool.com, gloom.sh) and the Q2 8-K summary (stocktitan.net); Indiana OUCC case pages (in.gov) for Causes 46120 and 45967; IPM / Indiana Capital Chronicle (August 27, 2026) for the commissioner firing, ROE/tracker investigations and the Wolfe and Jefferies assessments; Utility Dive for Amazon contract terms; nipsco.com, nisource.com and web search results for the Blackstone transaction; USW, WNDU and CBS Chicago for the lockout; the datasets/s-and-p-500-companies constituents file (GitHub) for the S&amp;P 500 add date.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from the unadjusted "Real Price" column at digrin.com/stocks/detail/NI/price, except August 2026, where digrin shows $40.91 and the StockAnalysis daily row for August 31, 2026 shows $40.92; the StockAnalysis value is used. July 2026 ($44.43) matches on both. The final point is the September 21, 2026 settled close. <strong>No interior months were reconstructed or estimated.</strong> Rate-base dollars by jurisdiction are our arithmetic on the company's published percentages of year-end 2024 rate base. The NIPSCO gas and Columbia allowed ROEs, NIPSCO's equity ratio, current FFO/debt, named institutional holders, market-cap rankings and index-level relative returns were not sourced and are marked as such. The "$741M" tracker figure is as reported by IPM; the company call describes the order as covering gas modernization. Call summaries disagree on annual equity issuance ($400–600M vs ~$250M) and on whether the April event was a lockout; the lockout is confirmed by NIPSCO, USW and local press, and the equity figure is not used. Employees: 7,668 per StockAnalysis, ~7,700 per the company.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price"; Aug 2026 from StockAnalysis) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [24.23,24.67,24.51,27.61,29.18,28.93,31.80,29.12,31.45,29.49,30.40,29.51,25.19,25.69,27.94,27.42,27.75,27.43,27.96,28.46,26.89,27.35,27.84,26.76,24.68,25.16,25.64,26.55,25.97,26.06,27.66,27.86,29.06,28.81,31.25,33.06,34.65,35.16,38.09,36.76,37.30,40.81,40.09,39.11,39.54,40.34,42.45,42.27,43.30,42.11,44.13,41.76,44.29,47.30,46.66,48.28,46.22,47.55,44.43,40.92,40.52];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — $25.19, worst month of the window (−14.6%)',     color: '#ef4444' },
+  { idx: 24, label: 'Sep 2023 — $24.68 low; Blackstone NIPSCO deal pending',     color: '#ef4444' },
+  { idx: 38, label: 'Nov 2024 — $38.09, end of 2024 re-rating (RSI 93.3)',        color: '#22c55e' },
+  { idx: 50, label: 'Nov 2025 — IURC approves Amazon GenCo contract; $44.13',     color: '#3b82f6' },
+  { idx: 55, label: 'Apr 2026 — five-year high $48.28; NIPSCO lockout',           color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — Indiana regulatory reset, Q2 miss; $40.92',        color: '#f59e0b' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $40.52',                         color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
