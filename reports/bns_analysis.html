@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BNS — The Bank of Nova Scotia | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #FF4D5A;
+  --accent-dim: #FF4D5A33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">BNS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE (interlisted; home market TSX)</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Banks - Diversified</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $114.53B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="By market cap, country ranking via companiesmarketcap (ranks by primary listing/country; Sep 21, 2026 data at $95.35)">TSX #5 · Canada</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="Global market-cap rank via companiesmarketcap ($116.21B at $95.35)">Global: #196</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">NOT IN S&amp;P 500 / NASDAQ-100 — GLOBAL COVERAGE</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Bank of Nova Scotia (Scotiabank)</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;">NYSE common shares, interlisted 1:1 with the TSX line · Canada-domiciled · Reports in CAD (IFRS, fiscal year ends Oct 31)</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$95.35</div>
+      <div class="price-change" style="color:var(--green);">+$1.28 (+1.36%)</div>
+      <div class="price-date">NYSE close, Monday September 21, 2026 · settled close (prior close $94.07)</div>
+      <div class="price-date">After-hours quote not used</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 40 Temperance St, Toronto (executive offices) · founded in Halifax, N.S.</div>
+    <div class="meta-item"><span>Share line:</span> 1 NYSE share = 1 TSX common share (interlisted, not an ADR)</div>
+    <div class="meta-item"><span>Employees:</span> 90,979</div>
+    <div class="meta-item"><span>Founded:</span> 1832, Halifax</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q4 FY2026 (Aug–Oct 2026) — date not confirmed</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Scotiabank's history in one sentence: chartered in <strong>Halifax in 1832</strong>, run today from <strong>40 Temperance Street, Toronto</strong>, and for three decades the Canadian bank that bet on Latin America instead of the United States. It ranks <strong>#5 by market capitalisation in Canada</strong> (behind Royal Bank, TD, Shopify and BMO, per companiesmarketcap's country ranking) and <strong>#196 globally</strong>, at a $114.53B market value on the NYSE line. The shares trade 1:1 on the NYSE and the <span class="tip" title="Toronto Stock Exchange — BNS's home market. The home-market benchmark is the S&amp;P/TSX Composite.">TSX</span>; the S&amp;P/TSX Composite is its home-market index.</p>
+  <p class="prose" style="margin-top:16px;">The premise supplied for this report — "registered head office in Halifax, operational HQ Toronto" — is <strong>half verified</strong>. Toronto is confirmed as the executive address (company profile, results-release dateline) and Halifax as the 1832 founding city; a <em>registered</em> head office in Halifax is widely stated but was not confirmed on any page fetched this session, so this report does not assert it.</p>
+  <p class="prose" style="margin-top:16px;">The story that matters is <strong>return on equity</strong>. For years Scotiabank earned the lowest <span class="tip" title="Return on Equity: net income divided by shareholders' equity — profit per dollar of owner capital. For a bank this is the scorecard.">ROE</span> of the big Canadian banks, and its stock traded like it: the NYSE line fell from $72.34 (Feb 2022) to $40.47 (Oct 2023). Under CEO Scott Thomson (since February 2023) the bank has been <strong>pivoting capital from Latin America to North America</strong>: it bought a <strong>14.9% stake in US regional bank KeyCorp</strong> for about US$2.8B (closed December 2024), filed in March 2026 to lift that to as much as <strong>19.99%</strong>, and in Q1 FY2026 completed the sale of its <strong>Colombia, Costa Rica and Panama</strong> banking operations, booking a C$434M loss (C$377M after tax). The payoff showed up in <strong>Q3 FY2026 (May–Jul 2026)</strong>: reported ROE of <strong>14.1%</strong> (adjusted 14.2%) versus 12.2% a year earlier, clearing management's 14% medium-term target for the first time. On a trailing basis the gap to peers is still open — <strong>11.46% TTM ROE for BNS versus 16.21% at Royal Bank and 12.83% at TD</strong> (stockanalysis) — and the stock has already run <strong>+46.85% in 52 weeks</strong>. The question is how much of the re-rating is left.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Currency:</strong> Scotiabank reports in Canadian dollars; the NYSE line trades in US dollars. Every income-statement figure on this page is <strong>C$</strong> unless marked; every price, market cap, per-share valuation and USD EPS is <strong>US$</strong>, converted at the Bank of Canada rate of <strong>1.4021 CAD per USD</strong> (0.7132 USD per CAD) for September 21, 2026. Earnings are generated in Canada, the US, Mexico and Latin America, so a weaker Canadian dollar and weaker Latin American currencies both reduce the USD value of the same earnings.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">L. Scott Thomson</div>
+      <div class="card-note">President &amp; CEO since February 1, 2023, confirmed by his quote on the Q3 FY2026 release (Aug 25, 2026): "Q3 was a record quarter for the Bank, as all business lines reported strong results and we exceeded our medium-term objectives in the period." The North America-first capital allocation, the KeyCorp stake and the Central American exits are his program.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Raj Viswanathan</div>
+      <div class="card-note">Group Head and CFO since December 2019; confirmed by Scotiabank's own March 4, 2026 release announcing him as a conference speaker, and by the stockanalysis executive list ("Rajagopal Viswanathan").</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Holders</div>
+      <div class="card-value" style="font-size:20px;">No anchor holder identified</div>
+      <div class="card-note">No controlling or anchor shareholder was found in the sources fetched. Institutional ownership of the share count is <strong>47.67%</strong>, insiders <strong>0.02%</strong> (stockanalysis). The register is widely held, which means the buyback (8.6M shares in Q3 alone) and index flows set the marginal bid, not a founder or holding company.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Scotiabank reports four business lines plus "Other": <strong>Canadian Banking, International Banking, Global Wealth Management, and Global Banking &amp; Markets</strong>. The release reports segment <em>earnings</em>, not segment revenue, so the mix below is built from <strong>Q3 FY2026 (three months ended July 31, 2026) reported net income</strong>, the most recent reported period, in C$. The four lines sum to C$3,002M; "Other" was a C$49M loss, giving group net income of C$2,953M. FY2025 segment figures were not retrieved this session and are not shown. Group revenue for the quarter was <strong>C$10,535M, +11.1% YoY</strong>.</p>
+  <div class="seg-bar">
+    <div style="flex:35.7;background:#FF4D5A;">CDN BANKING 35.7%</div>
+    <div style="flex:25.5;background:#22c55e;">INTERNATIONAL 25.5%</div>
+    <div style="flex:21.6;background:#f59e0b;">GBM 21.6%</div>
+    <div style="flex:17.3;background:#a78bfa;">WEALTH 17.3%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#FF4D5A;"></span> Canadian Banking — C$1,071M (Q3 FY26 net income), +12% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> International Banking — C$766M, +8% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Global Banking &amp; Markets — C$647M, +37% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Global Wealth Management — C$518M, +23% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Percentages are shares of the four lines' combined C$3,002M, not of revenue. The pivot is visible in the growth column: International — the Latin America franchise — grew slowest, while the two capital-markets-linked lines grew fastest.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #FF4D5A;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Canadian Banking</div>
+        <span class="biz-badge dominant">LARGEST EARNER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">C$1,071M</div><div class="biz-stat-label">Q3 FY26 Net Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+12%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">19.4%</div><div class="biz-stat-label">Segment ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">35.7%</div><div class="biz-stat-label">Earnings Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Retail, small-business and commercial banking in Canada — mortgages, cards, deposits, auto finance and the Tangerine direct bank. Earnings of C$1.07B were up 12% with a <strong>19.4% segment ROE</strong>, the release's "fifth consecutive quarter of margin expansion" and a fourth consecutive quarter of positive <span class="tip" title="Operating leverage: revenue growth minus expense growth. Positive means revenue is outgrowing costs.">operating leverage</span>. This is the core of the pivot: management has been repricing the Canadian book toward deposits and relationships rather than chasing mortgage volume, and the segment ROE now sits well above the group's.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Canadian banking market size and BNS share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Royal Bank of Canada</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$285.45B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">16.21%</div><div class="comp-bubble-label">ROE TTM</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">TD Bank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$203.24B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">12.83%</div><div class="comp-bubble-label">ROE TTM</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bank of Montreal</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$123.16B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">ROE</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CIBC</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$105.55B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">ROE</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International Banking</div>
+        <span class="biz-badge emerging">BEING RESHAPED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">C$766M</div><div class="biz-stat-label">Q3 FY26 Net Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+8%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.7%</div><div class="biz-stat-label">Segment ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.5%</div><div class="biz-stat-label">Earnings Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The Latin American and Caribbean franchise — Mexico and the rest of Latin America per the company description. It is smaller than it was: Colombia, Costa Rica and Panama were sold in Q1 FY2026 (a C$434M pre-tax loss on completion), in a deal announced in January 2025 under which Davivienda absorbed those operations and Scotiabank took a 20% stake in Davivienda (per Wikipedia's summary of the announcement). What remains earned C$766M, +8% YoY, "driven by margin expansion and improved credit quality", with a <strong>15.7% segment ROE</strong>. Higher-margin, higher-loss lending: this is where most of the bank's credit cost and emerging-market currency risk sits.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session. Local competitors and market shares were not verified and are not named.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Banking &amp; Markets</div>
+        <span class="biz-badge growth">RECORD QUARTER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">C$647M</div><div class="biz-stat-label">Q3 FY26 Net Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+37%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.9%</div><div class="biz-stat-label">Segment ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.6%</div><div class="biz-stat-label">Earnings Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Corporate and investment banking, capital markets, trading and transaction banking across Canada, the US and Latin America. Record earnings of C$647M, +37% YoY, with a 15.9% segment ROE. The fastest-growing line, and the most cyclical: trading and underwriting revenue is the part of a bank's earnings that shrinks first when markets turn.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Royal Bank of Canada</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$285.45B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">TD Bank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$203.24B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bank of Montreal</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$123.16B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Global Wealth Management</div>
+        <span class="biz-badge growth">AUM +16%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">C$518M</div><div class="biz-stat-label">Q3 FY26 Net Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+23%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">18.6%</div><div class="biz-stat-label">Segment ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">17.3%</div><div class="biz-stat-label">Earnings Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Asset management, private banking and brokerage in Canada and internationally. Earnings C$518M, +23%, with <span class="tip" title="Assets Under Management — client money the bank manages and earns fees on.">AUM</span> up 16% YoY to C$474B. Fee income on a growing asset base needs little capital, which is why an 18.6% segment ROE is achievable — but those fees track market levels, so part of this growth is the equity market rather than the bank.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Royal Bank of Canada</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$285.45B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">TD Bank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$203.24B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CIBC</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$105.55B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The bank metrics that actually matter</h3>
+  <p class="prose">A bank is judged on how much it earns on its capital, how much capital it holds, what its loans cost it, and what it costs to run. All four, Q3 FY2026, C$ where applicable:</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">ROE (Q3 FY26)</div>
+      <div class="card-value" style="color:var(--green);">14.1%</div>
+      <div class="card-note">Reported; adjusted 14.2%, versus 12.2% / 12.4% a year earlier. First quarter above the 14% medium-term target. TTM ROE per stockanalysis is lower at 11.46% because it still carries the Q1 divestiture loss.</div>
+    </div>
+    <div class="card">
+      <div class="card-label"><span class="tip" title="Common Equity Tier 1 ratio: the highest-quality capital (common equity) divided by risk-weighted assets. The regulator's main solvency gauge; more capital means more safety but lower ROE.">CET1 Ratio</span></div>
+      <div class="card-value">13.1%</div>
+      <div class="card-note">Down from 13.3% in Q2 as the bank spent capital on buybacks (8.6M shares in the quarter; C$6.3B returned year-to-date through buybacks and dividends).</div>
+    </div>
+    <div class="card">
+      <div class="card-label"><span class="tip" title="Provision for Credit Losses: the charge a bank takes against earnings for loans it expects not to be repaid.">PCL</span></div>
+      <div class="card-value" style="color:var(--amber);">C$1,079M</div>
+      <div class="card-note">56 <span class="tip" title="Basis points — one basis point is 0.01 percentage points.">bps</span> of loans versus 51 bps a year ago (C$1,041M). The PCL ratio on impaired loans was 52 bps. Gross impaired loans rose to C$7,801M from C$7,608M in Q2.</div>
+    </div>
+    <div class="card">
+      <div class="card-label"><span class="tip" title="Productivity ratio (Scotiabank's name for the efficiency ratio): non-interest expenses divided by revenue. Lower is better.">Productivity Ratio</span></div>
+      <div class="card-value">52.7%</div>
+      <div class="card-note">Reported, versus 53.6% a year earlier; adjusted 52.5% versus 53.7%. The cost base is growing more slowly than revenue.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Canadian big-bank oligopoly</span>
+    <span class="moat-pill">Low-cost deposit funding</span>
+    <span class="moat-pill">19.4% domestic segment ROE</span>
+    <span class="moat-pill">KeyCorp option on US scale</span>
+    <span class="moat-pill">CET1 13.1% capital buffer</span>
+    <span class="moat-pill">C$474B wealth AUM</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A Canadian bank's moat is structural: a concentrated domestic market in which five or six banks hold the deposits, the branch networks and the payment rails, and in which a customer's chequing account, mortgage and investments tend to stay at one institution for decades. Scotiabank's distinguishing choice has been where it put the rest of its capital. For thirty years that meant Latin America — higher margins, higher growth, and also higher loan losses, currency volatility and political risk, which is why the market paid less for each dollar of Scotiabank earnings. The KeyCorp stake is the other direction: a minority position in a US regional bank that gives exposure to US deposit and lending growth without paying a control premium, and with an option to grow it (the March 2026 filing to go up to 19.99%).</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Credit costs are rising, not falling.</strong> PCL of C$1,079M in Q3 was 56 bps of loans, up from 51 bps a year earlier, and gross impaired loans grew quarter on quarter. The ROE improvement has come despite credit, not because of it. A Canadian consumer slowdown or a Latin American recession would hit this line first.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">A minority stake is not control.</strong> 14.9% of KeyCorp (the most recent verified figure; a move toward 19.99% was filed in March 2026) earns an equity-accounted share of profit — C$77M in Q2 FY2026 — but Scotiabank does not run KeyCorp's balance sheet. KeyCorp's spokesperson said the larger stake "does not indicate any changes in the nature of the relationship between the two banks."</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The remaining Latin America book still carries currency and political risk.</strong> The exits so far were the smaller Central American and Colombian operations; International Banking still earned C$766M in Q3, a quarter of the four lines' profit, and those earnings are translated into Canadian dollars at whatever the local currencies are worth.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Capital is being run down.</strong> CET1 fell 20 bps in one quarter to 13.1% as buybacks accelerated. That is a choice that lifts ROE — but it leaves a thinner buffer if credit costs rise further.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark column is the <strong>S&amp;P 500</strong> for consistency across this report set; BNS is not an S&amp;P 500 constituent. Industry-average and S&amp;P 500 values were not obtained from the sources fetched and are shown as "—" rather than estimated. Peer figures (Royal Bank, TD) are given in the Context column where sourced. Gross margin and current ratio are <strong>n/m</strong> (not meaningful) for a bank: interest expense is its cost of goods, and its balance sheet is not split into current and non-current. Per-share figures are US$ per NYSE share (1:1 with the TSX share) at <strong>1.4021 CAD per USD</strong> (Bank of Canada daily rate, Sep 21, 2026).</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>BNS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>17.45</td><td>—</td><td>—</td><td>$95.35 ÷ $5.4632 USD TTM EPS = 17.45. stockanalysis shows 17.47. Royal Bank 18.24, TD 18.70 on the same source.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>15.7</td><td>—</td><td>—</td><td>$95.35 ÷ FY2026 (Oct) consensus EPS of C$8.53 × 0.7132 = $6.08. stockanalysis's own forward figure is 14.43 on a different period basis.</td></tr>
+      <tr><td><span class="tip" title="Price-to-Book: market value divided by shareholders' equity on the balance sheet. P/TBV strips out goodwill and intangibles.">P/B · P/TBV</span></td><td>1.77 · 2.20</td><td>—</td><td>—</td><td>Royal Bank 2.72 P/B, TD 2.26 (stockanalysis). The discount to Royal Bank tracks the ROE gap.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$5.46</td><td>—</td><td>—</td><td>C$7.66 per share TTM to Jul 31, 2026 (stockanalysis) × 0.7132 USD/CAD = $5.4632. Includes the Q1 FY2026 divestiture loss (C$377M after tax). FY2025 EPS was C$5.67.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+11.1%</td><td>—</td><td>—</td><td>Q3 FY2026: C$10,535M vs C$9,486M. TTM revenue C$35,204M; FY2025 C$31,641M (+7.32%).</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus direct cost of sales. Not a meaningful measure for a bank.">Gross Margin</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a bank. See productivity ratio below.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>28.43%</td><td>—</td><td>—</td><td>stockanalysis TTM. On the C$ figures above, C$9,505M ÷ C$35,204M = 27.0%; the gap is definitional.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>14.1%</td><td>—</td><td>—</td><td>Q3 FY2026 reported (adjusted 14.2%, prior year 12.2%). TTM 11.46% vs Royal Bank 16.21% and TD 12.83% (stockanalysis). Canadian Banking segment 19.4%.</td></tr>
+      <tr><td><span class="tip" title="Common Equity Tier 1 ratio: common equity divided by risk-weighted assets — the regulator's main capital gauge.">CET1 Ratio</span></td><td>13.1%</td><td>—</td><td>—</td><td>Down from 13.3% in Q2 FY2026 on buybacks.</td></tr>
+      <tr><td><span class="tip" title="Provision for credit losses as a share of average loans, in basis points.">PCL Ratio</span></td><td>56 bps</td><td>—</td><td>—</td><td>C$1,079M in Q3 vs 51 bps a year ago; 52 bps on impaired loans.</td></tr>
+      <tr><td><span class="tip" title="Productivity (efficiency) ratio: non-interest expenses divided by revenue. Lower is better.">Productivity Ratio</span></td><td>52.7%</td><td>—</td><td>—</td><td>Reported Q3 FY2026, vs 53.6% a year earlier; adjusted 52.5%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>3.37%</td><td>—</td><td>—</td><td>$3.22 trailing USD dividends on $95.35 (stockanalysis). Quarterly dividend C$1.14; payout ratio 58.92%; ex-dividend Oct 6, 2026.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of shares — the proportion sold short by investors betting the price falls.">Short Interest</span></td><td>0.60%</td><td>—</td><td>—</td><td>7.32M shares, as % of shares outstanding (stockanalysis). Negligible.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: borrowings divided by equity. For a bank, deposits and wholesale funding are the raw material, so this ratio is not meaningful.">Debt-to-Equity</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a bank; CET1 is the capital measure.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Banks do not present a classified balance sheet.">Current Ratio</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a bank.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>1.21</td><td>—</td><td>—</td><td>5-year beta (stockanalysis). More market-sensitive than a typical utility-like bank, reflecting the Latin America book.</td></tr>
+      <tr><td>52-Week Range</td><td>$62.98 – $95.58</td><td>—</td><td>—</td><td>$95.35 is within 0.3% of the 52-week high set intraday on Sep 21, 2026.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">One item dominates: the <strong>C$434M pre-tax (C$377M after-tax) loss recognised in Q1 FY2026</strong> on completing the sale of the Colombia, Costa Rica and Panama banking operations. It sits inside the trailing EPS of C$7.66 and the 11.46% TTM ROE, which therefore understate the run-rate that Q3's 14.1% ROE shows. Year-to-date reported net income was C$7,884M (diluted EPS C$6.00) versus C$5,552M (C$4.02) in the first nine months of FY2025. In Q3 itself, reported and adjusted results were close (C$2,953M vs C$2,973M; diluted EPS C$2.27 vs C$2.28), so adjustments are not doing heavy lifting in the latest quarter. Separately, the KeyCorp stake contributed C$77M to Q2 FY2026 net income (C$85M adjusted) as Scotiabank's share of KeyCorp's quarterly profit.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">14 analysts polled by S&amp;P Global via stockanalysis. MarketBeat's narrower 7-analyst US-line panel reads <strong>Moderate Buy</strong> (1 Strong Buy, 4 Buy, 2 Hold). Coverage of the NYSE line is thin; most brokers cover the TSX line in C$.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$91.79</div><div class="card-note"><span style="color:var(--red);">−3.73% downside</span> from $95.35. Median $96.46 (+1.16%). The stock has run past the average target.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$77.68 – $101.23</div><div class="card-note">−18.53% to +6.17% (stockanalysis, US$). Even the highest target leaves little room.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 8 / 1</div><div class="card-note">2 Strong Buy + 3 Buy, 8 Hold, 1 Sell, 0 Strong Sell (September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:35.7;background:#22c55e;"></div>
+    <div style="flex:57.1;background:#f59e0b;"></div>
+    <div style="flex:7.1;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (35.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 8 (57.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (7.1%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">TD Securities</strong> · Upgrade to Buy (Aug 25, 2026) — the day of the Q3 print. No target shown on the source page.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">National Bank Financial</strong> · Upgrade to Outperform (Aug 26, 2026). And <strong>Keefe, Bruyette &amp; Woods</strong> initiated at Outperform on Aug 21, 2026. Three positive actions in a week around the results.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">RBC Capital Markets — Darko Mihelic</strong> · Sector Perform · target raised to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">117</span> (May 28, 2026). MarketBeat shows "$117" with no currency; Canadian brokers normally set TSX-line targets in C$, which at 1.4021 would be about US$83. Treat the currency as unverified.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Canaccord Genuity</strong> · Downgrade to Hold (Mar 9, 2026), shortly before the March drawdown (−8.5% on the month).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date</div>
+        <div class="tl-desc">Quarterly dividend of C$1.14 per share (maintained at Q3). Any change to the dividend would be a read on management's confidence in the 14% ROE run-rate.</div>
+        <div class="tl-impact neutral">Scheduled</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 FY2026 results</div>
+      <div class="tl-content">
+        <div class="tl-title">Full-year FY2026 (Nov 2025 – Oct 2026) — date not confirmed</div>
+        <div class="tl-desc">Can the bank hold ROE above 14% for a second quarter, and does the PCL ratio stop rising past 56 bps? Consensus FY2026 EPS is C$8.53 (+20.31%); FY2027 C$9.49 (+11.27%). The first-quarter divestiture loss drops out of trailing figures in Q1 FY2027, which will mechanically lift TTM ROE and EPS.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">KeyCorp stake — up to 19.99%</div>
+        <div class="tl-desc">A regulatory filing reported on March 20, 2026 showed Scotiabank seeking to lift its KeyCorp interest from 14.99% to as much as 19.99%. Whether that increase has happened since was not verified on any page fetched this session. A bigger stake means a bigger share of KeyCorp's profit — and more US exposure.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 25, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026 — "a record quarter"</div>
+        <div class="tl-desc">Reported net income C$2,953M (+16.9%), diluted EPS C$2.27 (+23.4%), adjusted EPS C$2.28 against a C$2.10 estimate (per The Deep Dive), ROE 14.1%. The NYSE line closed at $93.10 from $86.86 the previous session — <strong>+7.2% in a day</strong>.</div>
+        <div class="tl-impact up">Reaction already happened: +7.2%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q1 FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Central America and Colombia exit completed</div>
+        <div class="tl-desc">Sale of the Colombia, Costa Rica and Panama banking operations completed, with a C$434M pre-tax loss. The strategic step that shrinks the Latin America book.</div>
+        <div class="tl-impact neutral">Completed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">BNS (NYSE, US$) — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes (NYSE line, unadjusted) + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#FF4D5A;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$61.53</strong> to the September 21, 2026 settled close of <strong>$95.35</strong>, the NYSE line gained <strong>55.0% on price</strong> (dividends excluded; the chart is in US$, so it also carries the CAD/USD move). The path was a V, not a line: a 44% fall from $72.34 (Feb 2022) to <strong>$40.47 (Oct 2023)</strong> through the rate-hiking cycle, then a <strong>+136% recovery</strong> from that low to today, most of it in the last twelve months (+47.5% since the Sep 2025 close of $64.65).</p>
+  <p class="prose" style="margin-top:14px;">Momentum is stretched. The 6-period monthly RSI reads <strong>88.6</strong>, just below its five-year peak of 90.6 (Feb 2026) and far from the 21.6 trough of October 2023. The price sits about <strong>17% above its 10-month moving average</strong> ($81.29) and 3.9% above the average analyst target. None of that is a sell signal on its own — trends can stay overbought — but it means the good news of the Q3 print is in the price.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Feb 2022</div><div class="tl-content"><div class="tl-title">Pre-hike high — $72.34</div><div class="tl-desc">The high of the first half of the window, before central banks began raising rates.</div><div class="tl-impact up">Early-window peak</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate shock — $47.57</div><div class="tl-desc">−34% from February during the 2022 rate-hiking cycle. RSI 26.7.</div><div class="tl-impact down">−34% from Feb 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Five-year low — $40.47, RSI 21.6</div><div class="tl-desc">The low point of the window, eight months into Scott Thomson's tenure and before the North America pivot was announced.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024</div><div class="tl-content"><div class="tl-title">KeyCorp stake completed — $53.72</div><div class="tl-desc">The US$2.8B, 14.9% KeyCorp investment closed. The first concrete step of the capital shift from Latin America to the US.</div><div class="tl-impact neutral">Strategic pivot</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">Pullback — $69.31 (−8.5% in a month)</div><div class="tl-desc">The one sharp setback in the rally, the month Canaccord downgraded to Hold and Scotiabank filed to raise its KeyCorp stake.</div><div class="tl-impact down">−8.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Q3 record quarter — $91.66</div><div class="tl-desc">ROE of 14.1% cleared the 14% target; the stock gained 7.2% on results day, August 25.</div><div class="tl-impact up">+7.2% on results day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $95.35</div><div class="tl-desc">Up 29.4% from the December 2025 close of $73.69 and within cents of the 52-week high of $95.58.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> and the <strong>S&amp;P/TSX Composite</strong> were not obtained from the sources fetched, so no numeric index comparison is given. What is sourced: BNS is <strong>+55.0% on price over five years</strong> and <strong>+46.85% over 52 weeks</strong> (stockanalysis), with market cap up 42.6% year over year. Against its Canadian peers on the same source, the one-year move is in line with Royal Bank (+40.02%) and behind TD (+57.75%). On valuation it still trades at a discount to Royal Bank on book value (1.77x vs 2.72x) — roughly the ROE gap (11.46% vs 16.21% TTM).</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The turnaround is working and the trailing numbers still hide it. Q3 FY2026 ROE of 14.1% cleared the 14% target, Canadian Banking earns 19.4%, the productivity ratio is improving (52.7% from 53.6%), and the Q1 divestiture loss that weighs on the 11.46% TTM ROE falls out of the trailing figures next year. If ROE converges toward Royal Bank's 16%, a P/B of 1.77x against Royal Bank's 2.72x leaves room to re-rate, while a 3.37% yield and ongoing buybacks pay holders to wait. The KeyCorp stake, possibly heading to 19.99%, gives a growing US earnings stream without a control premium.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The re-rating has already happened: +46.85% in a year, a monthly RSI of 88.6, and a price 3.9% above the average target from 14 analysts whose consensus is Hold. Credit is moving the wrong way — PCL 56 bps against 51 bps a year earlier, impaired loans rising — while CET1 is falling as buybacks accelerate. One quarter at 14% ROE is not a run-rate, the fastest-growing line (Global Banking &amp; Markets, +37%) is the most cyclical, and International Banking still leaves a quarter of earnings exposed to Latin American credit and currency.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Credit cycle.</strong> PCL of C$1,079M (56 bps) in Q3 and rising gross impaired loans (C$7,801M). A turn in Canadian consumer credit or a Latin American downturn hits earnings before anything else.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Valuation and momentum already priced in.</strong> The stock trades above the average analyst target with a stretched monthly RSI. A good Q4 may be needed just to hold the price.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Currency translation.</strong> Earnings are in C$ and Latin American currencies; the NYSE line is in US$. At 1.4021 CAD per USD, each 5% move in the Canadian dollar changes the US$ value of the same C$ earnings by about 5%.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">ROE convergence among the Canadian banks</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">On stockanalysis's trailing figures, Royal Bank earns 16.21% on equity, TD 12.83% and Scotiabank 11.46% — and the price-to-book ratios line up in the same order (2.72x, 2.26x, 1.77x). The market pays for ROE. Scotiabank's Q3 FY2026 print (14.1% reported) is the first evidence that it can close part of the gap, and the mechanism is visible: a domestic bank at 19.4% ROE, capital moving out of lower-return Central American markets, and buybacks shrinking the equity base. The next two quarters decide whether 14% is a level or a spike.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">North America over Latin America</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">STRATEGIC SHIFT</span></div>
+    <p class="biz-desc">For decades Scotiabank's pitch was growth from Latin America. Under Scott Thomson the pitch is return on capital from North America: a 14.9% KeyCorp stake (US$2.8B, closed December 2024) with a March 2026 filing to go to 19.99%, and the exit from Colombia, Costa Rica and Panama completed in Q1 FY2026 at a C$434M loss. Mexico and the remaining Latin American operations stay in International Banking, which earned C$766M in Q3 at a 15.7% ROE. The trade-off is growth for predictability — the market has so far rewarded it.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Credit costs as the swing factor</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">WATCH ITEM</span></div>
+    <p class="biz-desc">Everything above assumes provisions stay near current levels. Scotiabank's Q3 PCL ratio was 56 bps, up from 51 bps a year earlier, and gross impaired loans grew quarter on quarter to C$7,801M, with credit-loss allowances at C$7.55B (per The Deep Dive). Revenue growth of 11.1% currently outruns that drift. If it did not, the ROE story would stall regardless of strategy.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/bns/history/</strong> — the September 21, 2026 NYSE settled close of $95.35 (open 94.75, high 95.58, low 94.29, Adj. Close 95.35, +1.36%), corroborated by the stockanalysis quote page ("At close: Sep 21, 2026, 4:00 PM EDT", previous close $94.07; $95.35 − $94.07 = +$1.28 = +1.36%) and by companiesmarketcap's $95.35.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Currency conversion: Bank of Canada daily exchange rate (Valet series FXUSDCAD), September 21, 2026: 1.4021 CAD per USD, i.e. 0.7132 USD per CAD. BNS NYSE shares are the same common shares as the TSX line (1:1, not ADRs). EPS: C$7.66 TTM (stockanalysis, twelve months to Jul 31, 2026) × 0.7132 = US$5.4632; trailing P/E = $95.35 ÷ $5.4632 = 17.45.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual/quarterly/trailing financials in C$, forecast) for price, valuation, ROE, dividend, holders, executives, consensus and Sector/Industry labels; Scotiabank's Q3 FY2026 release (scotiabank.investorroom.com, newswire.ca, and the 6-K summary at stocktitan.net, Aug 25, 2026) for segment earnings and ROE, CET1, PCL, productivity ratio, buybacks, the divestiture loss and the CEO quote; Scotiabank's March 4, 2026 release for the CFO; investing.com (Mar 20, 2026) and cp24.com (Apr 17, 2026) for the KeyCorp stake and contribution; Wikipedia for founding date/place, CEO start date and the Davivienda deal structure; companiesmarketcap.com for global and Canada ranks and peer market caps; marketbeat.com for named analyst actions; thedeepdive.ca for the EPS estimate and allowances; bankofcanada.ca for FX.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points on the NYSE line in US$. September 2021 through September 2025 month-end closes are from digrin.com's unadjusted "Real price" column (digrin's series ends at September 2025, which it labels "September 2026"; the value $64.65 matches Yahoo's September 2025 close). October 2025 through August 2026 month-end closes are from Yahoo Finance's monthly history for BNS (unadjusted close; it matches digrin exactly on every overlapping month and stockanalysis on July and August 2026). The final point is the September 21, 2026 settled close. No months were interpolated or estimated.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Not verified / caveats: a registered head office in Halifax was not confirmed on any page fetched (Toronto executive offices and the 1832 Halifax founding are). The current KeyCorp percentage after the March 2026 filing was not verified; 14.9% (14.99%) is the last confirmed figure. Segment revenue and FY2025 segment results were not retrieved; the segment mix uses Q3 FY2026 reported net income. The Deep Dive listed International Banking at C$725M and Wealth at C$515M, which differs from the release figures used here (C$766M, C$518M) — likely a different basis; the release is used. The RBC target currency is not stated on the source page. The next earnings date was not confirmed. Industry-average and S&amp;P 500 comparison values, BMO and CIBC ROE, and five-year index returns were not sourced and are not estimated. Employees: stockanalysis lists 90,979; Wikipedia gives about 86,431 for 2025.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures in C$ are the company's reported figures; US$ conversions are at a single stated rate and will differ at other rates. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — BNS NYSE line (US$): Sep 2021 → Sep 2025 month-end closes from digrin.com unadjusted "Real price"; Oct 2025 → Aug 2026 from Yahoo Finance monthly (unadjusted close); + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [61.53,65.56,62.43,71.69,71.96,72.34,71.72,63.32,67.71,59.21,60.95,55.29,47.57,48.32,52.20,48.98,54.13,49.48,50.36,49.91,48.31,50.04,50.36,47.44,45.59,40.47,44.77,48.69,46.75,48.47,51.78,45.90,47.33,45.72,46.67,49.88,54.49,51.49,57.02,53.72,51.17,49.63,47.43,49.98,53.52,55.27,55.61,62.46,64.65,65.60,69.29,73.69,74.72,75.75,69.31,77.80,80.05,86.84,87.77,91.66,95.35];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 5,  label: 'Feb 2022 — pre-hike high $72.34',                        color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — rate-hike cycle, $47.57',                      color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — five-year low $40.47, RSI 21.6',               color: '#ef4444' },
+  { idx: 39, label: 'Dec 2024 — 14.9% KeyCorp stake completed; $53.72',        color: '#3b82f6' },
+  { idx: 54, label: 'Mar 2026 — pullback $69.31 (−8.5% month)',                color: '#f59e0b' },
+  { idx: 59, label: 'Aug 2026 — Q3 FY26 record quarter, ROE 14.1%; $91.66',    color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $95.35',                     color: '#FF4D5A' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(255,77,90,0.22)');
+grad.addColorStop(1, 'rgba(255,77,90,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#FF4D5A', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#FF4D5A'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
