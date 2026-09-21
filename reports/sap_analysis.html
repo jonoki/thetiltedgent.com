@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP — SAP SE | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3DA5FF;
+  --accent-dim: #3DA5FF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically. Financial statements are in EUR; price, market cap and per-ADR figures are in USD.
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SAP</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE (ADR) · home market XETRA / Frankfurt</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software - Application</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $241.51B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="By market cap, country ranking via companiesmarketcap (Germany list, Sep 21, 2026): #1 Siemens $244.78B, #2 SAP $241.48B.">DAX #2 · Germany</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="World's 74th most valuable company by market cap, per companiesmarketcap.">Global: #74</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid #f59e0b44;padding:3px 10px;border-radius:4px;">NOT IN S&amp;P 500 / NASDAQ-100 — GLOBAL COVERAGE</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">SAP SE</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;">NYSE-listed ADRs · Germany-domiciled · IFRS · files 20-F / 6-K · reports in EUR</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$209.22</div>
+      <div class="price-change">−$0.23 (−0.11%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · NYSE settled close</div>
+      <div class="price-date">After-hours $208.88 (5:01 PM EDT) — not used in this report</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>ADR ratio:</span> 1 ADR = 1 ordinary share</div>
+    <div class="meta-item"><span>HQ:</span> Walldorf, Germany</div>
+    <div class="meta-item"><span>Employees:</span> 111,397</div>
+    <div class="meta-item"><span>Founded:</span> 1972 (NYSE ADR since Aug 1998)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 21, 2026 (Q3 2026, after US close)</div>
+    <div class="meta-item"><span>EUR/USD:</span> 1.1490 (ECB reference, Sep 21, 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">SAP sells the software that runs the back office of large companies — finance, procurement, supply chain, manufacturing, HR — and is now selling it as a subscription instead of a licence. Two numbers carry the story. <strong>Current cloud backlog</strong> (<span class="tip" title="Current cloud backlog (CCB): contractually committed cloud subscription revenue SAP expects to recognise over the next 12 months. It is SAP's main leading indicator for cloud revenue.">CCB</span>) was <strong>€22.9B at June 30, 2026, up 27% (26% at constant currencies)</strong>, and the Q2 2026 non-IFRS <strong>cloud gross margin was 74.6%, down 0.6pp year on year</strong> (IFRS 74.3%, −0.5pp). The order book is compounding in the mid-20s; the margin on delivering it is edging down, not up. FY2025 revenue was <strong>€36.80B, up 7.68%</strong>, with IFRS EPS of €6.10; cloud revenue was €21.02B, +23%.</p>
+  <p class="prose" style="margin-top:16px;">SAP is the largest listed software company in Europe and the <strong>#2 company in Germany by market capitalisation</strong> (companiesmarketcap, behind Siemens by about $3.3B), a constituent of the <strong>DAX</strong>, and #74 in the world at $241.5B. The premise that it is "Europe's software champion" checks out. The premise that the ERP migration tailwind is a clean 2027 cliff needs a correction: on third-party summaries of SAP's maintenance policy, <strong>mainstream maintenance for ECC 6.0 (EHP 6–8) ends December 31, 2027</strong>, but paid extended maintenance runs to 2030, and customers who sign RISE with SAP get a private-cloud transition path reported to run to 2033. The deadline is a forcing function, not a wall. The stock has already lived through the debate: it closed <strong>$304.10 in June 2025</strong>, <strong>$154.11 in June 2026</strong> (−49%), and $209.22 today — so the question is not whether cloud grows, but how long 25%-ish backlog growth lasts once the migration wave is through, and whether AI adds revenue or only defends it.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Currency, read carefully.</strong> SAP reports in euros; the NYSE ADR trades in dollars at 1 ADR = 1 ordinary share (20-F, FY2025). Every per-share number on this page is converted at the ECB reference rate of <strong>1.1490 USD per EUR on September 21, 2026</strong>. FX exposure: 39% of FY2025 revenue was earned in the Americas (US €11.54B, 31% of group), 46% in EMEA (Germany €5.83B, 16%), and the remaining ~14% in Asia Pacific Japan. A stronger euro therefore cuts reported euro growth and raises the dollar value of each euro of profit at the same time — SAP's own guidance assumes 1.13 USD per EUR.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Christian Klein</div>
+      <div class="card-note">CEO and Member of the Executive Board, verified by quote on the Q2 2026 Quarterly Statement (July 23, 2026) and the StockAnalysis profile. His framing of Q2: "strong current cloud backlog growth, up 26% at constant currencies ... underpinned by our Autonomous Enterprise strategy."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Dominik Asam</div>
+      <div class="card-note">CFO, verified by quote on the Q2 2026 Quarterly Statement: "sustained current cloud backlog and free cash flow growth against a volatile macroeconomic backdrop." He owns the €10B buyback (Feb 2026 – end 2027) and the ~€10B FY2026 free-cash-flow target.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Anchor &amp; Institutional Holders</div>
+      <div class="card-value" style="font-size:20px;">Founders, then funds</div>
+      <div class="card-note">The FY2025 20-F lists two holders above 5%: <strong>Dietmar Hopp, collectively</strong> (co-founder; 62.5M shares, 5.1%, per a 2022 Schedule 13G) and <strong>BlackRock</strong> (76.8M shares, 6.3%). The <strong>Hasso Plattner Foundation</strong> (co-founder Plattner) has a representative on the Supervisory Board; its holding does not appear in the 20-F's 5%-plus table and is not quantified here. StockAnalysis puts institutions at 41.55% and insiders at 5.38%. No holder has special voting rights.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">SAP reports four revenue lines — <strong>Cloud, Software Support, Services and Software Licenses</strong> — all in <strong>EUR</strong>. The mix bar uses trailing-twelve-month revenue to June 30, 2026 (€38.19B, StockAnalysis). The cards show the most recent reported period, <strong>Q2 2026 (April–June 2026)</strong>, from SAP's Quarterly Statement, with FY2025 for context. The shape is a hand-off: cloud grows while support and licences shrink, because a customer who moves to RISE with SAP stops paying on-premise maintenance and starts paying a subscription.</p>
+  <div class="seg-bar">
+    <div style="flex:60.6;background:#3DA5FF;">CLOUD 60.6%</div>
+    <div style="flex:26.3;background:#22c55e;">SUPPORT 26.3%</div>
+    <div style="flex:10.9;background:#f59e0b;">SVCS 10.9%</div>
+    <div style="flex:2.3;background:#a78bfa;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3DA5FF;"></span> Cloud — €23,143M TTM · Q2'26 €6,281M, +22% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span> (+24% cc)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Software Support — €10,030M TTM · Q2'26 €2,439M, −8% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Services — €4,160M TTM · Q2'26 €1,027M, −3% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Software Licenses — €860M TTM (2.3%) · Q2'26 €131M, −32% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Q2 2026 total revenue was €9,878M, +9% reported and +11% at constant currencies ("cc" — growth with exchange-rate moves stripped out). Cloud was 63.6% of the quarter.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #3DA5FF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Cloud (SaaS / PaaS / IaaS)</div>
+        <span class="biz-badge growth">GROWTH ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€6,281M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+22%</div><div class="biz-stat-label">YoY (+24% cc)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">74.6%</div><div class="biz-stat-label">Cloud GM (non-IFRS)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">60.6%</div><div class="biz-stat-label">Revenue Mix (TTM)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The <strong>Cloud ERP Suite</strong> — S/4HANA Cloud sold mainly through RISE with SAP and GROW with SAP, plus the finance, procurement, HR and supply-chain modules bundled around it — was <strong>€5,525M in Q2 2026, +25% (+27% cc)</strong>, 88% of cloud revenue. The Extension Suite (standalone products such as SuccessFactors, Concur, Ariba and customer-experience tools) grew 11% to €692M; infrastructure-as-a-service fell 23% to €65M as SAP exits it. FY2025 cloud revenue was €21,023M, +23%, with the Cloud ERP Suite at €18,119M, +28%. FY2026 guidance is <strong>€25.8–26.2B cloud revenue at constant currencies, +23% to 25%</strong>. The margin line is the watch item: cloud gross margin fell 0.6pp to 74.6% (non-IFRS) as SAP adds data-centre and AI capacity. Management guides CCB growth to "slightly decelerate" in 2026 from 25% in 2025.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM for enterprise applications not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Oracle</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$449.20B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Microsoft (Dynamics)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$3.724T</div><div class="comp-bubble-label">Mkt Cap (group)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Workday</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$46.25B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Software Support</div>
+        <span class="biz-badge dominant">CASH COW, SHRINKING BY DESIGN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€2,439M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−8%</div><div class="biz-stat-label">YoY (−7% cc)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">26.3%</div><div class="biz-stat-label">Revenue Mix (TTM)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Annual maintenance fees paid by on-premise customers — the installed base of ECC and on-premise S/4HANA. FY2025 support revenue was €10,525M, down 6.8% from €11,290M. This line is where the migration deadline lives. Every customer who converts to RISE moves spend from here into cloud, usually at a higher annual value. SAP's outlook says plainly that the support decline "is expected to accelerate in the coming years as a consequence of an acceleration of customers transforming to the cloud." On July 9, 2026 the European Commission closed its competition investigation into SAP's on-premise maintenance and support practices with a commitment decision (no fine was mentioned in the statement).</p>
+    <div class="biz-tam"><strong>Installed base:</strong> number of ECC customers still to migrate not disclosed in the sources fetched — not estimated.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Third-party support providers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Services</div>
+        <span class="biz-badge dominant">ADOPTION ENABLER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€1,027M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">−3%</div><div class="biz-stat-label">YoY (−2% cc)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.9%</div><div class="biz-stat-label">Revenue Mix (TTM)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Consulting, premium support and training. The 20-F describes the strategic focus of services as driving adoption of the cloud products, not maximising services revenue. Most migration labour is done by systems integrators, not SAP. FY2025 services revenue was €4,262M (−1.9%). Low-margin and deliberately flat; it matters mainly as a read on project activity.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced — no estimate presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Accenture</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">IBM (Consulting)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$218.50B</div><div class="comp-bubble-label">Mkt Cap (group)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Software Licenses</div>
+        <span class="biz-badge emerging">RUN-OFF</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€131M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−32%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.3%</div><div class="biz-stat-label">Revenue Mix (TTM)</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">One-time on-premise licence sales, now a rounding error: €990M in FY2025 (−29%) against €3,248M in FY2021. The decline is the intended result of the cloud transition. Licence revenue is lumpy and concentrated in Q4, so any single quarter says little.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not applicable — managed run-off.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating metrics that actually matter</h3>
+  <p class="prose">For a subscription transition, the income statement follows the backlog. Watch CCB growth, cloud margin, and the size of the support base still left to convert.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Current Cloud Backlog</div>
+      <div class="card-value">€22.9B</div>
+      <div class="card-note"><span style="color:var(--green);">+27% YoY (+26% cc)</span> at June 30, 2026, from €18.05B. The Reltio acquisition contributed less than 1pp. FY2026 guide: cc growth to "slightly decelerate" from 25% in 2025.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cloud Gross Margin (Q2'26)</div>
+      <div class="card-value" style="color:var(--amber);">74.6%</div>
+      <div class="card-note">Non-IFRS, <strong>−0.6pp YoY</strong> (−0.7pp cc); IFRS 74.3%, −0.5pp. First-half non-IFRS 74.9%, −0.2pp. Operating leverage from the transition is not yet showing up here.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow (Q2'26)</div>
+      <div class="card-value">€3,002M</div>
+      <div class="card-note"><span style="color:var(--green);">+27% YoY</span>. First half €6,250M (+5%). FY2026 target: about €10B at actual currencies, against €8.24B in 2025.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">FY2026 Operating Profit Guide</div>
+      <div class="card-value" style="font-size:20px;">€11.8–12.2B</div>
+      <div class="card-note">Non-IFRS, cc, +13% to 17%. Cut by €0.1B at the top and bottom (was €11.9–12.3B) to absorb over €100M of dilution from the Dremio and Prior Labs acquisitions, closed in July.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">System of record for finance &amp; supply chain</span>
+    <span class="moat-pill">Multi-year cloud contracts (€22.9B CCB)</span>
+    <span class="moat-pill">Migration path owned by SAP</span>
+    <span class="moat-pill">Integrator ecosystem</span>
+    <span class="moat-pill">Proprietary business-process data</span>
+    <span class="moat-pill">A1 / A+ balance sheet</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>switching cost at the system-of-record layer</strong>. An ERP holds a company's general ledger, inventory, orders and payroll; replacing it is a multi-year project that touches every department, which is why most ECC customers weigh "which SAP" rather than "whether SAP". The migration itself strengthens the moat: a RISE contract is a multi-year subscription with the hosting bundled in, so SAP moves from selling a licence that customers maintain to running the system for them. The AI pitch builds on that position — management argues that agents are only as good as the business data and process context under them, and SAP holds both. The vulnerability is that the switching cost protects the <em>installed base</em>, not the <em>price of the next contract</em>, and that AI agents may make it cheaper to wrap a legacy core than to replace it.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">A deadline-driven wave has a back end.</strong> Part of the 25%+ backlog growth is customers moving ahead of the end-2027 ECC mainstream-maintenance date. Management already guides CCB growth to slightly decelerate in 2026. Once the bulk of the installed base has converted, cloud growth has to come from new customers, expansion and AI rather than conversions, and the market will price the business on that lower run-rate.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The deadline is softer than the headline.</strong> Paid extended maintenance to 2030, a RISE transition option reported to run to 2033, and independent third-party support providers all let a hesitant customer wait. A slower, longer migration is still revenue, but it spreads the tailwind thinner.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Cloud gross margin is moving the wrong way.</strong> 74.6% non-IFRS in Q2 2026, −0.6pp YoY, while SAP accelerates R&amp;D and pays for AI compute. If AI features ship bundled rather than priced separately, margin dilution is the cost of defending the base.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">AI monetisation is not yet a reported number.</strong> SAP discloses Cloud ERP Suite and CCB, not AI revenue. The Q2 statement lists AI partnerships (Anthropic, AWS, NVIDIA, Palantir, Accenture and others, May 12) and two AI/data acquisitions (Dremio, Prior Labs), but the sources fetched contain no euro figure for AI revenue or attach rates.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark column is the <strong>S&amp;P 500</strong>. SAP is not a member; its home index is the <strong>DAX</strong>. Industry-average and S&amp;P 500 values were not obtained from the sources fetched and are shown as "—" rather than estimated. <strong>Per-share figures are USD per ADR</strong>: EUR per ordinary share × 1 ordinary share per ADR × 1.1490 USD/EUR (ECB reference rate, September 21, 2026). Statement figures are EUR.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SAP</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>27.2</td><td>—</td><td>—</td><td>$209.22 ÷ $7.68 TTM EPS per ADR = 27.24. StockAnalysis shows 27.12 using its own currency conversion ($7.63).</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>25.5</td><td>—</td><td>—</td><td>$209.22 ÷ ($8.19 = €7.13 FY2026 consensus EPS × 1.1490). The €7.13 consensus sits on a €6.15 FY2025 base (not IFRS €6.10), so it appears to be an adjusted figure. FY2027 consensus €8.37 ($9.62) gives 21.7x.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>n/a</td><td>—</td><td>—</td><td>Not published by the source. On StockAnalysis's 16.7% three-year EPS growth forecast, 27.2 ÷ 16.7 ≈ 1.6 (derived, not sourced).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share, converted here to USD per ADR.">EPS (TTM)</span></td><td>$7.68</td><td>—</td><td>—</td><td>€6.68 IFRS EPS per ordinary share (TTM to Jun 30, 2026, StockAnalysis) × 1 share/ADR × 1.1490 = $7.675. +20.2% YoY in EUR.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+6.4%</td><td>—</td><td>—</td><td>TTM, in EUR (€38.19B). Q2 2026 was +9% reported, <strong>+11% cc</strong>; the gap is the stronger euro. FY2026 guide: cc total-revenue growth similar to 2025's 10.6%, accelerating in 2027.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering the product, as a percentage of revenue.">Gross Margin</span></td><td>73.7%</td><td>—</td><td>—</td><td>TTM IFRS. Cloud gross margin (the one that matters as the mix shifts) was 74.6% non-IFRS in Q2 2026, −0.6pp YoY.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating profit as a percentage of revenue.">Operating Margin</span></td><td>28.8%</td><td>—</td><td>—</td><td>TTM IFRS (€10,991M ÷ €38,192M). Q2 2026 IFRS 26.8% (−0.5pp), non-IFRS 27.8% (−0.7pp).</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>20.4%</td><td>—</td><td>—</td><td>TTM. Flattered in Q2 2026 by a lower IFRS tax rate (26.5% vs 30.8% non-IFRS) from tax-exempt income.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.02%</td><td>—</td><td>—</td><td>$2.14 per ADR per StockAnalysis (USD-converted annual dividend; paid once a year, last ex-date May 5, 2026). Payout ratio 28.0%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of shares outstanding — the proportion sold short by investors betting the price falls. Measured on the US line only.">Short Interest (% shares out)</span></td><td>0.44%</td><td>—</td><td>—</td><td>5.03M ADRs short, down from 8.55M the prior month. US-line data only; says little about positioning in Frankfurt.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.22</td><td>—</td><td>—</td><td>€9.94B debt vs €11.63B cash and investments: <strong>net cash €1.69B</strong>. Rated A1 (Moody's) / A+ (S&amp;P); issued €3.5B of Eurobonds in May 2026.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.15</td><td>—</td><td>—</td><td>Normal for a subscription business that collects cash in advance (deferred revenue sits in current liabilities).</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>€8.73B</td><td>—</td><td>—</td><td>TTM (≈ $10.03B at 1.1490) — a <strong>4.2% FCF yield</strong> on the $241.5B market cap. FY2026 target about €10B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>18.3%</td><td>—</td><td>—</td><td>Price-to-tangible-book of 18.1x (StockAnalysis) shows how much of the equity base is acquired intangibles.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>18.2%</td><td>—</td><td>—</td><td>ROIC ≈ ROE: almost no net leverage.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.78</td><td>—</td><td>—</td><td>5-year. Understates the last year: the ADR fell 49% from its June 2025 month-end high to its June 2026 month-end.</td></tr>
+      <tr><td>52-Week Range</td><td>$144.97 – $281.37</td><td>—</td><td>—</td><td>$209.22 sits 25.6% below the high and 44.3% above the low. 52-week price change −21.61%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported numbers. First, the <strong>2024 transformation programme</strong>: €3,144M of restructuring expense in FY2024, against €3M in FY2025. That explains why IFRS EPS fell to €2.65 in 2024 and rebounded 130% to €6.10 in 2025; the 2025 growth rate is not a run-rate. Second, <strong>tax</strong>: in Q2 2026, IFRS profit after tax (€2,209M) exceeded non-IFRS (€1,828M) because tax-exempt income lowered the IFRS tax rate to 26.5%, so the +30% IFRS EPS growth in the quarter overstates the underlying +6% non-IFRS EPS growth. Third, <strong>buybacks and M&amp;A</strong>: a €10B repurchase programme (€2.6B spent by June 30 on 16.28M shares at €161.16 average) is shrinking the share count, while the Reltio, Dremio and Prior Labs acquisitions add backlog (Reltio under 1pp of CCB growth) and dilute 2026 operating profit by over €100M.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note"><strong>16 analysts</strong> polled by S&amp;P Global via StockAnalysis (US-line coverage). MarketBeat's 22-analyst panel reads <strong>Moderate Buy</strong> with an average target of $255.67. European-listed coverage in EUR is wider and is not counted here.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$250.33</div><div class="card-note"><span style="color:var(--green);">+19.65% upside</span> from $209.22. Median $250.50.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$177 – $319</div><div class="card-note">−15.4% to +52.5%. MarketBeat's range is wider, $177 – $375.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">13 / 3 / 0</div><div class="card-note">September 2026: 9 Strong Buy + 4 Buy, 3 Hold, 0 Sell. Count unchanged at 16 since April. No one on the panel is a seller after a 49% peak-to-trough fall.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:81.25;background:#22c55e;"></div>
+    <div style="flex:18.75;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 13 (81.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 3 (18.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Argus Research — Joseph Bonner</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$215 → $265</span> (Sep 10, 2026). The largest recent target increase, made after the August rally.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barclays — Raimo Lenschow</strong> · Overweight · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$255 → $242</span> (Jul 27, 2026). Stayed bullish on the Q2 print but trimmed the target.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">UBS — Michael Briest</strong> · Downgrade Buy → Neutral (Aug 26, 2026, per MarketBeat). The most notable change of stance since the results.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">TD Cowen — Derrick Wood</strong> · Buy · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$210 → $205</span> (Jul 24, 2026). And <strong>Bank of America — Frederic Boulan</strong> reiterated Buy on Sep 21, 2026, lifting the EUR target to €226 from €223 (TheFly headline carried on StockAnalysis).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results (after US close)</div>
+        <div class="tl-desc">The CCB growth rate is the number. Q2 was +26% cc against guidance for a "slight" deceleration from 2025's 25%; anything that reads as a sharper slowdown resets the migration-durability debate. Also watch cloud gross margin after two AI/data acquisitions, and FX: at June 30 rates SAP expects a +1.5pp currency tailwind to Q3 cloud growth, turning into −1.5pp for the full year.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 31, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">ECC 6.0 (EHP 6–8) mainstream maintenance ends</div>
+        <div class="tl-desc">The forcing function behind RISE with SAP. Per third-party summaries of SAP's policy (Rimini Street, SEIDOR), extended maintenance for a fee runs to end-2030, and RISE / private-edition customers get a transition option to 2033. Expect contract signings to bunch up before the deadline, with a question mark over what the growth rate looks like after it.</div>
+        <div class="tl-impact up">Tailwind through 2027, then a test</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Through end-2027</div>
+      <div class="tl-content">
+        <div class="tl-title">€10B share buyback — €7.4B left</div>
+        <div class="tl-desc">Started February 2026; €2.6B done by June 30 at an average €161.16. At current prices the remaining €7.4B (≈ $8.5B at 1.1490) is about 3.5% of the market cap.</div>
+        <div class="tl-impact up">Support under the price</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">CCB +26% cc, cloud +24% cc, Cloud ERP Suite +27% cc, FCF +27%, operating-profit guide trimmed for acquisition dilution. The ADR rose <strong>+9.30% on Jul 24, +6.88% on Jul 27 and +4.77% on Jul 28</strong>, from a $146.38 close on the day of the release to $179.17 three sessions later.</div>
+        <div class="tl-impact up">Reaction already happened: July +19.1%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">EU antitrust case closed; Dremio and Prior Labs closed</div>
+        <div class="tl-desc">July 9: the European Commission concluded its probe into SAP's on-premise maintenance and support practices through a commitment decision. July 6 and 16: SAP completed the Dremio (data lakehouse) and Prior Labs (tabular foundation models) acquisitions — the AI-and-data layer management says turns ERP data into agent-ready context.</div>
+        <div class="tl-impact neutral">Overhang removed; AI build-out priced in guidance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SAP (NYSE ADR, USD) — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes of the NYSE ADR + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3DA5FF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$135.04</strong> to the September 21, 2026 settled close of <strong>$209.22</strong>, the SAP ADR gained <strong>54.9% on price</strong> (dividends excluded). The path went down, up, then down again. A 2022 rate-shock trough at $81.25, a 3.7x run to $304.10 in June 2025 as the cloud transition started to show up in margins, then a 49% fall to $154.11 by June 2026. The ADR is priced in dollars on a euro business, so some of every move is currency. The 5-year window is an ADR-in-USD series. The home-market XETRA line in EUR will look different.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reached <strong>12.1 in April 2026</strong>, the most oversold reading in the five-year window, and far below the 20.0 of the September 2022 bear-market trough. It has since recovered to <strong>52.3</strong>, neutral. The price ($209.22) is above the 10-month moving average (~$193.58), as it was at the August month-end — the first two such readings since July 2025. The long-term trend line has been crossed; one month does not show it will hold.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock trough — $81.25</div><div class="tl-desc">The low of the window, after nine down months out of eleven, in the year FY2022 net income fell to €2.28B. RSI 20.0.</div><div class="tl-impact down">−44% from Oct 2021</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan–Mar 2024</div><div class="tl-content"><div class="tl-title">Transformation programme, re-rating begins — $173 → $195</div><div class="tl-desc">SAP announced its company-wide restructuring in January 2024 (€3.1B of charges in FY2024) to refocus on cloud and business AI. The market looked through the charge to the margin story.</div><div class="tl-impact up">+26% in the quarter</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">Peak — $304.10</div><div class="tl-desc">The high of the window. RSI at 90.0 — no month since April 2024 had fallen more than 2.4%.</div><div class="tl-impact up">5-year high</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">−17.2% in one month — $201.04</div><div class="tl-desc">The month of the FY2025 results and 2026 outlook (Jan 29), which guided CCB growth to slightly decelerate, alongside a new €10B buyback. The drop coincided with that release; the sources fetched do not attribute the move to a single cause.</div><div class="tl-impact down">−17.2% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–Jun 2026</div><div class="tl-content"><div class="tl-title">Two more −15% months — $154.11</div><div class="tl-desc">March −15.0% and June −15.2%. RSI printed 12.1 in April. The lowest close in the six months of daily data fetched was $146.38 on July 23, the day of the Q2 release; the intraday 52-week low is $144.97.</div><div class="tl-impact down">−49% from Jun 2025</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">Q2 relief rally — $183.62, then $220.89</div><div class="tl-desc">+19.1% in July and +20.3% in August, the two best months in the window, after CCB came in at +26% cc.</div><div class="tl-impact up">+43% in two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $209.22</div><div class="tl-desc">−5.3% month to date after a −4.01% session on Sep 1 and a +5.78% session on Sep 14; cause of the Sep 14 move not established from the sources fetched.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> (benchmark) and the <strong>DAX</strong> (home index) were not obtained from the sources fetched, so no numeric comparison is given. From sourced data: the ADR is <strong>+54.9% over five years</strong> and <strong>−21.61% over the trailing 52 weeks</strong>. Against software peers by market value (companiesmarketcap, Sep 21, 2026), SAP at $241.5B ranks #8 globally in software — behind Microsoft ($3.724T), Oracle ($449.2B), Palantir, Palo Alto Networks and CrowdStrike, ahead of Salesforce ($194.6B), ServiceNow ($142.3B) and Workday ($46.3B). On valuation StockAnalysis shows 17.9x <span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span> and 24.1x price-to-free-cash-flow; peer multiples were not retrieved.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A €22.9B current cloud backlog growing 26% at constant currencies means most of next year's cloud revenue is already under contract. The Cloud ERP Suite is +27% cc and 88% of cloud. Management guides total cc growth to accelerate in 2027, with opex growing at only 80–90% of revenue growth, which is operating leverage by design. FCF is heading to about €10B, the balance sheet is net cash and rated A1/A+, and a €10B buyback runs to end-2027. At 27.2x trailing and 25.5x forward USD EPS, after a 49% drawdown, you buy a business whose ERP migration deadline still lies ahead. If AI agents need clean, process-level business data, SAP owns the data they need.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The backlog is strong because a deadline is pulling it forward, and management already guides deceleration. Cloud gross margin is falling (74.6%, −0.6pp) while R&amp;D and AI compute ramp and acquisitions dilute profit by over €100M. Support revenue (26% of TTM sales, the highest-margin stream) is shrinking 8% a year, and SAP says that decline will accelerate. AI revenue is not disclosed, so "AI monetisation" is still a claim, not a number. And the deadline is softer than advertised — 2030 extended maintenance and a 2033 transition option spread the wave out. On that view 25x forward earnings is not cheap for growth that peaks with the migration.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Post-migration growth cliff.</strong> CCB growth is guided to slightly decelerate in 2026. If Q3 or Q4 show a sharper slowdown, the market will read it as the migration wave peaking before 2027 rather than after.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Margin cost of AI.</strong> Cloud gross margin −0.6pp YoY in Q2, operating-profit guidance cut for acquisition dilution, R&amp;D spending accelerating. If AI is priced into the suite rather than sold on top, it defends revenue while diluting margin.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Currency.</strong> ~31% of revenue comes from the US and the guidance assumes 1.13 USD/EUR. SAP's own table shows a −1.5pp FX drag on FY2026 cloud growth and −2.0pp on operating-profit growth at June 30 rates. For a USD holder of the ADR a strong euro partly offsets this, but reported euro growth — the number the market trades on — takes the hit.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The ERP migration wave and the 2027 deadline</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">TAILWIND, TIME-LIMITED</span></div>
+    <p class="biz-desc">The on-premise ECC installed base has to go somewhere before end-2027, when mainstream maintenance for EHP 6–8 ends (third-party summaries of SAP's policy). SAP's answer is RISE with SAP: a bundled subscription that moves the customer to S/4HANA Cloud, with SAP running the infrastructure. Its results show the mechanism clearly. Cloud ERP Suite +27% cc, software support −7% cc, and a statement that the support decline will accelerate "as a consequence of an acceleration of customers transforming to the cloud." The question for the multiple is duration: extended maintenance to 2030 and a reported 2033 transition option mean the wave can be long and shallow rather than short and steep. A long, shallow wave is better for sustaining the backlog. It is worse for anyone betting on a 2027 peak-and-fade.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">AI: defend the system of record, then charge for it</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">UNPROVEN IN THE NUMBERS</span></div>
+    <p class="biz-desc">SAP's 2026 strategy is branded the "Autonomous Enterprise": Joule as the AI interface, Joule Agents that execute workflows, and Business Data Cloud as the data layer — now reinforced by Reltio (master data), Dremio (lakehouse) and Prior Labs (tabular foundation models), plus partnerships with Anthropic, AWS, NVIDIA, Palantir and Accenture announced May 12, 2026. The bull reading is that agents are only useful if they sit on accurate business data, which SAP owns, so AI deepens lock-in. The bear reading is that AI agents make it easier to automate around an ERP core rather than buy more modules from its vendor. Neither is settled by the numbers: SAP reports no standalone AI revenue in the sources fetched, and the measurable costs — cloud margin down, R&amp;D up, >€100M of acquisition dilution — arrive before the revenue.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The 2026 software de-rating</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">SENTIMENT HEADWIND</span></div>
+    <p class="biz-desc">SAP's ADR fell 49% from June 2025 to June 2026 while its reported CCB growth stayed in the mid-20s — the price moved far more than the fundamentals. The fetched sources do not establish a single cause, and this report does not assign one. The market-cap table shows the damage across the group: on September 21, 2026 SAP ($241.5B) sits below CrowdStrike and Palo Alto Networks and not far above Salesforce ($194.6B), and trails Siemens for the #1 spot in Germany by about $3.3B. The July–August rebound (+43% in two months) came straight after a backlog print. For this stock the backlog number moves the price, and the October 21 print is the next one.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/sap/history/</strong> — the September 21, 2026 settled close of the NYSE ADR, $209.22 (open 212.43, high 212.71, low 209.01, volume 1,824,146, Adj. Close present, −0.11% on the prior close of $209.45). Corroborated by the stockanalysis.com/stocks/sap/ quote page ("At close: Sep 21, 2026, 4:00 PM EDT", Previous Close 209.45, −0.23) and by companiesmarketcap's $209.22 share price. The $208.88 after-hours print is not used.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Currency and ADR ratio: 1 ADR = 1 SAP ordinary share, per SAP SE's FY2025 Form 20-F (filed Feb 26, 2026). EUR/USD 1.1490 is the European Central Bank euro reference rate for September 21, 2026 (ECB Data Portal, series EXR.D.USD.EUR.SP00.A). USD EPS per ADR = EUR EPS per ordinary share × 1 × 1.1490: TTM €6.68 → $7.68; FY2026 consensus €7.13 → $8.19; FY2027 consensus €8.37 → $9.62. StockAnalysis's own USD figures ($7.63 EPS, 27.12 P/E) use a different conversion and are cited only for comparison.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: SAP Quarterly Statement Q2 2026 (July 23, 2026, via PR Newswire) for CCB, cloud and Cloud ERP Suite revenue, cloud gross margin, operating profit, EPS, FCF, buyback, outlook, FX assumptions, acquisitions, partnerships, the EC decision and CEO/CFO quotes; SAP SE Form 20-F for FY2025 (sec.gov) for the ADR ratio, major shareholders, regional revenue, FY2025 segment and restructuring figures and founding/HQ; stockanalysis.com (quote, statistics, annual/quarterly/TTM financials, forecast, profile, history) for price, valuation, margins, returns, balance sheet, consensus (16 analysts, S&amp;P Global) and named calls, Sector/Industry labels and employees; marketbeat.com for the 22-analyst panel and the UBS, Barclays and TD Cowen actions; companiesmarketcap.com for the global rank (#74), the Germany country ranking (#2) and peer market caps; digrin.com/stocks/detail/SAP/price (unadjusted "Real price" column) for month-end closes; Rimini Street and SEIDOR blog summaries of SAP's ECC maintenance dates (third-party, not an SAP document).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes of the NYSE ADR in USD from September 2021 through August 2026 from digrin's unadjusted "Real price" column, plus a final point at the September 21, 2026 settled close of $209.22. The August 2026 month-end ($220.89) matches the stockanalysis daily close for Aug 31, 2026. <strong>No interior months were reconstructed or estimated.</strong> No ADR ratio change or split occurred in the window (last split: 4:1 on July 28, 1998). The final point is a settled close 15 trading days into September, not a month-end. Industry-average and S&amp;P 500 benchmark columns in Section 04 are "—" because no sourced values were obtained. Market shares, TAM and the size of the remaining ECC installed base were not verified and are shown as "n/v" or omitted. Competitor figures are market capitalisations, not revenues or shares. The Hasso Plattner Foundation's stake was not quantified in the sources fetched. The FY2026/27 consensus EPS basis (adjusted vs IFRS) is inferred from its €6.15 FY2025 base, not stated by the source. APJ's ~14% revenue share is derived as the remainder of FY2025 revenue after EMEA and Americas.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results; current cloud backlog is contracted revenue expected over the next twelve months, not revenue recognised. ADR holders bear EUR/USD currency risk. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (NYSE ADR, USD; digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [135.04,144.78,128.44,140.11,125.21,112.58,110.96,100.80,99.84,90.72,93.21,85.22,81.25,96.06,110.87,103.19,118.53,113.82,126.55,135.27,130.44,136.81,136.35,139.69,129.32,134.00,159.12,154.59,173.10,187.87,195.03,181.21,182.44,201.71,211.60,219.71,229.10,233.64,237.60,246.21,276.06,275.00,268.44,292.19,302.86,304.10,286.70,272.16,267.21,260.01,241.75,242.91,201.04,201.53,171.21,169.49,181.79,154.11,183.62,220.89,209.22];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — rate-shock trough $81.25, RSI 20.0',            color: '#ef4444' },
+  { idx: 28, label: 'Jan 2024 — transformation programme; re-rating begins',    color: '#3b82f6' },
+  { idx: 45, label: 'Jun 2025 — 5-year high $304.10, RSI 90',                   color: '#22c55e' },
+  { idx: 52, label: 'Jan 2026 — FY25 results / 2026 outlook month; −17.2%',     color: '#f59e0b' },
+  { idx: 55, label: 'Apr 2026 — RSI 12.1, most oversold in window',             color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — $154.11, −49% from Jun 2025 peak',              color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2: CCB +26% cc; +19.1% month',                 color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $209.22',                     color: '#3DA5FF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(61,165,255,0.22)');
+grad.addColorStop(1, 'rgba(61,165,255,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3DA5FF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3DA5FF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
