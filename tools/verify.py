@@ -39,16 +39,23 @@ def check(path):
     else:
         out['n_labels'] = out['n_prices'] = None; out['price_match'] = False
     # P/E arithmetic
-    pe = re.search(r'Trailing\s*<span[^>]*>P/E</span>.*?<td[^>]*>\s*([\d.]+)', t, re.S) or re.search(r'Trailing P/E.*?<td[^>]*>\s*(?:<[^>]+>\s*)*([\d.]+)', t, re.S)   # value may sit inside a <span>
-    # anchor on the row's label cell first: the loose pattern fires on "TTM EPS" in the P/E row's context text
-    # and then reads the next row's value (VMC read its Forward P/E as EPS)
-    eps = re.search(r'>\s*EPS\s*\(TTM\)\s*(?:</span>)?\s*</td>\s*<td[^>]*>\s*\$?(-?[\d.]+)', t) \
-        or re.search(r'EPS.*?TTM.*?<td[^>]*>\s*\$?(-?[\d.]+)', t, re.S)
-    if pe and eps and price:
-        try:
-            out['pe_stated'] = float(pe.group(1)); out['pe_calc'] = round(price / float(eps.group(1)), 2)
-        except Exception:
-            pass
+    # read the metrics table row by row with tags stripped: labels are often split into tooltip spans
+    # ("<span>EPS</span> (<span>TTM</span>)"), values sit inside spans, and a loose regex over the whole page
+    # picks up numbers from prose or the next row. A value cell that is not a plain number (n/m, n/a, ~257x)
+    # yields no check rather than a wrong one.
+    rows = {}
+    for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S):
+        cells = [re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', c)).strip() for c in re.findall(r'<td[^>]*>(.*?)</td>', tr, re.S)]
+        if len(cells) >= 2:
+            rows.setdefault(cells[0], cells[1])
+    def val(cell):
+        m = re.match(r'^\s*([−-])?\s*\$?([\d,]+(?:\.\d+)?)\s*[x×]?\s*(?:$|\(|—|–|-|\s)', cell)
+        return (-1 if m.group(1) else 1) * num(m.group(2)) if m else None
+    pe_cell = next((v for k, v in rows.items() if re.match(r'^Trailing P/?E\b', k)), None)
+    eps_cell = next((v for k, v in rows.items() if re.match(r'^(?:Diluted )?EPS \(TTM\b', k)), None)
+    pe_v, eps_v = (val(pe_cell) if pe_cell else None), (val(eps_cell) if eps_cell else None)
+    if pe_v is not None and eps_v and eps_v > 0 and price:
+        out['pe_stated'] = pe_v; out['pe_calc'] = round(price / eps_v, 2)
     # 52-week range
     r = re.search(r'52-Week Range.*?\$?([\d,]+\.\d+)\s*(?:[–\-—]|&ndash;|&mdash;)\s*\$?([\d,]+\.\d+)', t, re.S)
     if r and price:
