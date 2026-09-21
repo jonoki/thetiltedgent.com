@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-k · claimed 2026-09-21 (local Claude Code session)
+VTRS BBY AMCR LYB NI SNA GIS LEN IP SBAC
+
 ### sess-2026-09-21-j · claimed 2026-09-21 (local Claude Code session)
 DLTR OMC LUV EXE CMS RL STZ STE CHTR FICO
 
