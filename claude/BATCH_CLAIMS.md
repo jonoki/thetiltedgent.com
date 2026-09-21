@@ -23,8 +23,11 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-g1 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
+TSM BABA HSBC NVS SAP TM SHEL TTE BHP MUFG
+
 ### sess-2026-09-21-f · claimed 2026-09-21 (local Claude Code session)
-SYF RF HUBB DRI ULTA SW PPG VLTO CHD GPN
+SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
 
 ### sess-2026-09-21-e · claimed 2026-09-21 (local Claude Code session)
 WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
