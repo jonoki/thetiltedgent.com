@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TPR — Tapestry, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #C68B4E;
+  --accent-dim: #C68B4E33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">TPR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Luxury Goods</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $22.55B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #1067 (est.)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);border:1px solid #22c55e44;padding:3px 10px;border-radius:4px;">S&amp;P 500 member since September 1, 2004 (as Coach, Inc.)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Tapestry, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$113.07</div>
+      <div class="price-change">−$1.93 (−1.68%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours: $113.40 (+0.29%) at 5:35 PM EDT — not used in this report</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 10 Hudson Yards, New York, New York</div>
+    <div class="meta-item"><span>Employees:</span> 20,600</div>
+    <div class="meta-item"><span>Founded:</span> 1941 (IPO Oct 5, 2000)</div>
+    <div class="meta-item"><span>Fiscal Year:</span> ends late June / early July</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 5, 2026 (Q1 FY2027)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Tapestry is the handbag company that used to be called Coach. The leather workshop founded in New York in 1941 listed as Coach, Inc. in October 2000, bought Kate Spade in 2017 in a $2.4 billion deal, and renamed itself Tapestry — ticker COH became TPR — on October 31, 2017, to sound like a house of brands rather than one brand. Nine years later it is, in practice, one brand again: in fiscal 2026 (year ended June 27, 2026) <strong>Coach produced $6.91B of $8.00B in revenue — 86%</strong> — and grew 24%, while Kate Spade shrank 10% and Stuart Weitzman was sold on August 4, 2025. Total revenue rose <strong>14% reported, 17% on a pro forma constant-currency basis</strong>, with non-GAAP <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> up 38% to <strong>$7.05</strong> and GAAP EPS of <strong>$7.27</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The detour that explains the last five years is the one that did not happen. In August 2023 Tapestry agreed to buy Capri Holdings — Michael Kors, Versace, Jimmy Choo — for $8.5 billion. The FTC sued to block it in April 2024, a court blocked it on October 24, 2024, and the companies called it off the following month. The market's verdict on the deal was written in the stock: a 22.8% fall the month it was announced, a 31.3% rise the month it died. Freed of the integration, management spent the cash on buybacks instead — $2.06B in FY2025 and $1.64B in FY2026 per the cash-flow statement — and hit its September 2025 Investor Day revenue, margin and EPS targets two years early. And then, on August 13, 2026, the stock fell <strong>16.5% in a day</strong> on a beat, because the FY2027 guide called for mid-single-digit growth after a 17% year. That is the whole debate: is Coach a structurally re-rated brand compounding at a lower speed, or a fashion cycle that has just peaked?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Joanne Crevoiserat</div>
+      <div class="card-note">CEO since July 2020, previously Tapestry's CFO from early 2019. Quoted in the FY2026 results release (Aug 13, 2026): "Our success is by design, demonstrating the power of our Amplify strategy."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CFO &amp; COO / Coach CEO</div>
+      <div class="card-value" style="font-size:20px;">Scott Roe · Todd Kahn</div>
+      <div class="card-note">Scott Roe is Chief Financial Officer and Chief Operating Officer (named CFO in 2021, from VF). Todd Kahn is CEO and Brand President of Coach — the division that is now 86% of revenue. Both per the StockAnalysis executive list.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">101.4% institutional</div>
+      <div class="card-note">Institutions hold 101.40% of shares outstanding and insiders 0.42% per StockAnalysis (above 100% is a known artefact of share lending and filing lags). Named top holders were not retrieved this session and are not shown.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Tapestry reports two brand segments, <strong>Coach and Kate Spade</strong>; Stuart Weitzman contributed $14.6M in FY2026 before its sale on August 4, 2025. The mix below is <strong>FY2026 (year ended June 27, 2026) net sales</strong>. The three lines sum to $8,004.2M, which ties to reported revenue.</p>
+  <div class="seg-bar">
+    <div style="flex:86.4;background:#C68B4E;">COACH 86.4%</div>
+    <div style="flex:13.4;background:#f472b6;">KATE SPADE 13.4%</div>
+    <div style="flex:0.2;background:#64748b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#C68B4E;"></span> Coach — $6,914.7M (FY26), +24% <span class="tip" title="Year over year — versus the prior fiscal year.">YoY</span> (+23% constant currency)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f472b6;"></span> Kate Spade — $1,074.9M, −10% YoY (−11% constant currency)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Stuart Weitzman — $14.6M, divested Aug 4, 2025</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">This is a one-engine aircraft. Coach added roughly $1.3B of revenue in a year; Kate Spade lost about $120M. Segment operating income was not retrieved from the sources fetched and is not shown.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #C68B4E;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Coach</div>
+        <span class="biz-badge growth">GROWTH ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6,915M</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+24%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">86.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The original business and, again, nearly the whole business. Women's handbags alone were <strong>$4,016M</strong> in FY2026 (up from $3,223M), with women's accessories — small leather goods, wristlets, bag charms — at $1,992M, footwear $408.5M and other products $498.1M. The story in one number: Coach <strong>handbag <span class="tip" title="Average Unit Retail — the average price a unit actually sells for after discounts. Rising AUR means fewer markdowns and/or pricier products.">AUR</span> rose at a mid-teens percentage rate</strong> in both Q4 and the full year, and the company says leathergoods growth came from both price and units. That is pricing power, earned by pulling back from outlet discounting and by landing with younger buyers — Tapestry says roughly 35% of its 11.0 million new FY2026 customers were Gen Z. Coach grew double digits in every quarter of FY2026, including 14% constant currency in Q4.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> accessible-luxury handbag TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Ralph Lauren</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$20.25B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Capri Holdings (Michael Kors)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.63B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f472b6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Kate Spade New York</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">SHRINKING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,075M</div><div class="biz-stat-label">FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−10%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Bought for $2.4 billion in 2017 and written down by <strong>$855M</strong> in the fourth quarter of FY2025 — goodwill and brand-intangible impairment charges that turned Tapestry's FY2025 GAAP EPS into $0.82. Revenue has fallen every year in the sources fetched: annual segment sales of $1.42B in FY2023 became $1.33B in FY2024, $1.20B in FY2025 and $1.07B in FY2026, and Q4 FY2026 was down another 7% to $235.1M. Handbags, the brand's core, fell from $779.7M in FY2023 to $594.9M in FY2026. The fix under way is creative: Jonathan Saunders was named Executive Creative Director, effective August 26, 2026. The question for the equity is not whether Kate Spade recovers but whether it stops consuming management attention and marketing dollars that Coach would earn more on.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Capri Holdings (Michael Kors)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.63B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Ralph Lauren</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$20.25B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Where the growth came from</h3>
+  <p class="prose">For a brand business, judge it on <strong>price realised</strong>, <strong>new customers</strong> and <strong>geography</strong>. FY2026, pro forma (ex-Stuart Weitzman), constant currency unless noted.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Greater China</div>
+      <div class="card-value" style="color:var(--green);">+35%</div>
+      <div class="card-note">$1,396.6M of revenue, +38% reported and +28% constant currency in Q4 alone. Now the second-largest region behind North America ($5,034.1M, +15%). Europe grew 23% to $525.4M.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Japan</div>
+      <div class="card-value" style="color:var(--red);">−7%</div>
+      <div class="card-note">$465.7M, −10% reported. The one major region going backwards, and down 4% constant currency in Q4.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">New Customers (FY26)</div>
+      <div class="card-value">~11.0M</div>
+      <div class="card-note">Including over 2.5 million in Q4, with approximately 35% Gen Z, per the company. Direct-to-consumer revenue grew 16% for the year; stores grew at a mid-teens rate and digital at a high-teens rate.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Non-GAAP Gross Margin</div>
+      <div class="card-value">76.6%</div>
+      <div class="card-note">Up 120<span class="tip" title="Basis points — one basis point is 0.01 percentage points."> bps</span>, after absorbing a <strong>130bps tariff and duty hit</strong>. Operational improvements added ~200bps and the Stuart Weitzman exit ~60bps.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">85-year Coach brand heritage</span>
+    <span class="moat-pill">Pricing power (AUR up mid-teens)</span>
+    <span class="moat-pill">Direct-to-consumer control</span>
+    <span class="moat-pill">Gen Z customer acquisition</span>
+    <span class="moat-pill">76.6% gross margin</span>
+    <span class="moat-pill">Greater China scale</span>
+    <span class="moat-pill">$1.8B free cash flow</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A handbag company's moat is the distance between what the bag costs to make and what someone will pay for the logo. Tapestry's non-GAAP gross margin of 76.6% says that distance is wide, and the direction matters more than the level: rising average unit prices <em>alongside</em> rising units is the signature of a brand gaining heat rather than buying volume with discounts. The operating model — mostly own stores and own websites, not department stores — means Tapestry sees the customer data and sets the price. The vulnerability is that a brand moat is rented from the customer's taste, and taste can be withdrawn faster than a factory can be closed.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Single-brand concentration.</strong> Coach is 86% of revenue and nearly all of the growth. A portfolio built to diversify fashion risk has ended up with the opposite: one brand, one core category (handbags were $4.0B of Coach's $6.9B), and a customer base increasingly weighted to young buyers whose loyalty is untested through a downturn.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Kate Spade keeps shrinking.</strong> −10% in FY2026, −7% in Q4, $855M of impairments already taken in FY2025. Each year it shrinks, fixed store and marketing costs are spread over less revenue.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Tariffs.</strong> Tariff and duty costs took 130bps off FY2026 gross margin, and the FY2027 guide embeds a mid-20% tariff rate on U.S. inventory receipts. FY2026 also benefited from one-off IEEPA tariff refunds, which are excluded from non-GAAP figures.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">A thin equity base.</strong> Buybacks have left book equity at $692.1M against $3.96B of total debt (including leases), so debt-to-equity reads 5.72x and ROE 197%. Neither number is a useful signal on its own; the company's own leverage measure — gross debt to adjusted EBITDA — was 1.1x at fiscal year-end.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which Tapestry has been a member since 2004. It is NYSE-listed and not eligible for the NASDAQ-100. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—". Ratios below are StockAnalysis (S&amp;P Global data) unless recomputed at the $113.07 close, which is stated where done.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>TPR</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>15.6</td><td>—</td><td>—</td><td>$113.07 ÷ $7.27 GAAP TTM EPS = 15.55. StockAnalysis shows 15.82, computed on the prior close of $115.00. On non-GAAP FY26 EPS of $7.05 it is 16.0.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>14.2</td><td>—</td><td>—</td><td>$113.07 ÷ consensus FY2027 EPS of $7.97 = 14.19. On management's $7.80–$7.90 guide midpoint ($7.85) it is 14.4.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>1.67</td><td>—</td><td>—</td><td>StockAnalysis figure. Consensus 3-year EPS growth forecast is 13.14% a year.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — here equal to fiscal 2026, which ended June 27, 2026.">EPS (TTM)</span></td><td>$7.27</td><td>—</td><td>—</td><td>GAAP, FY2026. Up from $0.82 in FY2025, which carried the $855M Kate Spade impairment. Non-GAAP EPS was $7.05, up 38%.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+14.2%</td><td>—</td><td>—</td><td>FY2026 reported, $8.00B vs $7.01B. <strong>+17% pro forma constant currency</strong> excluding the sold Stuart Weitzman. FY2027 guide: $8.4–$8.5B, mid-single digits.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of the goods sold, as a percentage of revenue.">Gross Margin</span></td><td>76.6%</td><td>—</td><td>—</td><td>Non-GAAP 76.6% (+120bps); GAAP 77.8%, lifted by one-off items. Up from 69.6% in FY2022.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>23.3%</td><td>—</td><td>—</td><td>Non-GAAP 23.4%, +340bps, including 80bps from the Stuart Weitzman exit. FY2027 guide: ~50bps more expansion.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>19.1%</td><td>—</td><td>—</td><td>$1.53B net income on $8.00B revenue. FY2025 was 2.6% because of the impairment.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.64%</td><td>—</td><td>—</td><td>$1.85 annualised ($0.4625/quarter, raised 16%) on $113.07. Payout ratio 22.87%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>7.56%</td><td>—</td><td>—</td><td>15.00M shares short, down from 16.53M the prior month; 4.28 days to cover.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings (here including lease liabilities) divided by shareholders' equity.">Debt-to-Equity</span></td><td>5.72</td><td>—</td><td>—</td><td>Inflated by buyback-depleted equity ($692.1M). Total debt $3.96B incl. leases; borrowings $2.38B; gross debt / adj. EBITDA 1.1x.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>1.75</td><td>—</td><td>—</td><td>Quick ratio 1.01. Inventory $826M, down from $861M a year earlier while sales rose 14%.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$1.81B</td><td>—</td><td>—</td><td>FY2026, up 66% from $1.09B. An 8.0% FCF yield on the $22.55B market cap. FY2027 guide: adjusted FCF approaching $1.7B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>197.1%</td><td>—</td><td>—</td><td>Not meaningful as a quality signal — a small denominator after years of buybacks.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by debt plus equity capital employed.">ROIC</span></td><td>43.5%</td><td>—</td><td>—</td><td>The better measure here. Against a StockAnalysis-estimated WACC of 10.69%.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>1.43</td><td>—</td><td>—</td><td>5-year beta. A consumer-discretionary name that moves more than the market in both directions.</td></tr>
+      <tr><td>52-Week Range</td><td>$93.00 – $164.80</td><td>—</td><td>—</td><td>$113.07 sits 31% below the high and 22% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported series. First, <strong>the Kate Spade impairment</strong>: $855M of goodwill and brand-intangible charges in Q4 FY2025 produced a quarterly GAAP loss of $2.49 per share and make every FY2026-vs-FY2025 GAAP growth rate meaningless (StockAnalysis shows net income +734%). Second, <strong>FY2026 items that ran the other way</strong>: IEEPA tariff refunds, distribution-network optimisation, organisation-efficiency costs and the Stuart Weitzman divestiture together <em>added</em> $49M to operating income and $0.22 to EPS — which is why GAAP EPS ($7.27) is above non-GAAP ($7.05), and why this report's trailing P/E uses the lower-quality GAAP figure only because it is the reported one. Third, <strong>the Capri financing</strong>: debt on the balance sheet was $8.77B at the end of FY2024 (with $7.20B of cash) because the acquisition was pre-funded; it fell back to $3.90B after the deal was abandoned. Looking ahead, FY2027 has a <strong>53rd week</strong>, which management says adds about a point to revenue growth and is excluded from its guidance.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">22 analysts polled by S&amp;P Global via StockAnalysis (data as of Sep 16, 2026).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$166.50</div><div class="card-note"><span style="color:var(--green);">+47.3% upside</span> from $113.07. Median target $167 (+47.7%). The targets have not followed the stock down.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$96 – $232</div><div class="card-note">−15.1% to +105.2%. Even the lowest target is only 15% below the current price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">17 / 4 / 1</div><div class="card-note">11 Strong Buy + 6 Buy, 4 Hold, 1 Sell, 0 Strong Sell (September 2026). In August the Strong Sell count went from 1 to 0 and the Sell count from 0 to 1.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:77.3;background:#22c55e;"></div>
+    <div style="flex:18.2;background:#f59e0b;"></div>
+    <div style="flex:4.5;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 17 (77.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 4 (18.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (4.5%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS — Jay Sole</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$232</span> maintained (Sep 2, 2026). The highest target on the board, implying the stock roughly doubles.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barclays — Adrienne Yih</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$185</span> maintained (Sep 10, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Telsey Advisory — Dana Telsey</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$175</span> maintained (Sep 15, 2026). <strong>Goldman Sachs — Brooke Roach</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$169</span> maintained (Sep 16, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Guggenheim</strong> · Hold maintained, no target listed (Sep 11, 2026). None of the firms named here changed its rating in September, after the August sell-off.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 5, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 FY2027 Earnings</div>
+        <div class="tl-desc">Management guided to high-single-digit revenue growth and EPS of about $1.55, low-teens growth — above the $1.48 consensus cited by Yahoo Finance at the time. The first test of whether the full-year mid-single-digit guide is a floor or a ceiling. Watch Coach AUR, Greater China, and whether Kate Spade's decline narrows.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">$1.7B capital return — $1.35B of buybacks</div>
+        <div class="tl-desc">The same total as FY2026, of which $1.35B in repurchases under the existing authorisation — about 6% of the current market cap. The FY2026 program bought ~11.5 million shares at an average of ~$118, so the company has been buying at roughly today's price.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Coach and Kate Spade buyable in Google's Gemini app and AI Mode</div>
+        <div class="tl-desc">Announced by Business Wire in mid-September: products purchasable directly inside Google's AI shopping surfaces. Tapestry also holds a U.S. patent for Mira, a proprietary AI platform. A distribution experiment, not yet a number.</div>
+        <div class="tl-impact neutral">Watch item</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Kate Spade: Jonathan Saunders as Executive Creative Director</div>
+        <div class="tl-desc">The latest attempt at a Kate Spade creative reset. Product designed under a new director typically takes several seasons to reach stores, so FY2027 numbers will mostly reflect the old line.</div>
+        <div class="tl-impact neutral">Slow-burn</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 13, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 results — beat, then −16.5%</div>
+        <div class="tl-desc">Q4 revenue $1.88B (+9%, +11% pro forma constant currency), non-GAAP EPS $1.32 vs a $1.25 consensus. But the FY2027 revenue guide of $8.4–$8.5B had a midpoint below the $8.47B consensus, and mid-single-digit growth after 17% read as a deceleration. The stock closed at $128.39, down 16.49%, after falling 4.24% the day before.</div>
+        <div class="tl-impact down">Reaction already happened: −16.5% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend paid — $0.4625 per share</div>
+        <div class="tl-desc">The first payment at the 16%-higher rate, to holders of record on September 4, 2026 (the ex-dividend date).</div>
+        <div class="tl-impact up">Paid</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">TPR — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#C68B4E;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$37.02</strong> to the September 21, 2026 settled close of <strong>$113.07</strong>, TPR roughly tripled — <strong>+205% on price</strong> — before dividends of roughly $7 a share over the period (an approximation from the fiscal-year dividend series). Almost all of that came in one leg: the stock went nowhere for three years, bottoming at <strong>$27.56 in October 2023</strong> while the Capri deal hung over it, then rose more than fivefold to a <strong>$155.47 month-end peak in February 2026</strong>. It is now 27% below that peak.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI spent most of 2025 and the first half of 2026 above 70 — peaking at <strong>92.3 in February 2025</strong> and 89.3 in February 2026 — the reading of a stock that had run a long way on a re-rating. August's fall took it to 42.7 and it is now <strong>35.8</strong>, the lowest since autumn 2023. The 10-month moving average, at about $137.70, sits well above the price: the long-run trend has rolled over. On a daily basis StockAnalysis puts the 14-day RSI at 29.57 and the 50- and 200-day averages at $135.23 and $138.81.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">2022 low — $28.43</div><div class="tl-desc">An 18.1% monthly fall that capped a year in which the stock lost roughly 30% from its February high of $40.90. RSI 32.6.</div><div class="tl-impact down">−18.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2023</div><div class="tl-content"><div class="tl-title">Capri deal announced — $33.32 (−22.8%)</div><div class="tl-desc">Tapestry agreed to buy Capri Holdings for $8.5 billion. The market sold the acquirer, and the stock kept falling to its five-year low the following October.</div><div class="tl-impact down">−22.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Five-year low — $27.56</div><div class="tl-desc">The lowest month-end in the series, with monthly RSI at 24.6.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2024</div><div class="tl-content"><div class="tl-title">FTC sues to block the deal — $39.92 (−15.9%)</div><div class="tl-desc">The Federal Trade Commission challenged the acquisition, citing reduced competition between brands such as Coach and Michael Kors in accessible-luxury handbags.</div><div class="tl-impact down">−15.9% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">Deal dies — $62.28 (+31.3%)</div><div class="tl-desc">A court blocked the merger on October 24, 2024 and the companies called it off the following month. The largest monthly gain in the series: the market paid for the deal <em>not</em> happening.</div><div class="tl-impact up">+31.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">FY2025 ends — $87.81 (+11.8%)</div><div class="tl-desc">The fiscal quarter that closed here carried $855M of Kate Spade impairments, reported with results in August 2025. By then the market was paying for Coach: the stock rose 23.0% in July 2025 and 11.2% in September 2025.</div><div class="tl-impact neutral">Non-cash charge</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">Peak — $155.47 (+22.5%)</div><div class="tl-desc">The holiday quarter (to December 27, 2025) had revenue up 14% to $2.50B and GAAP EPS of $2.68. Monthly RSI 89.3 — as stretched as the series got.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">The guide — $123.39 (−19.0%)</div><div class="tl-desc">FY2026 beat; FY2027 guided to mid-single-digit growth. −16.49% on August 13 alone.</div><div class="tl-impact down">−19.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $113.07</div><div class="tl-desc">Down another 8.4% from the August close and 25.8% below July's $152.37. StockAnalysis puts the 52-week price change at −0.98%: the stock has given back a year of gains in six weeks.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: TPR is <strong>up about 205% on price over five years</strong> and <strong>down 0.98% over the trailing 52 weeks</strong>. Against peers, Tapestry's $22.55B market value now exceeds Ralph Lauren's $20.25B (trailing P/E 21.42 vs TPR's 15.6), while Capri Holdings — the company Tapestry tried to buy for $8.5 billion — is valued at $1.63B. The failed merger is the cleanest natural experiment in the sector: the standalone Coach business was worth more than the combined plan.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 15.6x trailing GAAP earnings and about 14x forward for a brand that grew 17% (pro forma, constant currency), expanded operating margin 340bps, raised prices on its core product by a mid-teens rate while selling more units, and added about 11 million customers, a third of them Gen Z. It converts 23% of revenue to free cash flow, yields 8% on FCF, and hands back $1.7B a year. The August sell-off punished a guide that management has beaten repeatedly — it hit Investor Day targets two years early — and every named analyst kept a Buy or Hold after the drop, with the lowest target of $96 only 15% below the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>This is one brand, one category, riding a fashion cycle, priced as if the cycle were structural. FY2026 was flattered by a 60–80bps divestiture benefit and one-off tariff refunds; FY2027 growth is guided to mid-single digits with a mid-20% tariff rate embedded. Kate Spade is still shrinking after an $855M write-down, Japan is going backwards, and a customer base tilted to Gen Z has never been tested through a consumer downturn. The 10-month moving average has rolled over, the stock is 27% off its peak, and a guide that merely matches consensus was enough for a 16.5% one-day fall.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Coach demand normalises.</strong> 86% of revenue and nearly all growth sit in one brand whose momentum depends on staying fashionable with young buyers. A slowdown in Coach alone would take group growth below the guide, with no second engine to offset it.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Tariffs and trade policy.</strong> 130bps of FY2026 gross margin lost to tariffs and duties; the FY2027 guide assumes a mid-20% rate on U.S. receipts holds. Changes in either direction, or in the treatment of the IEEPA refunds, move the margin line directly.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">China and consumer cyclicality.</strong> Greater China grew 35% to $1.40B and is now the second-largest region. It is also the region where luxury demand has historically been most volatile, and TPR's 1.43 beta says the stock amplifies consumer cycles.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Accessible luxury is winning the middle</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">A WSJ piece this summer put it plainly: "Coach and Ralph Lauren are still growing because they understand what middle-class shoppers can afford." Tapestry's own numbers agree — handbag prices up mid-teens, units up too, and a new-customer base that is about 35% Gen Z. The accessible-luxury tier sits between mass fashion and the European houses, and when the top end raises prices faster than incomes, the middle collects the shoppers who trade down. The risk is symmetrical: the same shopper trades back out when budgets tighten.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Tariffs on imported leather goods</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Handbags are made overseas and sold in America, so import duties go straight to gross margin. Tapestry absorbed a 130bps tariff and duty hit in FY2026 and still expanded non-GAAP gross margin by 120bps — pricing power doing its job. Its FY2027 outlook embeds a mid-20% tariff rate on U.S. inventory receipts and assumes a neutral net year-over-year impact. The FY2025 Kate Spade impairment was itself partly driven, per coverage of the company&#39;s FY2025 results (ouispeakfashion.com), by the expected impact of tariff and trade-policy cost increases.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Consolidation that regulators would not allow</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">STRUCTURAL FACT</span></div>
+    <p class="biz-desc">The FTC's successful challenge to the Tapestry–Capri deal defined "affordable luxury handbags" as a market in its own right and blocked Coach's owner from combining with Michael Kors's. The practical effect for investors: Tapestry's growth now has to come organically or from smaller deals, and its capital goes to buybacks — $1.64B in FY2026 per the cash-flow statement — rather than acquisitions. For Capri, now valued at $1.63B, the outcome was far worse.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/tpr/history/</strong> — the September 21, 2026 settled close of $113.07 (open 115.77, high 115.78, low 112.73, volume 3,682,555, Adj. Close present, −1.68% on the prior close of $115.00). Confirmed by the stockanalysis.com/stocks/tpr/ quote page: "At close: Sep 21, 2026, 4:00 PM EDT", $113.07. The after-hours print ($113.40) is not used.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual and quarterly financials, cash-flow statement, forecast and named analyst actions) for price, valuation, margins, returns, balance sheet, segment and product-line revenue, consensus, executives and Sector/Industry labels; Tapestry's FY2026 fourth-quarter and full-year results release (Business Wire, August 13, 2026, via stocktitan.net) for pro forma and constant-currency growth, regions, customer metrics, non-GAAP items, capital returns, guidance and the CEO quote; Yahoo Finance and The Motley Fool (August 13, 2026) for consensus comparisons and the day's reaction; wwd.com (headline) and the StockAnalysis cash-flow statement for the $855M Kate Spade charges; Wikipedia (Tapestry, Inc. and List of S&amp;P 500 companies) for company history, the Capri timeline and the September 1, 2004 S&amp;P 500 addition date; digrin.com/stocks/detail/TPR/price (unadjusted "Real price" column) for month-end closes; companiesmarketcap.com for the global market-cap rank.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 taken from the unadjusted "Real price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $113.07. The July and August 2026 month-ends ($152.37, $123.39) were cross-checked against stockanalysis.com daily closes. <strong>No interior months were reconstructed or estimated.</strong> No stock splits occurred in the window (the last was 2:1 in April 2005). Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Market shares and TAM are "n/v" (not verified). Competitor figures are market capitalisations from stockanalysis.com, not revenues or shares. Segment operating income was not retrieved. The global rank of #1067 is marked "(est.)" because the source page carried a $22.54B market cap as of September 20, 2026. The "roughly $7" five-year dividend figure is an approximation summed from fiscal-year dividends per share and is not a precise total-return calculation. Trailing P/E is recomputed at $113.07; StockAnalysis's 15.82 uses the prior close.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and non-GAAP figures exclude items management considers non-recurring. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21, 2026'];
+const prices = [37.02,38.98,40.12,40.60,37.95,40.90,37.15,32.92,34.50,30.52,33.63,34.73,28.43,31.68,37.77,38.08,45.57,43.51,43.11,40.81,40.02,42.80,43.15,33.32,28.75,27.56,31.67,36.81,38.79,47.53,47.48,39.92,43.49,42.79,40.09,40.97,46.98,47.45,62.28,65.33,72.94,85.42,70.41,70.65,78.55,87.81,108.03,101.82,113.22,109.82,109.28,127.77,126.91,155.47,141.11,145.04,145.46,146.38,152.37,123.39,113.07];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — 2022 low $28.43 (−18.1% month)',               color: '#ef4444' },
+  { idx: 23, label: 'Aug 2023 — Capri deal announced; $33.32 (−22.8%)',         color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — five-year low close $27.56, RSI 24.6',          color: '#ef4444' },
+  { idx: 31, label: 'Apr 2024 — FTC sues to block Capri deal; $39.92 (−15.9%)', color: '#f59e0b' },
+  { idx: 38, label: 'Nov 2024 — Capri deal called off; $62.28 (+31.3%)',        color: '#22c55e' },
+  { idx: 45, label: 'Jun 2025 — FY25 ends; $855M Kate Spade impairments in Q4', color: '#f59e0b' },
+  { idx: 53, label: 'Feb 2026 — five-year high close $155.47',                  color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — FY27 guide; −16.49% on Aug 13; $123.39',        color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $113.07',                     color: '#C68B4E' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(198,139,78,0.22)');
+grad.addColorStop(1, 'rgba(198,139,78,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#C68B4E', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#C68B4E'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
