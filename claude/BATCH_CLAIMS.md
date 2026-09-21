@@ -32,9 +32,6 @@ JBHT L NRG BG CASY BRO FSLR IFF EIX PKG
 ### sess-2026-09-21-h · claimed 2026-09-21 (local Claude Code session)
 DRI ULTA SW PPG VLTO CHD GPN TPR VRSK KEY
 
-### sess-2026-09-21-e · claimed 2026-09-21 (local Claude Code session)
-WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
-
 ### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
 AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
 
@@ -106,6 +103,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-e · done 2026-09-21 (local Claude Code session)
+WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
+- All 10 published (killed by an interrupt, relaunched, each independently checked).
 
 ### sess-2026-09-21-f · done 2026-09-21 (local Claude Code session)
 SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
