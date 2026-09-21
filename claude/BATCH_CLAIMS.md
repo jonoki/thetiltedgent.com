@@ -26,10 +26,6 @@ work, so the claim goes in first and the research goes second.
 ### sess-2026-09-21-h · claimed 2026-09-21 (local Claude Code session)
 DRI ULTA SW PPG VLTO CHD GPN TPR VRSK KEY
 
-### sess-2026-09-21-g3 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
-AEM CLS FLUT SONY SE RACE SPOT NU HDB UL
-- FLUT and SPOT checked against the 503-row S&P 500 list fetched 2026-09-21: neither is a member.
-
 ### sess-2026-09-21-f · claimed 2026-09-21 (local Claude Code session)
 SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
 
@@ -110,6 +106,11 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-g3 · done 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
+AEM CLS FLUT SONY SE RACE SPOT NU HDB UL
+- FLUT and SPOT checked against the 503-row S&P 500 list fetched 2026-09-21: neither is a member.
+- All 10 published (all 29 Global names now live), each independently checked. Sep 21 settled close.
 
 ### sess-2026-09-21-g2 · done 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
 NVO RY TD BNS BN ENB CNQ CNI CP
