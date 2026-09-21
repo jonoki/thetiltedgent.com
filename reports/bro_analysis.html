@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRO — Brown &amp; Brown, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #C8894B;
+  --accent-dim: #C8894B33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">BRO</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Insurance Brokers</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $21.52B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500 MEMBER — added September 20, 2021</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Brown &amp; Brown, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$64.30</div>
+      <div class="price-change">−$0.72 (−1.11%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours (5:55 PM EDT): $64.30, unchanged</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 300 North Beach Street, Daytona Beach, Florida</div>
+    <div class="meta-item"><span>Employees:</span> 22,888 (profile) · "23,000+" (company, Q2 2026)</div>
+    <div class="meta-item"><span>Founded:</span> 1939</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 26, 2026 (Q3 2026, estimated)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Brown &amp; Brown is an <span class="tip" title="An insurance broker places risk with insurance companies on behalf of clients and is paid commissions and fees. It does not carry the insurance risk on its own balance sheet — so there is no combined ratio, no reserves and no catastrophe losses in its income statement.">insurance broker</span>, not an insurer. It sells property &amp; casualty, employee-benefits and specialty cover to businesses, public entities and individuals, and earns a commission on the premium it places — it never pays a claim. Founded in Florida in 1939 and still run from Daytona Beach by a Brown (CEO J. Powell Brown), it has spent decades compounding by acquisition. FY2025 revenue was <strong>$5.76B, up 22.49%</strong>, and trailing-twelve-month revenue to June 2026 is <strong>$6.66B, up 34.6%</strong>.</p>
+  <p class="prose" style="margin-top:16px;">That growth rate is the trap in this report. Almost none of it is organic. On <strong>August 1, 2025</strong> Brown &amp; Brown closed its largest-ever deal, the <strong>$9.83B acquisition of Accession Risk Management Group</strong> — parent of retail broker Risk Strategies and wholesaler One80 Intermediaries — funded with roughly $4B of new equity and $4B of new debt, and adding about $1.7B of annual revenue. Strip the acquisitions out and Q2 2026 <span class="tip" title="Organic revenue: commission and fee revenue growth excluding acquisitions, divestitures and (in the headline figure) contingent commissions. The honest measure of a broker's underlying growth.">organic revenue</span> <strong>fell 0.7%</strong>. The price tells you how the market scored that: from a <strong>$124.40 month-end close in March 2025 to $64.30 on September 21, 2026</strong>, down 48%. The question now is simple to state and hard to answer — is a broker whose organic growth has stalled on softening property rates, carrying a new $8B debt stack and 17% more shares, cheap at 20x trailing earnings, or merely no longer expensive?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">J. Powell Brown</div>
+      <div class="card-note">President and CEO, per the StockAnalysis company profile and the Q2 2026 results release, where he said the company is "pleased with our financial results for the quarter and have great momentum as we head into the back half of the year." Organic growth that quarter was −0.7%, so the second half has to deliver on that.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">R. Andrew Watts</div>
+      <div class="card-note">Executive Vice President and CFO, per the StockAnalysis company profile. He owns the leverage bill: total debt rose from $4.06B at FY2024 to $8.07B at June 2026, and Q2 interest expense doubled to $100M from $51M.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">86.5% institutional</div>
+      <div class="card-note">Institutions own 86.46% and insiders 13.91% of shares, per StockAnalysis. An insider stake near 14% is unusually high for a $21B S&amp;P 500 company. The largest named holders were not sourced for this report.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Brown &amp; Brown reports two segments: <strong>Retail</strong> and <strong>Specialty Distribution</strong>, the second of which combines the former Programs and Wholesale Brokerage segments. The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) segment revenue</strong> from the company's earnings slides as reported by Investing.com. The two segments sum to $1.668B, which matches the reported $1.68B total revenue.</p>
+  <div class="seg-bar">
+    <div style="flex:56.8;background:#C8894B;">RETAIL 56.8%</div>
+    <div style="flex:43.2;background:#22c55e;">SPECIALTY DISTRIBUTION 43.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#C8894B;"></span> Retail — $947M (Q2'26), +35.9% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span> total, +1.5% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Specialty Distribution — $721M, +28.1% YoY total, −3.5% organic</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Both segments grew around 30% on paper and between −3.5% and +1.5% underneath. The difference between those two numbers is the Accession acquisition (about $410M of Q2 revenue).</p>
+
+  <div class="biz-card" style="border-left: 3px solid #C8894B;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Retail</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$947M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+1.5%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.8%</div><div class="biz-stat-label">EBITDAC Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">56.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The traditional brokerage business: commercial P&amp;C, employee benefits, personal lines and specialty cover sold directly to businesses, public entities and individuals, plus dealer services for auto and RV dealers. Accession's retail arm, Risk Strategies, went in here. Q2 2026 organic growth was <strong>1.5%, or 2.5% including contingent commissions</strong>, driven by net new business and exposure-unit expansion. Adjusted EBITDAC rose 46.9% to $282M and the <span class="tip" title="EBITDAC: earnings before interest, taxes, depreciation, amortization and change in estimated acquisition earn-out payables. The broker industry's standard operating-profit measure.">EBITDAC</span> margin <strong>widened 230bps to 29.8%</strong>. Management guided second-half Retail organic growth to 1.5–2.5%. On September 21, 2026 the company named Erik Templin executive managing director of employee benefits for North America.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Arthur J. Gallagher</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$60.65B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Aon</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$61.69B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">WTW</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$28.49B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Specialty Distribution</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">ORGANIC DECLINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$721M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−3.5%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.7%</div><div class="biz-stat-label">EBITDAC Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">43.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Wholesale brokerage and program businesses. Wholesale places hard-to-insure <span class="tip" title="Excess and surplus lines — risks the standard insurance market will not write, placed with specialist carriers.">E&amp;S</span> risk for independent agents. Programs, under the Arrowhead name, run niche insurance programs for carrier partners. Some of these units underwrite under authority delegated by the carrier, but the insurance risk stays with the carrier. Accession's wholesaler, One80 Intermediaries, is in this segment. This is the higher-margin half of the company, and in Q2 2026 it was the weaker half: organic revenue <strong>fell 3.5% (−1.6% including contingents)</strong> and the adjusted EBITDAC margin <strong>fell 400bps to 42.7%</strong>. The cause was lower catastrophe-property pricing. Management attributed about 200bps of the decline to new-business revenue it expects to book in Q3 instead, and guided second-half organic growth to 2–4%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Ryan Specialty</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$10.25B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arthur J. Gallagher</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$60.65B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two operating metrics that actually matter</h3>
+  <p class="prose">An insurance broker has no underwriting result to analyse. Judge it on <strong>organic growth</strong>, which shows whether it is winning business and riding premium rates, and on its <strong>EBITDAC margin</strong>, which shows whether it is converting that business into profit.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Organic Revenue — Q2 2026</div>
+      <div class="card-value" style="color:var(--red);">−0.7%</div>
+      <div class="card-note"><strong>+0.7%</strong> including contingent commissions. The first half of 2026 was −0.3% (+1.6% with contingents). Reported revenue grew 30.4% in Q2, so acquisitions account for the entire gap between the two figures.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">EBITDAC Margin — Adjusted</div>
+      <div class="card-value" style="color:var(--amber);">35.7%</div>
+      <div class="card-note">Q2 2026, down from 36.7% a year earlier. Part of the drop is lower interest income, because Brown &amp; Brown held raised cash ahead of the Accession close in 2025. H1 2026: 37.2% vs 37.4%. Management expects the margin to be "roughly flat for 2026 excluding the effect of lower investment income."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Accession Synergies</div>
+      <div class="card-value">$30–40M</div>
+      <div class="card-note">Target for full-year 2026, reaffirmed on the Q2 call. Against about $1.7B of acquired revenue, that is roughly 2%. This deal was bought for growth and scale, not for cost savings.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Talent Leakage</div>
+      <div class="card-value" style="color:var(--red);">$50–60M</div>
+      <div class="card-note">Estimated full-year revenue impact from employees leaving for a start-up competitor, as reported in the Q2 2026 call coverage. A broker's client relationships sit with its producers, so this is the business's main structural weakness.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">No underwriting risk</span>
+    <span class="moat-pill">Recurring renewal commissions</span>
+    <span class="moat-pill">Decentralised acquisition machine</span>
+    <span class="moat-pill">Niche program franchises (Arrowhead)</span>
+    <span class="moat-pill">Wholesale access for independent agents</span>
+    <span class="moat-pill">Founder-family ownership (13.9% insiders)</span>
+    <span class="moat-pill">33 years of dividend growth</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">Brokerage is a good business: clients renew every year, the commission is a percentage of a premium that tends to rise with inflation and asset values, and the broker never pays a claim. The moat is <strong>distribution</strong>, meaning thousands of producers with local relationships plus wholesale and program franchises that carriers rely on to reach niche risks. The weakness is the flip side. That distribution walks out of the door with its people, and the revenue line moves with <em>premium rates</em> set by a market the broker does not control. When catastrophe-property rates rise, brokers look like growth companies. When they fall, as in 2026, brokers look like what they are, which is a leveraged bet on the insurance pricing cycle.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Premium-rate cycle.</strong> Specialty Distribution organic growth of −3.5% in Q2 2026 reflects pressure from falling catastrophe-property rates. A broker earns a share of the premium, so lower rates mean lower revenue even when every client renews.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Leverage after Accession.</strong> Total debt went from $4.06B (FY2024) to $8.07B (June 2026), against $918M of cash. Debt/EBITDA is 2.71x and interest coverage is 5.98x. Neither is alarming, but Q2 interest expense doubled to $100M, and that money is no longer available for acquisitions or buybacks.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Dilution.</strong> Shares outstanding rose 17.07% year over year because of the Accession equity raise. TTM GAAP EPS of $3.18 is <strong>down 8.6%</strong> even though net income rose 19.8%. Per-share value has not yet kept up with the growth in company size.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">People risk.</strong> The company expects $50–60M of lost revenue in 2026 from employees leaving for a start-up competitor. In brokerage, producers take their books with them, and non-competes only slow that down.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The benchmark index is the <strong>S&amp;P 500</strong>, which BRO joined on September 20, 2021. It is NYSE-listed and is not a NASDAQ-100 constituent. Because this is a broker, the table uses organic growth and EBITDAC margin in place of an insurer's combined ratio, and gross margin is marked n/m. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>BRO</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>20.2</td><td>—</td><td>—</td><td>$64.30 ÷ $3.18 TTM GAAP EPS = 20.22. StockAnalysis shows 20.24. GAAP earnings are held down by acquisition amortization and new share issuance.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>14.4</td><td>—</td><td>—</td><td>$64.30 ÷ FY2026 consensus adjusted EPS of $4.48 = 14.35. StockAnalysis's next-twelve-month figure is 13.93. Adjusted EPS excludes amortization, which is why it is about 40% above GAAP.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>3.16</td><td>—</td><td>—</td><td>High because consensus EPS growth is only 5.2% for FY2026 and 7.7% for FY2027.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — GAAP diluted.">EPS (TTM)</span></td><td>$3.18</td><td>—</td><td>—</td><td>Down 8.6% YoY while net income rose 19.8% to $1.19B, because the share count grew 17%. Quarterly EPS: $0.68, $0.61, $1.06, $0.84.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth, trailing twelve months, including acquisitions.">Revenue Growth (YoY)</span></td><td>+34.6%</td><td>—</td><td>—</td><td>TTM $6.66B, driven by acquisitions. Consensus FY2026 revenue is $6.99B (+21.3%), falling to +4.3% in FY2027 once Accession is in both years.</td></tr>
+      <tr><td><span class="tip" title="Commission and fee growth excluding acquisitions, divestitures and contingent commissions.">Organic Revenue Growth</span></td><td>−0.7%</td><td>—</td><td>—</td><td>Q2 2026. +0.7% including contingents. Retail +1.5%, Specialty Distribution −3.5%. This line shows what the underlying business is doing.</td></tr>
+      <tr><td><span class="tip" title="EBITDAC Margin - Adjusted: the company's non-GAAP operating margin, excluding acquisition/integration costs and similar items.">EBITDAC Margin (Adj.)</span></td><td>35.7%</td><td>—</td><td>—</td><td>Q2 2026, down from 36.7%. H1 2026: 37.2%. Guided "roughly flat" for 2026 excluding lower investment income.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: not a meaningful concept for a broker, whose main cost is producer compensation rather than cost of goods.">Gross Margin</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a broker. StockAnalysis shows 56.28% TTM, but that depends on how its data provider classifies compensation, and the TTM figure is not comparable with the FY2025 figure of 49.07%. EBITDAC margin is the right lens.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue.">Net Profit Margin</span></td><td>18.1%</td><td>—</td><td>—</td><td>TTM (StockAnalysis statistics page). Q2 2026 pre-tax margin was 22.9%.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.03%</td><td>—</td><td>—</td><td>$0.66 annualised ($0.165 per quarter after a 10% increase in July 2026). Payout ratio 20.78%. 33 consecutive years of dividend growth.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>4.83%</td><td>—</td><td>—</td><td>13.89M shares, down from 16.58M the prior month. Days to cover 7.62.</td></tr>
+      <tr><td><span class="tip" title="Total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>0.64</td><td>—</td><td>—</td><td>$8.07B debt vs $12.61B equity. Debt/EBITDA 2.71x and interest coverage 5.98x. Net debt is $7.15B.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities.">Current Ratio</span></td><td>1.13</td><td>—</td><td>—</td><td>For a broker this is inflated by premiums held in trust for carriers on both sides of the balance sheet, so treat it as indicative only.</td></tr>
+      <tr><td><span class="tip" title="Cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$1.45B</td><td>—</td><td>—</td><td>TTM (OCF $1.52B, capex $74M). FCF yield 6.66% on the $21.52B market cap, and 21.7% of revenue. Capex is small, as is typical for a broker.</td></tr>
+      <tr><td><span class="tip" title="Net income divided by shareholders' equity.">ROE</span></td><td>10.0%</td><td>—</td><td>—</td><td>Held down by a large equity base. Goodwill alone is $15.1B of $29.9B total assets after Accession.</td></tr>
+      <tr><td><span class="tip" title="After-tax operating profit divided by debt plus equity capital.">ROIC</span></td><td>9.49%</td><td>—</td><td>—</td><td>Against a StockAnalysis WACC estimate of 6.49%. A $9.83B acquisition has to earn its cost of capital, and a positive spread shows it currently does.</td></tr>
+      <tr><td><span class="tip" title="How much the stock moves relative to the overall market.">Beta</span></td><td>0.58</td><td>—</td><td>—</td><td>5-year beta. The stock is defensive against the market but has fallen 48% since March 2025 for company-specific and sector reasons.</td></tr>
+      <tr><td>52-Week Range</td><td>$53.81 – $96.55</td><td>—</td><td>—</td><td>$64.30 is 33% below the high and 19% above the low. 52-week price change −29.90%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported figures. First, the <strong>Accession consolidation</strong>. Revenue growth rates of 30%+ will fall away mechanically once August 2026 laps the August 1, 2025 close, and consensus FY2027 revenue growth is 4.3%. Second, <strong>GAAP vs adjusted EPS</strong>: Q2 2026 diluted EPS was $0.84 and adjusted EPS was $1.07, a gap made up mostly of acquisition-related amortization and integration costs. Third, <strong>interest income</strong>: in 2025 the company earned interest on cash raised before the deal closed, which flatters the prior-year margin comparison. On the other side, Brown &amp; Brown bought back $500M of stock in the first half of 2026 ($250M in Q2), and the share count fell 0.89% quarter on quarter.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">19 analysts polled by S&amp;P Global, via StockAnalysis (last updated Sep 16, 2026).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$76.69</div><div class="card-note"><span style="color:var(--green);">+19.27% upside</span> from $64.30. Median target $77 (+19.75%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$60 – $90</div><div class="card-note">−6.69% to +39.97%. The Street's lowest target is only about 7% below the current price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">4 / 14 / 1</div><div class="card-note">2 Strong Buy + 2 Buy, 14 Hold, 0 Sell, 1 Strong Sell (September 2026). Almost three-quarters of the Street is at Hold.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:21.1;background:#22c55e;"></div>
+    <div style="flex:73.7;background:#f59e0b;"></div>
+    <div style="flex:5.3;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 4 (21.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 14 (73.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (5.3%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Mizuho — Yaron Kinar</strong> · Outperform · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$86 → $83</span> (Sep 16, 2026). The most prominent bull cut his target as part of a property-and-casualty sector adjustment.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Morgan Stanley — Bob Huang</strong> · Underweight · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$56 → $60</span> (Aug 19, 2026; reiterated Aug 30). This is the only Sell on the board and the lowest target.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Citi</strong> · downgraded to Neutral · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$70 → $79</span> (Jul 29, 2026). Citi raised its target while downgrading.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">J.P. Morgan — Pablo Singzon</strong> · Neutral · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$78 → $80</span> (Aug 3, 2026). Also <strong>KBW — Meyer Shields</strong>, Market Perform, $74 (Aug 4, 2026), and <strong>BMO — Michael Zaremski</strong>, Market Perform, $73 → $74 (Jul 29, 2026).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (estimated date)</div>
+        <div class="tl-desc">This is the test of the second-half guidance: Retail organic growth of 1.5–2.5% and Specialty Distribution of 2–4%, including the roughly 200bps of Specialty new business that management says moved from Q2 into Q3. It is also the first quarter in which Accession sits in both the current and prior-year numbers, so reported and organic growth should converge.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Accession synergies: $30–40M target</div>
+        <div class="tl-desc">Reaffirmed on the Q2 call. The amount is small next to the deal size, which makes it achievable. The bigger integration risk is keeping Risk Strategies and One80 producers from leaving.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">"AI-first enterprise" programme with Anthropic, McKinsey and Accenture</div>
+        <div class="tl-desc">The company announced the next phase of its technology transformation and named the three partners. On the Q2 call management said technology would "enhance capabilities" rather than replace roles. In a people-heavy business, operating leverage from automating servicing work is a credible route to margin, but no cost or revenue target was sourced.</div>
+        <div class="tl-impact neutral">Execution to be shown</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Revenue $1.68B (+30.4%) against a ~$1.72B consensus; adjusted EPS $1.07, in line; organic −0.7%; adjusted EBITDAC margin 35.7%. The stock traded down before the open, then <strong>closed up 5.67% at $73.65 on July 28</strong>, before falling 5.34% on July 30.</div>
+        <div class="tl-impact up">Reaction already happened: +5.67% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">September sell-off — $72.17 → $64.30</div>
+        <div class="tl-desc">The stock fell 10.9% from the August close to September 21, including −4.54% on September 8. Peers fell on the same day as the price print (AJG −1.20%, Aon −1.63%, WTW −1.02%). No single company-specific cause for the September move was sourced for this report.</div>
+        <div class="tl-impact down">−10.9% month to date</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">BRO — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#C8894B;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been, on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"). Readings below 30 mean it has fallen hard and fast ("oversold"). It measures momentum, not value, and a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$55.45</strong> to the September 21, 2026 settled close of <strong>$64.30</strong>, BRO gained <strong>16.0% on price</strong>. That number hides two opposite moves. The stock more than doubled to <strong>$124.40 at the end of March 2025</strong>, when brokers were priced as compounders during a hard insurance market. It then lost <strong>54.8% to a $56.25 May 2026 close</strong>, as organic growth faded, the Accession deal added shares and debt, and property rates softened. There were no share splits in the window (the last was 2:1 in March 2018). The chart uses unadjusted closes.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows how long the decline lasted. It stayed below 30 for eight consecutive month-ends, from October 2025 to May 2026, and bottomed at <strong>13.0 in May 2026</strong>, the most oversold reading of the five-year window. It recovered to 48.8 by August and is now <strong>37.2</strong> after the September drop. The 10-month moving average is about <strong>$67.63</strong>, above the current price. The June–August rebound got back to that average but did not hold above it.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2021</div><div class="tl-content"><div class="tl-title">S&amp;P 500 inclusion — $55.45</div><div class="tl-desc">BRO joined the S&amp;P 500 on September 20, 2021, the first point of this chart. It rose 13.8% the following month.</div><div class="tl-impact up">Index add</div></div></div>
+    <div class="tl-item"><div class="tl-date">2022–2023</div><div class="tl-content"><div class="tl-title">Two years of range trading, $56–$72</div><div class="tl-desc">Revenue grew 16.9% in FY2022 and 17.8% in FY2023, but the price went sideways. The multiple absorbed the earnings growth.</div><div class="tl-impact neutral">Sideways</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2025</div><div class="tl-content"><div class="tl-title">Peak — $124.40</div><div class="tl-desc">The high point of the window, with the 6-month RSI above 70 at most month-ends of 2024. Brokers were being valued as defensive compounders.</div><div class="tl-impact up">5-year high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2025</div><div class="tl-content"><div class="tl-title">−17.6% in a month — $91.37</div><div class="tl-desc">The first full month after the June 23, 2025 announcement of the Accession deal, which was funded with about $4B of new equity and $4B of debt. The deal closed on August 1, 2025. This report did not source a single cause for the monthly drop.</div><div class="tl-impact down">−17.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">−15.0% in a month — $79.74</div><div class="tl-desc">The second large step down, and the start of eight straight month-ends with RSI below 30. The cause was not sourced for this report.</div><div class="tl-impact down">−15.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">Trough — $56.25, RSI 13.0</div><div class="tl-desc">Down 54.8% from the March 2025 peak. The 52-week low of $53.81 was set during this stretch.</div><div class="tl-impact down">Low of the post-peak slide</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Aug 2026</div><div class="tl-content"><div class="tl-title">Relief rally — $72.17</div><div class="tl-desc">+14.0% in June, +9.7% in July and +2.5% in August. The Q2 print on July 27 disappointed on organic growth but did not break the rally.</div><div class="tl-impact up">+28.3% from May close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $64.30</div><div class="tl-desc">September has given back 10.9%, and the price is back below the 10-month average ahead of the October 26 Q3 report.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year total returns for the <strong>S&amp;P 500</strong> (the benchmark) and the <strong>NASDAQ-100</strong> were not obtained from the sources fetched, so no numeric comparison is given. From sourced data: BRO is <strong>up 16.0% on price over five years</strong> and <strong>down 29.90% over the past 52 weeks</strong>. Its peers have also fallen. On StockAnalysis at the same close, market capitalisation was down year over year by 19.2% for Arthur J. Gallagher ($60.65B), 20.1% for Aon ($61.69B), 12.1% for WTW ($28.49B) and 27.2% for Ryan Specialty ($10.25B), against BRO's 29.3%. So the whole broker group has de-rated, and BRO has fallen the most among the names checked. Market-cap change is not the same as price change for BRO, because its share count grew 17% over the year.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>At $64.30 you pay 14.4x FY2026 consensus adjusted EPS and get a 6.7% free-cash-flow yield from a broker with no underwriting risk, a 35–37% adjusted EBITDAC margin, 33 straight years of dividend growth and a founding family that still owns a meaningful stake. The stock has already fallen 48% from its peak. Organic growth is near zero, but management guides to 1.5–2.5% in Retail and 2–4% in Specialty for the second half. Accession stops distorting the comparisons from Q3, synergies of $30–40M are modest and achievable, and the company is still buying back stock. If property pricing stabilises, a return to mid-single-digit organic growth on a much larger revenue base would re-rate a business that the market valued at twice this price 18 months ago.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Headline growth of 30% is bought, and the organic business shrank 0.7% in Q2. The purchase doubled debt to $8.07B, doubled quarterly interest expense to $100M and increased the share count by 17%, so TTM GAAP EPS is down 8.6%. Specialty Distribution, the high-margin half, is shrinking organically with margins down 400bps, while catastrophe-property rates, which drive its revenue, are falling. Producers are leaving for a start-up competitor with an estimated $50–60M of revenue. At 20x trailing GAAP earnings this is not a distressed valuation, and 14 of 19 analysts are at Hold. Brokers were priced for a hard market, and pricing for a soft one may not be finished.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Soft insurance-pricing cycle.</strong> Broker revenue is a percentage of premium. Falling catastrophe-property rates already drove Specialty Distribution organic growth to −3.5% in Q2 2026. If the softening spreads to casualty lines, the second-half guidance of 2–4% will be missed.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Integration and talent retention at Accession.</strong> A $9.83B purchase of two producer-led businesses, Risk Strategies and One80, only works if the producers stay. The company has already flagged $50–60M of 2026 revenue lost to departures to a start-up competitor.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Leverage in a slower-growth world.</strong> Debt/EBITDA is 2.71x and interest coverage 5.98x. That is manageable while EBITDA grows. If organic growth stays near zero, the extra interest cost and the 17% dilution weigh on per-share earnings for longer than the deal model assumed.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The broker's hidden bet: premium rates</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Brokers are often described as safe businesses that take no insurance risk, and on the balance sheet that is true. The income statement is different. A commission is a percentage of the premium, so when rates rise the broker grows without winning a single new client, and when rates fall the broker shrinks while renewing every one. Brown &amp; Brown's 2026 figures show this. Retail, which relies more on new business and exposure growth, managed +1.5% organic. Specialty Distribution, which places property catastrophe risk, fell 3.5% as those rates came down. In poker terms, the broker takes a rake on every pot and never plays a hand, but the rake is a percentage, and the pots are getting smaller.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Consolidation and the war for producers</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Broker growth by acquisition, buying agencies at one multiple while being valued at a higher one, depends on the acquirer's own multiple staying high. BRO's forward P/E has fallen from 25.34 (FY2024 basis) to about 14 today, per StockAnalysis's forecast table, which narrows that arbitrage. At the same time, well-funded start-up brokers are hiring producers away from established firms, and the company has put a $50–60M figure on its 2026 exposure. The competition is now for producers as much as for clients.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The valuation reset — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">BRO trades at <strong>9.98x EV/EBITDA</strong>, a <strong>6.66% FCF yield</strong> and <strong>14.4x forward adjusted earnings</strong>, against a forward multiple above 23x in every year from FY2022 to FY2024 on StockAnalysis's basis. <strong>The bull framing:</strong> the market has moved from pricing a hard market to pricing a soft one, and at these levels even flat organic growth plus buybacks and debt paydown produces a mid-single-digit per-share return before any re-rating. <strong>The bear framing:</strong> the old multiple assumed organic growth of high single digits, which the business is not producing now. Until Q3 and Q4 show organic growth back in positive territory without contingents, the discount reflects what the business is earning today.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/bro/history/</strong> — the September 21, 2026 settled close of $64.30 (open 65.11, high 65.73, low 64.14, Adj. Close 64.30 present, −1.11% on the prior close of $65.02). Confirmed by the quote page at stockanalysis.com/stocks/bro/ ("At close: Sep 21, 2026, 4:00 PM EDT", $64.30, −0.72).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual and quarterly financials, forecast, news headlines from TheFly and GlobeNewswire) for price, valuation, margins, returns, balance sheet, consensus, named analyst actions, executives and peer market caps; Brown &amp; Brown's Q2 2026 results release (investor.bbrown.com, July 27, 2026) for revenue, organic growth, EBITDAC margin, EPS and the CEO quote; Investing.com coverage of the Q2 2026 slides and earnings call for segment revenue, segment organic growth and margins, second-half guidance, synergies and the start-up-competitor revenue impact; Insurance Business (insurancebusinessmag.com) for Q2 interest expense, goodwill and the Accession deal value, financing and revenue; Business Insurance and the company's completion release for the August 1, 2025 closing date and the Risk Strategies / One80 description; Wikipedia's List of S&amp;P 500 companies for the September 20, 2021 index-add date; digrin.com/stocks/detail/BRO/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. These are 60 real month-end closes from September 2021 through August 2026, taken from the unadjusted "Real price" column at digrin.com (the July and August 2026 month-ends, $70.40 and $72.17, match StockAnalysis daily rows), plus a final point at the September 21, 2026 settled close of $64.30. <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close 14 trading days into September, not a month-end. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Segment market shares and TAM are "n/v" (not verified). Competitor figures are market capitalisations from StockAnalysis on September 21, 2026, not revenues or shares. Marsh McLennan's market cap could not be retrieved and is omitted. Global, US and exchange market-cap ranks were not sourced. The date of the Citi downgrade is approximate (headline dated about seven weeks before September 21, 2026). Employees: the StockAnalysis profile lists 22,888; the company describes "23,000+". The start-up competitor behind the producer departures is not named in the sources fetched.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Adjusted EPS and EBITDAC are non-GAAP measures defined by the company. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [55.45,63.11,64.41,70.28,66.28,67.61,72.27,61.98,59.37,58.34,65.10,63.04,60.48,58.79,59.59,56.97,58.56,56.07,57.42,64.39,62.33,68.84,70.45,74.10,69.84,69.42,74.74,71.11,77.56,84.21,87.54,81.54,89.51,89.41,99.43,105.13,103.60,104.64,113.10,102.02,104.66,118.54,124.40,110.60,112.90,110.87,91.37,96.95,93.79,79.74,80.43,79.70,72.10,71.82,65.21,60.15,56.25,64.15,70.40,72.17,64.30];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Sep 2021 — added to the S&P 500 (Sep 20); $55.45',        color: '#3b82f6' },
+  { idx: 42, label: 'Mar 2025 — 5-year peak $124.40',                           color: '#22c55e' },
+  { idx: 46, label: 'Jul 2025 — −17.6% month after Accession announcement',     color: '#ef4444' },
+  { idx: 47, label: 'Aug 2025 — Accession deal closes (Aug 1); $96.95',         color: '#3b82f6' },
+  { idx: 49, label: 'Oct 2025 — −15.0% month; RSI enters oversold',             color: '#ef4444' },
+  { idx: 56, label: 'May 2026 — trough $56.25, RSI 13.0',                       color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2: organic −0.7%, revenue +30.4%',             color: '#f59e0b' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $64.30',                      color: '#C8894B' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(200,137,75,0.22)');
+grad.addColorStop(1, 'rgba(200,137,75,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#C8894B', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#C8894B'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
