@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWK — American Water Works Company, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22B8CF;
+  --accent-dim: #22B8CF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">AWK</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Utilities / Regulated Water</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $26.62B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Largest US publicly traded water utility (company 10-K)</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid #f59e0b44;padding:3px 10px;border-radius:4px;">PENDING MERGER: Essential Utilities (WTRG) — all-stock, 0.305 AWK per WTRG share, targeted close end of Q1 2027</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">American Water Works Company, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$133.97</div>
+      <div class="price-change">−$1.93 (−1.42%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours quote for that session not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Camden, New Jersey</div>
+    <div class="meta-item"><span>Employees:</span> ~7,000 (Dec 31, 2025)</div>
+    <div class="meta-item"><span>Founded:</span> History dating to 1886 (IPO Apr 23, 2008)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">American Water is the largest publicly traded water and wastewater utility in the United States by both revenue and population served — roughly <strong>14 million people</strong> across <strong>14 states</strong> and <strong>19 military installations</strong>, through <strong>3.6 million active customer connections</strong>. FY2025 revenue was <strong>$5.14B, up 9.74%</strong> from $4.68B, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$5.69</strong> (adjusted $5.64). 92% of revenue comes from state-regulated utilities; the remaining 8% is mostly the Military Services Group, which runs water systems on bases under 50-year federal contracts.</p>
+  <p class="prose" style="margin-top:16px;">The business is not complicated, and that is the point. A regulated water utility earns money by <strong>putting capital into the ground</strong> — pipes, treatment plants, tanks — and asking a state commission to let it earn an <span class="tip" title="Allowed (or authorized) return on equity — the percentage return on the equity-financed share of rate base that a state regulator sets as 'fair' when it approves customer rates.">allowed return on equity</span> on that <span class="tip" title="Rate base — the depreciated value of utility assets on which a regulator allows the company to earn a return. Grow the rate base, and allowed earnings grow with it.">rate base</span>. Earnings growth is, to a first approximation, rate base growth × allowed ROE, minus regulatory lag. American Water plans to spend <strong>$46–48 billion over 2026–2035</strong> and targets <strong>8–9% rate base growth</strong> and <strong>7–9% EPS and dividend growth</strong>. Every one of those numbers depends on commissions saying yes. In July 2026 the biggest one said <em>mostly no</em>: Pennsylvania's PUC granted about $75 million of a roughly $169 million request and set a <strong>9.55% ROE against 10.95% asked</strong>. Meanwhile the company is trying to swallow Essential Utilities in an all-stock merger that needs the very same Pennsylvania commission's blessing. The central debate: can a utility whose customers' bills are already the highest in its largest state keep compounding at 7–9% — and can it close a transformational merger through the same regulators it needs for that growth?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">John C. Griffith</div>
+      <div class="card-note">President and CEO, quoted in the Q2 2026 earnings release: "The company has delivered solid results for the first half of the year." The October 2025 merger announcement names him CEO of the combined company. His framing of the Essential deal: "two industry leaders united by our shared mission to provide safe, clean, reliable and affordable water and wastewater services."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">David Bowler</div>
+      <div class="card-note">Executive Vice President; named in the October 2025 merger announcement as CFO of the combined company. He owns the funding problem: $3.7B of planned 2026 capital investment against trailing operating cash flow of $2.33B. Board chair <strong>Karl Kurz</strong> continues as independent chair; Essential CEO <strong>Christopher Franklin</strong> becomes Executive Vice Chair on closing.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Workforce</div>
+      <div class="card-value" style="font-size:20px;">~105% institutional</div>
+      <div class="card-note">StockAnalysis reports institutional ownership of 105.31% of shares — above 100%, which typically happens when lent-out shares re-sold by short sellers are counted by both holders (short interest is 5.87% of shares). Named top holders were not retrieved this session. About <strong>44%</strong> of the ~7,000-person workforce is union-represented; 2025 employee turnover was 11.1%, up from 10.5%.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">American Water reports one real segment — <strong>Regulated Businesses</strong> ($4,723M, 92% of FY2025 revenue) — plus <strong>Other</strong> ($417M, 8%), which is chiefly the Military Services Group. The regulated segment is really a portfolio of state monopolies, each with its own commission, its own allowed ROE and its own politics, so the useful breakdown is by state. The bar below shows FY2025 revenue by state from the 10-K, expressed as a share of total company revenue of $5,140M (percentages are my arithmetic from the 10-K dollar figures).</p>
+  <div class="seg-bar">
+    <div style="flex:22.2;background:#22B8CF;">PA 22.2%</div>
+    <div style="flex:21.5;background:#22c55e;">NJ 21.5%</div>
+    <div style="flex:11.2;background:#f59e0b;">MO 11.2%</div>
+    <div style="flex:10.7;background:#a78bfa;">IL 10.7%</div>
+    <div style="flex:7.2;background:#3b82f6;">CA 7.2%</div>
+    <div style="flex:19.2;background:#94a3b8;">OTHER STATES 19.2%</div>
+    <div style="flex:8.1;background:#ef4444;">MSG/OTHER 8.1%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22B8CF;"></span> Pennsylvania — $1,140M, 814k customers</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> New Jersey — $1,105M, 750k customers</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Missouri — $575M, 510k customers</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Illinois — $548M, 376k customers</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> California — $370M, 196k customers</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Other regulated states — $985M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Other (incl. Military Services Group) — $417M</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Two states — Pennsylvania and New Jersey — are 44% of the company. Whatever those two commissions decide about allowed returns and affordability is most of the story.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22B8CF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pennsylvania American Water</div>
+        <span class="biz-badge dominant">LARGEST STATE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,140M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$6.6B</div><div class="biz-stat-label">Authorized Rate Base</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">9.55%</div><div class="biz-stat-label">Allowed ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">814,000 customers and the biggest single rate base in the group. On <strong>July 16, 2026</strong> the Pennsylvania PUC voted 4–1 to grant roughly <strong>$75 million</strong> of annualized revenue (excluding $24M of infrastructure surcharges) against a request of about <strong>$168.7 million</strong>, on a <strong>9.55% ROE versus 10.95% requested</strong>, a 54.23% equity ratio, and an authorized rate base of <strong>$6.6 billion</strong> that includes about $1.2B of investment to be made through mid-2027. New rates took effect August 13, 2026. The tone mattered as much as the number. Commissioner Kathryn Zerfuss: "PAWC's rates have risen 35 percent since 2020 and are the highest of any water utility in the state." Pennsylvania is also where Essential has substantial operations, including offices in Bryn Mawr and Pittsburgh — the state with the most to say about the merger.</p>
+    <div class="biz-tam"><strong>Water supply:</strong> 91% surface water, 7% groundwater, 2% purchased (FY2025 10-K).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Essential Utilities (merger target)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$11.49B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">New Jersey American Water</div>
+        <span class="biz-badge dominant">HOME STATE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,105M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$146M</div><div class="biz-stat-label">Pending Request</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">10.75%</div><div class="biz-stat-label">ROE Requested</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">750,000 customers in the company's headquarters state. On <strong>January 16, 2026</strong> the New Jersey subsidiary asked the Board of Public Utilities for about <strong>$146 million</strong> of annualized incremental revenue on a proposed <strong>10.75% ROE</strong> and a 55.18% equity ratio. The case is pending. If New Jersey lands anywhere near Pennsylvania's 9.55%, the gap between what the company asks for and what it gets becomes a pattern rather than an event. The 10-K shows 74% surface water, 22% groundwater and 4% purchased.</p>
+    <div class="biz-tam"><strong>Outcome:</strong> pending before the NJBPU; decision timing not sourced.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Missouri &amp; Illinois</div>
+        <span class="biz-badge growth">TWO LARGE CASES FILED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,123M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$298M</div><div class="biz-stat-label">Requested (step 1)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">10.50–10.75%</div><div class="biz-stat-label">ROE Requested</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Missouri ($575M revenue, 510k customers) and Illinois ($548M, 376k) together are as big as New Jersey. <strong>Missouri</strong> filed on July 1, 2026 for <strong>$179 million</strong> of annualized incremental revenue (excluding $32M of infrastructure surcharges) on a <strong>10.50% ROE</strong> and 50.30% equity. <strong>Illinois</strong> filed on January 27, 2026 for a two-step increase, the first of about <strong>$119 million</strong> effective January 1, 2027, on a <strong>10.75% ROE</strong>. The $298M step-1 total is my sum of the two. Together these two cases are the largest single revenue-growth lever in the 2027 plan — and the next two tests of whether Pennsylvania was an outlier.</p>
+    <div class="biz-tam"><strong>Outcome:</strong> both pending; decision timing not sourced.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">California &amp; the other regulated states</div>
+        <span class="biz-badge dominant">9.60–10.20% ALLOWED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,355M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Rate Base</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">26.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">California ($370M) plus the remaining states ($985M) — including Indiana, West Virginia, Kentucky, Virginia, Iowa, Tennessee and Hawaii, among others. Recent allowed returns cluster just under 10%: <strong>West Virginia 9.80%</strong> (March 2026, company-estimated rate base ~$1.1B), <strong>Kentucky 9.70%</strong> (rate base $667M), <strong>Tennessee 9.70%</strong> (~$300M), <strong>Iowa 9.60%</strong> ($262M), and California's then-effective <strong>10.20%</strong> used in a decision adopting a November 2023 partial settlement. In Virginia the company filed a settlement in June 2026 for $16 million against a $22 million request. California carries a unique risk — the Monterey system's forced reduction in Carmel River diversions — and a pending question over whether construction work in progress can enter rate base.</p>
+    <div class="biz-tam"><strong>Growth by acquisition:</strong> the June 1, 2026 Nexus Water purchase ($319M, ~47,000 connections across eight states) plus 19 further pending deals ($236M, ~56,600 customers) as of June 30, 2026.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">American States Water</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$3.36B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">California Water Service</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$2.92B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #ef4444;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Other — Military Services Group</div>
+        <span class="biz-badge emerging">CONTRACTED, NOT RATE-REGULATED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$417M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7.5%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Runs water and wastewater systems on military bases under <strong>50-year contracts</strong> with the US government's Utilities Privatization Program (18 installations per the 10-K; 19 per the Q2 2026 release). "Other" revenue rose from $388M to $417M in 2025 (+7.5%, my calculation). It needs little capital and is not set by state commissions — its economics come from contract price redeterminations instead. It is a steady diversifier, not a growth engine. The Homeowner Services business sold earlier left behind a $795M seller note, repaid in full on February 13, 2026.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two operating metrics that actually matter</h3>
+  <p class="prose">For a regulated utility, judge the year on <strong>how much capital went into the ground</strong> and <strong>how much new revenue regulators authorised to pay for it</strong>.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">2026 Capital Plan</div>
+      <div class="card-value">$3.7B</div>
+      <div class="card-note">$1.8B invested through June 30, 2026, including $346M for acquisitions. The 2026–2030 plan is <strong>$19–20B</strong>; 2026–2035 is <strong>$46–48B</strong>. That investment is what builds rate base — the input to 8–9% targeted rate base growth.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">YTD Authorized Revenue</div>
+      <div class="card-value">$216M</div>
+      <div class="card-note">Through Q2 2026: $111M from rate cases, $105M from infrastructure surcharges. Nearly half the new revenue came from surcharges — mechanisms that let the utility recover pipe spending between full rate cases and reduce regulatory lag.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pending Rate Requests</div>
+      <div class="card-value">$494M</div>
+      <div class="card-note">Annualized incremental revenue requested in active cases across <strong>six jurisdictions</strong> (Q2 2026 release). For scale, that is about 9% of TTM revenue of $5.28B. How much of it gets granted is the main input to 2027 earnings.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ask vs. Get — Pennsylvania</div>
+      <div class="card-value" style="color:var(--amber);">~44%</div>
+      <div class="card-note">Roughly $74–75M granted against $168.7M requested (my ratio), and a 140bp cut to the requested ROE. One case is not a trend, but it is the largest state, and the next three big decisions are New Jersey, Missouri and Illinois.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Legal monopoly service territories</span>
+    <span class="moat-pill">Essential, non-discretionary product</span>
+    <span class="moat-pill">Largest US scale (14 states)</span>
+    <span class="moat-pill">Infrastructure surcharge mechanisms</span>
+    <span class="moat-pill">Fair-value acquisition laws</span>
+    <span class="moat-pill">50-year military contracts</span>
+    <span class="moat-pill">Low beta (0.58)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">No one competes for a water customer; the pipe under the street only connects to one utility. Competition happens in two other places. First, <strong>for acquisitions</strong> — the 10-K names infrastructure funds, multi-utility companies, Algonquin and Nexus Water Group as rivals for municipal systems, and American Water just bought Nexus's systems for $319M. Some states let a buyer put acquired systems into rate base at fair market value rather than depreciated cost, which makes scale a real advantage in consolidating the country's fragmented municipal water systems. Second, <strong>for regulatory goodwill</strong>. The moat protects the franchise, not the return. A regulator cannot take away the customers, but it can set the price — and 9.55% versus 10.95% in Pennsylvania is what that looks like.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Affordability is now the regulators' first question.</strong> Pennsylvania's chairman framed the July order as balancing "affordability against infrastructure and regulatory needs, including lead service line replacement and PFAS-related investments." The investment the company must make — lead lines, PFAS treatment, ageing pipe — is exactly what drives bills up, and bills are what regulators are now pushing back on.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Growth is financed, not self-funded.</strong> Trailing operating cash flow was $2.33B against $3.36B of capex; free cash flow has been negative every year from FY2021 to FY2025 (−$1,067M in FY2025), before a $3.58 dividend. The gap is filled by debt and equity markets. Total debt is $16.07B, net debt/EBITDA 5.49x, interest coverage 3.04x. Higher rates raise the cost of that funding faster than regulators reset allowed returns.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The merger needs the same regulators.</strong> Closing requires approvals from all relevant state commissions on terms that would not add up to a "Burdensome Effect" as defined in the merger agreement, plus Hart-Scott-Rodino clearance. Pennsylvania — which just cut the company's rate request by more than half — is where Essential has substantial operations, and its merger settlement is non-unanimous.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Water supply and legacy liabilities.</strong> California's Monterey system must find alternative supply to replace Carmel River diversions, and the 10-K flags PFAS and other emerging contaminants, lead and copper rules, and condemnation risk as ongoing exposures. None were quantified in the sources fetched.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, which AWK joined effective March 4, 2016 (replacing CONSOL Energy). As a NYSE-listed company it is not eligible for the NASDAQ-100. For a regulated utility the metrics that matter come first: rate base, allowed return, and how the balance sheet funds the capex. Gross margin and current ratio are shown for completeness but tell you little here. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—". Market cap and valuation ratios are StockAnalysis figures at the same $133.97 close; P/E rows are recomputed.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>AWK</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Rate base growth — the growth rate of the asset base on which regulators allow a return. The core driver of regulated utility earnings.">Rate Base Growth (target)</span></td><td>8–9%</td><td>—</td><td>—</td><td>Company target over the next decade, backed by the $46–48B 2026–2035 capital plan. Standalone AWK rate base in dollars was not sourced; combined AWK + Essential water/wastewater rate base was ~$29.3B at end-2024 per the merger release.</td></tr>
+      <tr><td><span class="tip" title="The return on equity a state regulator authorised in its most recent rate order.">Allowed ROE (latest order)</span></td><td>9.55%</td><td>—</td><td>—</td><td>Pennsylvania, July 2026, against 10.95% requested. Other recent orders: WV 9.80%, KY 9.70%, TN 9.70%, IA 9.60%. Pending requests: NJ 10.75%, IL 10.75%, MO 10.50%.</td></tr>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>23.2</td><td>—</td><td>—</td><td>$133.97 ÷ $5.77 TTM EPS = 23.22. StockAnalysis shows 23.56 on its own share-count basis.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>22.0</td><td>—</td><td>—</td><td>$133.97 ÷ consensus FY2026 EPS of $6.08 = 22.03. Company guidance for 2026 adjusted EPS is $6.02–$6.12. StockAnalysis's own forward P/E is 23.28.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>2.89</td><td>—</td><td>—</td><td>High, as is typical for utilities: investors pay for the reliability of the growth, not its speed.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$5.77</td><td>—</td><td>—</td><td>+3.94% YoY. Consensus: $6.08 for FY2026 (+7.89%) and $6.57 for FY2027 (+7.91%) — right inside the 7–9% target band.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+6.9%</td><td>—</td><td>—</td><td>TTM revenue $5.28B. FY2025 was +9.74%, FY2024 +10.63%.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>37.45%</td><td>—</td><td>—</td><td>EBITDA margin 55.13%. Gross margin (61.47%) is not a meaningful measure for a utility whose largest costs sit below the gross line.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>21.35%</td><td>—</td><td>—</td><td>TTM net income $1.128B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE (earned)</span></td><td>10.10%</td><td>—</td><td>—</td><td>Earned consolidated ROE sits above the most recent allowed ROEs (9.55–9.80%). It is not like-for-like: the consolidated figure includes non-regulated earnings and parent-level financing.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>2.67%</td><td>—</td><td>—</td><td>$3.58 annualised ($0.8950 quarterly, declared July 29, 2026). Payout ratio 62.06%; dividend growth +8.16% YoY. Target: 7–9% a year.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>−$1.03B</td><td>—</td><td>—</td><td>TTM: $2.33B operating cash flow less $3.36B capex. Negative by design. The dividend and the growth are both funded externally.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>1.38</td><td>—</td><td>—</td><td>$16.07B total debt, $227M cash. Net debt/EBITDA 5.49x; interest coverage 3.04x.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA.">EV/EBITDA</span></td><td>14.61</td><td>—</td><td>—</td><td>EV $42.46B. Price/book 2.32.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.52</td><td>—</td><td>—</td><td>Low, but normal for a utility that funds itself in the capital markets rather than from working capital.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>5.88%</td><td>—</td><td>—</td><td>11.66M shares. High for a low-beta utility. Part of it may be merger-arbitrage hedging, but the sources fetched do not break this out.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>0.58</td><td>—</td><td>—</td><td>Classic defensive profile. The real macro sensitivity is to interest rates, not to the equity market.</td></tr>
+      <tr><td>52-Week Range</td><td>$120.57 – $145.64</td><td>—</td><td>—</td><td>The $133.97 close sits 8.0% below the high and 11.1% above the low. 52-week change −0.81%; 50-day MA $136.20, 200-day MA $131.93.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">GAAP and adjusted figures are close: Q2 2026 GAAP EPS $1.61 against adjusted $1.61, and year-to-date $2.61 GAAP against $2.62 adjusted. Merger-related costs of $4M in Q2 and $9M in the first half sat in operation and maintenance expense. The main distortion is further back. <strong>FY2021 EPS of $6.94 is an outlier</strong>: pretax margin that year was 41.73% against 26.6–29.0% in every other year shown, and FY2022's −35% "decline" to $4.51 followed. That pattern fits a one-off gain — the 10-K dates the Homeowner Services sale (to funds advised by Apax Partners, ~$1.275B total consideration) to December 2021 — but the gain amount itself was not verified this session. Treat any five-year EPS growth rate starting from 2021 as distorted. FY2022–FY2025 went $4.51 → $4.89 → $5.39 → $5.69, which is the underlying compounding.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">13 analysts via StockAnalysis. Nine of the thirteen sit at Hold — the Street sees a well-run utility at a full price, with the merger and rate cases as the swing factors.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$141.45</div><div class="card-note"><span style="color:var(--green);">+5.58% upside</span> from $133.97. The median target is $140 (+4.5%). Add the 2.67% yield and the implied total return is in high single digits.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$128 – $162</div><div class="card-note">−4.46% to +20.92%. A narrow range, typical of a regulated utility where the debate is about a percentage point of allowed return, not about survival.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">3 / 9 / 1</div><div class="card-note">3 Strong Buy + 0 Buy, 9 Hold, 1 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:23.1;background:#22c55e;"></div>
+    <div style="flex:69.2;background:#f59e0b;"></div>
+    <div style="flex:7.7;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 3 (23.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 9 (69.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (7.7%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS — Gregg Orrill</strong> · Buy · PT raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$162</span> (Sep 10, 2026). The top of the target range, roughly 21% above the September 21 close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Bank of America Securities — Ross Fowler</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$140</span> (Sep 1, 2026). Sits on the median: fair value with modest upside.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Mizuho Securities — Anthony Crowdell</strong> · Hold · PT raised to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$140</span> (Jul 31, 2026). Raised the day after the Q2 call, two weeks after the Pennsylvania order: the target moved up, the rating did not.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The first quarter with Pennsylvania's new rates (effective August 13) and a full quarter of the Nexus systems (closed June 1). Watch whether management keeps the $6.02–$6.12 guide and the 7–9% long-term targets, and what it says about the ask-versus-get gap in the pending New Jersey, Missouri and Illinois cases.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">Pennsylvania PUC ruling on the Essential merger</div>
+        <div class="tl-desc">On September 15, 2026 the companies filed a joint petition for a <strong>non-unanimous settlement</strong> with the Bureau of Investigation and Enforcement, the Office of Consumer Advocate, the Office of Small Business Advocate and others; at least one party did not join. Next come an Administrative Law Judge recommended decision and then a full commission vote. Settlement terms and timing were not disclosed in the filing.</div>
+        <div class="tl-impact neutral">Binary for the merger</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">End Q1 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Targeted merger close</div>
+        <div class="tl-desc">Kentucky (April 21), Ohio (May 13) and Virginia (June 22, 2026) have approved; a settlement in principle has been reached in Texas; Hart-Scott-Rodino clearance and the remaining commissions are outstanding. On closing, Essential holders receive <strong>0.305 AWK shares each</strong>, leaving AWK holders with ~69% of a company with ~4.7M water and wastewater connections plus ~740,000 gas connections. At the September 21 closes (AWK $133.97, WTRG $40.48), 0.305 × $133.97 = $40.86. That is a <strong>~0.94% spread</strong> (my calculation), so the market is pricing a high probability of completion.</div>
+        <div class="tl-impact up">Accretive to EPS in year one (company guidance)</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026–2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Rate cases: NJ ($146M), MO ($179M), IL ($119M step 1)</div>
+        <div class="tl-desc">Together, the three largest pending cases seek ~$444M of annualized revenue on requested ROEs of 10.50–10.75%. Illinois's first step is proposed for January 1, 2027. After Pennsylvania's 9.55%, the market will read each order for its ROE first and its dollars second.</div>
+        <div class="tl-impact neutral">Sets 2027 earnings power</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 16, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Pennsylvania rate order — 9.55% ROE, ~$75M of ~$169M</div>
+        <div class="tl-desc">A 4–1 vote, with Vice Chair Kimberly Barrow dissenting in favour of a depreciation change that she said "would reduce annual depreciation expense by approximately $50 million and ease near-term affordability pressure." The stock closed June at $131.58 and July at $134.17. The order did not break the stock, but it reset expectations for allowed returns.</div>
+        <div class="tl-impact down">Reaction already happened</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Nexus Water acquisition closed</div>
+        <div class="tl-desc">$319M for regulated water and wastewater systems in Illinois, Indiana, Kentucky, Maryland, New Jersey, Pennsylvania, Tennessee and Virginia — about 47,000 customer connections and 70 employees. A small, clean example of the consolidation strategy.</div>
+        <div class="tl-impact up">Completed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">AWK — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22B8CF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$169.04</strong> to the September 21, 2026 settled close of <strong>$133.97</strong>, AWK lost <strong>20.7% of its price</strong> while earnings rose. FY2022 to FY2025 EPS compounded from $4.51 to $5.69. FY2022–FY2025 dividends alone add $11.59 a share; counting only those, the total return is about <strong>−14%</strong> (my estimate; it leaves out late-2021 and 2026 payments). This is what happens when a bond-like stock starts at a bond-like peak. The December 2021 close of <strong>$188.86</strong> came at the end of the zero-rate era. Every move since has been a negotiation between steadily growing earnings and a much higher discount rate. The P/E did the falling; the business did not.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI has been unusually calm. It touched oversold only three times — <strong>28.1 in September 2022, 22.5 in October 2023</strong> (the five-year low close of $117.65) and <strong>29.8 in May 2026</strong> — and overbought once, <strong>70.9 in September 2024</strong>. It now reads <strong>51.2</strong>, dead neutral. The 10-month moving average is about <strong>$132.14</strong>, just below the price. The long-term trend is flat, which is the honest description of the last three years: a $118–$148 range with a ceiling set by rates and a floor set by earnings growth.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Peak — $188.86 month-end close</div><div class="tl-desc">The highest close of the window, reached at the end of the zero-rate era. The next month it fell 14.9%, the largest monthly drop in the series.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock low — $130.16, RSI 28.1</div><div class="tl-desc">A 12.3% monthly fall and the first oversold reading. FY2022 EPS was $4.51 against an outlier $6.94 in FY2021 (see Section 04) — the reported "decline" says little, but the de-rating was real.</div><div class="tl-impact down">−12.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Five-year low — $117.65, RSI 22.5</div><div class="tl-desc">37.7% below the December 2021 peak, while FY2023 EPS rose 8.56% to $4.89. The stock rallied 12.1% the next month.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">$146.24 — the only overbought reading (RSI 70.9)</div><div class="tl-desc">A run from $118.54 in February 2024. It reversed straight back to $124.49 by December.</div><div class="tl-impact up">RSI 70.9</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2025</div><div class="tl-content"><div class="tl-title">Recovery high — $147.52</div><div class="tl-desc">The best month-end since April 2023 after back-to-back gains of 9.1% and 8.5%. Still 22% below the 2021 peak.</div><div class="tl-impact up">Best level since Apr 2023</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">Essential merger announced — $128.43</div><div class="tl-desc">The all-stock deal was announced on October 27, 2025. AWK closed the month down 7.7%. The sources fetched do not separate the deal's effect from other moves that month.</div><div class="tl-impact down">−7.7% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">2026 low — $123.27, RSI 29.8</div><div class="tl-desc">The weakest month-end of 2026, ahead of the Pennsylvania rate decision. Kentucky and Ohio had just approved the merger.</div><div class="tl-impact down">Oversold</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $133.97</div><div class="tl-desc">Up 8.7% from the May low and 2.7% above the December 2025 close of $130.50, but down 3.1% from the August month-end of $138.23 after two straight down sessions.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> were not obtained, so no numeric comparison is given. From sourced data: AWK is <strong>down 20.7% on price over five years</strong> and <strong>down 0.81% over 52 weeks</strong> (StockAnalysis), while its earnings and dividend compounded at high single digits. Against peers at the same close: Essential Utilities at $11.49B market cap (P/E 20.70), American States Water at $3.36B (P/E 23.22) and California Water Service at $2.92B (P/E 21.22). At 23.2x trailing earnings, AWK trades in line with the small-cap water names and at a premium to Essential — which it is about to own.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A monopoly on an essential product, a $46–48B ten-year capital plan that builds rate base at 8–9% a year, and consensus EPS of $6.08 and $6.57 for 2026–27 that sits inside the 7–9% target. The stock is 29% below its 2021 peak despite earnings up from $4.51 (FY2022) to $5.77 (TTM), because the multiple, not the business, took the hit from higher rates. The Essential merger adds scale in the most acquisitive part of the country, is guided accretive in year one, and is priced by the market at a sub-1% spread, i.e. as likely to close. Buy at 22x forward, collect 2.67% growing at 7–9%, and let the rate base compound.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The model only works if regulators keep granting returns above the cost of capital, and the largest one just cut the ask by more than half and set 9.55% — while a commissioner said PAWC's rates are already the highest in the state and up 35% since 2020. Free cash flow is negative every year (−$1.03B TTM), net debt/EBITDA is 5.49x, and the capex plan accelerates. New Jersey, Missouri and Illinois are asking for 10.50–10.75%. If they follow Pennsylvania, the 7–9% target rests on volume of capital alone. That volume raises bills further, and the merger now needs the same Pennsylvania commission's approval. At 23x trailing earnings with a 2.67% yield, there is little valuation cushion if allowed ROEs drift down.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Allowed-ROE compression and the affordability backlash.</strong> Pennsylvania granted 9.55% against 10.95% requested and about 44% of the requested revenue. Pending NJ, MO and IL cases ask for 10.50–10.75% on ~$444M combined. Each 100bp of allowed ROE on a $6.6B Pennsylvania rate base at a 54.23% equity ratio is ~$36M of annual allowed net income (my arithmetic: $6.6B × 54.23% × 1%).</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Merger execution through hostile-to-price regulators.</strong> Closing needs every relevant PUC on terms that avoid a "Burdensome Effect," plus HSR. The Pennsylvania settlement is non-unanimous and has an ALJ decision and a commission vote still ahead. Conditions imposed to win approval could dilute the promised year-one accretion.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Funding cost and interest-rate sensitivity.</strong> $16.07B of debt, 3.04x interest coverage and a capex plan well above operating cash flow mean the company is a permanent issuer. Higher rates raise funding costs immediately; regulators reset allowed returns only case by case, with a lag. The five-year chart is essentially a picture of this risk.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Affordability vs. the investment bill</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">US water systems need replacement pipe, lead service line removal and new treatment for PFAS and other emerging contaminants — the Pennsylvania chairman named exactly these as the investment needs he was weighing. Regulators pass that spending into customer bills. The July 2026 Pennsylvania order shows where the constraint binds. The commission accepted a <strong>$6.6B rate base</strong> that includes future investment through mid-2027, and it cut the return and the revenue. In other words, regulators are letting the pipes get built but squeezing the price of capital. For an investor, a lower allowed ROE on a larger rate base is still growth, just slower and lower-quality growth.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Consolidation of a fragmented industry</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">STRUCTURAL SHIFT</span></div>
+    <p class="biz-desc">US water is still mostly municipal and highly fragmented. Investor-owned utilities grow by buying small systems — American Water added ~52,000 connections in the first half of 2026, including Nexus, and had 19 more deals ($236M) pending — and by buying each other. AWK + Essential would be the step change: ~4.7M water and wastewater connections across 17 states, a ~$29.3B combined water/wastewater rate base (end-2024) and ~$63B enterprise value at announcement. It also brings roughly 740,000 gas connections, making the combined company less of a pure-water story than AWK is today. That changes both the risk mix and the regulatory map.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The valuation framing — bull and bear</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">HOLD BY CONSENSUS</span></div>
+    <p class="biz-desc">At <strong>23.2x trailing and 22.0x forward</strong> earnings, <strong>14.6x EV/EBITDA</strong> and a <strong>2.67% yield</strong>, AWK is priced as a premium, low-risk compounder. <strong>The bull framing:</strong> 7–9% EPS growth plus a ~2.7% yield is a ~10–12% annual total-return profile with a 0.58 beta, and the merger lengthens the runway. <strong>The bear framing:</strong> that arithmetic assumes allowed ROEs hold near 10% and the multiple holds where it is. Pennsylvania has just shown the first assumption can break, and the five-year chart shows what rates can do to the second. The numbers that will settle it are dated and public: the NJ, MO and IL orders, the Pennsylvania merger vote, and whether the 2026 guide survives Q3.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/awk/history/</strong> — the September 21, 2026 settled close of $133.97 (open 135.31, high 136.03, low 133.73, Adj. Close present, −1.42% on the prior close of $135.90), fetched after the 4:00 PM ET close. It matches the StockAnalysis quote page ($133.97, previous close $135.90) and the forecast page, which computes upside from $133.97.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, financials, forecast; peer quotes for WTRG, AWR, CWT at the Sep 21, 2026 close) for price, valuation, margins, balance sheet, consensus and named analyst actions; American Water FY2025 Form 10-K (SEC EDGAR) for state revenue and customer mix, water sources, workforce, the Military Services Group, capital plan and prior rate orders; the Q2 2026 Form 10-Q for the Pennsylvania order detail (9.55% ROE, $6.6B rate base), pending NJ/IL/MO/VA cases, the Nexus acquisition and merger conditions; the Q2 2026 earnings release (8-K Ex. 99.1) for EPS, guidance, capital, authorized revenue and the CEO quote; the October 2025 merger release (ir.amwater.com) for exchange ratio, ownership split, combined rate base, leadership and targets; the June 22, 2026 Virginia approval release; 8-Ks dated August 28 and September 17, 2026 for the Pennsylvania merger settlement; dailyenergyinsider.com and the PA PUC for the July 16, 2026 vote and commissioner quotes; S&amp;P Dow Jones Indices (press.spglobal.com) for the March 2016 S&amp;P 500 addition; digrin.com/stocks/detail/AWK/price (unadjusted "Real Price" column) for month-end closes, cross-checked against Yahoo Finance monthly closes (Jul 2026 $134.17, Aug 2026 $138.23) and the StockAnalysis Aug 31, 2026 daily close ($138.23).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin.com, plus a final point at the September 21, 2026 settled close of $133.97. <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close fourteen trading days into September, not a month-end, and is labelled accordingly. Industry-average and S&amp;P 500 benchmark columns in Section 04 are "—" because no sourced values were obtained. AWK's standalone rate base in dollars, segment market shares, named institutional holders and global/US market-cap ranks were not sourced and are marked as such. The merger spread, revenue-mix percentages, Pennsylvania ask-versus-get ratio, ROE sensitivity and total-return estimate are the author's arithmetic from the sourced figures shown. FY2021 EPS is treated as an outlier because of its 41.73% pretax margin and the December 2021 Homeowner Services sale; the gain amount was not verified, and per-share history is read from FY2022 onward. The Military Services Group installation count is 18 in the FY2025 10-K and 19 in the Q2 2026 release; the later figure is used in the overview.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and requested rate increases are applications, not approved revenue. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 2026'];
+const prices = [169.04,174.18,168.57,188.86,160.80,151.09,165.53,154.08,151.25,148.77,155.44,148.45,130.16,145.34,151.76,152.42,156.49,140.38,146.49,148.25,144.45,142.75,147.43,138.74,123.83,117.65,131.84,131.99,124.02,118.54,122.21,122.32,130.77,129.16,142.36,143.12,146.24,138.11,136.94,124.49,124.64,135.97,147.52,147.01,142.97,139.11,140.24,143.51,139.19,128.43,130.07,130.50,129.13,136.03,136.09,128.42,123.27,131.58,134.17,138.23,133.97];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 3,  label: 'Dec 2021 — peak month-end close $188.86',                 color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — rate-shock low $130.16, RSI 28.1',             color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — five-year low close $117.65, RSI 22.5',        color: '#ef4444' },
+  { idx: 36, label: 'Sep 2024 — $146.24, only overbought reading (RSI 70.9)',  color: '#f59e0b' },
+  { idx: 42, label: 'Mar 2025 — recovery high $147.52',                        color: '#22c55e' },
+  { idx: 49, label: 'Oct 2025 — Essential merger announced; $128.43 (−7.7%)',  color: '#3b82f6' },
+  { idx: 56, label: 'May 2026 — 2026 low $123.27, RSI 29.8',                   color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — PA rate order, 9.55% ROE; $134.17',            color: '#f59e0b' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $133.97',                    color: '#22B8CF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,184,207,0.22)');
+grad.addColorStop(1, 'rgba(34,184,207,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22B8CF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22B8CF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
