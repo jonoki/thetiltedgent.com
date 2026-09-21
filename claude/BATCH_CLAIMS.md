@@ -26,9 +26,6 @@ work, so the claim goes in first and the research goes second.
 ### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
 AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
 
-### sess-2026-09-21-b · claimed 2026-09-21 (local Claude Code session)
-RDDT EXR HPQ ZTS MTD PCG WTW CFG CBOE TDY
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -97,6 +94,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-b · done 2026-09-21 (local Claude Code session)
+RDDT EXR HPQ ZTS MTD PCG WTW CFG CBOE TDY
+- All 10 published (348 reports). RDDT chart is since-IPO (31 points).
 
 ### sess-2026-09-21-a · 2026-09-21 · all 10 published (338 reports)
 BE VMRK FERG P ILMN BIIB RMD VMC JBL CCI — as of the Sep 18 close (CCI: Sep 21).
