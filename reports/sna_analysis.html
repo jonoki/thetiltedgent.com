@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNA — Snap-on Incorporated | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SNA</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Tools &amp; Accessories</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $19.13B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">S&amp;P 500 member since Sep 30, 1982</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global rank: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NASDAQ-100: not a member (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Snap-on Incorporated</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$369.75</div>
+      <div class="price-change">−$2.40 (−0.64%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours 5:26 PM EDT: $369.75, unchanged</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 2801 80th Street, Kenosha, Wisconsin</div>
+    <div class="meta-item"><span>Employees:</span> 13,000</div>
+    <div class="meta-item"><span>Founded:</span> 1920, Milwaukee (as the Snap-on Wrench Company)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 15, 2026 (Q3 2026, estimated)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">In 1920 Joseph Johnson and William Seidemann started selling ten sockets that would "snap on" to five interchangeable handles — "5 do the work of 50." A century later Snap-on still sells wrenches, sockets and ratchets, but the thing that makes it unusual is not the tool. It is the <strong>van</strong>. Snap-on tools reach mechanics through mobile franchisee dealers who visit customers' workplaces weekly in vans loaded with inventory, and the company runs its own lending arm whose financing programs, in its words, "facilitate the sales of its products and ... support its franchise business." Around that core sit diagnostics and repair-information software for repair shops (the Repair Systems &amp; Information Group) and a direct and distributor business selling to aerospace, military, natural-resources and manufacturing customers (Commercial &amp; Industrial).</p>
+  <p class="prose" style="margin-top:16px;">Fiscal 2025 revenue was <strong>$5.16B, up just 0.93%</strong> after a flat FY2024, with <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$19.19</strong>. That is the tension in this stock: a business whose revenue grew about 1% a year over FY2024–25 that the market nonetheless values at <strong>$19.13B</strong>, close to 19 times trailing earnings, because the margins look like software (25.2% operating margin, 19.6% net margin on a trailing basis) and the dividend has compounded at about 14–15% a year. The 2026 numbers have turned up — Q2 net sales rose <strong>4.7%</strong>, with the Commercial &amp; Industrial Group up 13.8% — yet the share price fell from a <strong>$410.41 July month-end to $369.75</strong> on September 21, 2026. The question is whether a long-cycle compounder is being marked down for its slow middle segments, or re-rated back toward the mid-teens multiple it carried in 2023.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Nicholas T. Pinchuk</div>
+      <div class="card-note">Chairman, CEO and President (StockAnalysis profile; Wikipedia). On the Q2 2026 release he described results that achieved "improved gross margins, overcoming an environment of significantly increasing turbulence," and pointed to "the continuing sales growth in the U.S. Tools Group, the gains in our Asia Pacific and European-based hand tools operations, and our rise in the critical industries."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Aldo J. Pagliari</div>
+      <div class="card-note">Senior Vice President of Finance and CFO (StockAnalysis profile; Wikipedia). Company outlook for 2026: capital expenditures of about $100 million ($44.3 million spent in the first six months) and a full-year effective tax rate of about 22%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">98.23% institutional</div>
+      <div class="card-note">Insiders hold 2.36% (StockAnalysis). Named institutional holders were not retrieved from sources fetched this session and are not listed. Shares outstanding 51.73M, down 1.03% in a year — the buyback is steady but modest.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Snap-on reports three operating groups plus <strong>Financial Services</strong>. The mix below uses <strong>Q2 2026 (quarter ended July 4, 2026)</strong> figures from the company's July 23, 2026 release: segment sales for the three operating groups and Financial Services revenue, as a share of their combined $1,484.6M. That total is <em>before</em> intersegment eliminations, so it is larger than reported total revenue of $1,334.8M. Shares are rounded and sum to 100.1%.</p>
+  <div class="seg-bar">
+    <div style="flex:34.3;background:#22c55e;">TOOLS GROUP 34.3%</div>
+    <div style="flex:32.4;background:#f59e0b;">RS&amp;I 32.4%</div>
+    <div style="flex:26.7;background:#2DD4BF;">C&amp;I 26.7%</div>
+    <div style="flex:6.7;background:#a78bfa;">FS</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Snap-on Tools Group — $508.8M (Q2'26), +3.6% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Repair Systems &amp; Information — $480.3M, +2.5% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Commercial &amp; Industrial — $395.8M, +13.8% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Financial Services — $99.7M revenue (6.7%), −2.0% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The small purple sliver is the part to watch. Financial Services is 6.7% of segment revenue but earned <strong>$67.5M of the $336.4M</strong> consolidated operating earnings in Q2 — about <strong>20%</strong> of the profit (computed from the release).</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Snap-on Tools Group</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$508.8M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3.0%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.6%</div><div class="biz-stat-label">Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">34.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The franchise van channel — the business most people picture when they hear the name. Franchisees buy from Snap-on and sell to professional technicians at their workplace, week after week, often on credit that Snap-on itself extends. Q2 2026 sales rose to $508.8M from $491.0M, a <strong>3.0% organic gain</strong> with growth in both the U.S. and international operations. The cost of that growth showed up in the margin: operating earnings slipped to $115.1M from $116.7M and the operating margin fell to <strong>22.6% from 23.8%</strong>. Revenue up, profit down is a pattern worth tracking for more than one quarter. Trailing-twelve-month segment sales: $2,006M (StockAnalysis / Fiscal.ai).</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM for professional hand tools not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Matco Tools</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Mac Tools</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Cornwell Tools</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+    <p class="prose" style="margin-top:10px;font-size:12px;">Competitors as named by Wikipedia's Snap-on article ("primary competitors include Matco, Mac Tools, and Cornwell Tools"). None is a standalone listed company with a market cap we sourced.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Repair Systems &amp; Information Group</div>
+        <span class="biz-badge dominant">HIGHEST OPERATING MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$480.3M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+0.7%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.0%</div><div class="biz-stat-label">Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">32.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Diagnostics, repair information, business-management software and undercar equipment (wheel balancers, tire changers, lifts, alignment) sold to independent repair shops and OEM dealerships. The information products are the closest thing Snap-on has to recurring software revenue. Q2 2026 sales of $480.3M were up from $468.6M, but only <strong>0.7% organically</strong>: stronger undercar equipment and diagnostics sales to independent shops were "partially offset by lower activity with OEM dealerships." Operating margin eased to <strong>24.0% from 25.6%</strong>. The quarter's acquisition of Diesel Laptops adds diagnostics and repair information for commercial trucks and off-highway vehicles.</p>
+    <div class="biz-tam"><strong>Industry size / competitors:</strong> not sourced this session; no competitor is named on the pages fetched for this segment, so none is shown.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Commercial &amp; Industrial Group</div>
+        <span class="biz-badge growth">FASTEST GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$395.8M</div><div class="biz-stat-label">Q2'26 Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+11.0%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.8%</div><div class="biz-stat-label">Op Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">26.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Tools and equipment sold directly and through distributors to what management calls the "critical industries" — aerospace, military, natural resources and manufacturing, where the cost of a failed tool is high. This was the quarter's star: sales rose to $395.8M from $347.8M on an <strong>11.0% organic gain</strong>, with higher sales in every one of the segment's operations, and operating margin jumped <strong>330 basis points to 16.8%</strong>. The Q2 acquisition of Hi-Force Hydraulic Tools extends its torque offering. It is still the lowest-margin of the three operating groups, so its growth lifts profit dollars more than the group margin percentage.</p>
+    <div class="biz-tam"><strong>Industry size / competitors:</strong> not sourced this session; no competitor is named on the pages fetched for this segment, so none is shown.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Financial Services</div>
+        <span class="biz-badge emerging">~20% OF OPERATING EARNINGS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$99.7M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$67.5M</div><div class="biz-stat-label">Op Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−4.1%</div><div class="biz-stat-label">Originations YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The lending arm. The company describes it as providing "financing programs to facilitate the sales of its products and to support its franchise business"; the balance sheet splits the book into finance receivables and contract receivables. Q2 2026 revenue was $99.7M against $101.7M a year earlier, with operating earnings of <strong>$67.5M versus $68.2M</strong> — roughly two-thirds of revenue drops through to operating profit. <strong>Originations fell 4.1% to $281.0M</strong>, meaning fewer new loans were written than a year ago. At July 4, 2026 the balance sheet carried $597.6M of current and $1,274.0M of long-term finance receivables, plus $121.1M and $410.6M of contract receivables — about <strong>$2.40B in total</strong> (sum computed from the release). Credit quality of that book is the risk no income-statement line shows until it does.</p>
+    <div class="biz-tam"><strong>Note:</strong> Financial Services is a captive lender, not a standalone market; no TAM or competitor is presented.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The four numbers that matter</h3>
+  <p class="prose">For Snap-on, the income statement is the end of the story. The start is whether technicians keep buying on credit and whether the non-van businesses keep growing.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Q2 2026 Organic Sales Growth</div>
+      <div class="card-value">+3.0%</div>
+      <div class="card-note">Group net sales $1,235.1M, +4.7% reported: $35.5M organic, $11.5M from acquisitions, $8.7M favourable currency.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Financial Services Originations</div>
+      <div class="card-value" style="color:var(--red);">−4.1%</div>
+      <div class="card-note">$281.0M in Q2 2026, down $12.0M. New credit written is a leading indicator of what technicians are willing to buy on terms.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">C&amp;I Operating Margin</div>
+      <div class="card-value" style="color:var(--green);">16.8%</div>
+      <div class="card-note">Up 330bps from 13.5%. The one segment where both growth and margin moved the right way in Q2.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Gross Margin (Q2 2026)</div>
+      <div class="card-value">51.4%</div>
+      <div class="card-note">Up from 50.5% a year earlier (StockAnalysis summary of the Q2 release and call). Consolidated operating margin, by contrast, slipped to 25.2% from 25.5%.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Weekly franchise-van route</span>
+    <span class="moat-pill">Captive credit for techs &amp; franchisees</span>
+    <span class="moat-pill">Premium professional brand</span>
+    <span class="moat-pill">Diagnostics &amp; repair-information data</span>
+    <span class="moat-pill">Critical-industries positioning</span>
+    <span class="moat-pill">Net cash balance sheet ($334M)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is a <strong>distribution and credit loop</strong>. A franchisee who stops at the same garage every week knows each technician, carries the tool to the bay, and can offer financing through Snap-on's own lending arm. A competitor needs more than a better wrench to break that; it needs a route, a relationship and a balance sheet. The numbers show what the loop earns: a trailing gross margin of 51.8% and an operating margin of 25.2% on a tool business — plus Financial Services turning about two-thirds of its revenue into operating profit. The weakness is the flip side of the same loop: the model depends on technicians' willingness to take on debt for tools, and on franchisees staying solvent.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The core van business is growing slowly and earning less per dollar.</strong> Tools Group organic growth was 3.0% in Q2 2026 while its operating margin fell 120bps to 22.6%. The largest segment is not where the growth is.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Credit is built into the sale.</strong> About $2.40B of finance and contract receivables sit on a balance sheet with $19.13B of market value on top of it. Originations fell 4.1% in Q2. If technician incomes or franchisee economics weaken, both sales and loan quality suffer at the same time.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">OEM dealership softness in RS&amp;I.</strong> The release flagged "lower activity with OEM dealerships," leaving RS&amp;I at 0.7% organic growth with margin down 160bps. This is the segment carrying the highest operating margin, so weakness here costs more profit per dollar of sales.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Valuation leaves little room.</strong> At 18.9x trailing earnings and a <span class="tip" title="Price/Earnings-to-Growth: P/E divided by expected earnings growth rate. Above 2 means you pay a lot for each point of growth.">PEG</span> of 2.49 (StockAnalysis), the stock is priced for consistency. Consensus 3-year EPS growth is 7.24% and revenue growth 1.92% (StockAnalysis, estimates).</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, which Snap-on has belonged to since September 30, 1982. SNA is listed on the NYSE, so it is not a NASDAQ-100 member. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated. Note: Snap-on's reported debt and ratios include its captive finance arm, which funds customer loans; debt-based ratios therefore look different from a pure manufacturer's.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SNA</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>18.86</td><td>—</td><td>—</td><td>$369.75 ÷ $19.60 TTM EPS = 18.86. StockAnalysis displays 18.98 on its own basis; the arithmetic here uses the stated EPS.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>18.66</td><td>—</td><td>—</td><td>$369.75 ÷ consensus FY2026 adjusted EPS of $19.82 (estimate, 8 analysts). StockAnalysis's statistics page shows 17.98 on a different forward basis.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>2.49</td><td>—</td><td>—</td><td>StockAnalysis. You pay a lot for each point of expected growth — the premium is for steadiness, not speed.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$19.60</td><td>—</td><td>—</td><td>+4.44% YoY. Annual EPS: $14.92 (FY2021) → $19.19 (FY2025), about 6.5% a year compounded (computed).</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+4.02%</td><td>—</td><td>—</td><td>TTM total revenue $5,275M including Financial Services. FY2025 grew only 0.93% and FY2024 0.00%; Q2 2026 net sales +4.7% (3.0% organic).</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of goods, as a percentage of revenue.">Gross Margin</span></td><td>51.83%</td><td>—</td><td>—</td><td>TTM. Remarkably stable: between 50.5% and 52.0% in every fiscal year from 2021 to 2025.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>25.16%</td><td>—</td><td>—</td><td>TTM. Down from 26.43% in FY2024; the Q2 2026 consolidated operating margin was 25.2% versus 25.5% a year earlier.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>19.60%</td><td>—</td><td>—</td><td>TTM net income $1,034M on $5,275M revenue.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>2.64%</td><td>—</td><td>—</td><td>$9.76 annualised ($2.44 per quarter) ÷ $369.75. 16 consecutive years of dividend growth; payout ratio 49.79%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>6.67%</td><td>—</td><td>—</td><td>3.36M shares, up from 3.04M the prior month; 11.39 days to cover. High for a 0.71-beta name.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>0.22</td><td>—</td><td>—</td><td>$1.31B debt vs $1.64B cash: net cash $334.2M. Debt partly funds the finance receivables book.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>3.43</td><td>—</td><td>—</td><td>Includes current finance and contract receivables. Quick ratio 2.51.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$1.11B</td><td>—</td><td>—</td><td>TTM: $1,186M operating cash flow − $77.7M capex. FCF yield 5.77%; FCF margin 21.0%.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>17.93%</td><td>—</td><td>—</td><td>On $6.07B of book equity — earned with little leverage.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by debt plus equity capital employed.">ROIC</span></td><td>18.43%</td><td>—</td><td>—</td><td>Well above StockAnalysis's 7.84% WACC estimate.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>0.71</td><td>—</td><td>—</td><td>5-year. A defensive profile on paper; the stock still fell 9.9% from the July month-end in seven weeks.</td></tr>
+      <tr><td>52-Week Range</td><td>$320.80 – $423.02</td><td>—</td><td>—</td><td>$369.75 is 12.6% below the high and 15.3% above the low. 52-week price change +9.64%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable Items</h3>
+  <p class="prose">Three things to read the numbers correctly. First, <strong>"revenue" versus "sales"</strong>: Snap-on reports net sales ($1,235.1M in Q2 2026) and Financial Services revenue ($99.7M) separately; total revenue ($1,334.8M) is the two combined. The consensus FY2026 "revenue" estimate of $4.95B (−4.08%) on StockAnalysis appears to be on a net-sales basis compared with a total-revenue base, so it is not used here. Second, <strong>acquisitions</strong>: Hi-Force Hydraulic Tools and Diesel Laptops were bought in Q2 2026; $11.5M of Q2 sales were acquisition-related, trailing cash acquisitions were $159.1M and goodwill rose to $1,231.5M from $1,109.5M at the start of the year. Third, <strong>capital return</strong>: Q2 2026 dividends paid were $126.4M and treasury-stock purchases $91.4M. No material one-off charges were identified in the sources fetched.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">11 analysts polled by S&amp;P Global via StockAnalysis. Targets last updated August 20, 2026.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$413.78</div><div class="card-note"><span style="color:var(--green);">+11.91% upside</span> from $369.75. Median target $415 (+12.24%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$330 – $485</div><div class="card-note">−10.75% to +31.17%. Even the lowest target is only about 11% below today's price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 4 / 2</div><div class="card-note">2 Strong Buy + 3 Buy, 4 Hold, 2 Sell, 0 Strong Sell (September 2026). The split has barely moved since May.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:45.5;background:#22c55e;"></div>
+    <div style="flex:36.4;background:#f59e0b;"></div>
+    <div style="flex:18.2;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (45.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 4 (36.4%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (18.2%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS (StockAnalysis / TipRanks)</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Tigress Financial — Ivan Feinseth</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$445 → $485</span> (Jul 31, 2026). The top of the range, +31.17% from the current price.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Roth MKM — Scott Stember</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$409 → $461</span> (Jul 23, 2026, the day of the Q2 release). And <strong>Barclays — John Babcock</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$420 → $450</span> (Jul 29, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Robert W. Baird — Luke Junk</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$395 → $415</span> (Jul 24, 2026). A neutral house that still lifted its target after Q2.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barrington — Gary Prestopino</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$415</span> maintained (Aug 20, 2026) — the most recent call. The two Sell ratings behind the $330 low target are not identified on the page fetched.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (estimated date)</div>
+        <div class="tl-desc">The test of whether Q2 was a turn or a blip. Watch Tools Group organic growth and margin (3.0% and 22.6% in Q2), Financial Services originations (−4.1% in Q2), RS&amp;I's OEM-dealership comment, and whether C&amp;I can hold double-digit organic growth. Consensus FY2026 adjusted EPS is $19.82 (estimate).</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Dividend decision — the pattern, not a promise</div>
+        <div class="tl-desc">In every year of the chart window the quarterly dividend stepped up with the November ex-date: $1.23 → $1.42 (2021), → $1.62 (2022), → $1.86 (2023), → $2.14 (2024), → $2.44 (2025), each a 14–16% increase. A raise of similar size would continue that record; a smaller one would say something about management's view of 2027.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Integration of Hi-Force and Diesel Laptops</div>
+        <div class="tl-desc">Both acquisitions closed in Q2 2026 — one extends C&amp;I in torque tools for critical industries, the other extends RS&amp;I into commercial-truck and off-highway diagnostics. They added $11.5M of Q2 sales. Watch whether they lift organic growth in future periods once they lap their first year.</div>
+        <div class="tl-impact neutral">Execution</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Net sales $1,235.1M (+4.7%, +3.0% organic), diluted EPS $4.96 versus $4.72, gross margin 51.4% versus 50.5%. Four brokers raised targets within eight days. The stock closed July at $410.41, the highest month-end in the five-year series, then gave back 5.9% in August and a further 4.3% so far in September. No company-specific news explaining the August–September decline was found in the sources fetched.</div>
+        <div class="tl-impact down">Reaction since: −9.9% from July month-end</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SNA — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$208.95</strong> to the September 21, 2026 settled close of <strong>$369.75</strong>, SNA gained <strong>77.0% on price</strong> — about <strong>12.1% a year</strong> compounded (computed, (369.75 ÷ 208.95)^(1/5) − 1). Adding the $37.92 per share of dividends with ex-dates in the window (not reinvested) takes the simple total return to roughly <strong>+95%</strong>. No stock split has occurred since 1996, so the per-share series is continuous. The shape is a staircase: a flat 2021–2022 between about $197 and $224, a 2023 step up to the high $200s, a sharp late-2024 jump to $369.69, a pullback through mid-2025, and a new high in 2026.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI has cooled from <strong>73.5 at the July 2026 peak to 47.7</strong> — neutral. The last oversold-looking reading in the window was 37.3 in June 2022; the stock has not been deeply oversold on a monthly basis in five years. The 10-month moving average, at about <strong>$378.26</strong>, now sits just above the price: the first close below its 10-month trend line since August 2025. (On a daily basis StockAnalysis shows a 14-day RSI of 27.65 and a 50-day average of $396.83 — short-term momentum is weaker than the monthly picture.)</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">Five-year low — $197.03 month-end close</div><div class="tl-desc">An 11.2% monthly drop to the lowest close in the window, followed by a 13.7% rebound in July. FY2022 still delivered revenue growth of 5.23% and EPS of $16.82.</div><div class="tl-impact down">−11.2% month · 5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2023</div><div class="tl-content"><div class="tl-title">Step up — $288.19 (+15.8% in a month)</div><div class="tl-desc">The largest monthly gain in the series, in a year when EPS rose 11.53% to $18.76. The stock moved from the $240s to the high $200s and held there.</div><div class="tl-impact up">+15.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct–Nov 2024</div><div class="tl-content"><div class="tl-title">Re-rating — $289.71 to $369.69 in two months</div><div class="tl-desc">+14.0% in October and +12.0% in November, pushing monthly RSI to 83.6, the most overbought reading in the window. Fundamentals did not move as fast: FY2024 revenue was flat (0.00%) and EPS grew 4.00%. The price jumped mainly on the multiple, which is why part of it gave back in 2025.</div><div class="tl-impact up">RSI 83.6 · most overbought</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">The digestion — $311.18</div><div class="tl-desc">About 16% below the November 2024 close, as FY2025 went on to show revenue +0.93% and EPS −1.64%. The multiple had run ahead of the earnings; the earnings did not catch up that year.</div><div class="tl-impact down">−15.8% from Nov 2024</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">Five-year high month-end — $410.41</div><div class="tl-desc">Q2 2026 delivered net sales +4.7% and diluted EPS $4.96, and analysts raised targets.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $369.75</div><div class="tl-desc">Down 9.9% from the July month-end, still 87.7% above the June 2022 low. Monday's session closed −0.64% from $372.15.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) were not obtained from the sources fetched, so no numeric comparison is given. What is sourced: SNA is <strong>up 77.0% on price over the chart window</strong> and <strong>up 9.64% over the trailing 52 weeks</strong> (StockAnalysis), with a 5-year beta of 0.71. Peer valuation comparisons were not sourced; the named van-channel competitors (Matco, Mac Tools, Cornwell Tools) are not standalone listed companies.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A 106-year-old tool company earning a 25% operating margin, an 18.4% ROIC and $1.11B of free cash flow, with net cash on the balance sheet and 16 straight years of dividend growth at roughly 14–15% a year. 2026 has brought growth back — Q2 net sales +4.7%, gross margin up 90bps, C&amp;I +11.0% organic with a 330bp margin gain — and two bolt-on acquisitions push further into critical industries and heavy-duty diagnostics. After a 9.9% pullback from July, the stock trades at 18.7x consensus FY2026 EPS with the average target 11.9% higher and even the lowest target only 10.75% below. For a patient holder, the dividend alone yields 2.64% and has historically grown faster than earnings.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Strip out the fastest-growing segment and the core is barely growing: Tools Group +3.0% organic with margin down 120bps, RS&amp;I +0.7% organic with margin down 160bps and OEM dealerships weaker. FY2024 revenue was flat and FY2025 grew 0.93%, yet the stock carries a PEG of 2.49. About 20% of operating earnings come from lending to technicians and franchisees, originations are falling, and ~$2.40B of receivables sits behind the sales line. Short interest of 6.67% of float with 11.39 days to cover says some investors think the premium multiple is the risk.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Credit quality in the franchise loop.</strong> Financial Services earned $67.5M of $336.4M Q2 operating earnings, on a receivables book of about $2.40B. A downturn in technician employment or franchisee health would hit sales and the loan book together.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Margin slippage in the two largest segments.</strong> Tools Group (22.6%, −120bps) and RS&amp;I (24.0%, −160bps) together were about 71% of Q2 operating-group sales (computed). If C&amp;I growth slows, group margin has no offset.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Multiple compression.</strong> The price is near 19x trailing earnings for a business whose three-year consensus revenue growth is 1.92% (estimate). The 2024 run-up was mostly re-rating; a return to the 15x of FY2023 on unchanged EPS would mean a price near $294 (15 × $19.60, illustrative arithmetic, not a forecast).</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #2DD4BF;">
+    <div class="biz-header"><div class="biz-name">Selling tools on a route, and on credit</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">STRUCTURAL FEATURE</span></div>
+    <p class="biz-desc">Snap-on's franchisees visit customers' workplaces weekly in vans loaded with retail inventory, and the company provides "financing programs to facilitate the sales of its products and to support its franchise business." That makes the Tools Group part retailer, part lender. When technicians are confident, easy credit pulls purchases forward; when they are not, originations — the new loans written — fall first. Q2 2026 originations of $281.0M were 4.1% lower than a year ago, even as Tools Group sales rose 3.6%. One quarter is not a trend, but it is the number that would move first.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Repair shops versus dealerships</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">MIXED SIGNAL</span></div>
+    <p class="biz-desc">In RS&amp;I, Q2 2026 showed higher sales of undercar equipment and diagnostic and repair information products to independent repair shops, offset by lower activity with OEM dealerships. The Diesel Laptops acquisition points the segment toward commercial trucks and off-highway vehicles. The segment's organic growth of 0.7% says the offset was nearly complete.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Critical industries — the growth runway management keeps naming</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">Management frames its strategy as "runways for growth": extending in critical industries "where the cost and penalties for failure are high," expanding with repair shop owners, and enhancing the franchise van channel. In Q2 2026 the critical-industries side (C&amp;I) delivered: 11.0% organic growth and a 16.8% operating margin, up from 13.5%. Trailing segment sales of $1,543M compare with $1,458M in FY2025 (StockAnalysis / Fiscal.ai). If that rate holds, C&amp;I becomes the segment that decides whether Snap-on's growth breaks out of the low single digits.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/sna/history/</strong> — the September 21, 2026 row: open 373.42, high 373.97, low 369.16, close 369.75, Adj. Close 369.75, −0.64%. Confirmed by the quote page at stockanalysis.com/stocks/sna/ ("369.75 −2.40 (−0.64%) At close: Sep 21, 2026, 4:00 PM EDT"; previous close 372.15). The history row showed volume 324,549 and the quote page 326,006; the price fields agree.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, profile, annual financials, cash flow, dividends, forecast) for price, valuation, margins, returns, balance sheet, short interest, consensus, named analyst actions and Sector/Industry labels; Snap-on's Q2 2026 earnings release of July 23, 2026 (Business Wire, as republished on franchising.com; the SEC 8-K and snapon.com also carry it) for segment sales, organic growth, operating earnings and margins, Financial Services revenue and originations, receivables, acquisitions, outlook and the CEO quote; en.wikipedia.org (Snap-on article) for founding history, the franchise-van channel description and the named competitors; en.wikipedia.org (List of S&amp;P 500 companies) for the S&amp;P 500 addition date of September 30, 1982; digrin.com/stocks/detail/SNA/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from the unadjusted "Real price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $369.75. The July and August 2026 month-ends ($410.41 and $386.31) were cross-checked against the stockanalysis.com daily rows for July 31 and August 31, 2026 and match. <strong>No months were reconstructed or estimated.</strong> The final point is a settled close three weeks into September, not a month-end. Industry-average and S&amp;P 500 columns in Section 04 are "—" because no sourced values were obtained. Market shares, TAMs, competitor market caps and a global market-cap rank were not sourced and are shown as "n/v" or "not sourced". Segment mix is Q2 2026 segment sales plus Financial Services revenue before intersegment eliminations. Computed figures (P/E arithmetic, 5-year price change and CAGR, dividends in window, Financial Services share of operating earnings, total receivables, percentage moves) are derived from the sourced inputs as stated. Consensus estimates are estimates. The NYSE listing (hence no NASDAQ-100 membership) is per StockAnalysis.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as estimates or outlook are forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [208.95,203.23,205.91,215.38,208.25,210.18,205.48,212.49,221.88,197.03,224.05,217.86,201.35,222.05,240.60,228.49,248.73,248.68,246.89,259.41,248.86,288.19,272.44,268.60,255.06,257.94,274.69,288.84,289.93,275.66,296.22,267.96,272.86,261.39,287.03,283.74,289.71,330.13,369.69,339.48,355.15,341.17,337.01,313.81,320.75,311.18,321.19,325.24,346.53,335.55,340.05,344.60,366.11,385.22,363.22,383.40,371.21,402.40,410.41,386.31,369.75];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 9,  label: 'Jun 2022 — five-year low close $197.03',                 color: '#ef4444' },
+  { idx: 21, label: 'Jun 2023 — $288.19 (+15.8% month)',                      color: '#22c55e' },
+  { idx: 38, label: 'Nov 2024 — $369.69; RSI 83.6 after +14% / +12% months',  color: '#f59e0b' },
+  { idx: 45, label: 'Jun 2025 — $311.18, ~16% below Nov 2024',                color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 print; five-year high month-end $410.41',  color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $369.75',                   color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
