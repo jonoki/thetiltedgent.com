@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHEL — Shell plc | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #FBCE07;
+  --accent-dim: #FBCE0733;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div style="background:var(--accent-dim);border-bottom:1px solid var(--border);padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);text-align:left;">
+    💱 CURRENCY &amp; SHARE NOTE — Shell reports under IFRS in US DOLLARS, so the accounts and the NYSE line share a currency. The NYSE security is an <span class="tip" title="American Depositary Share — a US-traded certificate representing a fixed number of the company's ordinary shares held by a depositary bank.">ADS</span>: <strong>1 ADS = 2 ordinary shares</strong>. Shell's own per-share figures are per ORDINARY share; every per-share number below is converted to per-ADS (× 2) and labelled.
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SHEL</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE (ADS) · home market LSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Energy / Oil &amp; Gas Integrated</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $267.85B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="By market cap, country ranking via companiesmarketcap (Largest UK companies by market cap, fetched Sep 21, 2026): 1 HSBC $353.20B, 2 Arm Holdings $344.85B, 3 Shell $266.35B. Note the list ranks by company country, so it includes Arm (Nasdaq-listed) and Linde (#5), which are not FTSE 100 constituents.">UK #3 · United Kingdom</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="companiesmarketcap.com global ranking, $266.35B at $93.27, fetched Sep 21, 2026">Global: #60</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid #f59e0b44;padding:3px 10px;border-radius:4px;">NOT IN S&amp;P 500 / NASDAQ-100 — GLOBAL COVERAGE</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Shell plc</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;">NYSE American Depositary Shares · UK-domiciled · FTSE 100 constituent · Reports in USD (IFRS)</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$93.27</div>
+      <div class="price-change">−$1.27 (−1.34%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · settled NYSE close (prior close $94.54)</div>
+      <div class="price-date">After-hours $93.33 (+0.06%) at 5:28 PM EDT — not used anywhere below</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>ADS Ratio:</span> 1 ADS = 2 ordinary shares</div>
+    <div class="meta-item"><span>HQ:</span> London, United Kingdom</div>
+    <div class="meta-item"><span>Employees:</span> 85,000</div>
+    <div class="meta-item"><span>Founded:</span> 1907</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 29, 2026 (Q3 2026, before US open)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Shell is one of the five Western oil and gas <span class="tip" title="Integrated oil company: one that both produces hydrocarbons (upstream) and refines, trades and sells them (downstream), so a price move hits different parts of the business in opposite directions.">integrated majors</span>, and the one whose distinguishing asset is a global <span class="tip" title="Liquefied Natural Gas — natural gas cooled to about −162°C so it can be shipped by tanker instead of pipeline.">LNG</span> portfolio. It reports five segments — Integrated Gas, Upstream, Marketing, Chemicals &amp; Products, and Renewables &amp; Energy Solutions. FY2025 revenue was <strong>$266.89B, down 6.13%</strong>, with income attributable to shareholders of <strong>$17.84B</strong>. The trailing twelve months to June 30, 2026 look very different: revenue <strong>$296.60B (+9.0%)</strong> and net income <strong>$25.97B (+90.9%)</strong>, almost all of it from one quarter — Q2 2026, when revenue jumped 44.7% YoY to $94.66B. At a $267.85B market value it ranks <strong>#60 globally</strong> and <strong>#3 in the United Kingdom</strong> by companiesmarketcap's country ranking (behind HSBC and Arm; among FTSE 100 constituents on that list only HSBC is larger). Its home index is the <strong>FTSE 100</strong>; the NYSE ADS is the line priced on this page.</p>
+  <p class="prose" style="margin-top:16px;">The question this report asks: <strong>why does Shell still trade at half the multiple of ExxonMobil and Chevron while throwing off roughly twice the free-cash-flow yield?</strong> On StockAnalysis's September 21 data, SHEL trades at <strong>5.4x EV/EBITDA and an 11.8% FCF yield</strong>; XOM sits at 10.1x and 4.7%, CVX at 8.5x and 6.7%. Shell has also shrunk its share count <strong>6.42%</strong> in a year versus 3.89% at Exxon (Chevron's count <em>rose</em> 12.01%). The premise holds on the numbers. The harder part is the "why" — and the honest answer is that some of the gap is earned: more leverage (debt/equity 0.40 vs 0.16–0.19), more earnings volatility from refining and trading, a European political bid for windfall taxes, and a shareholder register that is London-first. Integrated Gas is the supposed differentiator — but in H1 2026 it was <em>Upstream</em> and <em>Chemicals &amp; Products</em> that drove the jump, not LNG. We use Shell's own measures throughout: <span class="tip" title="Cash Flow From Operations — Shell's headline cash measure; it includes working-capital swings, which can be large for a commodity trader.">CFFO</span>, <span class="tip" title="Adjusted Earnings — Shell's non-GAAP profit measure: income attributable to shareholders excluding 'identified items' (impairments, disposal gains, some derivative effects) and on a current-cost-of-supplies basis.">Adjusted Earnings</span> and <span class="tip" title="Gearing — Shell's leverage ratio: net debt divided by (net debt + total equity).">gearing</span>.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Wael Sawan</div>
+      <div class="card-note">CEO and director, per the StockAnalysis company profile (updated Sep 16, 2026). The Q2 2026 record under him: cost-cutting ($5.8B of structural cost reductions since 2022, per the Q2 2026 release), capex discipline and distributions — plus the ARC Resources acquisition announced April 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Sinead Gorman</div>
+      <div class="card-note">CFO and director, per the same StockAnalysis profile. She owns the distribution framework the valuation debate turns on: at least $3.0B of buybacks announced per quarter (another $3.0B with Q2 2026) and full-year 2026 cash capex guided to $24–26B.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Holders</div>
+      <div class="card-value" style="font-size:20px;">No anchor holder</div>
+      <div class="card-note">No controlling, founding-family or state shareholder was identified in the sources fetched — Shell is a widely held company. StockAnalysis shows <strong>67.13% institutional</strong> and <strong>0.02% insider</strong> ownership on its share base. Named 13F holders were not retrieved this session and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Figures below are in <strong>USD</strong> (Shell's reporting currency). The mix bar uses <strong>Q2 2026 (quarter ended June 30, 2026) third-party segment revenue</strong> from StockAnalysis; the five segments sum to $94.67B against reported revenue of $94.66B (rounding). Revenue is a poor guide to where Shell makes money — Upstream sells most of its output to other Shell segments, so its external revenue ($1.80B in Q2) is smaller than its Adjusted Earnings ($3.49B). Each card therefore also shows <strong>segment Adjusted Earnings</strong> from Shell's Q2 2026 results (Form 6-K), which is the number that matters.</p>
+  <div class="seg-bar">
+    <div style="flex:40.2;background:#FBCE07;">MARKETING 40.2%</div>
+    <div style="flex:36.2;background:#22c55e;">CHEM &amp; PROD 36.2%</div>
+    <div style="flex:11.9;background:#3b82f6;">IG 11.9%</div>
+    <div style="flex:9.9;background:#a78bfa;">R&amp;ES 9.9%</div>
+    <div style="flex:1.9;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#FBCE07;"></span> Marketing — $38,015M (Q2'26), +34.6% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Chemicals &amp; Products — $34,235M, +86.2% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Integrated Gas — $11,278M, +17.8% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Renewables &amp; Energy Solutions — $9,338M, +16.8% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Upstream — $1,800M (1.9%), +50.9% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Adjusted Earnings tell the real story. Q2 2026 group Adjusted Earnings were <strong>$9.84B vs $4.26B</strong> a year earlier. Of the $5.57B increase, Upstream (+$1.75B) and Chemicals &amp; Products (+$2.76B) delivered about 81%; Integrated Gas added +$0.95B. Over the half-year the LNG segment grew Adjusted Earnings only 6.8% ($4.51B vs $4.22B) while Upstream grew 44% and C&amp;P went from $0.57B to $4.80B.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Integrated Gas (LNG)</div>
+        <span class="biz-badge dominant">THE DIFFERENTIATOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,691M</div><div class="biz-stat-label">Q2'26 Adj. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+54.9%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$11,278M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">7.73 Mt</div><div class="biz-stat-label">Q2 LNG Liquefaction</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Liquefaction plants, the LNG shipping fleet and — the part that separates Shell from the US majors — a global LNG trading book that buys from third-party plants and resells across Asia and Europe. H1 2026 liquefaction volumes were <strong>15.60 million tonnes vs 13.32 Mt</strong> in H1 2025 (+17%); Q3 2026 guidance is 7.1–7.7 Mt. This is the segment the long-term bull case rests on: long-dated contracts, trading optionality when markets dislocate, and projects like LNG Canada, whose Phase 2 expansion Reuters reports could reach a final investment decision as early as October. The Q2 2026 quarter was strong (+54.9% YoY), but over the full half-year the segment's Adjusted Earnings rose only 6.8% — so the LNG story explains the <em>durability</em> of Shell's cash flow better than it explains the recent jump in it.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> global LNG market size and Shell's share were not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">ExxonMobil</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$650.92B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">LNG Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Chevron</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$399.52B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">LNG Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">TotalEnergies</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">LNG Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #ef4444;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Upstream</div>
+        <span class="biz-badge dominant">LARGEST EARNER Q2'26</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,485M</div><div class="biz-stat-label">Q2'26 Adj. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+101.2%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$1,800M</div><div class="biz-stat-label">Q2'26 Ext. Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">1.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Oil and gas exploration and production worldwide, including deepwater. Adjusted Earnings doubled YoY in Q2 2026 on higher realised prices even as group production fell: <strong>2,455 thousand boe/d in Q2</strong> and 2,603 kboe/d for H1 2026 versus 2,760 kboe/d in H1 2025 (group total, including Integrated Gas). Q3 2026 Upstream production guidance is 1,680–1,880 kboe/d. The <strong>ARC Resources</strong> acquisition (announced April 2026, completed September 2, 2026; ~$13.9B equity value, ~$16.5B enterprise value, per Shell's completion release) adds about 370 kboe/d of Canadian liquids and gas that can feed LNG Canada; it is not in the H1 figures above. Of all segments this is the most directly geared to the oil and gas price.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">ExxonMobil</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$650.92B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Chevron</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$399.52B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Chemicals &amp; Products</div>
+        <span class="biz-badge growth">THE SWING FACTOR</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,877M</div><div class="biz-stat-label">Q2'26 Adj. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">vs $118M</div><div class="biz-stat-label">Q2'25</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$34,235M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">36.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Refineries, chemical plants and the crude and products trading desks. It earned <strong>$118M in Q2 2025 and $2,877M in Q2 2026</strong> — a 24-fold swing in one year. That is the single best illustration of why the market pays less for Shell's earnings than for a US major's: a large slice of profit is refining margins and trading, which are high in dislocations and thin in normal markets. Q3 2026 guidance: refinery utilisation 93–101%, chemicals utilisation 78–86%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">ExxonMobil</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$650.92B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Chevron</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$399.52B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #FBCE07;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Marketing</div>
+        <span class="biz-badge dominant">LARGEST BY REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,329M</div><div class="biz-stat-label">Q2'26 Adj. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+10.8%</div><div class="biz-stat-label">YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$38,015M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">40.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Retail fuel stations, lubricants and business-to-business fuel sales — the pecten on the forecourt. Huge revenue, thin margin, steady earnings: $1.33B of Adjusted Earnings in Q2 2026, up 10.8%, and $2.66B for H1. Shell is pruning it: the <strong>Jiffy Lube</strong> divestment completed on June 30, 2026 for $1.3B. Q3 2026 sales-volume guidance is 2,550–2,750 thousand b/d.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Renewables &amp; Energy Solutions</div>
+        <span class="biz-badge emerging">SHRINKING BY DESIGN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$79M</div><div class="biz-stat-label">Q2'26 Adj. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">vs −$9M</div><div class="biz-stat-label">Q2'25</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$9,338M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Power trading, renewable generation, hydrogen and carbon capture. Revenue is mostly power and gas trading; profit is marginal ($427M for H1 2026). Shell is recycling capital out of it: <strong>Sprng Energy</strong> (India renewables) agreed for sale in July 2026 for $1.8B, and on September 10, 2026 Shell Energy North America agreed to sell its interests in the RISEC power plant to Constellation Energy for $715M.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Global LNG portfolio &amp; trading book</span>
+    <span class="moat-pill">Integrated value chain</span>
+    <span class="moat-pill">Deepwater operating know-how</span>
+    <span class="moat-pill">Retail brand &amp; network</span>
+    <span class="moat-pill">Scale: $49.1B TTM operating cash flow</span>
+    <span class="moat-pill">Capex discipline ($24–26B FY26 guide)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">Shell's edge is <strong>optionality</strong>. Owning liquefaction, shipping, regas access and a trading desk means that when a supply shock hits — Reuters reports LNG buyers scrambling to diversify as the war involving Iran cuts Gulf shipments, and Shell itself has warned that 36 million tonnes of lost LNG are exhausting market buffers — Shell can move cargoes to where the price is highest. A US major with a mostly domestic, production-weighted portfolio captures the commodity price; Shell also captures the <em>spread</em>. The vulnerability is the same thing viewed from the other side: spread income is episodic, and investors capitalise episodic income at a lower multiple.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Earnings volatility.</strong> Chemicals &amp; Products went from $118M to $2,877M of Adjusted Earnings in a year; Q1 2026 CFFO was $6.06B and Q2 was $21.43B. A business whose quarterly cash flow can triple is priced on its normal quarter, not its best one.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">European tax and policy risk.</strong> Headlines on September 18, 2026 had Shell falling as Europe revived windfall-tax politics. The US majors face no equivalent debate at home. The headline (GuruFocus) was seen without detail; no specific levy was verified. A levy aimed at exactly the kind of crisis profits Shell is now earning would cap the upside the bull case needs.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">More leverage than the US peers.</strong> Debt/equity is 0.40 against 0.16 at XOM and 0.19 at CVX (StockAnalysis). Shell's own gearing measure was 18.7% at June 30, 2026 (net debt $41.75B), down from 23.2% at March 31 — so the direction is right, but the ARC Resources deal (completed Sep 2, 2026; ~$2.5B of net debt and leases assumed, part-paid in Shell shares) lands after that date.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Legal legacy.</strong> A UK High Court has ruled that allegations that witnesses for Shell gave false or misleading evidence can be examined before the full trial of a long-running Nigeria oil-spill case (Premium Times, Sep 10, 2026). No financial estimate is available.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark column is the <strong>S&amp;P 500</strong>. SHEL is not a member — it is a UK company whose home index is the FTSE 100 — so the benchmark is a reference point, not a peer. S&amp;P 500 values are taken from the SPDR S&amp;P 500 ETF (SPY) page on StockAnalysis as a proxy; values not available there are shown as "—". The third column shows the two US majors (ExxonMobil / Chevron, StockAnalysis statistics, Sep 21, 2026 closes) because that is the comparison this report is about. <strong>All per-share figures are per ADS (= 2 ordinary shares), USD.</strong></p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SHEL</th><th>XOM / CVX</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>10.36</td><td>21.09 / 20.12</td><td>25.15 (SPY)</td><td>$93.27 ÷ $9.00 TTM EPS per ADS = 10.36. StockAnalysis's own figure is 10.31 on a slightly different share count. Half the US majors' multiple on the same pricing date.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$9.00</td><td>—</td><td>—</td><td>Per ADS. Conversion: $4.50 TTM IFRS EPS per ordinary share (StockAnalysis financials, USD, to Jun 30, 2026) × 2 ordinary shares per ADS × 1.00 FX (Shell reports in USD) = $9.00. Up 103% YoY — Q2 2026 alone was $1.94 basic per ordinary share.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>8.36</td><td>13.21 / 13.09</td><td>—</td><td>$93.27 ÷ ($5.58 FY2026 consensus adjusted EPS per ordinary share × 2 = $11.16 per ADS). StockAnalysis's next-twelve-month figure is 8.99, the like-for-like comparison with the peers' 13.21 / 13.09 (also StockAnalysis). Consensus sees FY2027 EPS falling 11% to $4.97 per ordinary share.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — the whole capital structure (equity plus net debt) divided by earnings before interest, tax, depreciation and amortisation. Neutral to leverage and to share count.">EV / EBITDA</span></td><td>5.40x</td><td>10.06x / 8.53x</td><td>—</td><td>The cleanest valuation-gap measure: it already charges Shell for its higher debt. EV $310.88B.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow yield: free cash flow (operating cash flow minus capex) divided by market capitalisation.">FCF Yield</span></td><td>11.78%</td><td>4.69% / 6.70%</td><td>—</td><td>TTM FCF $31.55B ($49.14B operating cash flow − $17.59B capex) on $267.85B. Flattered by a $3.4B Q2 working-capital inflow; FY2025 FCF was $23.92B (8.9% on today's cap).</td></tr>
+      <tr><td><span class="tip" title="Buyback yield: the percentage reduction in shares outstanding over the past year (as computed by StockAnalysis). A negative figure means the share count rose.">Buyback Yield</span></td><td>6.42%</td><td>3.89% / −12.01%</td><td>—</td><td>Share count down 6.42% YoY. In cash terms Shell spent $14.17B on repurchases in the TTM — 5.3% of market cap. Chevron's count rose 12.01% (share issuance, most likely the all-stock Hess deal — attribution not verified this session).</td></tr>
+      <tr><td><span class="tip" title="Shareholder yield: dividend yield plus buyback yield.">Shareholder Yield</span></td><td>9.66%</td><td>6.49% / −8.55%</td><td>—</td><td>TTM dividends ($8.44B) plus buybacks ($14.17B) = $22.61B, or 46% of TTM operating cash flow (our arithmetic from StockAnalysis cash-flow data).</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>3.24%</td><td>2.60% / 3.50%</td><td>0.98% (SPY)</td><td>$3.02 per ADS trailing (last four: $0.7812, $0.7812, $0.744, $0.716). Current run-rate $0.7812 × 4 = $3.12 → 3.35%. Per ordinary share: $0.3906 a quarter.</td></tr>
+      <tr><td><span class="tip" title="Shell's leverage ratio: net debt divided by (net debt plus total equity).">Gearing</span></td><td>18.7%</td><td>—</td><td>—</td><td>Shell's own measure, Jun 30, 2026; 23.2% at Mar 31, 2026 and 19.1% at Jun 30, 2025. Net debt $41.75B.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>0.40</td><td>0.16 / 0.19</td><td>—</td><td>$73.08B total debt (incl. leases) vs $31.37B cash. Roughly twice the US majors' leverage — part of the discount is earned here.</td></tr>
+      <tr><td><span class="tip" title="Return on Capital Employed: operating profit divided by the capital tied up in the business.">ROCE</span></td><td>13.33%</td><td>10.72% / 9.36%</td><td>—</td><td>StockAnalysis TTM calculation. Shell out-earns both US peers on capital employed — which makes the multiple gap harder, not easier, to explain.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+9.0%</td><td>—</td><td>—</td><td>TTM $296.60B. Q2 2026 revenue +44.7% YoY to $94.66B; FY2025 was −6.1%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>8.76%</td><td>—</td><td>—</td><td>TTM. FY2025 was 6.68%. Gross margin 26.09%, EBITDA margin 19.42%.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>14.34%</td><td>—</td><td>—</td><td>TTM, on $181.78B of book equity. P/B 1.47.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable float.">Short Interest (% float)</span></td><td>0.41%</td><td>—</td><td>—</td><td>23.22M ADS-equivalent shares short on the US count. Nobody is betting heavily against it.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock has moved relative to the overall market; 1.0 moves with the market.">Beta (5Y)</span></td><td>−0.22</td><td>—</td><td>1.01 (SPY)</td><td>As reported by StockAnalysis. A negative beta means SHEL has tended to move against US equities — oil spikes hurt the index and help Shell. Treat as descriptive, not predictive.</td></tr>
+      <tr><td>52-Week Range</td><td>$68.63 – $99.16</td><td>—</td><td>—</td><td>$93.27 sits 5.9% below the high (set in the Sep 15, 2026 session) and 35.9% above the low. 52-week price change +31.76%.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose" style="margin-top:14px;font-size:13px;"><strong>FX exposure:</strong> none between the accounts and the ADS — both are in USD. The exposure is operational: Shell's revenue is earned worldwide in commodity markets priced in dollars, while part of its cost base and tax is in sterling, euros and other currencies (not quantified in the sources fetched). The London line trades in sterling; the NYSE ADS is the line priced here.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the trailing figures. First, <strong>identified items</strong>: H1 2026 carried a <strong>net $2.0B loss</strong> of identified items (H1 2025: $1.2B loss), which is why Q2 IFRS income ($10.82B) and Adjusted Earnings ($9.84B) diverge, and in opposite directions quarter to quarter (Q1 2026: $5.69B IFRS vs $6.92B adjusted). Second, <strong>working capital</strong>: Q2 CFFO of $21.43B included a $3.4B working-capital inflow; Q1's $6.06B was depressed by the opposite, so the half-year ($27.50B) is the fairer read. Third, <strong>portfolio moves</strong>: Jiffy Lube ($1.3B, completed Jun 30), Sprng Energy ($1.8B, agreed Jul 2026) and RISEC ($715M, agreed Sep 10) bring in disposal proceeds, while ARC Resources (~$13.9B equity value, completed Sep 2) goes the other way. Shell's disclosed $5.8B of structural cost reductions since 2022 ($0.7B in H1 2026) is recurring rather than one-off.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">16 analysts polled by S&amp;P Global via StockAnalysis — this is US-line coverage of the ADS; many London-based analysts covering the ordinary shares are not in this count. Only 8 contribute to the FY2026 EPS estimate.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$100.35</div><div class="card-note"><span style="color:var(--green);">+7.59% upside</span> from $93.27. Median $100.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$83 – $120.60</div><div class="card-note">−11.0% to +29.3%. A narrow range for an oil major in a supply shock — the sell side broadly agrees on value and disagrees on timing.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">7 / 9 / 0</div><div class="card-note">6 Strong Buy + 1 Buy, 9 Hold, 0 Sell (September 2026). Hold is the plurality — "Buy" is the average of a split board.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:43.75;background:#22c55e;"></div>
+    <div style="flex:56.25;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 7 (43.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 9 (56.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Morgan Stanley — Martijn Rats</strong> · Upgrade to Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$82 → $101</span> (Sep 3, 2026). The most notable move on the board: a 23% target increase alongside an upgrade.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Piper Sandler — John Royall</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$89 → $100</span> (Sep 3, 2026). Raised the target, kept the rating — the "fair value has moved up, the stock has moved with it" view.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Wells Fargo — Sam Margolin</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$100 → $105</span> (Jul 31, 2026), the day after Q2 results.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">TD Cowen — Jason Gabelman</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$107</span> maintained (Jul 31, 2026). Erste Group also upgraded to Buy on Aug 27, 2026 (no target disclosed).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Early Oct 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">LNG Canada Phase 2 — possible final investment decision</div>
+        <div class="tl-desc">Reuters (Sep 17, 2026, citing three people familiar with the matter) reports the Shell-led LNG Canada partners could take FID on the Phase 2 expansion as early as October. It is the clearest test of whether Shell will spend its LNG windfall on growing the differentiator — and of how much capex headroom the $24–26B 2026 guide leaves.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2, 2026 (done)</div>
+      <div class="tl-content">
+        <div class="tl-title">ARC Resources acquisition — completed</div>
+        <div class="tl-desc">Completed September 2, 2026: ~$13.9B equity value (C$8.20 cash + 0.40247 Shell shares per ARC share), ~$16.5B enterprise value, ~370 kboe/d added (Shell completion release). Watch the effect on gearing (18.7% at June 30) in the Q3 results and on the buyback pace.</div>
+        <div class="tl-impact neutral">Balance-sheet event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results and next buyback announcement</div>
+        <div class="tl-desc">The current $3.0B programme (plus $1.2B left from the prior one) is due to complete by the Q3 results. The market will read two things: whether the buyback stays at or above $3.0B, and whether Integrated Gas turns the LNG supply shock into earnings — Q3 guidance is 7.1–7.7 Mt of liquefaction and 570–630 kboe/d of Integrated Gas production.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Middle East supply shock and LNG tightness</div>
+        <div class="tl-desc">Reuters reports LNG importers diversifying away from Gulf supply as the war involving Iran cuts shipments; Shell and Equinor executives have warned the market's shock absorbers are weakening. European gas storage was reported at about 67% of capacity in mid-September against a 90% EU target (MarketBeat). Tight markets favour Shell's trading book — for as long as they last.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">European windfall-tax politics</div>
+        <div class="tl-desc">Shell fell on September 18, 2026 as Europe revived windfall-tax politics (GuruFocus headline). The size and design of any levy is unknown; this is a headline risk, not a quantified one.</div>
+        <div class="tl-impact down">Potential downside</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Adjusted Earnings $9.84B (vs $4.26B), CFFO $21.43B, free cash flow $17.52B, gearing 18.7%, another $3.0B buyback, dividend $0.3906 per ordinary share ($0.7812 per ADS). The ADS rose 2.46% on the day and July closed at $91.98, up 18.6% on the month.</div>
+        <div class="tl-impact up">Reaction already happened: July +18.6%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SHEL (NYSE ADS, USD) — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · Sep–Dec 2021 are the predecessor Royal Dutch Shell ADS line (see note below) · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#FBCE07;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$44.57</strong> to the September 21, 2026 settled close of <strong>$93.27</strong>, the ADS rose <strong>109.3% on price alone</strong>, before dividends — it more than doubled. The low of the window was November 2021 at $42.04; the current print is the highest point on the chart. The path came in three legs: the 2022 energy-crisis re-rating (+18.4% in January 2022 alone), a two-and-a-half-year grind from the mid-$50s to the low-$70s, and a violent 2026 in which the stock went $73.48 → $93.00 (December to March), back to $77.54 in June, and up 18.6% in July.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI peaked at <strong>87.0 in March 2026</strong> — the most overbought reading in the series — cooled to 45.0 by June, and now reads <strong>67.0</strong>: strong, just short of overbought. The 10-month moving average is about $85.61, and the price sits roughly 9% above it: the long-term trend is up. The lowest RSI in the window was 32.6 in December 2024, when the stock had slid from $73.22 to $62.65 in five months.</p>
+  <p class="prose" style="margin-top:14px;font-size:13px;"><strong>Series continuity:</strong> Shell's A and B shares were assimilated into a single line of ordinary shares on Saturday January 29, 2022, and the ADSs began trading on the NYSE as a single line on January 31, 2022 (Shell Form 6-K, Jan 31, 2022). The NYSE listing approval dated January 27, 2022 describes the new security as "American Depositary Shares, each Representing two (2) Ordinary Shares." The Sep–Dec 2021 points are digrin's unadjusted history for SHEL, which carries the predecessor Royal Dutch Shell ADS line before the change; StockAnalysis records no split for SHEL. We did not independently re-source which predecessor line (RDS.A or RDS.B) digrin uses, or the predecessor ADS ratio, this session — the first four points should be read with that caveat. From January 2022 onwards every point is the SHEL ADS itself.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2021</div><div class="tl-content"><div class="tl-title">Window low — $42.04</div><div class="tl-desc">The lowest month-end in the five-year series, two months before the January 2022 share-structure unification.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2022</div><div class="tl-content"><div class="tl-title">Unification month — $51.40 (+18.4%)</div><div class="tl-desc">The first month-end as a single SHEL ADS line. FY2022 went on to be the peak-earnings year of the window: revenue $381.31B and net income $42.31B.</div><div class="tl-impact up">+18.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May–Sep 2022</div><div class="tl-content"><div class="tl-title">Energy-crisis high, then retreat — $59.22 → $49.76</div><div class="tl-desc">May 2022 was the 2022 high; by September the stock was 16% lower even as profits stayed at record levels — the first sign the market would not capitalise peak-cycle earnings.</div><div class="tl-impact down">−16% in four months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2024</div><div class="tl-content"><div class="tl-title">$73.22 — then a five-month slide</div><div class="tl-desc">The stock fell to $62.65 by December 2024 as FY2024 net income slipped to $16.09B. RSI bottomed at 32.6.</div><div class="tl-impact down">−14% to Dec 2024</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2025</div><div class="tl-content"><div class="tl-title">$64.48 (−12.0% month)</div><div class="tl-desc">The largest monthly fall of the window. The cause is not established in the sources fetched this session.</div><div class="tl-impact down">−12.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">$93.00 — RSI 87.0</div><div class="tl-desc">A 26.6% run from December 2025 in three months. Most overbought reading in the window.</div><div class="tl-impact up">+26.6% in 3 months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Jul 2026</div><div class="tl-content"><div class="tl-title">$77.54 → $91.98</div><div class="tl-desc">A 16.6% three-month pullback to June, then an 18.6% July — the month of the Q2 2026 print (Adjusted Earnings $9.84B, CFFO $21.43B). What drove the June low is not established in the sources fetched.</div><div class="tl-impact up">+18.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $93.27</div><div class="tl-desc">Highest point on the chart, 5.9% below the Sep 15 intraday high of $99.16, after a −1.34% session.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">A five-year S&amp;P 500 or FTSE 100 return was not sourced this session, so no numeric relative figure is given. What is sourced: SHEL is <strong>up 109.3% on price over five years</strong> and <strong>up 31.76% over 52 weeks</strong>. Against the two US majors the relevant comparison is valuation, not price: on the same September 21 closes, Shell's $267.85B market value buys $31.55B of trailing free cash flow; ExxonMobil's $650.92B buys $30.55B, and Chevron's $399.52B buys $27.01B. Shell generates more free cash than Exxon on a market value 59% smaller.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay 10.4x trailing earnings, 8.4x forward and 5.4x EV/EBITDA for a company with an 11.8% FCF yield, a 9.66% shareholder yield, a share count falling 6.42% a year and a higher ROCE (13.3%) than either ExxonMobil (10.7%) or Chevron (9.4%). Gearing is back to 18.7%. The LNG portfolio — 15.6 Mt liquefied in H1 2026, +17% — is the asset the world is short of, and Shell also trades the spread. If the market paid even Chevron's 8.5x EV/EBITDA, the equity would be worth far more than today's price; and every quarter the gap persists, the buyback retires shares more cheaply.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The discount is not a mistake; it is a price for volatility and jurisdiction. Chemicals &amp; Products went from $118M to $2.9B in a year, Q1 CFFO was $6.1B and Q2 was $21.4B, and TTM earnings are riding a Middle East supply shock that consensus already expects to fade (FY2027 EPS −11%). Leverage is twice the US peers', ARC Resources added ~$13.9B of equity value (cash plus Shell shares), Europe is talking windfall taxes again, and Integrated Gas — the supposed differentiator — grew H1 Adjusted Earnings only 6.8%. A cheap multiple on peak-cycle earnings is how a cyclical looks near the top.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Normalisation of the 2026 windfall.</strong> Q2 2026 produced $9.84B of Adjusted Earnings against $4.26B a year earlier. Consensus already models FY2027 EPS falling 11% from FY2026. If the supply shock eases faster than that, the 11.8% FCF yield is a trailing number, not a forward one.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Policy and tax in Europe.</strong> Windfall-tax politics resurfaced on September 18, 2026 (headline only; no specific proposal verified). US peers do not carry the equivalent home-market risk, and it is one of the few explanations for the valuation gap that could get worse rather than better.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capital allocation drift.</strong> ARC Resources (~$13.9B, completed Sep 2) and a possible LNG Canada Phase 2 FID arrive together. Both are coherent with the LNG strategy; both compete with the $3B-a-quarter buyback that underpins the per-share story.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #FBCE07;">
+    <div class="biz-header"><div class="biz-name">The valuation gap — why it persists</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">CENTRAL QUESTION</span></div>
+    <p class="biz-desc">The premise checks out on the numbers: on September 21, 2026 SHEL traded at <strong>5.40x EV/EBITDA vs 10.06x for XOM and 8.53x for CVX</strong>, with an <strong>11.78% FCF yield vs 4.69% and 6.70%</strong>, and a faster-shrinking share count. Our reading of why the gap persists (analysis, not sourced fact): (1) <strong>earnings quality</strong> — more of Shell's profit comes from refining and trading, which the market capitalises at lower multiples; (2) <strong>leverage</strong> — 0.40 debt/equity vs 0.16–0.19; (3) <strong>jurisdiction</strong> — a London primary listing and a European policy environment that periodically revisits windfall taxes; and (4) <strong>the payout mix</strong> — Shell returns more through buybacks than dividends, and its dividend yield (3.24%) is still below Chevron's (3.50%), which matters to income-focused holders. None of these is new, which is why a fresh cash-flow beat alone has not closed the gap. What would: several quarters of stable CFFO through a <em>normal</em> commodity tape, with the buyback held at $3B+.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #3b82f6;">
+    <div class="biz-header"><div class="biz-name">LNG: the tightest market in energy</div><span class="biz-badge" style="background:var(--blue-dim);color:var(--blue);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">Shell has warned that around 36 million tonnes of lost LNG supply are exhausting market buffers, and Reuters reports buyers seeking alternatives to Gulf cargoes as the war involving Iran disrupts shipments. European gas storage was reported at about 67% of capacity in mid-September against the EU's 90% pre-winter target, and European gas prices hit a four-year high (Barron's, ~Sep 10, 2026). For a portfolio LNG player this is the best possible tape — but tapes like this pull forward new supply, and Shell's own Phase 2 FID at LNG Canada is part of that response.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Big Oil's capital discipline</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING THEME</span></div>
+    <p class="biz-desc">Across the majors, production has kept rising despite deep spending cuts, with cash returned to shareholders prioritised since the 2020 crash (OilPrice.com, Sep 2026). Shell is an example: FY2025 capex of $18.95B against $22.99B in FY2023, while buybacks ran at $14–19B a year from 2022 through 2025. The open question for 2026–27 is whether a price spike loosens that discipline — Shell's $24–26B cash-capex guide for 2026 (which includes items beyond StockAnalysis's capex line) is the number to hold it to.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/shel/history/</strong> — the September 21, 2026 row: open 94.72, high 95.03, low 93.19, close 93.27, Adj. Close 93.27, −1.34%, volume 4,973,866. Corroborated by stockanalysis.com/stocks/shel/ ("At close: Sep 21, 2026, 4:00 PM EDT", previous close $94.54; $94.54 − $1.27 = $93.27) and by companiesmarketcap.com ($93.27). The after-hours quote is shown for information only.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">ADS ratio: 1 ADS = 2 ordinary shares, per the NYSE certification of listing filed with the SEC (January 27, 2022) and consistent with the dividend record ($0.7812 per ADS = 2 × $0.3906 per ordinary share). FX: none applied — Shell reports in USD, so the conversion factor is 1.00. EPS conversion: $4.50 TTM EPS per ordinary share (StockAnalysis financials, to Jun 30, 2026) × 2 = $9.00 per ADS; Trailing P/E = $93.27 ÷ $9.00 = 10.36.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, history, statistics, profile, annual/quarterly/TTM financials, cash-flow statement, dividend history, forecast; XOM and CVX statistics; SPY page as the S&amp;P 500 proxy) for price, valuation, margins, returns, balance sheet, segment revenue, consensus, named analyst calls and Sector/Industry labels; Shell's Q2 2026 results (Form 6-K filed with the SEC, period ended June 30, 2026) for Adjusted Earnings, CFFO, free cash flow, net debt, gearing, segment Adjusted Earnings, LNG volumes, production, Q3 outlook, identified items, buybacks and portfolio transactions; Shell Form 6-K of January 31, 2022 for the share unification; digrin.com/stocks/detail/SHEL/price (unadjusted "Real price" column) for month-end closes; companiesmarketcap.com for the global rank (#60) and the UK country ranking (#3). News items are cited to the outlet named in the text as listed on StockAnalysis's SHEL news feed (Reuters, GuruFocus, MarketBeat, Barron's, Premium Times, OilPrice.com, PRNewswire).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin's unadjusted "Real price" column, plus the September 21, 2026 settled close of $93.27. No interior months were reconstructed or estimated. The Sep–Dec 2021 points precede the January 2022 unification (see Section 07). Not verified this session: named 13F holders, segment market shares and industry sizes (shown as "n/v"), TotalEnergies' market cap, five-year S&amp;P 500 and FTSE 100 returns, the cause of the April 2025 and June 2026 declines, and the attribution of Chevron's share-count rise. Section 07/Industry Commentary interpretation of the valuation gap is the author's analysis.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Adjusted Earnings, CFFO and gearing are Shell's non-GAAP measures; guidance figures are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price", NYSE ADS, USD) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [44.57,45.92,42.04,43.40,51.40,52.39,54.93,53.43,59.22,52.29,53.38,52.98,49.76,55.63,58.47,56.95,58.81,60.77,57.54,61.98,56.00,60.38,61.63,62.09,64.38,65.14,65.80,65.80,62.91,62.83,67.04,71.66,72.78,72.18,73.22,71.66,65.95,67.55,64.74,62.65,65.85,67.46,73.28,64.48,66.22,70.41,72.21,73.88,71.53,74.92,73.77,73.48,77.03,83.51,93.00,90.67,84.12,77.54,91.98,91.45,93.27];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 2,  label: 'Nov 2021 — window low $42.04 (predecessor ADS line)',      color: '#ef4444' },
+  { idx: 4,  label: 'Jan 2022 — A/B unification, single SHEL ADS; $51.40 (+18.4%)', color: '#22c55e' },
+  { idx: 8,  label: 'May 2022 — energy-crisis high $59.22',                      color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — retreat to $49.76 despite record profits',        color: '#ef4444' },
+  { idx: 39, label: 'Dec 2024 — $62.65, RSI 32.6 (window low)',                   color: '#ef4444' },
+  { idx: 43, label: 'Apr 2025 — $64.48 (−12.0% month)',                           color: '#f59e0b' },
+  { idx: 54, label: 'Mar 2026 — $93.00, RSI 87.0',                                color: '#22c55e' },
+  { idx: 57, label: 'Jun 2026 — pullback to $77.54',                              color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 results; $91.98 (+18.6% month)',               color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $93.27',                        color: '#FBCE07' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(251,206,7,0.22)');
+grad.addColorStop(1, 'rgba(251,206,7,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#FBCE07', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#FBCE07'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
