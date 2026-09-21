@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
+AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
+
 ### sess-2026-09-21-b · claimed 2026-09-21 (local Claude Code session)
 RDDT EXR HPQ ZTS MTD PCG WTW CFG CBOE TDY
 
