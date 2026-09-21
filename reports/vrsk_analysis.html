@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRSK — Verisk Analytics, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EC4B6;
+  --accent-dim: #2EC4B633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">VRSK</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Consulting Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $22.39B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index Membership:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">S&amp;P 500 since Oct 8, 2015</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global mkt-cap rank: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);background:var(--red-dim);border:1px solid #ef444444;padding:3px 10px;border-radius:4px;">NASDAQ-100: REMOVED — effective before the open, June 22, 2026</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Verisk Analytics, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$172.02</div>
+      <div class="price-change">−$3.39 (−1.93%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $172.00 (−0.01%) at 5:54 PM EDT, per StockAnalysis</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Jersey City, New Jersey</div>
+    <div class="meta-item"><span>Employees:</span> 8,000 (2025)</div>
+    <div class="meta-item"><span>Founded:</span> 1971 as Insurance Services Office (IPO Oct 2009)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Every time an American property-and-casualty insurer writes a policy, there is a decent chance a Verisk form, rule or loss-cost table sits somewhere underneath it. The company began in <strong>1971</strong> as the <strong>Insurance Services Office (ISO)</strong>, created by consolidating state, regional and national insurance rating bureaus into one shared pool of industry data. The insurers who owned it sold down in a <strong>$1.9B IPO in October 2009</strong> (Verisk raised nothing for itself), and for the next decade it grew by acquisition: AIR Worldwide in catastrophe modelling, Xactware in claims estimating, Wood Mackenzie in energy research. Then it reversed course. Health services went in 2016, financial services to TransUnion and Wood Mackenzie to Veritas Capital in the 2022–23 clean-up, leaving a pure insurance data company. FY2025 revenue was <strong>$3.07B, up 6.63%</strong>, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$6.48</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The business model is very good. Gross margin is <strong>70.2%</strong>, operating margin <strong>44.9%</strong>, and in Q2 2026 <strong>83% of revenue was subscription</strong>, growing 8.0% on an organic constant-currency basis. The stock has not been. It closed at <strong>$314.14 at the end of May 2025</strong> and at <strong>$172.02 on September 21, 2026</strong>, down 45%. Three things caused it, one after another: an October 2025 guidance cut after a hurricane season with no US landfalls starved the claims business of volume; a $2.35B deal for roofing software maker AccuLynx that Verisk walked away from in December 2025 and that a Delaware court <strong>put back on the table in August 2026</strong>; and a market-wide worry that AI turns data vendors into commodities. Adjusted earnings kept rising through all of it. The debate is whether Verisk's data is the thing AI needs, or the thing AI replaces.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Lee Shavel</div>
+      <div class="card-note">President and CEO, quoted in the Q2 2026 release (July 29, 2026): "Our solid second-quarter financial performance reflects the durability of Verisk's economic model and the operational discipline with which we are managing the business." In February 2026 he met the AI question head-on: "High-quality data is critical for accuracy and effectiveness, and Verisk is in a unique position as one of very few providers who currently aggregate data from multiple sources."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Elizabeth Mann</div>
+      <div class="card-note">CFO, quoted in the Q2 2026 release: "We grew revenue 5.8% on an OCC basis with 8.0% underlying subscription growth and delivered 7.4% OCC adjusted EBITDA growth." She runs the capital return programme: $1.9B of buybacks in the first half of 2026 alone.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">100.6% institutional</div>
+      <div class="card-note">Per StockAnalysis (readings above 100% typically reflect double-counting in 13F data), with insiders at 0.21%. Named top holders were not retrieved from the sources fetched and are not listed here. When the company went public in 2009, Berkshire Hathaway was the only large owner that sold none of its stock in the IPO.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Verisk reports two revenue groups, <strong>Underwriting</strong> and <strong>Claims</strong>. The mix below is <strong>Q2 2026 (quarter ended June 30, 2026)</strong>, the most recent reported quarter. The two groups sum to $806M, matching total reported revenue.</p>
+  <div class="seg-bar">
+    <div style="flex:70.6;background:#2EC4B6;">UNDERWRITING 70.6%</div>
+    <div style="flex:29.4;background:#f59e0b;">CLAIMS 29.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> Underwriting — $569M (Q2'26), +3.5% reported / +5.6% <span class="tip" title="Organic constant currency — growth excluding acquisitions, divestitures and exchange-rate moves.">OCC</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Claims — $237M, +6.3% reported / +6.1% OCC</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The split that matters more is subscription against transactional. Subscriptions were 83% of Q2 revenue and grew 8.0% OCC. That leaves the transactional 17% dragging the total down to 5.8%. Transactional revenue depends on events: storms, claims volumes, one-off data pulls. It is the part of the business that can't be forecast.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EC4B6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Underwriting</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$569M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+5.6%</div><div class="biz-stat-label">OCC Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">70.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is the ISO heritage: the standard policy forms, rules and loss costs that insurers license to write and price policies, plus catastrophe models built on AIR Worldwide and risk analytics. It is sticky because it's plumbing. An insurer's filed rates and policy language are built on these forms, and Verisk says it submits more than 2,000 regulatory product filings a year. Swapping vendors means refiling with state regulators. Growth comes mostly from price increases at renewal, which the Q2 release calls "strong price realization." The flip side is concentration: almost every customer is a property-and-casualty insurer, so Verisk is tied to that industry's budgets.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Moody's Analytics</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">LexisNexis Risk Solutions</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Claims</div>
+        <span class="biz-badge emerging">EVENT-SENSITIVE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$237M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.1%</div><div class="biz-stat-label">OCC Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Xactware-based property estimating software used by adjusters and contractors to price a repair, plus anti-fraud analytics and casualty solutions. The Q2 release credits the 6.1% OCC growth mainly to anti-fraud analytics and property and restoration solutions. This is where the weather lands on the income statement: fewer storms mean fewer claims to estimate. In October 2025, with no US hurricane landfall through the end of September for the first time in a decade, Verisk cut its 2025 revenue guidance and the stock fell as much as 15% in a day. The AccuLynx deal, roofing-contractor software, would have sat next to this business.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">CCC Intelligent Solutions</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">LexisNexis Risk Solutions</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that matter</h3>
+  <p class="prose">For a data franchise the tells are subscription growth, margin and cash conversion. All three were fine in Q2 2026.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Subscription Growth (OCC)</div>
+      <div class="card-value" style="color:var(--green);">+8.0%</div>
+      <div class="card-note">Q2 2026, on 83% of revenue. The recurring core is growing faster than the headline 5.8%. The transactional slice is what pulls the total down.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Adj. EBITDA Margin</div>
+      <div class="card-value">57.5%</div>
+      <div class="card-note">Q2 2026 adjusted EBITDA of $464M, +7.4% OCC. FY2026 guide is 56.0–56.5%. Very few businesses of any kind run at these margins.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q2 Free Cash Flow</div>
+      <div class="card-value">$298M</div>
+      <div class="card-note"><span style="color:var(--green);">+57.9% YoY</span>, on operating cash flow of $366M (+49.7%). TTM free cash flow is $1.24B, 39.4% of revenue.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">H1 2026 Buybacks</div>
+      <div class="card-value">$1.9B</div>
+      <div class="card-note">About 8.5M shares at an average $186.32, above today's price. $800M of authorisation remained at the Q2 release. Shares outstanding are down 3.58% YoY to 130.16M.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Industry-contributed data pool since 1971</span>
+    <span class="moat-pill">Standard policy forms &amp; rules</span>
+    <span class="moat-pill">2,000+ regulatory filings a year</span>
+    <span class="moat-pill">Xactware estimating standard</span>
+    <span class="moat-pill">83% subscription revenue</span>
+    <span class="moat-pill">70% gross margin</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>contributed data</strong>. Insurers send Verisk their premium and loss data, Verisk pools it, and insurers buy it back as rating inputs no one of them could build alone. The more insurers contribute, the better the pool, and the harder it is for anyone else to match. That is the answer to the AI question, and Shavel gave it in February 2026: a model is only as good as its data, and this data is proprietary, regulated and built into insurers' filed rates. What the moat doesn't cover is the <em>edges</em>: transactional revenue that depends on the weather, and acquisitions made outside the core.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">A deal it tried to walk away from.</strong> Verisk agreed to buy AccuLynx for $2.35B on July 29, 2025, got an FTC second request on October 22, 2025, terminated the agreement on December 26, 2025 and repaid $1.5B of acquisition notes on January 6, 2026. On August 7, 2026 Vice Chancellor Bonnie David of the Delaware Court of Chancery ordered specific performance, which means Verisk must use commercially reasonable efforts to get FTC clearance. The shares fell 5.55% on the next trading day. Verisk said it strongly disagrees and, per law firm Axinn, appealed on August 18, 2026. The FTC review is still pending.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The weather is a line item.</strong> The 2025 guidance cut was blamed on a quiet hurricane season, which shows how much of the transactional business depends on catastrophe activity. Nobody can forecast that part of the P&amp;L.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Negative equity by design.</strong> StockAnalysis puts book value at −$1.19B after $1.9B of first-half buybacks, against $4.62B of debt and $552M of cash (debt/EBITDA 3.0x). That is a deliberate choice, and the cash flow can carry it. But it leaves less room if Verisk is forced to fund a $2.35B acquisition it no longer wants.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Index removal took away a buyer.</strong> Verisk was removed from the NASDAQ-100 effective June 22, 2026, in the same rebalance that removed Cognizant, Charter, Insmed and Zscaler. Funds that track that index had to sell whatever the valuation, and that bid does not come back unless Verisk qualifies again.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>. VRSK has been a member since October 8, 2015 and <strong>left the NASDAQ-100 on June 22, 2026</strong>. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—". Because book equity is negative, ROE and debt-to-equity are not meaningful (n/m).</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>VRSK</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>26.5</td><td>—</td><td>—</td><td>$172.02 ÷ $6.50 TTM EPS = 26.46. StockAnalysis displays 27.00. The gap comes from a slightly different EPS base; 26.5 is the arithmetic at this report's price.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by estimated earnings per share for the next twelve months.">Forward P/E</span></td><td>21.46</td><td>—</td><td>—</td><td>StockAnalysis figure. On consensus FY2026 EPS of $7.71 it is 22.3x ($172.02 ÷ $7.71). Consensus EPS is on an adjusted basis; trailing EPS is GAAP.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>1.85</td><td>—</td><td>—</td><td>StockAnalysis figure. Above 1.0: the multiple has fallen, but so has the growth it is discounting.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$6.50</td><td>—</td><td>—</td><td>GAAP diluted, StockAnalysis TTM to June 30, 2026; the four quarters ($1.61 + $1.42 + $1.73 + $1.75) sum to $6.51. Q2 adjusted EPS was $1.98 (+5.3%) against GAAP $1.75.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+5.0%</td><td>—</td><td>—</td><td>TTM revenue $3.14B. Q2 2026 +4.3% reported, <strong>+5.8% OCC</strong>. FY2026 guide $3,190–$3,240M.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering the product, as a percentage of revenue.">Gross Margin</span></td><td>70.18%</td><td>—</td><td>—</td><td>Up every year in the StockAnalysis series, from 65.33% in FY2021.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>44.93%</td><td>—</td><td>—</td><td>TTM operating income $1.41B. Adjusted EBITDA margin 57.5% in Q2 2026.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>28.24%</td><td>—</td><td>—</td><td>TTM net income $885.5M, −3.3% YoY.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.16%</td><td>—</td><td>—</td><td>$2.00 annualised ($0.50/quarter; ex-date Sep 15, 2026, payable Sep 30). Payout ratio 30.78%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>2.61%</td><td>—</td><td>—</td><td>3.39M shares, 2.62 days to cover. Short sellers are not the story here.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Not meaningful when equity is negative.">Debt-to-Equity</span></td><td>n/m</td><td>—</td><td>—</td><td>Book value −$1.19B. Leverage is better read as <strong>debt/EBITDA of 3.0x</strong>: $4.62B debt, $552M cash, net debt $4.06B.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>1.01</td><td>—</td><td>—</td><td>Thin. Subscription businesses that bill in advance often run near 1.0 because deferred revenue sits in current liabilities. Quick ratio 0.90.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$1.24B</td><td>—</td><td>—</td><td>TTM: $1.50B operating cash flow less $266.7M capex. About a 5.5% FCF yield on the $22.39B market cap (P/FCF 18.18).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>n/m</td><td>—</td><td>—</td><td>Negative equity. See ROIC.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the debt and equity capital employed.">ROIC</span></td><td>31.68%</td><td>—</td><td>—</td><td>ROA 18.96%. This is the number that shows how good the franchise is: 30%+ returns on the capital actually tied up in the business.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span></td><td>17.51</td><td>—</td><td>—</td><td>Enterprise value $26.45B on TTM EBITDA of $1.52B.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>0.66</td><td>—</td><td>—</td><td>The stock is less volatile than the market day to day, yet it has still fallen 45% from its May 2025 month-end high.</td></tr>
+      <tr><td>52-Week Range</td><td>$155.94 – $253.35</td><td>—</td><td>—</td><td>$172.02 is 10.3% above the low and 32.1% below the high. 52-week change −29.35%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the per-share history. First, the <strong>2022–23 divestitures</strong> (financial services to TransUnion for $515M, Wood Mackenzie to Veritas Capital for $3.1B) make FY2022–FY2024 reported earnings noisy. StockAnalysis shows diluted EPS of $6.00, $4.17 and $6.71 in those years and an FY2022 operating margin of 56.4%, so year-on-year EPS growth rates from that period should not be read as operating trends. Second, <strong>buybacks</strong>: $1.9B in H1 2026, including a $1.5B accelerated repurchase announced in February and a $200M ASR in Q2, cut the share count 3.58% in a year and flatter per-share growth relative to net income, which is down 3.3% TTM. Third, the <strong>AccuLynx financing</strong>: $1.5B of notes were raised for the deal and repaid on January 6, 2026 after the termination. If the court ruling stands, that funding need returns.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">19 analysts, via StockAnalysis.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$234.76</div><div class="card-note"><span style="color:var(--green);">+36.47% upside</span> from $172.02. Median $235 (+36.61%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$195 – $260</div><div class="card-note">+13.36% to +51.15%. Even the lowest target on the board is 13% above the price. Either the sell-side is behind the tape, or the tape is pricing a risk the models don't include.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">11 / 8 / 0</div><div class="card-note">7 Strong Buy + 4 Buy, 8 Hold, 0 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:57.9;background:#22c55e;"></div>
+    <div style="flex:42.1;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 11 (57.9%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 8 (42.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wells Fargo — Jason Haas</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260</span> reiterated (Sep 18, 2026). The top target on the board, reaffirmed during a month in which the stock fell 11%.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barclays — Manav Patnaik</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$225</span> maintained (Sep 16, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">RBC Capital — Ashish Sabadra</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$230</span> maintained (Aug 19, 2026), after the AccuLynx ruling.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Bank of America — Curtis Nagle</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$228</span> maintained (Aug 11, 2026). A Hold whose target is still 33% above the price. <strong>William Blair — Andrew Nicholas</strong> reiterated a Buy on Aug 10, 2026, the day the shares fell 5.55% on the court ruling.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">A year ago the Q3 print brought the guidance cut. Watch subscription OCC growth against Q2's 8.0%, transactional revenue, whether FY2026 guidance ($3,190–$3,240M revenue, $7.45–$7.75 adjusted EPS, reaffirmed in July) holds, and any update on AccuLynx.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">AccuLynx: appeal and FTC review</div>
+        <div class="tl-desc">Verisk appealed the August 7 ruling on August 18, 2026 (per Axinn). The FTC's review, which began with a second request in October 2025, has not concluded. There are three possible outcomes: the appeal succeeds, the FTC blocks the deal (Verisk stays out), or the deal closes and Verisk takes on a $2.35B acquisition it had already tried to exit. Only the third is clearly bad for the stock.</div>
+        <div class="tl-impact neutral">Binary legal overhang</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — $800M remaining</div>
+        <div class="tl-desc">After $1.9B repurchased in H1 2026 at an average of $186.32, $800M of authorisation remained at the Q2 release, about 3.6% of today's market cap. With the stock below the average buyback price, whatever remains buys more shares per dollar.</div>
+        <div class="tl-impact up">Potential support</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 7, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Delaware court revives AccuLynx obligations</div>
+        <div class="tl-desc">Vice Chancellor Bonnie David ordered specific performance. On the next trading day, August 10, the shares fell 5.55% to $181.18, taking about $1.39B off the market value.</div>
+        <div class="tl-impact down">Reaction already happened: −5.55%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat, guidance reaffirmed</div>
+        <div class="tl-desc">Revenue $806M (+5.8% OCC), adjusted EPS $1.98 (+5.3%), adjusted EBITDA margin 57.5%, free cash flow +57.9%. The stock closed June at $179.53 and July at $194.85, up 8.5% for the month.</div>
+        <div class="tl-impact up">Reaction already happened: July +8.5%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Removed from the NASDAQ-100</div>
+        <div class="tl-desc">Announced June 11 and effective before the open on June 22, part of a five-in, five-out rebalance. The stock had already made its lowest month-end of the year in May, at $174.99.</div>
+        <div class="tl-impact down">Index-flow event, already happened</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">VRSK — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$200.27</strong> to the September 21, 2026 settled close of <strong>$172.02</strong>, VRSK lost <strong>14.1% of its price</strong>. Add back dividends of roughly $7–8 per share over the period (an estimate from StockAnalysis's annual dividend-per-share series) and the total return is <strong>about −10%</strong>. The endpoints hide two separate stories. From the February 2023 low of $171.11 the stock rose 84% to <strong>$314.14 in May 2025</strong>, re-rated as a clean insurance-data compounder after the divestitures. Then it gave all of that back in sixteen months, and today it sits within a few dollars of the 2022–23 lows.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows how steady the selling was. It stayed below 30 for nine straight month-ends, from September 2025 to May 2026, and bottomed at <strong>11.5 in May 2026</strong>, the lowest reading in the five-year series. The July bounce lifted it to 37.7. September's 11% drop has pushed it back to <strong>25.0</strong>. The 10-month moving average is about $193.81 and the price is $172.02, below it. The long-term trend is still down.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock low — $170.53</div><div class="tl-desc">The lowest month-end in the window, during the 2022 multiple compression and while the divestiture programme was under way. February 2023 ($171.11) tested it and held.</div><div class="tl-impact down">5-year low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">Peak — $314.14</div><div class="tl-desc">The high point of the "pure-play insurance data" re-rating: an 84% run from the February 2023 low, with the stock at its highest month-end in the series.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2025</div><div class="tl-content"><div class="tl-title">AccuLynx agreement signed — $278.71 (−10.5% month)</div><div class="tl-desc">Verisk agreed on July 29, 2025 to buy AccuLynx for $2.35B. The month closed down 10.5%. The sources fetched do not say how much of that move was the deal.</div><div class="tl-impact down">−10.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">Quiet hurricane season, guidance cut — $218.76 (−13.0% month)</div><div class="tl-desc">Q3 revenue of $768M missed the $776M estimate and FY2025 revenue guidance was cut to $3.05–$3.08B. The shares fell as much as 15% intraday to $197, the lowest since May 2023.</div><div class="tl-impact down">−13.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">AccuLynx terminated — $223.69</div><div class="tl-desc">Verisk ended the agreement on December 26, 2025 after the FTC review ran past the deadline, and repaid $1.5B of acquisition notes on January 6, 2026.</div><div class="tl-impact neutral">Deal off (for now)</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">Capitulation — $174.99, RSI 11.5</div><div class="tl-desc">All of the first five months of 2026 closed lower, while the February Q4 print beat ($1.82 adjusted EPS against $1.61 expected) and the company announced a $1.5B ASR. AI-disruption worry about information-services businesses was the backdrop the CEO was answering in February.</div><div class="tl-impact down">Most oversold reading in 5 years</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">Q2 beat — $194.85 (+8.5% month)</div><div class="tl-desc">8.0% subscription growth and 57.5% adjusted EBITDA margin. The best month since May 2024.</div><div class="tl-impact up">+8.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $172.02</div><div class="tl-desc">Down 11.2% from the August close in fourteen sessions, including a −5.54% day on September 8 and a +6.15% day on September 14. The sources fetched give no specific cause for either move, so none is offered. Down 23.1% year-to-date from the December 2025 close of $223.69.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year index returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) and the <strong>NASDAQ-100</strong> were not obtained from the sources fetched, so no numeric comparison is given. From sourced data: VRSK is <strong>down 14.1% on price over five years</strong>, <strong>down 29.35% over the trailing year</strong>, with market cap down 35.8% year-over-year (the gap to the price decline is the buyback), and <strong>down 45.2% from its May 2025 month-end high</strong>. The S&amp;P 500 finished both windows higher, so the underperformance is large. On valuation the stock has moved from a premium multiple to 26.5x trailing GAAP earnings and about 22x FY2026 consensus.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying about 22x this year's consensus earnings for a business with 70% gross margins, 57.5% adjusted EBITDA margins, 83% subscription revenue growing 8% OCC, 31.7% ROIC and $1.24B of free cash flow. Every published price target in the StockAnalysis panel of 19 is above the price, the lowest at $195. The fall from $314 came from a quiet hurricane season, a deal Verisk tried to leave, and a sector-wide AI scare. None of those touched the subscription franchise. Management bought $1.9B of stock at an average of $186.32, above today's price. If AI turns out to need exactly the kind of proprietary, regulator-embedded data Verisk owns, this is a quality compounder at its cheapest multiple in years.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>A Delaware court has ordered Verisk to try to complete a $2.35B acquisition it had already walked away from, with a balance sheet showing negative equity and 3.0x debt/EBITDA. Net income is down 3.3% TTM, and per-share growth is being bought with debt-funded repurchases. Transactional revenue depends on the weather. The index bid is gone. The chart has fallen in almost a straight line for sixteen months and is back at the 2022 lows despite beats. Markets don't usually do that to a franchise they believe in: they are pricing a terminal-value question, whether AI erodes the premium for curated data, that no quarterly beat can answer.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">AccuLynx.</strong> A court-ordered path to a $2.35B acquisition, pending FTC review and Verisk's appeal. If it closes, Verisk re-levers a negative-equity balance sheet for an asset its own management chose to exit.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">AI eroding the data premium.</strong> The bull case assumes contributed, regulated data stays scarce. If AI tools let insurers or rivals build good-enough rating and claims analytics from other sources, the pricing power behind "strong price realization" weakens. There is no sign of it in the numbers yet (subscription growth 8.0%), but the stock is priced as if there might be.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Transactional volatility and concentration.</strong> About 17% of revenue depends on events like catastrophe activity, and almost all of it comes from one customer industry, property-and-casualty insurance. A second quiet storm season or an insurer budget squeeze would show up quickly.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">AI and the information-services multiple</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL QUESTION</span></div>
+    <p class="biz-desc">In 2026 the market applied one blunt question to every data vendor: if a model can read, summarise and reason over information, what is the information worth? Verisk's February 2026 answer was that high-quality, aggregated data is the input AI needs, and that few providers can pool data from so many insurers at once. The numbers back it for now: Q2 subscription growth of 8.0% OCC is the fastest part of the business. But the stock's derating ran through two beat-and-reaffirm quarters, which suggests the market is discounting what happens to pricing power a few years out rather than anything in the current P&amp;L.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Weather as a revenue driver</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING SENSITIVITY</span></div>
+    <p class="biz-desc">Verisk's claims tools are used when property is damaged, so fewer landfalling storms mean fewer estimates and less transactional revenue. The 2025 Atlantic season, the first in a decade with no US hurricane landfall through the end of September, turned directly into the October 2025 guidance cut. Investors have to treat the transactional line as a weather option inside a subscription business.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Capital returns into a falling price</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">SUPPORT</span></div>
+    <p class="biz-desc">Verisk has turned its cash flow into shrinking the share count: $1.9B in H1 2026, 3.58% fewer shares than a year ago, and a dividend raised from $1.80 (FY2025) to a $2.00 annual rate. <strong>The bull framing:</strong> management is buying at prices it considers cheap, with $1.24B of free cash flow a year behind it. <strong>The bear framing:</strong> buybacks averaged $186.32 and the stock is at $172.02. Debt-funded buybacks on a negative-equity balance sheet only look smart if the multiple recovers, and the AccuLynx ruling could redirect $2.35B away from repurchases.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/vrsk/history/</strong> — the September 21, 2026 settled close of $172.02 (open 174.13, high 175.15, low 170.88, volume 1,177,595, Adj. Close present at 172.02, −1.93% on the prior close of $175.41). Confirmed by the quote page at stockanalysis.com/stocks/vrsk/, which shows $172.02 at close, 4:00 PM EDT on Sep 21, 2026, with after-hours trading at $172.00.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, forecast, annual and quarterly financials, company profile) for price, valuation, margins, returns, balance sheet, consensus, named analyst actions and Sector/Industry labels; Verisk's Q2 2026 earnings release as reproduced by stocktitan.net (July 29, 2026) for segment revenue, OCC growth, subscription growth, adjusted EBITDA, cash flow, buybacks, guidance and the CEO/CFO quotes; insurancejournal.com (October 29, 2025 and February 18, 2026) for the 2025 guidance cut, the Q4 2025 results and the February 2026 Shavel quote; the Delaware Court of Chancery post-trial opinion (C.A. No. 2026-0023-BWD, decided August 7, 2026), Verisk's August 10, 2026 statement (GlobeNewswire) and Axinn's case note for the AccuLynx ruling and appeal; ts2.tech for the earlier AccuLynx timeline; CB Insights (Moody's Analytics, LexisNexis Risk Solutions) and KoalaGains (CCC) for competitor names; stocktitan.net for the June 2026 NASDAQ-100 rebalance; Wikipedia (Verisk Analytics; List of S&amp;P 500 companies) for company history, headquarters and the October 8, 2015 S&amp;P 500 addition date; digrin.com/stocks/detail/VRSK/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. These are 60 real month-end closes from September 2021 through August 2026, taken from the unadjusted "Real price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $172.02. The July and August 2026 month-ends ($194.85, $193.78) were cross-checked against StockAnalysis daily rows and match. <strong>No interior months were reconstructed or estimated.</strong> VRSK has no stock splits on record. The 2022–23 divestitures were cash sales, not spin-offs, so the price series needs no adjustment. The final point is a settled close fourteen trading days into September, not a month-end. Industry-average and S&amp;P 500 columns in Section 04 are "—" because no sourced values were obtained. Segment market shares, TAM and competitor market caps are "n/v". Competitors are named for context only. Named institutional holders and a global market-cap rank were not sourced. The dividends-added-back total return in Section 07 is an estimate. Causes of the September 8 and September 14, 2026 moves were not found in the sources fetched.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close (stockanalysis.com) =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [200.27,210.27,224.87,228.73,196.13,177.34,214.63,204.05,174.92,173.09,190.25,187.16,170.53,182.83,183.71,176.42,181.79,171.11,191.86,194.11,219.11,226.03,228.94,242.22,236.24,227.36,241.43,238.86,241.53,241.90,235.73,217.96,252.78,269.55,261.75,272.82,267.96,274.72,294.21,275.43,287.44,296.91,297.62,296.43,314.14,311.50,278.71,268.12,251.51,218.76,225.07,223.69,217.46,207.57,189.75,184.49,174.99,179.53,194.85,193.78,172.02];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — rate-shock low $170.53',                        color: '#ef4444' },
+  { idx: 44, label: 'May 2025 — peak month-end $314.14',                        color: '#22c55e' },
+  { idx: 46, label: 'Jul 2025 — AccuLynx deal signed; $278.71 (−10.5% month)',  color: '#f59e0b' },
+  { idx: 49, label: 'Oct 2025 — Q3 miss, FY25 guidance cut; $218.76',           color: '#ef4444' },
+  { idx: 51, label: 'Dec 2025 — AccuLynx agreement terminated; $223.69',        color: '#3b82f6' },
+  { idx: 56, label: 'May 2026 — lowest 2026 month-end $174.99, RSI 11.5',       color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — NASDAQ-100 removal; $179.53',                   color: '#f59e0b' },
+  { idx: 58, label: 'Jul 2026 — Q2 beat; $194.85 (+8.5% month)',                color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $172.02',                     color: '#2EC4B6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,196,182,0.22)');
+grad.addColorStop(1, 'rgba(46,196,182,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EC4B6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EC4B6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
