@@ -40,7 +40,10 @@ def check(path):
         out['n_labels'] = out['n_prices'] = None; out['price_match'] = False
     # P/E arithmetic
     pe = re.search(r'Trailing\s*<span[^>]*>P/E</span>.*?<td[^>]*>\s*([\d.]+)', t, re.S) or re.search(r'Trailing P/E.*?<td[^>]*>\s*([\d.]+)', t, re.S)
-    eps = re.search(r'EPS.*?TTM.*?<td[^>]*>\s*\$?(-?[\d.]+)', t, re.S)
+    # anchor on the row's label cell first: the loose pattern fires on "TTM EPS" in the P/E row's context text
+    # and then reads the next row's value (VMC read its Forward P/E as EPS)
+    eps = re.search(r'>\s*EPS\s*\(TTM\)\s*(?:</span>)?\s*</td>\s*<td[^>]*>\s*\$?(-?[\d.]+)', t) \
+        or re.search(r'EPS.*?TTM.*?<td[^>]*>\s*\$?(-?[\d.]+)', t, re.S)
     if pe and eps and price:
         try:
             out['pe_stated'] = float(pe.group(1)); out['pe_calc'] = round(price / float(eps.group(1)), 2)
