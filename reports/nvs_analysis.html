@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NVS — Novartis AG | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #3D8FE6;
+  --accent-dim: #3D8FE633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">NVS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE (ADR) · home SIX Swiss Exchange (NOVN)</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Drug Manufacturers - General</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $268.82B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="By market cap, country ranking via companiesmarketcap (Switzerland list, Sep 21, 2026): #1 Roche $362.07B, #2 Novartis $267.96B, #3 Nestlé $241.48B">SMI #2 · Switzerland</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="companiesmarketcap.com, Novartis market cap $267.96B, world's 59th most valuable company">Global: #59</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid #f59e0b44;padding:3px 10px;border-radius:4px;">NOT IN S&amp;P 500 / NASDAQ-100 — GLOBAL COVERAGE</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Novartis AG</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;">NYSE American Depositary Receipts · Basel, Switzerland · IFRS · Reports in USD</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$140.98</div>
+      <div class="price-change" style="color:var(--green);">+$0.61 (+0.43%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · settled NYSE close (prior close $140.37)</div>
+      <div class="price-date">After-hours $140.78 (−0.14%) — not used in this report</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Lichtstrasse 35, Basel, Switzerland</div>
+    <div class="meta-item"><span>Employees:</span> 75,267</div>
+    <div class="meta-item"><span>ADR:</span> 1 ADR = 1 ordinary share (depositary: JPMorgan Chase)</div>
+    <div class="meta-item"><span>Founded:</span> 1895 (StockAnalysis; predecessor-company date)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 27, 2026 (Q3 2026, before US open)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Novartis is a Basel-based prescription-drug company. It calls itself a <strong>"pure-play" innovative medicines company</strong> with four core therapeutic areas (cardiovascular-renal-metabolic, immunology, neuroscience, oncology). The premise holds: the generics arm Sandoz was spun off in October 2023, and the Alcon eye-care spin came before that, so what is left is branded, patent-protected drugs. FY2025 net sales were <strong>$54.53B, up 8% (+8% at <span class="tip" title="Constant currency: growth with exchange-rate movements stripped out, so you see volume and price rather than currency translation.">cc</span>)</strong>, with a <span class="tip" title="Core figures are Novartis's adjusted measures. They exclude amortisation of acquired intangibles, impairments, restructuring and other items management treats as non-recurring. IFRS figures are the audited statutory numbers.">core</span> operating margin of <strong>40.1%</strong> and core <span class="tip" title="Earnings Per Share: net income divided by shares outstanding. Novartis reports it in USD, and one NYSE ADR equals one share, so no conversion is needed.">EPS</span> of <strong>$8.98</strong> (IFRS EPS $7.21). At a $268B market value Novartis ranks <strong>#2 in Switzerland</strong>, behind Roche, and <strong>#59 in the world</strong> by companiesmarketcap's count. At home it is one of the heavyweights of the <strong>SMI</strong>, the Swiss blue-chip index.</p>
+  <p class="prose" style="margin-top:16px;">This report turns on two numbers. The first is <strong>margin</strong>. Novartis reached a 40% core operating margin in 2025, a level most large pharma companies do not reach, and it bought that margin partly by shedding lower-margin businesses. The second is the <strong>patent cliff</strong>. Entresto, its heart-failure drug and its biggest seller at $7.75B in FY2025, got US generic competition in July 2025. In Q2 2026 Entresto sales fell <strong>51% at cc to $1.18B</strong>. Management's 2026 guide is net sales up low single digits and core operating income <em>down</em> low single digits. The Q2 2026 core margin was 41.2%, down 70bps, which management attributed mainly to incremental cost from the Avidity acquisition. Filling the gap is the job of <strong>Kisqali, Kesimpta, Pluvicto, Scemblix and Leqvio</strong>, the brands management named on the Q2 call. Together with Cosentyx they are still growing at double-digit rates. September 2026 reopened the question in a different place. Three pipeline setbacks came in one week: pelacarsen (a cholesterol-type heart drug that lowers Lp(a)), del-desiran (the main asset from the ~$12B Avidity deal) and a safety pause on the cell therapy rap-cel. The US line fell <strong>13.93% on September 8</strong>, and a major shareholder publicly called for board changes. The market is no longer asking whether the launches can replace Entresto. It is asking whether the <em>next</em> wave, which is the one that was bought through acquisitions, is worth what was paid for it.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Vas Narasimhan</div>
+      <div class="card-note">CEO. Verified by quote on the Q2 2026 media release and by the StockAnalysis profile ("Dr. Vasant Narasimhan M.D."). He led the Alcon and Sandoz separations and the pivot to pure-play innovative medicines. His Q2 line: "Novartis delivered a solid second quarter, returning to sales growth driven by continued momentum from Kisqali, Kesimpta, Scemblix and Pluvicto." He now owns the M&amp;A record that shareholders are questioning.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Mukul Mehta</div>
+      <div class="card-note">CFO. Verified on the Q2 2026 earnings-call participant list and the StockAnalysis profile. He is responsible for the 2026 guide (sales up low single digits, core operating income down low single digits), the $10B buyback announced in July 2025 ($5.6B still remaining at end-June 2026) and a balance sheet whose net debt rose to $39.4B from $21.9B in six months.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Holders — anchor then institutional</div>
+      <div class="card-value" style="font-size:20px;">No controlling holder</div>
+      <div class="card-note">No controlling or anchor shareholder turned up in the sources fetched. The company is widely held: StockAnalysis shows 37.67% institutional ownership and 0.11% insider ownership across all shares. For the US line only, MarketBeat's 13F data puts <strong>13.12%</strong> of the stock with US-filing institutions. The largest are <strong>Dodge &amp; Cox</strong> ($1.24B), <strong>Dimensional</strong> ($1.24B), <strong>Morgan Stanley</strong> ($1.22B), <strong>Primecap</strong> ($1.04B) and <strong>Fisher Asset Management</strong> ($1.03B). The "major shareholder" calling for board changes in September 2026 was not named in the headlines fetched.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Since the Sandoz spin-off Novartis reports <strong>one segment, Innovative Medicines</strong>, so the useful breakdown is by brand. The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) net sales of $14,408M</strong>, which was +3% in USD and +1% at cc. Growth rates are at constant currency, as the company reports them. All figures are in <strong>USD (reporting currency)</strong>. In the quarter, volume added 18 points of growth, generic competition took away 14 points, pricing took away 3 points and currency added 2 points. StockAnalysis shows Q2 revenue of $14,951M because it includes other revenues on top of net sales. This report uses the company's net-sales figure.</p>
+  <div class="seg-bar">
+    <div style="flex:12.7;background:#3D8FE6;">COSENTYX</div>
+    <div style="flex:11.8;background:#22c55e;">KISQALI</div>
+    <div style="flex:9.9;background:#a78bfa;">KESIMPTA</div>
+    <div style="flex:8.2;background:#ef4444;">ENTRESTO</div>
+    <div style="flex:11.7;background:#f59e0b;">PLUV+SCEM+LEQ</div>
+    <div style="flex:45.7;background:#64748b;">ALL OTHER 45.7%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3D8FE6;"></span> Cosentyx — $1,824M (Q2'26), 12.7%, +12% cc <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Kisqali — $1,695M, 11.8%, +43% cc</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Kesimpta — $1,424M, 9.9%, +32% cc</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Entresto — $1,181M, 8.2%, −51% cc</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Pluvicto $651M (+43%) · Scemblix $562M (+89%) · Leqvio $480M (+59%) — 11.7% combined</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> All other brands — $6,591M, 45.7% (incl. Jakavi $576M +10%, Zolgensma $365M +20%, Xolair $342M −25%, Fabhalta $225M +88%, Promacta $179M −65%, Tasigna $142M −58%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The cliff in one line: in FY2025 Entresto sold $7,748M, and Kisqali, Pluvicto, Leqvio and Scemblix together sold $9,260M. In Q2 2026 those four brought in $3,388M against Entresto's $1,181M. The growth brands are already bigger than the drug going off patent. What they cannot do yet is grow faster than Entresto, Promacta and Tasigna are falling. That is why H1 2026 net sales were −2% at cc and why management's guide calls for core operating income to fall this year.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Oncology — Kisqali, Pluvicto, Scemblix</div>
+        <span class="biz-badge growth">PRIMARY GROWTH ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,908M</div><div class="biz-stat-label">Q2'26 (3 brands)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+43% / +43% / +89%</div><div class="biz-stat-label">cc growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Kisqali</strong> is a CDK4/6 inhibitor for breast cancer (a pill that slows tumour-cell division). It sold $4,783M in FY2025 (+57% cc) and $1,695M in Q2 2026 (+43%). On the Q2 call management said its US sales passed $1 billion in a quarter for the first time, and that it is growing faster than the CDK4/6 market. <strong>Pluvicto</strong> is a radioligand therapy for prostate cancer (a targeting molecule carrying a radioactive payload). It sold $651M (+43%), helped by use earlier in treatment, before chemotherapy. <strong>Scemblix</strong> treats chronic myeloid leukaemia and nearly doubled to $562M (+89%). It treats the same disease as the older Tasigna (−58%), so some of its growth is probably Novartis moving patients from one of its products to another. That is our inference, not a company statement. Oncology is where the replacement for Entresto is actually being built.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> therapeutic-area market sizes not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Eli Lilly</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.038T</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">AstraZeneca</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$260.70B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Pfizer</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$158.10B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3D8FE6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Immunology — Cosentyx and the next wave</div>
+        <span class="biz-badge dominant">LARGEST BRAND</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,824M</div><div class="biz-stat-label">Q2'26 Cosentyx</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+12%</div><div class="biz-stat-label">cc growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Cosentyx</strong> treats psoriasis, psoriatic arthritis and spondyloarthritis. It sold $6,668M in FY2025 (+8% cc) and is now Novartis's largest single product, since Entresto has fallen below it. A positive EU advisory (CHMP) opinion for a further Cosentyx indication came through in September 2026. Behind it are <strong>Rhapsido (remibrutinib)</strong>, which management said on the Q2 call had passed 4,000 prescribers and 10,000 patients, and <strong>ianalumab</strong> for Sjögren's disease, which management described as having "multi-billion dollar potential". <strong>Xolair</strong> fell 25% to $342M. Immunology is the steady earner. It is not the part expected to fill the Entresto gap.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">AbbVie</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$467.36B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Johnson &amp; Johnson</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$649.39B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Roche</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$362.07B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Neuroscience — Kesimpta, Zolgensma, Avidity</div>
+        <span class="biz-badge growth">GROWING · M&amp;A UNDER SCRUTINY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,789M</div><div class="biz-stat-label">Q2'26 (2 brands)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+32% / +20%</div><div class="biz-stat-label">cc growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Kesimpta</strong> is a multiple-sclerosis antibody patients inject themselves at home. It sold $4,426M in FY2025 (+37% cc) and $1,424M in Q2 2026 (+32%). <strong>Zolgensma</strong>, a one-time gene therapy for spinal muscular atrophy, sold $365M (+20%). This is also where the <strong>~$12B Avidity Biosciences acquisition</strong> sits, a platform of RNA drugs for neuromuscular disease. The deal closed on February 27, 2026 at $72.00 per share (equity value ~$12B fully diluted, EV ~$11B, per the Novartis completion release), and the Q2 release books incremental Avidity cost. On September 8, 2026, its lead asset <strong>del-desiran</strong> failed the Phase 3 HARBOR trial in myotonic dystrophy type 1. Barclays had modelled peak sales of about $3.1B at a 60% probability of success. Two other Avidity programmes are moving: management said del-zota is heading for a first FDA filing for accelerated approval in DMD exon 44, and that del-brax met its biomarker endpoints. Separately, in mid-September Novartis halted VHB937 in ALS after the Phase 2 ASTRALS trial missed its endpoints.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Roche</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$362.07B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Vertex</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$129.44B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Amgen</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$212.55B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #ef4444;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Cardiovascular-Renal-Metabolic — Entresto &amp; Leqvio</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">PATENT CLIFF</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,661M</div><div class="biz-stat-label">Q2'26 (2 brands)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−51% / +59%</div><div class="biz-stat-label">cc growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Entresto</strong> treats heart failure. US generics launched in July 2025, when MSN Laboratories and other generic makers entered after Novartis lost its bid for an injunction. Trade press reported the generics coming in at about a 90% discount to the branded list price. FY2025 sales still held at $7,748M (−2% cc) because the erosion only started mid-year. In Q2 2026 they halved, to $1,181M (−51%). Management said the Entresto hit should ease in H2 2026 and guided H2 net sales growth to mid-single digits. <strong>Leqvio</strong> is a cholesterol-lowering injection given twice a year. It grew 59% to $480M. <strong>Pelacarsen</strong>, meant to be the next heart franchise, failed to reduce major cardiac events in the Phase 3 HORIZON trial in early September 2026. So in this area the replacement is Leqvio alone, and it is less than half Entresto's current quarterly sales.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">AstraZeneca</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$260.70B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Amgen</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$212.55B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Merck</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$368.84B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two operating metrics that actually matter</h3>
+  <p class="prose">For a pure-play drug company past a patent cliff, the two numbers to watch are <strong>core operating margin</strong> (how much of each sales dollar survives R&amp;D and launch spending) and <strong>the gap between growth brands and generic erosion</strong>.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Core Operating Margin — FY2025</div>
+      <div class="card-value">40.1%</div>
+      <div class="card-note"><span style="color:var(--green);">+210bps cc</span> on core operating income of $21,889M. This is the "40% core margin" milestone in the FY2025 headline. IFRS operating income was lower at $17,644M because amortisation of acquired intangibles and other items are left out of the core figure.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Core Operating Margin — Q2 2026</div>
+      <div class="card-value" style="color:var(--amber);">41.2%</div>
+      <div class="card-note"><span style="color:var(--red);">−70bps cc</span>, mainly incremental Avidity cost, with a lower gross margin offset by productivity. H1 2026 was 39.4% (−230bps cc) on core operating income of $10,837M (−7% cc). The margin is holding at about 40% even as Entresto halves, but it has stopped rising.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Generic erosion vs volume (Q2'26)</div>
+      <div class="card-value">+18 / −14</div>
+      <div class="card-note">Volume added 18 points of sales growth and generics took away 14 points, with pricing −3 points and currency +2 points. The priority brands grew 36% at cc as a group, per the Q2 call. The cliff has not overwhelmed the growth brands, but it cancels out most of what they add.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Net debt</div>
+      <div class="card-value" style="color:var(--amber);">$39.4B</div>
+      <div class="card-note">At June 30, 2026, up from $21.9B at December 31, 2025, reflecting the Avidity purchase plus $2.8B of H1 buybacks and the annual dividend. This is why the M&amp;A questions matter: roughly $17B of new net debt in six months, much of it tied to Avidity, whose lead asset has now failed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Patent-protected franchises</span>
+    <span class="moat-pill">Radioligand manufacturing (Pluvicto)</span>
+    <span class="moat-pill">Global commercial scale</span>
+    <span class="moat-pill">40% core margin funds R&amp;D</span>
+    <span class="moat-pill">$16.8B TTM free cash flow</span>
+    <span class="moat-pill">RNA / gene / cell platforms</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A drug company's moat is temporary by construction. Each patent is a lease with an expiry date, and the durable asset is the ability to keep replacing expiring leases with new ones. Novartis has shown the commercial half of that clearly. Kisqali, Kesimpta and Pluvicto turned into multi-billion-dollar brands, and the company kept a ~40% core margin while Entresto went generic. Radioligand therapy also has a real manufacturing barrier: the radioactive payload decays within days, so supply depends on a network of specialised sites near patients. The weak half is what September 2026 exposed: <strong>the replacement pipeline itself, and in particular the part bought through acquisitions</strong>.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Acquired pipeline has failed its first big tests.</strong> Del-desiran was the main asset from the ~$12B Avidity deal, and it failed Phase 3. Pelacarsen failed its cardiovascular-outcomes trial. Rap-cel cell-therapy trials were paused after patient deaths. Reuters reported investors stepping up scrutiny of Novartis's dealmaking, and a major shareholder called for board changes. A company that buys its growth is only as good as its record at picking deals, and that record has just been marked down in public.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">More erosion is already in the numbers.</strong> Besides Entresto (−51%), the older brands Promacta/Revolade (−65%) and Tasigna (−58%) fell sharply in Q2 2026. Generics took 14 points off Q2 sales growth. The 2026 guide already assumes core operating income falls.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Price pressure.</strong> Pricing took 3 points off Q2 2026 sales. US drug-pricing policy affects all large pharma, and the Q2 price drag shows it already reaching Novartis's reported numbers.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Balance-sheet capacity is thinner.</strong> Debt/equity is 1.17 and the current ratio 0.86 (StockAnalysis). Net debt is $39.4B, with $5.6B of the $10B buyback still to run. The balance sheet is not stretched, since TTM free cash flow is $16.8B. But the room for another large deal to fix the pipeline is smaller than it was in 2025, and shareholder patience for one is lower.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The benchmark index is the <strong>S&amp;P 500</strong>. NVS is a Swiss foreign private issuer, so it is not an S&amp;P 500 or NASDAQ-100 constituent, and its home index is the SMI. <strong>Per-share figures:</strong> Novartis reports under IFRS <em>in US dollars</em>, and one NYSE ADR represents one ordinary share (JPMorgan Chase, the depositary, holds one Novartis share for each ADR, per the company's FAQ). So the ADR EPS equals the reported EPS: $6.61 × 1 share × 1.0 FX = <strong>$6.61 per ADR</strong>, and no currency conversion is involved. Financial statements are in USD. Industry-average and S&amp;P 500 values were not obtained from the sources fetched and are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>NVS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>21.3</td><td>—</td><td>—</td><td>$140.98 ÷ $6.61 IFRS TTM EPS = 21.33. StockAnalysis shows 21.07 on a slightly different EPS basis. On FY2025 <strong>core</strong> EPS of $8.98 the multiple is 15.7. The IFRS multiple looks rich mainly because of acquisition amortisation.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>16.0</td><td>—</td><td>—</td><td>$140.98 ÷ consensus FY2026 core EPS of $8.83 (StockAnalysis; 21 analysts on the estimate). StockAnalysis's own next-twelve-month figure is 15.21.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate.">PEG Ratio</span></td><td>n/a</td><td>—</td><td>—</td><td>Not meaningful: FY2026 consensus core EPS is <em>down</em> 1.7% (8.98 → 8.83). FY2027 consensus is $9.83 (+11.3%).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share. IFRS, diluted, USD per share = USD per ADR.">EPS (TTM)</span></td><td>$6.61</td><td>—</td><td>—</td><td>IFRS diluted, USD, TTM to June 30, 2026, −3.4% YoY. ADR ratio 1:1, reporting currency USD, FX 1.0. <strong>Core vs IFRS:</strong> Q2 2026 core EPS $2.41 vs IFRS $1.71, and FY2025 core $8.98 vs IFRS $7.21. Core consistently runs 25–40% above IFRS.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+2.7%</td><td>—</td><td>—</td><td>TTM total revenue $56.69B (StockAnalysis). Q2 2026 net sales +3% USD / +1% cc. H1 2026 +1% USD / −2% cc. FY2026 guide: low-single-digit growth.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of making the product, as a percentage of revenue.">Gross Margin</span></td><td>75.0%</td><td>—</td><td>—</td><td>TTM 74.98%, IFRS. Management cited a lower gross margin in Q2 2026, offset by productivity.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating profit as a share of revenue. Novartis's 'core' version excludes amortisation, impairments and restructuring.">Operating Margin</span></td><td>32.8%</td><td>—</td><td>—</td><td>IFRS TTM 32.75%. <strong>Core</strong> margin 41.2% in Q2 2026 and 40.1% in FY2025. The ~8-point gap is mostly amortisation of acquired intangibles.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>22.5%</td><td>—</td><td>—</td><td>TTM net income $12.76B, down 6.6% YoY. Q2 2026 net income −19%, hit by higher amortisation and financing costs after Avidity.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>2.19%</td><td>—</td><td>—</td><td>$3.08 per ADR TTM (StockAnalysis). Declared as <strong>CHF 3.70</strong> per share for 2025 (+5.7%). The USD amount ADR holders receive moves with CHF/USD.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of shares outstanding — the proportion of shares sold short by investors betting the price falls.">Short Interest (% shares)</span></td><td>0.30%</td><td>—</td><td>—</td><td>5.63M ADRs short, 4.0 days to cover. Negligible. The US line shows no crowded bearish bet even after the September sell-off.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Higher means more financial leverage.">Debt-to-Equity</span></td><td>1.17</td><td>—</td><td>—</td><td>$49.01B total debt, $7.62B cash (StockAnalysis). Company-reported net debt $39.4B at June 30, 2026. Debt/EBITDA 2.10x.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.86</td><td>—</td><td>—</td><td>Below 1.0, which is common for cash-generative large pharma that funds buybacks with short-term paper. Not a liquidity concern while FCF runs at about $17B.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$16.76B</td><td>—</td><td>—</td><td>TTM, down 13.3% YoY. FY2025 $17.60B. FCF yield 6.24% on market cap. H1 2026 FCF $8,891M (−9%).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>30.4%</td><td>—</td><td>—</td><td>Flattered by a small equity base ($41.95B) after years of buybacks and two spin-offs.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the debt and equity capital employed.">ROIC</span></td><td>18.8%</td><td>—</td><td>—</td><td>Against a StockAnalysis WACC estimate of 6.23%. A large spread, which the Avidity capital will dilute unless del-zota and del-brax deliver.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.49</td><td>—</td><td>—</td><td>5-year. Defensive on paper, yet the stock fell 13.93% in one day on September 8. Beta measures sensitivity to the market, and trial readouts have nothing to do with the market.</td></tr>
+      <tr><td>52-Week Range</td><td>$121.57 – $170.46</td><td>—</td><td>—</td><td>$140.98 is 17.3% below the high and 16.0% above the low. 52-week price change +14.68%.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose" style="margin-top:14px;font-size:13px;"><strong>FX exposure:</strong> the reporting currency (USD) is the same as the ADR's trading currency, so no translation sits between reported EPS and the ADR price. Currency still matters in two places. Sales are earned worldwide, and the gap between USD and cc growth shows the swing (Q2 2026 +3% USD vs +1% cc; H1 −2% cc vs +1% USD). And the dividend is declared in Swiss francs.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported figures. First, <strong>core vs IFRS</strong>: Novartis guides and is valued on core numbers, which leave out amortisation of acquired intangibles and impairments. FY2025 core EPS was $8.98 vs IFRS $7.21, and Q2 2026 was $2.41 vs $1.71. The gap will widen as Avidity amortisation starts, and failed Avidity assets are a candidate for <strong>impairment charges</strong> in coming quarters. That last point is our inference, not something the company has disclosed. Second, <strong>portfolio reshaping</strong>, including the 2023 Sandoz spin-off, makes older IFRS EPS figures unusable for comparison. StockAnalysis shows diluted EPS of $10.63 in FY2021 and $7.10 in FY2023, against $3.17 in FY2022 (net income $24.0B in FY2021 vs $7.0B in FY2022), which points to large one-off gains in those years. Third, <strong>buybacks</strong>: 77.6M shares were repurchased for $8.9B in 2025 and 18.2M for $2.8B in H1 2026, and the share count is down 3.34% YoY. Per-share growth therefore runs ahead of absolute profit growth.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note"><strong>12 analysts</strong> in the US-line panel (S&amp;P Global via StockAnalysis). CHF-denominated targets on the Swiss line are not included. The panel was last updated September 10, 2026, so part of the post-September 8 revision cycle may be missing.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$156.56</div><div class="card-note"><span style="color:var(--green);">+11.1% upside</span> from $140.98. The median is $160.15 (+13.6%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$130 – $185</div><div class="card-note">−7.8% to +31.2%. The low end sits below the current price even after a 12% fall.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 6 / 1</div><div class="card-note">September 2026: 2 Strong Buy + 3 Buy, 6 Hold, 0 Sell + 1 Strong Sell. Holds rose from 4 to 6 between August and September.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:41.7;background:#22c55e;"></div>
+    <div style="flex:50;background:#f59e0b;"></div>
+    <div style="flex:8.3;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (41.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 6 (50.0%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (8.3%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">HSBC — Rajesh Kumar</strong> · Upgrade to Hold from Reduce · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$123 → $136</span> (Sep 10, 2026). The reason given: "negative catalyst path has played out." In other words, after the September 8 sell-off the bear had no reason left to stay bearish. The same call carries a CHF 110 target on the Swiss line.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">TD Cowen — Steve Scala</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$180</span> maintained (Sep 9, 2026). A Hold with a target 28% above the price, the day after the crash, reads as "unclear, not broken".</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Bank of America — Sachin Jain</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$183</span> maintained (Sep 7, 2026). This was set before the del-desiran readout moved the US line on September 8.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Berenberg — Kerry Holford</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$141 → $147</span> (Jul 28, 2026), after Q2. Separately, <strong>Argus — Jasper Hellweg</strong> held a Buy with a $170 target (Jul 24, 2026). Both calls predate the September setbacks.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (confirmed, before US open)</div>
+        <div class="tl-desc">The first print after the September setbacks. Things to watch: whether H2 net sales growth reaches the mid-single-digit pace management pointed to as Entresto erosion annualises; whether the core margin holds near 40%; any impairment of Avidity intangibles; and any change to the 5–6% 2025–2030 sales <span class="tip" title="Compound Annual Growth Rate — the constant yearly growth rate that would take the starting value to the ending value.">CAGR</span> guidance.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">Board governance response</div>
+        <div class="tl-desc">About September 10, Reuters reported that a major shareholder called for a board shake-up to strengthen oversight of acquisitions. How the board responds — new directors, a capital-allocation review, or nothing — will decide whether the "$30 billion wipeout" is treated as a one-off or as a problem with how the company is run.</div>
+        <div class="tl-impact neutral">Governance</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">Del-zota FDA filing (DMD exon 44)</div>
+        <div class="tl-desc">Management said on the Q2 call that it is heading for a first FDA submission for accelerated approval. After del-desiran failed, this is the Avidity asset that has to justify the deal.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — $5.6B remaining</div>
+        <div class="tl-desc">What is left of the $10B authorisation announced in July 2025, about 2% of the market cap. After a fall on pipeline news, the buyback retires more ADRs per dollar spent.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Del-desiran (HARBOR) and pelacarsen (HORIZON) Phase 3 failures</div>
+        <div class="tl-desc">The US line fell <strong>13.93%</strong> to $137.70 on 10.2M ADRs, several times normal volume. The session followed the company's reports that both the pelacarsen outcomes trial and the del-desiran trial had failed, about a week after the rap-cel trial pause. A press report fetched for this page described a 10.9% fall as the shares' worst trading day on record, wiping about $32B from market value.</div>
+        <div class="tl-impact down">Reaction already happened: −13.93%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — guidance reaffirmed</div>
+        <div class="tl-desc">Net sales $14,408M (+1% cc), a return to growth. Core margin 41.2%, core EPS $2.41. Full-year guide reaffirmed. The stock ended July at $156.15, broadly flat on June's $156.72.</div>
+        <div class="tl-impact neutral">Reaction already happened: flat month</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">NVS (NYSE ADR, USD) — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · unadjusted prices (Sandoz spin-off Oct 2023 not back-adjusted) · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3D8FE6;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been, on a 0–100 scale. Above 70 means the stock has risen hard and fast relative to its own recent history ("overbought"). Below 30 means it has fallen hard and fast ("oversold"). It measures momentum, not value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>How the series treats the Sandoz spin-off:</strong> the chart uses <em>unadjusted</em> closes. digrin's "Real price" column matches Yahoo's monthly closes to the cent and the company's own year-end ADR prices ($100.97 for 2023, $97.31 for 2024, $137.87 for 2025). The October 2023 spin-off is therefore <strong>not</strong> back-adjusted. When Sandoz shares were distributed, their value left the NVS price, and it shows as part of the <strong>−8.1% step from $101.86 (Sep 2023) to $93.58 (Oct 2023)</strong>. That step is a distribution to holders, not a loss to them. The spin ratio and the value of the Sandoz shares received were not sourced this session, so the size of the adjustment is not given. The practical consequence: the chart <em>understates</em> the five-year return to a holder who kept their Sandoz shares.</p>
+  <p class="prose" style="margin-top:14px;">On price alone, NVS went from <strong>$81.78</strong> (September 2021 close) to <strong>$140.98</strong> (September 21, 2026), <strong>+72.4%</strong>, before dividends and before the Sandoz distribution. The path is a slow 2021–2023 base below $105, a 2024–early-2026 re-rating as the pure-play story and the growth brands came through, a peak month-end close of <strong>$168.62 in February 2026</strong> (6-month RSI 89.0, the most overbought reading in the window), and then a 16% slide to today, most of it on September 8. The 6-month RSI is now <strong>43.2</strong> and the 10-month moving average about <strong>$151.19</strong>. The price is below its long-term trend for the first time since 2024.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Window low — $76.01, RSI 28.9</div><div class="tl-desc">The lowest month-end close of the five years, and the only oversold RSI reading. Novartis was still a conglomerate carrying Sandoz, with FY2022 revenue down 1.2%.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Sandoz spin-off — $101.86 → $93.58</div><div class="tl-desc">Generics were separated and Novartis became a pure-play innovative medicines company. The −8.1% monthly step includes the distributed Sandoz value (unadjusted series).</div><div class="tl-impact neutral">Distribution, not a loss</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2024</div><div class="tl-content"><div class="tl-title">Pure-play re-rating — $120.89, RSI 82.1</div><div class="tl-desc">FY2024 revenue grew 10.85% and operating margin jumped to 31.6% from 21.9%. The market paid for a cleaner, higher-margin company.</div><div class="tl-impact up">First overbought reading</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2025</div><div class="tl-content"><div class="tl-title">Entresto US generics launch — $113.74</div><div class="tl-desc">MSN and other generic makers entered at a reported ~90% discount. The stock dipped that month (−6.0%) and then carried on climbing. The market had largely priced the cliff in advance.</div><div class="tl-impact down">−6.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">Peak — $168.62, RSI 89.0</div><div class="tl-desc">+22.3% in two months from December 2025, after the FY2025 print (40.1% core margin, core EPS +15%). March fell 9.4%, a month that included the ex-dividend date. The other drivers of that decline were not sourced.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 8, 2026</div><div class="tl-content"><div class="tl-title">Pipeline shock — $137.70 (−13.93%)</div><div class="tl-desc">Del-desiran and pelacarsen Phase 3 failures. The US line gave back more than a year of relative gains in one session. Note that September 1 had been a +6.04% session; its cause was not confirmed in the sources fetched.</div><div class="tl-impact down">Largest one-day fall in the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $140.98</div><div class="tl-desc">+2.4% off the September 8 close. The stock is stabilising, not recovering, while the market waits for the Q3 print and the board's response.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) and the <strong>SMI</strong> (home index) were not obtained from the sources fetched, so no numeric comparison is given. What the sourced data does show: NVS is <strong>+72.4% on unadjusted price over five years</strong> and <strong>+14.68% over the trailing 52 weeks</strong> (StockAnalysis). Against peers by market value, Novartis at $267.96B sits between Roche ($362.07B) and AstraZeneca ($260.70B), and far below Eli Lilly ($1.038T), the sector's largest company. At about 16x forward core earnings, Novartis is priced as a mature, cash-generative pharma company whose pipeline now has to prove itself again.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The Entresto cliff is being absorbed rather than feared. Entresto halved in Q2 2026, yet group sales still grew 1% at cc and the core margin held at 41.2%, because Kisqali (+43%), Kesimpta (+32%), Pluvicto (+43%), Scemblix (+89%) and Leqvio (+59%) are already bigger than the drug they replace. Management points to mid-single-digit growth in H2 2026 as the Entresto comparison annualises, and it keeps a 5–6% sales CAGR for 2025–2030. At ~16x forward core EPS, with $16.8B of free cash flow, a 2.2% dividend and $5.6B of buyback left, the September sell-off priced in two failed trials that Barclays had risk-weighted anyway. HSBC upgraded on exactly that logic. It is a cheap entry into a 40%-margin franchise.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The commercial engine is fine. The capital-allocation engine is what failed. Novartis added ~$17B of net debt in six months, mostly for Avidity, and the lead Avidity asset has failed Phase 3. The cholesterol-type heart programme meant to succeed Entresto has failed too, and a cell therapy is on safety hold. 2026 core operating income is guided <em>down</em>, and consensus core EPS falls from $8.98 to $8.83. IFRS earnings will carry Avidity amortisation and possibly impairments. When a major shareholder publicly asks for board changes, the market is being told the deal process is in question, and the 5–6% CAGR assumed the pipeline that has just shrunk. A stock can look cheap because its growth is being rebuilt, or because it is shrinking. Until del-zota and the growth brands carry 2027, the market cannot tell which one this is.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Pipeline and M&amp;A execution.</strong> Del-desiran (HARBOR), pelacarsen (HORIZON), the rap-cel pause and VHB937 (ALS) all failed or stalled in about three weeks. Any Avidity impairment or further readout failure would add to that record.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Generic erosion outrunning launches.</strong> Generics took 14 points off Q2 2026 growth (Entresto −51%, Promacta −65%, Tasigna −58%). If H2 growth does not reach the mid-single-digit pace management pointed to, the 2026 core operating income decline gets deeper.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Pricing and policy.</strong> Pricing was already −3 points in Q2 2026. Kisqali, Kesimpta and Pluvicto are US-weighted growth drivers, so further US price pressure would hit exactly the brands meant to fill the cliff.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Buying the pipeline — and paying for misses</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Large pharma companies facing patent cliffs buy late-stage assets to fill them, and they pay acquisition prices that assume a high chance of success. Novartis's September 2026 shows what happens when that probability does not come through. Reuters reported that investors would "step up scrutiny" of the company's dealmaking after setbacks to acquired drugs. The headline "$30 billion wipeout" refers to the market value lost on the del-desiran and pelacarsen days. The wider lesson is that the sector's main risk is no longer only patent expiries, which are known and dated. It is the <em>replacement</em> assets, which are uncertain and bought at full price.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Heart disease: from franchise to graveyard</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">A September 2026 WSJ piece carried the headline "Heart Disease, a Historic Strength for Big Pharma, Becomes a Weakness." Cardiovascular outcomes trials are huge, slow and expensive, and big drugs in this area go generic at deep discounts, as generic Entresto did at a reported ~90% off list. Pelacarsen's failure also resets the race to lower Lp(a), in which Eli Lilly is developing a competing therapy. For Novartis this area now rests on Leqvio ($480M in Q2, +59%).</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">New treatment platforms — radioligand, RNA, cell and gene</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">Novartis has bet on new ways of delivering drugs: radioligand therapy (Pluvicto, $651M in Q2 and +43%), gene therapy (Zolgensma, +20%), RNA drugs attached to antibodies (the Avidity platform) and cell therapy. <strong>The bull framing:</strong> Pluvicto shows a platform can become a multi-billion-dollar franchise with real manufacturing barriers, and one failed drug does not discredit a platform. <strong>The bear framing:</strong> the platforms that have paid off are the older ones, while the newest (Avidity RNA, rap-cel cell therapy) are the ones that just stumbled, and platforms are bought at a premium to their first product. How to judge it: del-zota's FDA path and Pluvicto's growth rate over the next four quarters.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/nvs/history/</strong> — the September 21, 2026 settled NYSE close of $140.98 (open 141.96, high 142.18, low 140.96, Adj. Close 140.98, volume 1,552,286, +0.43%). Prior close was $140.37 on September 18, and 140.98 − 140.37 = +0.61. Corroborated by "At close: Sep 21, 2026, 4:00 PM EDT" and "Previous Close 140.37" on stockanalysis.com/stocks/nvs/, and by companiesmarketcap's $140.98. After-hours prints are not used.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">ADR and currency: 1 ADR = 1 Novartis AG ordinary share. Per the Novartis shareholder FAQ, "The depositary, JPMorgan Chase Bank, N.A., holds one Novartis AG share for every ADR issued." Novartis reports in USD under IFRS, so ADR EPS = reported EPS × 1 × 1.0 (no FX conversion). EPS (TTM) $6.61 is StockAnalysis's diluted IFRS TTM figure to June 30, 2026. Trailing P/E = $140.98 ÷ $6.61 = 21.3. The dividend is declared in CHF (CHF 3.70 for 2025).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, profile, annual/TTM/quarterly financials, forecast and named analyst calls, news headlines); Novartis Q2 2026 media release (novartis.com, July 2026) for net sales, core and IFRS figures, brand sales, sales-growth bridge, guidance, buybacks and net debt; Novartis FY2025 media release (novartis.com) for FY2025 figures, brand sales, 5–6% 2025–2030 CAGR guidance, dividend and buyback; Novartis Q2 2026 earnings-call transcript (theglobeandmail.com) for CFO Mukul Mehta, named growth drivers and del-zota/del-brax/remibrutinib/ianalumab remarks; novartis.com shareholder FAQ and ADR pages for the ADR ratio, depositary and year-end ADR prices; companiesmarketcap.com for the global rank (#59), Swiss rank (#2) and peer market caps; marketbeat.com for 13F institutional holders; finance.yahoo.com (Insider Monkey article) for the September 8 market-value loss and the Barclays del-desiran estimate; Novartis media release of February 27, 2026 for the Avidity completion (~$12B equity value, $72.00/share); search-result headlines from CNBC, Fierce Biotech, Bloomberg, Reuters, Endpoints and Optum/Leerink for the rap-cel pause and the July 2025 Entresto generic launch; digrin.com/stocks/detail/NVS/price (unadjusted "Real price") cross-checked against Yahoo monthly closes for the chart.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. 60 real month-end closes from September 2021 through August 2026 from digrin's unadjusted "Real price" column (identical to Yahoo's monthly closes), plus a final point at the September 21, 2026 settled close of $140.98. <strong>No months were reconstructed or estimated.</strong> The series is not adjusted for the October 2023 Sandoz spin-off or for dividends. Industry-average and S&amp;P 500 columns in Section 04 are "—" because no sourced values were obtained. Market shares and TAMs are "n/v" (not verified) or omitted. Competitor figures are market caps, not revenues. Stated but not independently verified here: the Sandoz spin-off ratio; the identity of the shareholder seeking board changes; the cause of the September 1 (+6.04%) and March 2026 (−9.4%) moves. The Q2 call transcript summary also contained an Entresto US loss-of-exclusivity date that contradicts the July 2025 generic launch; it is not used. StockAnalysis's FY2025 diluted EPS ($7.15) differs slightly from the company's IFRS EPS ($7.21); company figures are used for FY2025 and StockAnalysis's for TTM. The analyst panel was last updated September 10, 2026.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. "Core" figures are company-defined non-IFRS measures. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price", = Yahoo monthly closes) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [81.78,82.76,79.70,87.47,86.91,87.46,87.75,88.03,90.94,84.53,85.83,80.52,76.01,81.13,89.56,90.72,90.62,84.12,92.00,102.57,96.25,100.91,104.90,100.48,101.86,93.58,97.90,100.97,103.47,100.97,96.73,97.13,103.13,106.46,111.48,120.89,115.02,108.40,105.77,97.31,104.72,109.05,111.48,113.49,115.76,121.01,113.74,126.55,128.24,123.79,130.40,137.87,148.68,168.62,152.75,147.85,150.17,156.72,156.15,152.06,140.98];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — window low $76.01, RSI 28.9',                     color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — Sandoz spin-off; unadjusted step $101.86 → $93.58', color: '#f59e0b' },
+  { idx: 35, label: 'Aug 2024 — pure-play re-rating $120.89, RSI 82.1',          color: '#22c55e' },
+  { idx: 46, label: 'Jul 2025 — Entresto US generics launch; $113.74',           color: '#ef4444' },
+  { idx: 53, label: 'Feb 2026 — 5-yr high close $168.62, RSI 89.0',              color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — $152.06, before the September trial failures',   color: '#3b82f6' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $140.98 (Sep 8: −13.93%)',     color: '#3D8FE6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(61,143,230,0.22)');
+grad.addColorStop(1, 'rgba(61,143,230,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#3D8FE6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#3D8FE6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
