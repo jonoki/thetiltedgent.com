@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SYF — Synchrony Financial | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #F2B705;
+  --accent-dim: #F2B70533;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SYF</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Credit Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $24.40B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Credit Services: #6 of 53 (StockAnalysis)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #F2B70544;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER — added November 18, 2015</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;margin-left:6px;">NASDAQ-100: not eligible (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Synchrony Financial</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$75.00</div>
+      <div class="price-change" style="color:var(--red);">−$0.04 (−0.05%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours: $75.00, unchanged (5:25 PM EDT, StockAnalysis)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 777 Long Ridge Road, Stamford, Connecticut</div>
+    <div class="meta-item"><span>Employees:</span> 20,000</div>
+    <div class="meta-item"><span>Founded:</span> 1932 roots (per StockAnalysis); IPO July 2014 at $23</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 14, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Walk into a furniture store, a vet's office, a Lowe's or a Sam's Club, and the store card you are offered at the till may well be a Synchrony card with somebody else's name on the front. Synchrony is the former retail-finance arm of GE Capital — it went public in <strong>July 2014 at $23 a share</strong>, raising $2.88B — and it is built around <span class="tip" title="Private-label credit card: a store card, usable only at the retailer whose brand it carries. Co-branded cards carry the retailer's brand but run on a card network and work anywhere.">private-label</span> and co-branded cards issued in partners' names. Its business is simple to describe: partner with a retailer or healthcare provider, lend to that partner's customers at high rates, share part of the profit back with the partner, and fund the whole thing with online bank deposits. At the end of Q2 2026 that meant <strong>$102.2B of loan receivables</strong>, <strong>68.3 million average active accounts</strong> and <strong>$82.8B of deposits</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The numbers that matter are bank numbers, and they are unusual ones. Synchrony earns a <span class="tip" title="Net interest margin: annualised net interest income divided by average interest-earning assets.">net interest margin</span> of <strong>15.08%</strong> — a card lender's margin, far above a deposit-and-mortgage bank's — and pays for it with a <span class="tip" title="Net charge-offs: loans written off as uncollectable, net of recoveries, as a percentage of average loans (annualised).">net charge-off</span> rate of <strong>5.43%</strong>. It is a high-margin, high-loss machine; the investment case is always the spread between those two figures, after the partner's cut. In Q2 2026 net earnings were <strong>$885M, or $2.59 per diluted share</strong> (versus $2.50 a year earlier), and management raised full-year guidance to <strong>$9.25–$9.50 of diluted EPS</strong>. On the market's side the story has been politics, not credit: in January 2026 a presidential call for a one-year <strong>10% cap on credit-card interest rates</strong> knocked the stock 8% in a session, and SYF has spent the year since between the high $60s and high $70s. At $75.00 it trades at <strong>7.7x trailing earnings</strong> — priced like a business the market is not sure it will be allowed to keep.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Brian Doubles</div>
+      <div class="card-note">President and CEO, named and quoted in the Q2 2026 earnings release (July 21, 2026): "Synchrony's second quarter performance reflected clear momentum across our core business drivers." On the call he was blunt about rate regulation: "price controls generally are bad… you're going to restrict credit."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Brian Wenzel Sr.</div>
+      <div class="card-note">EVP and CFO, quoted in the same release. He owns the guidance: EPS of $9.25–$9.50, net charge-offs "less than 5.5% for the full year", and "further progress towards our CET1 target of 11%" — i.e. more buybacks from a 13.2% starting point.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Institutional Ownership</div>
+      <div class="card-value" style="font-size:20px;">108.0% institutional</div>
+      <div class="card-note">Per StockAnalysis; insiders hold 0.44%. A reading above 100% is typically a reporting artefact (shares lent to short sellers get counted by both lender and buyer's custodian). Named largest holders were not retrieved from the sources fetched and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Synchrony reports through five <strong>sales platforms</strong>, organised by the kind of partner rather than the kind of product. For a lender the right way to measure mix is the loan book, so the bar below uses <strong>period-end loan receivables at June 30, 2026</strong> from the Q2 2026 financial supplement. Total loan receivables were $102,208M; a run-off corporate portfolio sold in Q4 2025 holds the remaining ~$91M. (The platform lines as extracted sum to $18M more than the reported total — a rounding/extraction difference of 0.02% that does not move any percentage shown.)</p>
+  <div class="seg-bar">
+    <div style="flex:29.7;background:#F2B705;">HOME &amp; AUTO 29.7%</div>
+    <div style="flex:28.4;background:#22c55e;">DIGITAL 28.4%</div>
+    <div style="flex:20.3;background:#3b82f6;">DIVERSIFIED &amp; VALUE 20.3%</div>
+    <div style="flex:15.1;background:#a78bfa;">H&amp;W 15.1%</div>
+    <div style="flex:6.5;background:#94a3b8;">6.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#F2B705;"></span> Home &amp; Auto — $30,351M loans, −0.1% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Digital — $29,011M, +4.4% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Diversified &amp; Value — $20,770M, +6.5% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Health &amp; Wellness — $15,390M, +0.5% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Lifestyle — $6,613M, −0.9% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Spending is running well ahead of balances: purchase volume grew 8.1% to a record $49.8B while loans grew 2.4%. Customers are using the cards more and paying them down faster — good for credit, a drag on interest income.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #F2B705;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Home &amp; Auto</div>
+        <span class="biz-badge dominant">LARGEST LOAN BOOK</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,394M</div><div class="biz-stat-label">Q2'26 Int. &amp; Fees</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">−0.1%</div><div class="biz-stat-label">Loans YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$12.1B</div><div class="biz-stat-label">Q2 Purchase Vol</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.7%</div><div class="biz-stat-label">Loan Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Home and auto partners (individual partner-to-platform assignments were not disclosed in the sources fetched). In April 2026 Synchrony also completed the acquisition of Lowe's commercial co-brand portfolio, the MyLowe's Pro Rewards American Express Card. Purchase volume rose <strong>5.8%</strong> to $12.1B on new programs, but loans were flat and interest and fees were flat at $1,394M. On the Q2 call management flagged furniture and home specialty turning positive — a green shoot in the most rate-sensitive, big-ticket part of the book.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Capital One</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$125.72B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Affirm</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$23.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Digital</div>
+        <span class="biz-badge growth">GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,604M</div><div class="biz-stat-label">Q2'26 Int. &amp; Fees</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+4.4%</div><div class="biz-stat-label">Loans YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$14.9B</div><div class="biz-stat-label">Q2 Purchase Vol</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.4%</div><div class="biz-stat-label">Loan Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Online-first partners — Amazon and PayPal (Synchrony has been the exclusive issuer for PayPal Credit since buying its $7.6B receivables book in 2018, per Wikipedia, through 2028). Highest interest-and-fee income of any platform at <strong>$1,604M (+1.8%)</strong>, with purchase volume up <strong>9.2%</strong> and 20.7 million average active accounts. The CFO called Amazon and PayPal "amazing partners" on refreshed value propositions. The flip side: the two largest names here are also two of the most powerful counterparties in retail, which matters when contracts come up for renewal.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">American Express</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$211.77B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Klarna</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$5.19B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Diversified &amp; Value</div>
+        <span class="biz-badge growth">FASTEST GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,177M</div><div class="biz-stat-label">Q2'26 Int. &amp; Fees</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.5%</div><div class="biz-stat-label">Loans YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$17.2B</div><div class="biz-stat-label">Q2 Purchase Vol</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.3%</div><div class="biz-stat-label">Loan Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Value-oriented and broad-assortment retailers (individual partner-to-platform assignments were not disclosed in the sources fetched). The CEO said spend was "particularly strong for our value-oriented partners". The company's biggest new program is Walmart's OnePay card, which management called "our fastest growing program… in our history across multiple metrics", with over half its accounts tied to Walmart+ members and a stated ambition for it to become a top-five program. The platform carries the largest purchase volume of the five ($17.2B, <strong>+11.7%</strong>) partly on higher gas sales, and the fastest loan growth.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Capital One</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$125.72B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">American Express</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$211.77B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Health &amp; Wellness</div>
+        <span class="biz-badge dominant">CARECREDIT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$948M</div><div class="biz-stat-label">Q2'26 Int. &amp; Fees</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+0.5%</div><div class="biz-stat-label">Loans YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$4.1B</div><div class="biz-stat-label">Q2 Purchase Vol</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.1%</div><div class="biz-stat-label">Loan Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">CareCredit — Synchrony's own brand — financing dental, veterinary, cosmetic and other out-of-pocket care through a network of providers. It is the one franchise Synchrony owns outright rather than renting from a retailer, which is why it earns the best economics per dollar of loans: <strong>$948M</strong> of interest and fees on $15.4B, the highest quarterly interest-and-fee yield of the five platforms (6.2% of period-end loans, computed here; +2.7% YoY). Purchase volume grew 2.1%, led by Pet and held back by Cosmetic; management said dental procedures inflected higher in the quarter. The same high yields are also the controversy: a 2024 class action (per Wikipedia) alleges CareCredit's 32.99% rate breaches state usury laws.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Affirm</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$23.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #94a3b8;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Lifestyle</div>
+        <span class="biz-badge emerging">SMALLEST PLATFORM</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$256M</div><div class="biz-stat-label">Q2'26 Int. &amp; Fees</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−0.9%</div><div class="biz-stat-label">Loans YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$1.5B</div><div class="biz-stat-label">Q2 Purchase Vol</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.5%</div><div class="biz-stat-label">Loan Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Specialty retail — apparel, outdoor, music and luxury (partners named by StockAnalysis include American Eagle, DICK'S Sporting Goods and Guitar Center). Purchase volume grew 6.0% on new programs and luxury, offset by weaker outdoors spend; loans shrank 0.9% and interest and fees fell 1.9%. DICK'S refreshed its card in Q2 with 10% back on qualifying purchases. Too small to move the group either way.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Klarna</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$5.19B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The four operating metrics that actually matter</h3>
+  <p class="prose">A card lender is a spread business. Judge it on what it earns on the book, what it loses on the book, what it gives away to partners, and how much capital it holds against the whole thing.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Net Interest Margin</div>
+      <div class="card-value">15.08%</div>
+      <div class="card-note"><span style="color:var(--green);">+30bps YoY</span> in Q2 2026 (14.78% a year earlier), though down from 15.50% in Q1. The expansion came from cheaper deposits as benchmark rates fell, not from higher loan yields.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Net Charge-Off Rate</div>
+      <div class="card-value" style="color:var(--green);">5.43%</div>
+      <div class="card-note">Down from 5.70% a year earlier and, per the CFO, "below our target range". 30+ day delinquency 4.16% (4.18%), 90+ day 2.01% (2.06%). Full-year guide: under 5.5%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CET1 Ratio</div>
+      <div class="card-value">13.2%</div>
+      <div class="card-note">Down from 14.2% a year ago (recast) as buybacks ran. Management's target is <strong>11%</strong> — roughly two points of excess capital still to hand back.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Efficiency Ratio</div>
+      <div class="card-value" style="color:var(--amber);">35.8%</div>
+      <div class="card-note"><span style="color:var(--red);">+170bps YoY</span>. Other expense rose 7% to $1.3B on operational losses and technology spend. Still a low number by bank standards — Synchrony uses its partners' shop floors as its branch network.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Point-of-sale distribution via partners</span>
+    <span class="moat-pill">CareCredit provider network</span>
+    <span class="moat-pill">Underwriting data on 68M active accounts</span>
+    <span class="moat-pill">Deposit funding (83% of total)</span>
+    <span class="moat-pill">Retailer share arrangements align partners</span>
+    <span class="moat-pill">Integration into partner checkout &amp; apps</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>distribution at the till</strong>. Synchrony does not have to find its customers — its partners hand them over at the moment of purchase, and the <span class="tip" title="Retailer share arrangements: payments to partners that share in the economic performance of their card programs. Rises when the program earns more.">retailer share arrangement</span> (RSA) makes each partner a co-owner of the program's profit: $1.0B paid out in Q2 2026 alone. That structure is sticky — renewing is almost always cheaper than rebuilding the underwriting, the systems and the customer base with a rival — and Synchrony added or renewed more than 15 partners in Q2. The vulnerability is the other side of the same coin: Synchrony rents its customers. A big partner that walks takes the relationship with it, and a big partner that stays uses that leverage to take a larger slice of the RSA.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Price controls on the product.</strong> The business model <em>is</em> a high APR against high losses. A 10% rate cap, as proposed in January 2026, would in Wells Fargo's assessment "wipe out earnings" for card-focused lenders like Synchrony. The CEO's own read on the July 21 call: "price controls generally are bad… you will have unintended consequences. You're going to restrict credit."</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Partner concentration.</strong> Programs like Walmart/OnePay, Amazon, PayPal and Lowe's are named by management or the company as major relationships; individual program sizes were not disclosed in the sources fetched. Renewals are negotiated when partners have the most leverage, and lost programs take their receivables with them. The PayPal Credit exclusivity runs through 2028 per Wikipedia.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Credit is the cycle.</strong> An allowance of <strong>10.09%</strong> of loans — about $10.3B on $102.2B — is the company's own estimate of lifetime losses on today's book. Q2 earnings were helped by a $163M reserve release; in a consumer downturn that line reverses into a build, and charge-offs rise at the same time.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Expense creep.</strong> The efficiency ratio rose 170bps to 35.8% on operational losses and technology spend, and management guides second-half expenses "relatively consistent with the first half" — no operating leverage this year.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong> (SYF is a member since November 18, 2015; as an NYSE listing it is not eligible for the NASDAQ-100). Synchrony is a bank holding company, so the usual industrial ratios are adapted: <strong>gross margin and current ratio are not meaningful (n/m)</strong> for a lender and are replaced by NIM, charge-offs, CET1, efficiency and ROTCE. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SYF</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>7.68</td><td>—</td><td>—</td><td>$75.00 ÷ $9.77 TTM diluted EPS = 7.68. Matches StockAnalysis.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by expected earnings per share.">Forward P/E</span></td><td>7.78</td><td>—</td><td>—</td><td>StockAnalysis next-twelve-month basis. On FY2026 consensus EPS of $9.37: $75.00 ÷ $9.37 = 8.0x; on the midpoint of management's $9.25–$9.50 guide, also ~8.0x.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$9.77</td><td>—</td><td>—</td><td>Through June 30, 2026, +18.9% YoY per StockAnalysis, while net income fell slightly ($3,435M TTM vs $3,469M FY2025). The per-share growth is the buyback: diluted shares fell from 371.9M to 325.3M (−12.5%) between Q2 2025 and Q2 2026.</td></tr>
+      <tr><td><span class="tip" title="Price to tangible book value: share price divided by tangible common equity per share.">Price / Tangible Book</span></td><td>1.79x</td><td>—</td><td>—</td><td>$75.00 ÷ $42.01 tangible book value per share (company, Q2 2026), computed here. StockAnalysis shows 1.94x on its own tangible-book definition. P/B on $46.67 book value: 1.61x.</td></tr>
+      <tr><td><span class="tip" title="Net interest margin: annualised net interest income divided by average interest-earning assets.">Net Interest Margin</span></td><td>15.08%</td><td>—</td><td>—</td><td>Q2 2026, +30bps YoY. Net interest income $4,608M in the quarter, +1.9%.</td></tr>
+      <tr><td><span class="tip" title="Net charge-offs as a percentage of average loan receivables, annualised.">Net Charge-Off Rate</span></td><td>5.43%</td><td>—</td><td>—</td><td>Q2 2026 vs 5.70% a year earlier. Guided under 5.5% for FY2026.</td></tr>
+      <tr><td><span class="tip" title="Loans 30 or more days past due as a percentage of period-end loans — the leading indicator for future charge-offs.">30+ Day Delinquency</span></td><td>4.16%</td><td>—</td><td>—</td><td>Vs 4.18% a year earlier and 4.54% at March 31, 2026 — flat YoY, seasonally lower QoQ.</td></tr>
+      <tr><td><span class="tip" title="Allowance for credit losses as a percentage of period-end loans — the reserve held against expected lifetime losses under CECL accounting.">Allowance Coverage</span></td><td>10.09%</td><td>—</td><td>—</td><td>Down from 10.42% in Q1 2026 and 10.59% in Q2 2025 — the $163M Q2 reserve release in one number.</td></tr>
+      <tr><td><span class="tip" title="Common Equity Tier 1 ratio: highest-quality regulatory capital divided by risk-weighted assets.">CET1 Ratio</span></td><td>13.2%</td><td>—</td><td>—</td><td>Estimated, June 30, 2026; 14.2% a year earlier. Target 11%. Tier 1 ratio 14.9%.</td></tr>
+      <tr><td><span class="tip" title="Efficiency ratio: other expense divided by (net interest income + other income − retailer share arrangements). Lower is better.">Efficiency Ratio</span></td><td>35.8%</td><td>—</td><td>—</td><td>Q2 2026, +170bps YoY on operational losses and technology investment.</td></tr>
+      <tr><td><span class="tip" title="Return on tangible common equity: annualised net earnings available to common shareholders divided by average tangible common equity (non-GAAP).">ROTCE</span></td><td>25.2%</td><td>—</td><td>—</td><td>Q2 2026, −150bps YoY. ROE 21.4%, ROA 2.9% in the quarter; StockAnalysis TTM ROE 20.79%.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus cost of goods sold. Lenders do not report a cost of goods sold.">Gross Margin</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a lender; NIM and efficiency ratio above do the job.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Banks do not report a classified balance sheet.">Current Ratio</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a bank. Liquidity instead: $19.8B of liquid assets (16.2% of total assets); deposits $82.8B, 83% of funding.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.81%</td><td>—</td><td>—</td><td>$1.36 annualised ($0.34/quarter after a 13% raise announced July 21, 2026; ex-date Aug 5). Payout ratio 13.92%.</td></tr>
+      <tr><td><span class="tip" title="Buyback yield: net share repurchases over the last year as a percentage of market capitalisation.">Buyback Yield</span></td><td>9.80%</td><td>—</td><td>—</td><td>Per StockAnalysis. $850M repurchased in Q2 2026; $5.7B authorisation remaining at June 30 — about 23% of the $24.40B market cap.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>5.52%</td><td>—</td><td>—</td><td>17.84M shares short. Moderate — a policy-risk hedge more than a credit bet.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta (5Y)</span></td><td>1.31</td><td>—</td><td>—</td><td>A levered consumer-credit name trades like one.</td></tr>
+      <tr><td>52-Week Range</td><td>$63.08 – $88.77</td><td>—</td><td>—</td><td>$75.00 sits 15.5% below the high and 18.9% above the low. 52-week price change −2.08% per StockAnalysis.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items colour the Q2 2026 print. First, the <strong>reserve release</strong>: provision for credit losses was $1.2B, including a $163M release of reserves (versus a $265M release a year earlier). Releases are real earnings but not recurring ones — they are the accounting echo of improving credit, and they flip sign when credit turns. Second, a <strong>$30M Visa B-2 share exchange gain</strong> in other income. Third, the <strong>share count</strong>: a 12.5% fall in diluted shares in a year means EPS growth (+3.6% in Q2, $2.59 vs $2.50) ran well ahead of net earnings, which fell 8% to $885M. The company also issued $500M of preferred stock at 7.25%. Separately, prior-period capital ratios were recast for a change in the presentation of capitalised internal-use software.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">24 analysts, per StockAnalysis (September 2026 breakdown).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$89.30</div><div class="card-note"><span style="color:var(--green);">+19.07% upside</span> from $75.00. Median $89 (+18.67%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$78 – $104</div><div class="card-note">+4.0% to +38.7%. Even the lowest target on the board sits above the current price — the Street's disagreement is about how much upside, not whether.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">15 / 9 / 0</div><div class="card-note">12 Strong Buy + 3 Buy, 9 Hold, 0 Sell, 0 Strong Sell. FY2026 EPS consensus $9.37; FY2027 $10.50 (+12.0%).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:62.5;background:#22c55e;"></div>
+    <div style="flex:37.5;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 15 (62.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 9 (37.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barclays — Terry Ma</strong> · Buy maintained · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$93</span> (Sep 15). About 24% above the September 21 close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wells Fargo — Donald Fandetti</strong> · Buy reiterated · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$88</span> (Sep 14). Notable because Wells Fargo's own January analysis framed a 10% rate cap as earnings-destroying for card lenders — the house is staying constructive on the stock regardless.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wolfe Research — Darrin Peller</strong> · Buy maintained · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$85 → $90</span> (Aug 25).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">BTIG — Vincent Caintic</strong> · Hold maintained · no target (Sep 15). And <strong>Bank of America — Mihir Bhatia</strong> maintained Buy without a published target (Sep 14).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The test of the raised $9.25–$9.50 EPS guide. Watch three things: whether loan growth accelerates toward the "mid-single-digit" year-end goal as purchase volume converts into balances; whether charge-offs stay under 5.5% as the reserve-release tailwind fades; and whether the RSA line keeps rising within the 4%–4.5% target range, which is how partners take their share of better credit.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Credit-card rate-cap and fee regulation</div>
+        <div class="tl-desc">The January 2026 call for a one-year 10% APR cap took 8% off SYF in a session. The status of any legislation or executive action was not verified in the sources fetched for this report; on the July 21 call the CEO said nothing had been formalised on the regulatory items discussed. Any concrete step would move this stock more than any quarterly print.</div>
+        <div class="tl-impact down">Headline risk</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Capital return toward an 11% CET1</div>
+        <div class="tl-desc">With CET1 at 13.2% and a $5.7B authorisation outstanding (~23% of the market cap), buybacks remain the main per-share engine. Q2 alone returned $950M ($850M repurchases, $100M dividends), and the quarterly dividend rose 13% to $0.34.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Walmart OnePay ramp</div>
+        <div class="tl-desc">Management calls it the fastest-growing program in company history and expects it to become a top-five program. It is the single clearest source of new receivables growth in the book.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Diluted EPS $2.59 (vs $2.50), record purchase volume of $49.8B (+8%), NIM 15.08%, NCO 5.43%, EPS guide raised to $9.25–$9.50 and the dividend lifted 13%. The stock ended July at $75.79, essentially flat on June's $76.05 — the beat was absorbed, not rewarded.</div>
+        <div class="tl-impact neutral">July −0.3%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Lowe's commercial co-brand acquisition closes</div>
+        <div class="tl-desc">Synchrony completed its acquisition of the MyLowe's Pro Rewards American Express Card portfolio in April and launched it in Q2, extending its Lowe's relationship into the professional-contractor segment.</div>
+        <div class="tl-impact up">Completed</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">10% rate-cap proposal hits card lenders</div>
+        <div class="tl-desc">After a presidential call for a one-year 10% cap on card interest rates, SYF fell 8% in the session versus −6% for Capital One and −4% for American Express. Wells Fargo's Mike Mayo reacted with a single word: "Yikes." The stock ended January at $72.63, down 12.9% on the month.</div>
+        <div class="tl-impact down">Reaction already happened: January −12.9%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SYF — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#F2B705;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$48.88</strong> to the September 21, 2026 settled close of <strong>$75.00</strong>, SYF gained <strong>53.4% on price</strong>. Dividends add to that: annual dividends per share over FY2022–FY2025 alone sum to $4.01 (StockAnalysis). But the path was anything but smooth. The stock bottomed at <strong>$27.62 in June 2022</strong> — down 44% from the start of the window — spent 2023 below $39, then roughly tripled from that low to a <strong>$83.43 December 2025 close</strong>, the high of the five-year series. 2026 has given a chunk of that back on regulatory fear rather than credit data.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows two extremes: <strong>10.1 in March 2022</strong>, the most oversold reading in the series, and <strong>93.6 in November 2024</strong>, the most overbought, after a 22.5% month. It now reads <strong>54.1</strong> — dead neutral. The 10-month moving average sits at about <strong>$74.47</strong>, just below the current price: after nine months of chop between $68 and $77, trend and price have converged. Momentum is waiting for a verdict, and the verdict is more likely to come from Washington than from the loan book.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Mar 2022</div><div class="tl-content"><div class="tl-title">First leg down — $34.81 (−18.6% in a month)</div><div class="tl-desc">The first big monthly fall of 2022; RSI printed 10.1, the lowest of the window. Specific drivers were not sourced for this report.</div><div class="tl-impact down">−18.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">Five-year low — $27.62 (−25.4% in a month)</div><div class="tl-desc">The lowest month-end close in the series. Specific drivers for the month were not sourced for this report.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Last low — $28.05</div><div class="tl-desc">FY2023 EPS fell to $5.19 from $6.15 (StockAnalysis). This was the final retest before a two-year rerating.</div><div class="tl-impact down">FY23 EPS −15.6%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">Breakout — $67.52 (+22.5% in a month)</div><div class="tl-desc">The largest monthly gain in the window, taking RSI to 93.6. FY2024 EPS would come in at $8.55, up 64.7%. The specific catalyst for the month was not sourced for this report.</div><div class="tl-impact up">+22.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb–Apr 2025</div><div class="tl-content"><div class="tl-title">Pullback — $51.95 by April</div><div class="tl-desc">A 25% slide from the January 2025 close of $68.98 over three months, fully recovered by July.</div><div class="tl-impact down">−24.7% Jan→Apr</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">Five-year high — $83.43</div><div class="tl-desc">FY2025 closed with EPS of $9.28 (+8.5%) and the stock at the top of the range.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">Rate-cap shock — $72.63 (−12.9% in a month)</div><div class="tl-desc">The 10% APR cap proposal cut SYF 8% on January 12 alone. The stock has not regained the December close since.</div><div class="tl-impact down">−12.9% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $75.00</div><div class="tl-desc">Down 2.7% from the August close of $77.08 and 10.1% below the December 2025 high, at 7.7x trailing earnings.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: SYF is <strong>up 53.4% on price over five years</strong> and <strong>down 2.08% over the trailing year</strong> per StockAnalysis, while its market capitalisation is down 12.3% year-over-year — a bigger fall than the price, because buybacks shrank the share count. Among US credit-services names Synchrony ranks <strong>#6 of 53 by market value</strong> at $24.40B, behind American Express ($211.77B), Capital One ($125.72B) and PayPal ($45.01B), and just ahead of Affirm ($23.97B) — a lender with $102B of loans valued about the same as a buy-now-pay-later platform.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay 7.7x trailing earnings and about 1.8x tangible book for a business earning a 25.2% ROTCE, with charge-offs (5.43%) below management's own target range and falling, record purchase volume, a 15.08% margin, and a CET1 of 13.2% against an 11% target — roughly two points of capital still to be returned, on top of a $5.7B authorisation worth about 23% of the market cap. Diluted shares already fell 12.5% in a year. If the rate-cap threat stays a threat, consensus has EPS rising to $10.50 in 2027, and every analyst target on the board — lowest $78 — sits above the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The low multiple is not an oversight; it is a discount for regulatory tail risk on the one thing Synchrony sells — high-rate credit to consumers who cannot get cheaper credit elsewhere. Wells Fargo's own January framing was that a 10% cap would "wipe out earnings" for lenders like SYF. Meanwhile the earnings being capitalised are flattered: a $163M reserve release in Q2, net income down 8% YoY with EPS up only because the share count shrank, an efficiency ratio up 170bps, and loans growing 2.4% against 8% spend growth. When the consumer cycle turns, reserve releases become builds and the buyback slows at exactly the wrong moment.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">APR caps or fee regulation.</strong> The January 2026 proposal took 8% off in a session and set the tone for the year. A concrete cap would reprice the whole model; the CEO's warning is that it would restrict credit to exactly the customers the business serves.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Consumer credit turning.</strong> The book is reserved at 10.09% of loans and losing 5.43% a year in a benign environment. A rise in unemployment would push charge-offs up and turn Q2's $163M reserve release into a reserve build — hitting earnings twice.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Partner leverage.</strong> The customers belong to the partners. Renewals of the largest programs, and the size of the RSA share paid to keep them ($1.0B in Q2, guided to rise within a 4%–4.5% range), set how much of the margin Synchrony actually keeps.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The price of credit is now a political variable</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">The January 2026 call for a one-year 10% cap on credit-card interest rates hit the pure-play card lenders hardest: SYF −8%, Capital One −6%, American Express −4%, versus about −1% for JPMorgan and Bank of America. The ordering is the lesson — the more of a company's revenue comes from revolving card balances, the more of its value is exposed. Wells Fargo estimated such a cap would cut large-bank pre-tax earnings by 5%–18% and "wipe out earnings" for card-focused lenders. The economics are straightforward: a book that charges off 5.43% a year and pays partners an RSA cannot be run at a 10% APR for the customers it currently serves. Whether the cap happens is a political question this report cannot answer; its status was not verified in the sources fetched.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Payers paying faster, spending more</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">MIXED SIGNAL</span></div>
+    <p class="biz-desc">Synchrony's Q2 shows a consumer who is spending — record purchase volume, out-of-partner discretionary spend on co-branded cards up double digits despite high fuel prices — but also paying down balances quickly: the CFO referred to "elevated payment behavior". For credit quality that is good news (delinquencies flat to lower, charge-offs down 27bps). For revenue it is not: interest and fees grew only 1% because balances are not building. Management's year-end goal of "mid-single-digit" loan growth depends on that payment rate normalising.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Capital return as the valuation floor — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc"><strong>The bull framing:</strong> at 7.7x earnings a company buying back ~10% of itself a year (9.80% buyback yield per StockAnalysis) compounds per-share value fast, and a CET1 two points above target means the pace can continue without new earnings. <strong>The bear framing:</strong> buybacks turned an 8% fall in Q2 net income into a 3.6% rise in EPS; they mask the absolute trend, and they are the first thing regulators or a credit downturn would slow. The way to adjudicate is not the P/E — it is whether net earnings, not EPS, grow over the next four quarters.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/syf/history/</strong> — the September 21, 2026 settled close of $75.00 (open 75.48, high 76.24, low 74.58, Adj. Close 75.00 present, −0.05% on the prior close of $75.04). Confirmed by the quote page stockanalysis.com/stocks/syf/ ("At close: Sep 21, 2026, 4:00 PM EDT", $75.00), which also showed an after-hours quote of $75.00. The history row lists volume of 2,326,645 and the quote page 2,358,896; neither is used elsewhere.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual financials, forecast and named analyst actions, credit-services industry ranking and peer market caps); Synchrony's Q2 2026 earnings press release and financial tables (July 21, 2026, company investor-relations PDF) for net earnings, EPS, NIM, charge-offs, delinquencies, allowance, efficiency ratio, CET1, ROTCE, book values, platform results, capital return, CEO/CFO names and quotes; the StockAnalysis-hosted Q2 2026 earnings call transcript for guidance, the CET1 target, OnePay, Lowe's and regulation comments; finance.yahoo.com for the January 12, 2026 rate-cap market reaction and the Wells Fargo commentary, and for a monthly-close cross-check; Wikipedia for the IPO, PayPal Credit history, the 2024 CareCredit class action and the S&amp;P 500 addition date (List of S&amp;P 500 companies: added 2015-11-18); digrin.com/stocks/detail/SYF/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from the unadjusted "Real price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $75.00. July and August 2026 month-ends ($75.79, $77.08) match the stockanalysis.com daily closes for July 31 and August 31, 2026; Oct 2025–Jun 2026 month-ends match Yahoo Finance monthly closes. No interior months were reconstructed or estimated. No stock splits are recorded. StockAnalysis "revenue" ($9.91B TTM) is a net figure not comparable to the company's gross interest and fees ($5.38B in Q2 alone) and is not used in analysis. Gross margin and current ratio are shown as n/m because they do not apply to a bank. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Segment market shares and TAM are "n/v" or omitted. Competitor figures are market capitalisations, not segment revenues or shares. Price-to-tangible-book of 1.79x is computed here from the company's tangible book value per share. Global and US market-cap ranks were not sourced. Named largest institutional holders were not retrieved. The status of the credit-card rate-cap proposal after January 2026 was not verified. SEC filings were not accessed directly; the same Q2 2026 release was read from the company's investor-relations PDF.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [48.88,46.45,44.79,46.39,42.59,42.78,34.81,36.81,37.04,27.62,33.48,32.75,28.19,35.56,37.58,32.86,36.73,35.71,29.08,29.51,30.96,33.92,34.54,32.28,30.57,28.05,32.36,38.19,38.87,41.30,43.12,43.98,43.80,47.19,50.79,50.26,49.88,55.14,67.52,65.00,68.98,60.68,52.94,51.95,57.65,66.74,69.67,76.34,71.05,74.38,77.36,83.43,72.63,69.11,68.02,76.20,71.44,76.05,75.79,77.08,75.00];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 6,  label: 'Mar 2022 — first big 2022 fall, $34.81; RSI 10.1',        color: '#ef4444' },
+  { idx: 9,  label: 'Jun 2022 — five-year low close $27.62',                   color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — last low $28.05',                              color: '#f59e0b' },
+  { idx: 38, label: 'Nov 2024 — +22.5% month, $67.52; RSI 93.6',               color: '#22c55e' },
+  { idx: 51, label: 'Dec 2025 — five-year high $83.43',                        color: '#22c55e' },
+  { idx: 52, label: 'Jan 2026 — 10% rate-cap proposal; $72.63 (−12.9%)',      color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 beat, guide raised; $75.79',                color: '#3b82f6' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $75.00',                     color: '#F2B705' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(242,183,5,0.22)');
+grad.addColorStop(1, 'rgba(242,183,5,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#F2B705', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#F2B705'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
