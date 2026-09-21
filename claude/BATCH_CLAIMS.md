@@ -23,6 +23,10 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-g3 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
+AEM CLS FLUT SONY SE RACE SPOT NU HDB UL
+- FLUT and SPOT checked against the 503-row S&P 500 list fetched 2026-09-21: neither is a member.
+
 ### sess-2026-09-21-g2 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
 NVO RY TD BNS BN ENB CNQ CNI CP
 
