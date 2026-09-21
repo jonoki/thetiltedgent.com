@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WSM — Williams-Sonoma, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #D9774A;
+  --accent-dim: #D9774A33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">WSM</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Specialty Retail</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $26.75B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);border:1px solid #22c55e44;padding:3px 10px;border-radius:4px;">S&amp;P 500: ADDED — effective March 24, 2025</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Williams-Sonoma, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$227.16</div>
+      <div class="price-change" style="color:var(--green);">+$2.96 (+1.32%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $228.00 (+0.37%) at 4:51 PM EDT — not used in this report</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 3250 Van Ness Avenue, San Francisco, California</div>
+    <div class="meta-item"><span>Employees:</span> 19,800</div>
+    <div class="meta-item"><span>Founded:</span> 1956 (IPO July 1983)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q3 fiscal 2026 — date not announced in sources fetched</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Williams-Sonoma started in 1956 as a kitchenware shop. Seventy years later it is a <strong>$26.75B</strong> home-furnishings group that sells sofas, beds, cookware and lighting under <strong>Pottery Barn, West Elm, Williams Sonoma, Pottery Barn Kids and Teen, Rejuvenation, Mark and Graham and GreenRow</strong>, through its own websites, catalogs and 508 stores. It bought Pottery Barn from Gap in 1986, launched West Elm in 2002 and added Rejuvenation in 2011. Fiscal 2025 (the year ended February 1, 2026) revenue was <strong>$7.81B, up 1.24%</strong>, with GAAP <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$8.84</strong>.</p>
+  <p class="prose" style="margin-top:16px;">That revenue line is the odd thing about this stock. Sales peaked at <strong>$8.67B in fiscal 2022</strong>, fell 10.65% the next year as the pandemic home-spending boom unwound, and have barely moved since. The share price went the other way: <strong>$88.67 (split-adjusted) at the end of September 2021, $227.16 today</strong>, up 156%. Almost none of that came from selling more. It came from selling at full price. Gross margin went from <strong>42.40% in fiscal 2022 to 46.45% in fiscal 2024</strong> and has held near 46% since, and the share count keeps shrinking (down 3.45% in the last year). The company joined the <strong>S&amp;P 500 on March 24, 2025</strong>. The question now is whether a retailer can keep growing earnings without much housing turnover behind it. The latest quarter says yes: comparable brand revenue up <strong>6.2%</strong> and management raising its full-year outlook. Tariffs are what could stop it.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Laura Alber</div>
+      <div class="card-note">President and CEO since May 2010, per Wikipedia and the StockAnalysis executive list. On the Q2 2026 results (August 26, 2026) she said the company "gained market share, continued to outperform the industry" and that "Every brand delivered again in the quarter."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Jeffrey E. Howie</div>
+      <div class="card-note">Executive Vice President and CFO, per the StockAnalysis executive list (sourced from EOD Historical Data). No CFO quote is used in this report because none was captured from the pages fetched.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">97.97% institutional</div>
+      <div class="card-note">Institutions hold 97.97% and insiders 1.10%, per StockAnalysis (S&amp;P Global data). The names and sizes of the largest holders were not sourced this session and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Williams-Sonoma reports revenue by brand. The mix below uses <strong>Q2 fiscal 2026 (quarter ended August 2, 2026)</strong> brand revenue from StockAnalysis's segment table. The five lines sum to $1,959.8M, which matches the $1,959.8M net revenue in the company's release. Growth is the reported change from the quarter ended August 3, 2025, calculated from the same table. The company's <strong>comparable brand revenue</strong> figures, which include business-to-business sales, come from its own release.</p>
+  <div class="seg-bar">
+    <div style="flex:39.3;background:#D9774A;">POTTERY BARN 39.3%</div>
+    <div style="flex:25.3;background:#22c55e;">WEST ELM 25.3%</div>
+    <div style="flex:15.2;background:#a78bfa;">PBK+TEEN 15.2%</div>
+    <div style="flex:13.7;background:#f59e0b;">WS 13.7%</div>
+    <div style="flex:6.5;background:#3b82f6;">6.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#D9774A;"></span> Pottery Barn — $770.8M (Q2'26), +6.4% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> West Elm — $496.3M, +5.9% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Pottery Barn Kids and Teen — $297.4M, +3.7% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Williams Sonoma — $268.8M, +7.9% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Other brands — $126.4M, +17.2% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Every brand grew. This is a seasonal business: the Williams Sonoma brand more than doubles its revenue in the holiday quarter ($579.4M in the quarter ended February 1, 2026), so a summer quarter understates its annual weight.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #D9774A;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pottery Barn</div>
+        <span class="biz-badge dominant">LARGEST BRAND</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$770.8M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+5.1%</div><div class="biz-stat-label">Comp Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">39.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The anchor: furniture, bedding, rugs and decor for the classic American home, with 181 stores at the end of Q2. Its trailing-twelve-month revenue of <strong>$3.06B</strong> is still well below the <strong>$3.56B</strong> of fiscal 2022, so the brand has not recovered its pandemic peak. It has grown for several quarters since, with comparable brand revenue up <strong>5.1%</strong> in Q2. Big-ticket furniture is the part of the business most tied to people moving house, and housing turnover is what makes this segment cyclical.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Wayfair</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$14.37B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">RH</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$2.41B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arhaus</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.24B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">West Elm</div>
+        <span class="biz-badge growth">REBUILDING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$496.3M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.4%</div><div class="biz-stat-label">Comp Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Modern furniture for younger, often urban buyers, with 117 stores. It had the sharpest fall after the boom: annual revenue went from <strong>$2.28B in fiscal 2022 to $1.86B</strong> in fiscal 2023 and stayed near that level for two years. Trailing-twelve-month revenue is now <strong>$1.92B</strong>, and Q2 comparable brand revenue rose <strong>6.4%</strong>, faster than Pottery Barn. It is the brand with the most room to recover and also the one most exposed to a first-time-buyer housing market that is not moving.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Wayfair</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$14.37B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arhaus</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.24B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pottery Barn Kids and Teen</div>
+        <span class="biz-badge dominant">STEADY</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$297.4M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3.5%</div><div class="biz-stat-label">Comp Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Nursery, kids' and dorm furniture and bedding, with 43 Pottery Barn Kids stores. This line has been the most stable across the cycle: annual revenue ranged from $1.06B to $1.14B from fiscal 2021 to fiscal 2025, and trailing-twelve-month revenue is $1.16B. Q2 comparable brand revenue rose 3.5%, the slowest of the four reported brands. Demand follows births and school years more than housing, which makes it the steadiest part of the group and also the slowest-growing.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Target</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$71.65B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Wayfair</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$14.37B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Williams Sonoma (incl. Williams Sonoma Home)</div>
+        <span class="biz-badge growth">FASTEST COMP</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$268.8M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7.6%</div><div class="biz-stat-label">Comp Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">13.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The founding brand, with 153 stores: cookware, cutlery, electrics, tabletop and food, plus the Williams Sonoma Home furniture line. Its annual revenue has grown every year since fiscal 2023, from $1.26B to <strong>$1.36B</strong> in fiscal 2025, and it had the group's fastest comparable brand growth in Q2 at <strong>7.6%</strong>. Cookware and gifts cost less and are bought more often than sofas, so this brand depends much less on the housing market. Q4 is its big quarter.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market share not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Target</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$71.65B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Other brands (Rejuvenation, Mark and Graham, GreenRow)</div>
+        <span class="biz-badge emerging">EMERGING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$126.4M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+17.2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Rejuvenation (lighting and hardware, 13 stores), Mark and Graham (personalised gifts) and GreenRow (1 store). Small, but it grew 17.2% in Q2 and has gone from $369M of revenue in fiscal 2023 to $470M on a trailing-twelve-month basis. This is where the group tests new brands. Brand-level comparable growth is not reported for this bucket.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that matter</h3>
+  <p class="prose">For a home retailer the income statement is the result. The inputs are comparable sales, gross margin, and how much inventory is needed to produce them.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Q2 Comparable Brand Revenue</div>
+      <div class="card-value" style="color:var(--green);">+6.2%</div>
+      <div class="card-note">Total net revenue grew 6.7% to $1,959.8M. Comparable brand revenue includes business-to-business sales. Full-year fiscal 2026 comp guidance was raised to <strong>+4.0% to +6.5%</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Non-GAAP Gross Margin</div>
+      <div class="card-value" style="color:var(--amber);">45.5%</div>
+      <div class="card-note"><strong>Down 160bps</strong> from a year earlier. The reported GAAP gross margin of 51.6% is inflated by one-off tariff refunds (see Section 04). The underlying number shows tariffs squeezing margin even as sales grew.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Merchandise Inventory</div>
+      <div class="card-value">$1,447.4M</div>
+      <div class="card-note"><strong>Up 1.0% YoY</strong> against revenue up 6.7%. Selling more from roughly the same inventory is what lets a retailer avoid markdowns.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Stores</div>
+      <div class="card-value">508</div>
+      <div class="card-note">At the end of Q2: Pottery Barn 181, Williams Sonoma 153, West Elm 117, Pottery Barn Kids 43, Rejuvenation 13, GreenRow 1. A year earlier there were 509, so revenue is growing without adding stores.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Owned brand portfolio</span>
+    <span class="moat-pill">Full-price selling discipline</span>
+    <span class="moat-pill">Digital-first, catalog-trained customer file</span>
+    <span class="moat-pill">Own design &amp; sourcing</span>
+    <span class="moat-pill">508-store showroom network</span>
+    <span class="moat-pill">Balance-sheet capacity ($1.03B cash)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>pricing power in a category that usually has none</strong>. Most home-furnishings retailers make money in good housing years and discount heavily in bad ones. Williams-Sonoma sells its own designs under its own brand names, so a Pottery Barn sofa has no identical listing elsewhere at a lower price. The numbers show it: revenue in fiscal 2025 ($7.81B) was <strong>below</strong> fiscal 2022 ($8.67B), but the operating margin was higher (18.15% against 17.45%) and trailing return on equity is <strong>54.96%</strong>. It has held margins through a down cycle, which is the hard part. The weakness is that owning the design usually also means depending on overseas factories, and tariffs hit exactly that.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Tariffs are already costing margin.</strong> Underlying (non-GAAP) gross margin fell 160bps to 45.5% in Q2 even though revenue grew 6.7%. The company says merchandise margin fell 230bps, "primarily driven by tariff costs," and full-year guidance assumes "all tariffs currently in place will remain for fiscal 2026." The one-off refund of IEEPA tariffs flattered GAAP results this quarter, but it does not change the ongoing tariff cost, which is still there.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Housing turnover drives furniture demand.</strong> Pottery Barn and West Elm, about 65% of Q2 revenue, sell big-ticket furniture that people buy when they move. Both brands' annual revenue is still below fiscal 2022. If the housing market stays frozen, growth has to come from taking share, not from the market growing.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The valuation leaves little room for error.</strong> At 23.3x trailing and 22.9x forward earnings, the stock is priced as a quality compounder, not as a cyclical retailer. The 52-week low was $165.51, 27% below today's price, and March 2025 shows how quickly that can happen: −18.7% in one month.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The benchmark index is the <strong>S&amp;P 500</strong>, which WSM joined on March 24, 2025. It is NYSE-listed and not a NASDAQ-100 constituent. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated. Fiscal years end around February 1. StockAnalysis labels the year ended February 1, 2026 "FY2026", but the company calls it fiscal 2025. This report uses the company's naming.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>WSM</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>23.3</td><td>—</td><td>—</td><td>$227.16 ÷ $9.76 TTM GAAP EPS = 23.27. Removing only the Q2 tariff-refund gain ($2.84 GAAP minus $2.10 non-GAAP = $0.74) gives ~$9.02 and ~25.2x (my calculation).</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>22.9</td><td>—</td><td>—</td><td>StockAnalysis's forward P/E. On the fiscal 2026 consensus non-GAAP EPS of $9.51 it is 23.9x.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>1.80</td><td>—</td><td>—</td><td>Consensus 3-year EPS growth forecast is 9.43% a year. The market is paying a premium multiple for growth just under 10%.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$9.76</td><td>—</td><td>—</td><td>GAAP, up 8.3%. It includes Q2's $167.8M of IEEPA tariff refund income, which is a one-off. The last four quarters: $1.96, $3.04, $1.93 and $2.84.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+2.2%</td><td>—</td><td>—</td><td>TTM. Q2 was +6.7% and full-year guidance is +4.7% to +7.2%, so growth is picking up after three flat-to-down years.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of the goods sold (including shipping and occupancy for this retailer), as a percentage of revenue.">Gross Margin</span></td><td>45.69%</td><td>—</td><td>—</td><td>TTM, per StockAnalysis. Q2 non-GAAP was 45.5% (−160bps YoY). GAAP was 51.6% because of the tariff refund.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating profit as a percentage of revenue — what the business earns before interest and tax.">Operating Margin</span></td><td>17.85%</td><td>—</td><td>—</td><td>TTM. Q2 non-GAAP 17.3% (−60bps), GAAP 22.9%. Fiscal 2026 non-GAAP guidance is 17.8% to 18.2%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>14.73%</td><td>—</td><td>—</td><td>TTM, flattered by the refund. Fiscal 2025 was 13.94%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.34%</td><td>—</td><td>—</td><td>$3.04 annualised ($0.76 a quarter, declared September 2026) on $227.16. 19 consecutive years of dividend growth, +15.29% YoY, payout ratio 30.12%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>4.69%</td><td>—</td><td>—</td><td>5.45M shares, 5.07 days to cover. Moderate for a large cap.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.71</td><td>—</td><td>—</td><td>$1.53B total debt against $1.03B cash, per StockAnalysis. Most of it is leases: the Q2 balance sheet carries $1.31B of long-term operating lease liabilities.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.45</td><td>—</td><td>—</td><td>Quick ratio 0.62. Most current assets are inventory, as expected for a retailer.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$1.34B</td><td>—</td><td>—</td><td>TTM, a 5.02% FCF yield on the $26.75B market cap. Fiscal 2025 FCF was $1.06B, so the TTM figure includes some of the refund cash ($200.2M collected through August 2).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>54.96%</td><td>—</td><td>—</td><td>High partly because buybacks have kept book equity small ($2.14B). ROIC of 39.97% is the cleaner read on the underlying business.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means historically more volatile than the index.">Beta</span></td><td>1.46</td><td>—</td><td>—</td><td>5-year beta. The stock moves about half again as much as the market, which is typical of a housing-linked discretionary name.</td></tr>
+      <tr><td>52-Week Range</td><td>$165.51 – $254.89</td><td>—</td><td>—</td><td>$227.16 sits 10.9% below the high and 37.2% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">One item matters most: <strong>the IEEPA tariff refund</strong>. In Q2 fiscal 2026 the company recorded <strong>$167.8M of tariff refund income</strong>, plus $6.3M of interest on the refunds. It also recorded $47.5M of refund-related vendor concessions and $10.0M of 401(k) employee recognition tied to the refunds. It had collected $200.2M of refunds and interest through August 2, 2026, with $3.2M still receivable, and deferred <strong>$29.3M</strong> of refund income into inventory that will reach the income statement as that stock sells. Net effect: <strong>GAAP EPS of $2.84 (+42.0%) against non-GAAP EPS of $2.10 (+5.0%)</strong>. The +5% is the real growth rate. The trailing P/E is on GAAP earnings, so it looks cheaper than the business actually is. Management's guidance explicitly excludes any further refund benefit. Separately, share repurchases of $287.8M and dividends of $175.4M in the first half keep per-share figures growing faster than net income.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">23 analysts polled by S&amp;P Global via StockAnalysis (forecast page updated September 15, 2026).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$247.85</div><div class="card-note"><span style="color:var(--green);">+9.1% upside</span> from $227.16. The median is higher at $257 (+13.1%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$151 – $280</div><div class="card-note">−33.5% to +23.3%. The low target is far below the rest of the range. At least one analyst sees this as a cyclical retailer due for a reset.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">11 / 11 / 1</div><div class="card-note">September 2026: 9 Strong Buy + 2 Buy, 11 Hold, 1 Sell, 0 Strong Sell. Half the analysts rate it Hold. Most of them doubt the valuation more than the business.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:47.8;background:#22c55e;"></div>
+    <div style="flex:47.8;background:#f59e0b;"></div>
+    <div style="flex:4.4;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 11 (47.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 11 (47.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (4.3%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Goldman Sachs — Kate McShane</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$279</span> (maintained, Sep 15, 2026). The most recent call and close to the top of the range, which implies about 23% upside.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Jefferies — Jonathan Matuszewski</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260 → $275</span> (Aug 27, 2026, the day after Q2). <strong>Telsey Advisory — Cristina Fernandez</strong> kept Outperform at <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260</span> after raising from $255. <strong>Argus — Chris Graja</strong> raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$230 → $250</span> (Sep 2, 2026), Buy.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">J.P. Morgan — Christopher Horvers</strong> · Neutral/Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$200 → $255</span> after Q2, maintained Sep 2, 2026. A 27.5% raise while staying at Hold means the analyst accepts the results but not the valuation.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">UBS — Michael Lasser</strong> · Neutral · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$190 → $247</span> after Q2. Also after Q2: <strong>Morgan Stanley</strong> $210 → $240 (Equal Weight), <strong>Evercore ISI</strong> $240 → $245 (In Line) and <strong>Citi</strong> $248 → $252 (Neutral). The Holds raised their targets by more than the Buys did.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 16, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date — $0.76 quarterly</div>
+        <div class="tl-desc">The first payment at the new $3.04 annual rate, up 15.29% year over year. Nineteen consecutive years of dividend growth.</div>
+        <div class="tl-impact neutral">Scheduled</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 fiscal 2026 earnings</div>
+        <div class="tl-desc">Date not announced in the sources fetched, so the month is an estimate. The number to watch is <strong>non-GAAP gross margin</strong>: Q2's 45.5% was down 160bps, and Q3 will still include the $29.3M of refund income deferred into inventory. Comparable brand revenue needs to stay inside the raised +4.0% to +6.5% full-year range going into the holiday quarter.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Tariff policy</div>
+        <div class="tl-desc">Guidance assumes "all tariffs currently in place will remain for fiscal 2026," including Section 232 and Section 301 tariffs (with new Section 301 tariffs announced July 23), elevated oil prices, and no benefit from tariff refunds. Any change to tariff rates on imported furniture and housewares moves the gross margin directly. That can go either way.</div>
+        <div class="tl-impact neutral">Two-sided</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 fiscal 2026 results — reaction already happened</div>
+        <div class="tl-desc">Revenue $1,959.8M (+6.7%), comparable brand revenue +6.2%, non-GAAP EPS $2.10 (+5.0%), GAAP EPS $2.84 including the tariff refund, full-year outlook raised. The stock traded between $221.34 and $241.86 that day and closed at $237.43 (+1.15%). At least eight brokers raised targets.</div>
+        <div class="tl-impact up">Reaction already happened: +1.2% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mar 24, 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Joined the S&amp;P 500</div>
+        <div class="tl-desc">Effective March 24, 2025. Laura Alber: "Being included in the S&amp;P 500 is a significant milestone that acknowledges the power of our brand portfolio and growth strategies." Index-fund buying was a one-off. March 2025 still closed down 18.7%.</div>
+        <div class="tl-impact down">Reaction already happened: March 2025 −18.7%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">WSM — Monthly Closes, Sep 2021 → Sep 21, 2026 (split-adjusted)</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · closes before July 2024 halved for the 2-for-1 split (Jul 9, 2024) · not dividend-adjusted · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#D9774A;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$88.67</strong> (split-adjusted) to the September 21, 2026 settled close of <strong>$227.16</strong>, WSM gained <strong>156.2% on price alone</strong>, before dividends. Williams-Sonoma split its shares 2-for-1 on July 9, 2024, so every close before July 2024 is shown at half its traded price to keep the line continuous. Without that adjustment the chart would show a false 50% drop in July 2024. The five years fall into three parts. First, a 2022 slump to <strong>$55.48 in June 2022</strong> as the pandemic furniture boom ended. Then a sideways 2023. Then the re-rating: from late 2023 to January 2025 the stock rose 2.7x, from $77.70 to $211.37, while revenue was falling. That was the market paying for margins rather than growth.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI is <strong>68.6</strong>, just below overbought, after peaking at 74.4 at the June 2026 high. The most extreme readings in the series were <strong>14.9 at the June 2022 low</strong> and <strong>92.1 in March 2024</strong>, when the stock rose 34.8% in one month. The 10-month moving average, about <strong>$207</strong>, is well below the current price and still rising. The long-term trend is up. Momentum has flattened since June: three small declines in a row: −1.9% in July, −0.2% in August and −0.5% so far in September.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2021</div><div class="tl-content"><div class="tl-title">Boom-era high — $97.42 (split-adjusted)</div><div class="tl-desc">Fiscal 2021 revenue grew 21.56% as pandemic spending went into the home. Sales would peak the following year at $8.67B.</div><div class="tl-impact up">Peak of the boom</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">Five-year low — $55.48, RSI 14.9</div><div class="tl-desc">A 43% fall from November 2021 as investors priced in the end of the furniture boom. July 2022 then rose 30.2%, which shows how far the selling had overshot.</div><div class="tl-impact down">−43% from Nov 2021</div></div></div>
+    <div class="tl-item"><div class="tl-date">Fiscal 2023</div><div class="tl-content"><div class="tl-title">Revenue falls 10.65% — margins hold</div><div class="tl-desc">Revenue dropped from $8.67B to $7.75B in the year ended January 28, 2024, yet over calendar 2023 the stock rose from $57.46 to $100.89. Gross margin went from 42.40% to 42.62%, then to 46.45% the following year.</div><div class="tl-impact up">Profit mattered more than sales</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">+34.8% in a month — $158.77</div><div class="tl-desc">The biggest monthly gain in the window, pushing RSI to 92.1. The 2-for-1 split followed on July 9, 2024.</div><div class="tl-impact up">+34.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2025</div><div class="tl-content"><div class="tl-title">$211.37 — then a reset</div><div class="tl-desc">The stock closed January 2025 at $211.37 and then fell for three months to $154.47 in April 2025, including −18.7% in March, the month it joined the S&amp;P 500.</div><div class="tl-impact down">−27% Jan → Apr 2025</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Five-year high — $233.10</div><div class="tl-desc">Up 14.5% in the month, the second straight double-digit month after May's 12.3%. The 52-week intraday high of $254.89 came in August 2026 (Aug 11 high).</div><div class="tl-impact up">Highest month-end close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $227.16</div><div class="tl-desc">2.5% below the June month-end high and up 27.2% year-to-date from the December 2025 close of $178.59 (my calculation from the monthly series).</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> (this report's benchmark) and the NASDAQ-100 were not obtained from the sources fetched, so no numeric comparison is given. From sourced data: WSM is <strong>up 156.2% on price over five years</strong> (split-adjusted), <strong>up 14.58% over the trailing 52 weeks</strong> per StockAnalysis, and up about 27% year-to-date. Against listed home-furnishings peers the market caps show where investors have put their money: Williams-Sonoma at <strong>$26.75B</strong> against Wayfair at $14.37B, RH at $2.41B (−44.0% over the year) and Arhaus at $1.24B (−21.7%). WSM is worth more than all three combined while having lower trailing revenue than Wayfair ($8.01B against $12.90B).</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Williams-Sonoma has already proved it can hold margins through a bad housing market. It kept operating margins in the 16–19% range through a 10.65% revenue decline and has now turned growth back on: Q2 comparable brand revenue +6.2%, every brand positive, guidance raised to +4.7% to +7.2% revenue growth. It converts earnings to cash (TTM FCF $1.34B), retires about 3.5% of its shares a year and has raised its dividend 19 years in a row. If housing turnover ever returns, Pottery Barn and West Elm, both still below their fiscal 2022 revenue, have a lot of catch-up room, and the income statement would benefit on every line. The average target of $247.85 and median of $257 suggest the Street thinks there is more to come.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The headline numbers flatter the quarter. The +42% GAAP EPS was a tariff refund, and underlying EPS grew 5.0% while non-GAAP gross margin fell 160bps. On earnings without the refund the stock is at roughly 25x for high-single-digit growth, with a PEG of 1.80 and half the analysts at Hold. Tariffs are an ongoing cost the refund does not fix, and guidance assumes they stay. Five-year revenue is flat: $8.25B in fiscal 2021 and $8.01B TTM. The whole re-rating has come from margins and buybacks. If margins merely stop improving, a 23x multiple is hard to defend for a furniture retailer with a 1.46 beta, and the $151 low target shows how far the downside could go.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Tariff-driven gross-margin erosion.</strong> Non-GAAP gross margin fell 160bps to 45.5% in Q2 on a sales gain. The refund was one-off; the tariffs are not. Guidance assumes current tariffs stay in place, so any escalation is not in the numbers.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">A premium multiple on a cyclical category.</strong> 23.3x trailing and 22.9x forward for a business whose five-year revenue is flat. The stock fell 27% from January to April 2025 without any collapse in results, and it could do so again.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Housing stays frozen.</strong> About 65% of Q2 revenue comes from Pottery Barn and West Elm, whose big-ticket furniture sells when people move. If turnover stays low, growth depends entirely on taking share from weaker competitors, which gets harder the more share you already have.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Tariffs and the imported-furniture cost base</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Home furnishings are mostly made overseas, so tariffs go straight into cost of goods. Williams-Sonoma's Q2 fiscal 2026 release shows both sides. The company recorded <strong>$167.8M of IEEPA tariff refund income</strong> and collected $200.2M of refunds plus interest through August 2, 2026: money paid under tariffs that were later refunded. Yet its underlying gross margin still fell <strong>160bps</strong>, and its outlook assumes "all tariffs currently in place will remain for fiscal 2026." The refund was a windfall for past payments. It does not lower the tariffs being paid now. Passing the ongoing cost to customers without discounting is the test of the full-price model.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">A housing market that isn't moving</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Furniture demand follows home sales: people furnish a house when they move into it. Housing-turnover data was not sourced this session, but the company's own numbers show the effect. Pottery Barn's annual revenue is still about $500M below fiscal 2022 and West Elm's about $360M below. Listed peers are doing worse: RH's market value fell 44.0% over the past year and Arhaus's 21.7%. In a shrinking or flat category the strongest brand can still grow by taking share, and Alber says the company "gained market share" in Q2. That only works for a while, and it gets harder as share grows.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The full-price model — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">STRUCTURAL ADVANTAGE</span></div>
+    <p class="biz-desc">Williams-Sonoma's gross margin moved from 42.40% (fiscal 2022) to about 46% and has stayed there through a down cycle, with inventory up only 1.0% against 6.7% sales growth in the latest quarter. <strong>The bull framing:</strong> this is structural. Proprietary design, a large direct customer base and disciplined inventory have turned a cyclical category into a compounder with ~40% ROIC, and a housing recovery would be extra upside the market is not paying for. <strong>The bear framing:</strong> the margin gain happened in a period of falling freight costs and pent-up pricing power. Tariffs now push the other way, and a 23x multiple assumes the gain is permanent. The Q3 and Q4 non-GAAP gross margins will show which view is right, and both will be reported within six months.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/wsm/history/</strong>, the September 21, 2026 settled close of $227.16 (open 226.10, high 228.89, low 222.77, Adj. Close present, +1.32% on the prior close of $224.20). Corroborated by stockanalysis.com/stocks/wsm/ ("At close: Sep 21, 2026, 4:00 PM EDT"). The after-hours quote is shown in the header for reference only and is not used anywhere in the analysis.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual and quarterly financials incl. brand revenue, forecast and analyst actions, peer quote pages for Wayfair, RH, Arhaus and Target) for price, valuation, margins, returns, balance sheet, dividends, short interest, split history, consensus, executives and sector/industry labels; Williams-Sonoma's Q2 fiscal 2026 earnings release (SEC 8-K Exhibit 99.1, August 26, 2026) for comparable brand revenue, GAAP and non-GAAP margins and EPS, tariff-refund items, inventory, stores, capital returns, guidance and the CEO quote; Williams-Sonoma investor relations (March 24, 2025 release) for the S&amp;P 500 inclusion date and quote; Wikipedia for founding year, IPO, brand history and CEO tenure; digrin.com/stocks/detail/WSM/price (unadjusted "Real Price" column) for month-end closes; TheFly headlines on stockanalysis.com for the UBS, Morgan Stanley, Evercore ISI, Citi and Telsey target changes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. 60 real month-end closes from September 2021 through August 2026 are taken from digrin.com's unadjusted "Real Price" column. <strong>Closes from September 2021 through June 2024 are divided by 2 for the 2-for-1 forward split effective July 9, 2024</strong> (split date and ratio per StockAnalysis), which makes the series split-consistent. The prices are not adjusted for dividends. The final point is the September 21, 2026 settled close. July and August 2026 month-ends ($228.66, $228.25) were cross-checked against StockAnalysis daily rows and match. No interior months were reconstructed or estimated. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Market shares, TAM, global/US market-cap ranks, the largest institutional holders, the next earnings date and five-year index returns were not sourced and are marked as such. Competitor figures are market capitalisations from StockAnalysis, not revenues or shares. The ex-refund EPS (~$9.02) and P/E (~25.2x) remove only the Q2 difference between GAAP and non-GAAP EPS; any adjustments in the other three trailing quarters were not checked.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and non-GAAP figures exclude items management considers non-recurring. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price"; closes before Jul 2024 divided by 2 for the 2-for-1 split effective Jul 9, 2024; not dividend-adjusted) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [88.67,92.87,97.42,84.57,80.27,72.43,72.50,65.24,63.96,55.48,72.21,74.38,58.93,61.92,58.45,57.46,67.47,62.46,60.83,60.52,56.76,62.57,69.32,70.60,77.70,75.12,93.77,100.89,96.70,117.77,158.77,143.39,146.61,141.19,154.68,134.33,154.92,134.13,172.02,185.18,211.37,194.58,158.10,154.47,161.76,163.37,187.05,188.19,195.45,194.34,180.01,178.59,204.65,205.65,182.33,181.21,203.57,233.10,228.66,228.25,227.16];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 2,  label: 'Nov 2021 — boom-era high $97.42 (split-adj.)',            color: '#22c55e' },
+  { idx: 9,  label: 'Jun 2022 — five-year low $55.48, RSI 14.9',                 color: '#ef4444' },
+  { idx: 30, label: 'Mar 2024 — +34.8% month, $158.77 (split-adj.), RSI 92.1',   color: '#22c55e' },
+  { idx: 34, label: 'Jul 2024 — 2-for-1 split effective Jul 9',                  color: '#3b82f6' },
+  { idx: 40, label: 'Jan 2025 — $211.37 before a 27% Jan–Apr reset',            color: '#f59e0b' },
+  { idx: 42, label: 'Mar 2025 — joined S&P 500 (Mar 24); −18.7% month',          color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — five-year high month-end close $233.10',         color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — Q2: comp +6.2%, GAAP EPS lifted by tariff refund', color: '#3b82f6' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $227.16',                      color: '#D9774A' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(217,119,74,0.22)');
+grad.addColorStop(1, 'rgba(217,119,74,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#D9774A', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#D9774A'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
