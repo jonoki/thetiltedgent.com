@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STE — STERIS plc | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">STE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Medical Devices</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $20.18B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #22D3EE44;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER — added December 23, 2019</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">STERIS plc</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$206.97</div>
+      <div class="price-change" style="color:var(--green);">+$1.93 (+0.94%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours: $206.97 (0.00%) per StockAnalysis</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Mentor, Ohio (operational) · registered in Dublin, Ireland</div>
+    <div class="meta-item"><span>Employees:</span> 17,937</div>
+    <div class="meta-item"><span>Founded:</span> 1985 (IPO Jun 1, 1992)</div>
+    <div class="meta-item"><span>Fiscal Year Ends:</span> March 31</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 4, 2026 (Q2 FY2027)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Every surgical instrument that touches a patient has to be clean, and every catheter, implant and syringe that leaves a factory has to be sterile. STERIS sits in the plumbing of both. It sells hospitals the sterilizers, washers, endoscope reprocessing gear, consumables and service contracts that turn a used tray back into a safe one; it runs contract sterilization plants for medical-device makers through its <strong>Applied Sterilization Technologies (AST)</strong> segment; and it supplies pharmaceutical manufacturers with the equipment and chemistry for sterile production. Fiscal 2026 (year ended March 31, 2026) revenue from continuing operations was <strong>$5.94B, up 8.7%</strong>, with GAAP diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$7.93</strong> and adjusted EPS of <strong>$10.17</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The company is a product of deals as much as of engineering. Founded in Ohio in 1985, it bought the UK's Synergy Health in a $1.9B transaction announced in October 2014 — an inversion that moved its legal home to the UK — then re-domiciled to Ireland in November 2018. It acquired Key Surgical (~$850M, November 2020) and Cantel Medical (completed June 2021), which is why fiscal 2022 revenue jumped <strong>35.9%</strong>. In April 2024 it agreed to sell its Dental segment to an affiliate of Peak Rock Capital for $787.5M (the deal's closing was not confirmed in the sources fetched), leaving three segments. The story now is a boring one told well: high-single-digit growth, most of it recurring. The market has nonetheless marked the stock down from an all-time high of <strong>$269.44 on January 16, 2026 to $206.97</strong> — a 23% slide in eight months — while management kept its fiscal 2027 guidance intact. The debate is whether tariffs, a $600M plant build and a higher capex bill are a temporary margin tax or a sign that the premium multiple was the thing that was wrong.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Dan Carestio</div>
+      <div class="card-note">President and CEO, quoted in the Q1 fiscal 2027 release (August 5, 2026): "Our first quarter results reflected stable underlying demand." On the call he said the company "had not seen a slowdown in hospital procedure activity," pointing to ambulatory surgery centres and endoscopy.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Karen Burton</div>
+      <div class="card-note">CFO, named on the Q1 fiscal 2027 earnings call. She owns a fiscal 2027 plan that lifted capex to ~$450M (from $375M) and trimmed free-cash-flow guidance to ~$800M (from $850M) to fund the new North Carolina chemistry site.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">~100% institutional</div>
+      <div class="card-note">StockAnalysis reports institutional ownership of 100.21% (a figure above 100% reflects overlapping filings) and insider ownership of 0.33% across 97.50M shares. Named top holders were not retrieved from the sources fetched.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">STERIS reports three segments — <strong>Healthcare, Applied Sterilization Technologies (AST) and Life Sciences</strong>. The mix below uses <strong>Q1 fiscal 2027 (quarter ended June 30, 2026) segment revenue</strong>, the most recent reported quarter. Full-year fiscal 2026 segment totals were not retrieved from the sources fetched. The three segments sum to $1,494.3M, which ties to the ~$1.5B total reported.</p>
+  <div class="seg-bar">
+    <div style="flex:70.3;background:#22D3EE;">HEALTHCARE 70.3%</div>
+    <div style="flex:19.9;background:#f59e0b;">AST 19.9%</div>
+    <div style="flex:9.8;background:#a78bfa;">LS 9.8%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Healthcare — $1,050.0M (Q1 FY27), +8% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Applied Sterilization Technologies — $297.6M, +6% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Life Sciences — $146.7M, +9% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Revenue is Healthcare-heavy, but profit is not proportionate: AST earned a 48.0% segment operating margin and Life Sciences 42.1% in the quarter, against 24.8% in Healthcare. The two smaller segments together were 30% of revenue and about 44% of segment operating income ($204.7M of $464.9M).</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Healthcare</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,050.0M</div><div class="biz-stat-label">Q1 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+8%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.8%</div><div class="biz-stat-label">Seg. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">70.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Equipment, consumables and service for hospital sterile-processing departments, operating rooms and endoscopy suites. The engine is the installed base: once a hospital has STERIS washers and sterilizers, it buys the chemistry and the service contract for years. In Q1 fiscal 2027 service revenue rose <strong>10%</strong>, consumables <strong>9%</strong> and capital equipment just <strong>1%</strong>; constant-currency organic growth was 6%. Capital orders grew 4% and backlog stood at <strong>$444M</strong>. Management said roughly one-third of the franchise is tied to endoscopy activity. Segment operating income was $260.2M versus $235.5M a year earlier. This is also where the tariff bill landed: about $16M of pre-tax tariff cost in Q3 fiscal 2026 fell primarily on Healthcare.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> sterilization equipment market estimated at USD 19.39B in 2026, projected USD 27.60B by 2031 (7.3% growth) — MarketsandMarkets estimate; covers equipment across segments, not Healthcare alone.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Getinge AB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Fortive</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Solventum</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Applied Sterilization Technologies (AST)</div>
+        <span class="biz-badge growth">HIGHEST MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$297.6M</div><div class="biz-stat-label">Q1 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">48.0%</div><div class="biz-stat-label">Seg. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">19.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Contract sterilization for medical-device and pharmaceutical manufacturers: they ship boxed product in, STERIS sterilizes it and ships it out. Service revenue grew 6% in Q1 fiscal 2027 while AST's capital equipment revenue fell 13%; organic constant-currency growth was 5%, against full-year guidance of 7–8% for the segment. Segment operating income rose to $142.9M from $136.7M, with the release crediting price and citing higher depreciation and labour as offsets; margin slipped 60 <span class="tip" title="Basis points — one basis point is 0.01 percentage points.">bps</span> to 48%. This is the business with the best economics and the ugliest tail risk: ethylene oxide, one of its sterilization methods, is the subject of personal-injury litigation across the industry.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> outsourced-sterilization market size not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Sotera Health</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Life Sciences</div>
+        <span class="biz-badge emerging">SMALLEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$146.7M</div><div class="biz-stat-label">Q1 FY27 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+9%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.1%</div><div class="biz-stat-label">Seg. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Equipment, consumables and service for pharmaceutical and biotech manufacturers running sterile production. Q1 fiscal 2027 revenue grew 9% reported (8% organic), led by capital equipment up <strong>17%</strong>, consumables up 8% and service up 2%. Backlog was roughly $110M, flat. Operating income rose to $61.8M from $58.7M, though margin fell 140bps to 42.1%. Capital-equipment timing makes this segment the lumpiest of the three; the consumables stream is what gives it a floor.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Getinge AB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that actually matter</h3>
+  <p class="prose">For a razor-and-blade business, watch the blades (consumables and service) and the thing that could make them more expensive to produce (tariffs).</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Healthcare Backlog</div>
+      <div class="card-value">$444M</div>
+      <div class="card-note">At the end of Q1 fiscal 2027, with Healthcare capital orders <span style="color:var(--green);">+4%</span>. Capital revenue grew only 1%, so orders are running ahead of shipments.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Recurring Growth (Healthcare)</div>
+      <div class="card-value" style="color:var(--green);">+10% / +9%</div>
+      <div class="card-note">Service and consumables growth in Q1 fiscal 2027. These lines ride procedure volumes, which management said have not slowed.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q1 FY27 Tariff Cost</div>
+      <div class="card-value" style="color:var(--amber);">$14M gross</div>
+      <div class="card-note">Versus $12M a year earlier, offset by $4M of tariff refunds received — a net $2M year-over-year benefit per the call. Fiscal 2026's tariff hit was guided at ~$55M pre-tax, up from ~$45M.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q1 FY27 Free Cash Flow</div>
+      <div class="card-value" style="color:var(--amber);">$279.6M</div>
+      <div class="card-note">Down from $326.5M a year earlier; operating cash flow fell to $367.1M from $420.0M. Full-year FCF guidance was cut to ~$800M as capex rose to ~$450M.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Installed base → consumables &amp; service</span>
+    <span class="moat-pill">Regulated, validated processes</span>
+    <span class="moat-pill">Contract sterilization network (AST)</span>
+    <span class="moat-pill">Procedure-volume exposure, not elective capex</span>
+    <span class="moat-pill">15 years of dividend growth</span>
+    <span class="moat-pill">Modest leverage (D/E 0.28)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>validation</strong>. A device maker's sterilization process is written into its regulatory filings; switching sterilizer or sterilization method means re-validating, which costs time and carries risk nobody in a quality department wants to own. A hospital that standardises on one vendor's washers, sterilizers and chemistry has the same inertia on a smaller scale. That shows in the numbers: Healthcare service and consumables grew 10% and 9% in the latest quarter while capital equipment grew 1%, and AST earns a 48% segment margin. The vulnerability is that the moat protects volume, not input costs — tariffs, labour and depreciation all ran through the margin line over the past year.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Tariffs sit on the cost line.</strong> Q3 fiscal 2026 gross margin fell 70bps to 43.9% as "increased tariffs and inflation" outran price and productivity, and the fiscal 2026 tariff estimate rose to ~$55M pre-tax from ~$45M. Refunds helped in Q1 fiscal 2027, but a policy-driven cost can come back as quickly as it left.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Ethylene oxide litigation.</strong> STERIS's Isomedix subsidiary agreed in March 2025 to pay up to $48.15M to resolve substantially all pending personal-injury claims in Cook County, Illinois, tied to a Waukegan plant it operated from 2005 to 2008 — without admitting liability. The industry-wide litigation continues; new venues or new plants are an open-ended tail.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capex step-up.</strong> The $600M North Carolina Formulated Chemistry Center of Excellence is the company's largest single-site investment, with operations 2–3 years out and a target of ROIC above 10% within 3–5 years. Until then it lifts capex, adds $55–70M of restructuring charges and lowers free cash flow.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Endoscopy concentration.</strong> About a third of Healthcare is linked to endoscopy activity, and the CEO acknowledged elevated volumes partly reflect a push toward earlier colon-cancer screening, saying sustainability remained uncertain.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which STE is a constituent (added December 23, 2019). STE is NYSE-listed and so is not eligible for the NASDAQ-100. S&amp;P 500 comparison values were not obtained and are shown as "—". The one industry figure shown is a May 2026 US Medical Equipment industry P/E quoted in a Yahoo Finance article when the stock was at $207.22.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>STE</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>25.3</td><td>24.8 (May '26)</td><td>—</td><td>$206.97 ÷ $8.18 TTM GAAP EPS = 25.30. On fiscal 2026 adjusted EPS of $10.17 the multiple is 20.4.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by expected next-year earnings per share.">Forward P/E</span></td><td>18.1</td><td>—</td><td>—</td><td>StockAnalysis figure. On the midpoint of management's fiscal 2027 adjusted EPS guide ($11.10–$11.30, midpoint $11.20): $206.97 ÷ $11.20 = 18.5.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth ratio.">PEG Ratio</span></td><td>n/a</td><td>—</td><td>—</td><td>Not reported by the source.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters.">EPS (TTM)</span></td><td>$8.18</td><td>—</td><td>—</td><td>GAAP diluted, TTM to June 2026, +25.3% YoY. Adjusted EPS runs well above GAAP ($10.17 vs $7.93 for fiscal 2026); the reconciling items were not itemised in the sources fetched.</td></tr>
+      <tr><td><span class="tip" title="Revenue growth versus the prior-year period.">Revenue Growth (YoY)</span></td><td>+8.4%</td><td>—</td><td>—</td><td>TTM revenue $6.04B. Q1 fiscal 2027 +7% reported, 6% constant-currency organic; fiscal 2027 guidance 7–8% reported.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus cost of goods and services, as a percentage of revenue.">Gross Margin</span></td><td>44.4%</td><td>—</td><td>—</td><td>TTM. Remarkably stable: between 43.5% and 44.6% in every fiscal year from 2022 to 2026. Q1 fiscal 2027 was ~46% per the call, up 70bps.</td></tr>
+      <tr><td><span class="tip" title="Operating income as a percentage of revenue.">Operating Margin</span></td><td>19.0%</td><td>—</td><td>—</td><td>TTM, up from 16.1% in fiscal 2022 — five years of steady expansion.</td></tr>
+      <tr><td><span class="tip" title="Net income as a percentage of revenue.">Net Profit Margin</span></td><td>13.3%</td><td>—</td><td>—</td><td>TTM. Fiscal 2023 was 2.4% on GAAP net income of $107M; the drivers of that year's low were not itemised in the sources fetched.</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by share price.">Dividend Yield</span></td><td>1.33%</td><td>—</td><td>—</td><td>$0.69 quarterly ($2.76 annualised) after a $0.06 increase; payout ratio 33.7%. StockAnalysis counts 15 years of dividend growth.</td></tr>
+      <tr><td><span class="tip" title="Shares sold short as a percentage of the tradable float.">Short Interest (% float)</span></td><td>2.52%</td><td>—</td><td>—</td><td>2.44M shares. Low — the sell-off has not been driven by a crowded short.</td></tr>
+      <tr><td><span class="tip" title="Total debt divided by shareholders' equity.">Debt-to-Equity</span></td><td>0.28</td><td>—</td><td>—</td><td>$2.04B total debt, $482M cash, net debt $1.56B; debt/EBITDA 1.19, interest coverage 18.97x.</td></tr>
+      <tr><td><span class="tip" title="Current assets divided by current liabilities.">Current Ratio</span></td><td>1.91</td><td>—</td><td>—</td><td>Quick ratio 1.17.</td></tr>
+      <tr><td><span class="tip" title="Operating cash flow minus capital expenditure.">Free Cash Flow</span></td><td>$925.6M</td><td>—</td><td>—</td><td>TTM, a 4.6% FCF yield on the $20.18B market cap (recomputed at $206.97). Guided to ~$800M for fiscal 2027 as capex rises to ~$450M.</td></tr>
+      <tr><td><span class="tip" title="Net income divided by shareholders' equity.">ROE</span></td><td>11.4%</td><td>—</td><td>—</td><td>Held down by acquired goodwill and intangibles on the balance sheet (price-to-book 2.77).</td></tr>
+      <tr><td><span class="tip" title="After-tax operating profit divided by invested capital.">ROIC</span></td><td>9.7%</td><td>—</td><td>—</td><td>Just under the ">10% within 3–5 years" hurdle management set for the North Carolina plant.</td></tr>
+      <tr><td><span class="tip" title="Enterprise value divided by EBITDA.">EV/EBITDA</span></td><td>13.2</td><td>—</td><td>—</td><td>EV $21.74B on TTM EBITDA of $1.64B (27.2% margin).</td></tr>
+      <tr><td><span class="tip" title="Sensitivity of the stock to market moves, five-year basis.">Beta</span></td><td>0.91</td><td>—</td><td>—</td><td>Five-year beta. The stock fell 16.8% over the past 52 weeks.</td></tr>
+      <tr><td>52-Week Range</td><td>$195.14 – $269.44</td><td>—</td><td>—</td><td>High on Jan 16, 2026; low is an intraday print on May 7, 2026. $206.97 sits 23.2% below the high and 6.1% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the reported figures. First, the <strong>GAAP-to-adjusted gap</strong> is wide: fiscal 2026 GAAP EPS of $7.93 against adjusted $10.17, and Q1 fiscal 2027 $2.04 against $2.59. Valuation looks very different depending on which line you use (25.3x GAAP TTM, 18.5x on the adjusted guide). Second, <strong>portfolio changes</strong>: the Cantel acquisition (completed June 2021) drove the 35.9% revenue jump in fiscal 2022, and the Dental segment, agreed for sale in April 2024, is reported as discontinued operations, so current figures are "continuing operations". Third, <strong>restructuring</strong>: $55–70M of pre-tax charges (~$40–50M cash) for consolidating chemistry manufacturing into North Carolina and closing facilities in St. Louis, Missouri and Plymouth, Minnesota. Free cash flow for fiscal 2026 is $972.4M on StockAnalysis and $982.9M in the company's release; the difference was not reconciled.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">9 analysts polled by S&amp;P Global via StockAnalysis.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$263.13</div><div class="card-note"><span style="color:var(--green);">+27.1% upside</span> from $206.97. Median $269.50 (+30.2%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$232 – $280</div><div class="card-note">+12.1% to +35.3%. Even the lowest target sits above the current price — the Street has not followed the stock down.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">7 / 2 / 0</div><div class="card-note">4 Strong Buy + 3 Buy, 2 Hold, 0 Sell (September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:77.8;background:#22c55e;"></div>
+    <div style="flex:22.2;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 7 (77.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 2 (22.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">KeyBanc — Brett Fishbin</strong> · Buy · maintains PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$269</span> (Aug 17, 2026). +30.0% from $206.97.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS — Patrick Wood</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$275 → $270</span> (Aug 7, 2026). A small trim after the Q1 print, rating kept.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Piper Sandler — Jason Bednar</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$270 → $275</span> (Aug 6, 2026). Raised the day of the post-earnings session.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Needham — Michael Matson</strong> · Hold · no price target (Aug 6, 2026).</div></div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">All four calls came in August, when the stock was around $230–$238. It has since fallen to $206.97 with no new rating change shown on the source page — the targets have not been tested against the September decline.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 Fiscal 2027 Earnings</div>
+        <div class="tl-desc">The first read after the September slide. Watch whether the $11.10–$11.30 adjusted EPS guide holds, the direction of gross margin after tariff refunds, Healthcare backlog versus $444M, and whether AST organic growth closes the gap to its 7–8% full-year guide from Q1's 5%.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027–FY2029</div>
+      <div class="tl-content">
+        <div class="tl-title">North Carolina chemistry consolidation</div>
+        <div class="tl-desc">A $600M, 600,000 sq ft manufacturing, R&amp;D and distribution site for formulated chemistries — a revenue base of $700M+ — with operations in 2–3 years and $55–70M of restructuring charges. It is a margin project with a long fuse: cost now, payback later.</div>
+        <div class="tl-impact neutral">Multi-year execution</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — $900M remaining</div>
+        <div class="tl-desc">The board approved a new $1B repurchase programme in May 2026; $100M was used in Q1 fiscal 2027. The remaining $900M is about 4.5% of the current market cap.</div>
+        <div class="tl-impact up">Potential support</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 5, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 fiscal 2027 — beat on EPS, guidance held</div>
+        <div class="tl-desc">Revenue ~$1.5B (+7%), adjusted EPS $2.59 vs $2.34, guidance reiterated, capex raised to ~$450M and FCF guide cut to ~$800M. On August 6 the stock opened at $214.54, 7.8% below the prior close, then recovered to close at $231.78 (−0.40%).</div>
+        <div class="tl-impact neutral">Reaction already happened: −0.4% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal 2026 results and fiscal 2027 guide</div>
+        <div class="tl-desc">Fiscal 2026 revenue +9% to $5.9B, adjusted EPS $10.17; Q4 adjusted EPS of $2.83 missed consensus by 0.9% per a Yahoo Finance summary. Fiscal 2027 guidance: 6–7% organic growth, adjusted EPS $11.10–$11.30 (+9–11%).</div>
+        <div class="tl-impact down">Reaction already happened: shares lower after the print</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 fiscal 2026 — revenue +9%, gross margin −70bps</div>
+        <div class="tl-desc">Revenue beat and adjusted EPS of $2.53 matched forecasts, but gross margin fell to 43.9% on tariffs and inflation and the tariff estimate rose to ~$55M. By March 16 the stock was 20.4% below its January 16 high, per Barchart.</div>
+        <div class="tl-impact down">Start of the 2026 de-rating</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">STE — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$204.28</strong> to the September 21, 2026 settled close of <strong>$206.97</strong>, STE is up <strong>1.3% on price</strong> — five years of earnings growth, and the share price is where it started. Dividends per share over fiscal 2022–2026 summed to $10.25, so a holder's total return is roughly <strong>+6%</strong> (estimate; dividends not reinvested, fiscal and calendar windows do not line up exactly). The multiple did the work in reverse: GAAP EPS went from $2.48 in fiscal 2022 to $8.18 TTM while the price went nowhere.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>35.1</strong> — weak, but not at the <strong>31.3</strong> of September 2022, the lowest reading in the series. The 10-month moving average sits near <strong>$229.78</strong>, about 11% above the price, and September alone is down 11.0% from the August close of $232.64. The July–August bounce took the stock back to the underside of its long-term trend; September gave it all back.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Early high — $243.41 month-end close</div><div class="tl-desc">Six months after closing the Cantel deal, in a fiscal year when revenue grew 35.9%.</div><div class="tl-impact up">High of the first two years</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Five-year low — $166.28 (−17.4% in a month)</div><div class="tl-desc">The worst month in the series and the lowest RSI (31.3). Fiscal 2023 went on to show GAAP net income of just $107M. The specific trigger for the September move was not identified in the sources fetched.</div><div class="tl-impact down">−31.7% from Dec 2021</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2023</div><div class="tl-content"><div class="tl-title">Recovery — $224.98 (+12.5% in a month)</div><div class="tl-desc">Back above $220, where the stock would range for most of the next two years.</div><div class="tl-impact up">+12.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025</div><div class="tl-content"><div class="tl-title">Month-end high — $266.28 (+13.0%)</div><div class="tl-desc">The best month-end in the window; the intraday all-time high of $269.44 followed on January 16, 2026.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">De-rating — $221.13 (−12.4% in a month)</div><div class="tl-desc">After the February 4 print showed gross margin down 70bps on tariffs and inflation. The stock was trading below its 200-day moving average from early March.</div><div class="tl-impact down">−12.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Four-month grind — $210.57</div><div class="tl-desc">Four consecutive down months (March to June). The May fiscal 2027 guide of 9–11% adjusted EPS growth did not stop it.</div><div class="tl-impact down">Fourth straight down month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">Bounce — $228.40, then $232.64</div><div class="tl-desc">+8.5% in July and +1.9% in August, through a Q1 print that beat on adjusted EPS and held guidance.</div><div class="tl-impact up">+10.5% over two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $206.97</div><div class="tl-desc">Down 11.0% month-to-date, including a 2.74% drop on September 8. The stock went ex-dividend on September 4. No company-specific news explaining the September decline was found in the sources fetched.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> were not obtained, so no numeric comparison is given. What was sourced: STE is up 1.3% on price over five years and down 16.8% over the past 52 weeks. As of March 16, 2026, Barchart put STE's 52-week performance at −3.5% against a +27.8% Nasdaq Composite, with Stryker — which Barchart used as a comparison — down 7.4% over the same period. A Yahoo Finance article at the May results cited STE on 25.9x earnings against a peer average of 21.8x and a US Medical Equipment industry average of 24.8x. At the time of that article the stock was still the more expensive name; since then its price has fallen further.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A business with high-single-digit growth, 44% gross margins that have not moved more than a point in five years, 48% margins in contract sterilization and a customer base that has to keep buying consumables and service is trading at 18.5x the midpoint of its own fiscal 2027 guide. Every analyst price target, including the lowest at $232, is above the current price. Leverage is modest (debt/EBITDA 1.19), dividends have grown for 15 straight years, $900M of buyback authorisation remains, and procedure volumes have not slowed. If tariffs stay a manageable cost and the North Carolina plant delivers its targeted return, today's price looks like the market overreacting to a noisy year.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>On GAAP numbers this is still a 25.3x P/E for a company growing revenue 7–8%, with a 4.6% free-cash-flow yield that is about to shrink: fiscal 2027 FCF is guided to ~$800M against $925.6M TTM as capex jumps to ~$450M. Tariffs are a policy variable outside management's control, AST organic growth of 5% is running below its 7–8% guide, and segment margins fell in both AST and Life Sciences last quarter. Ethylene oxide litigation is a tail that has already cost up to $48.15M in one county. Five years of flat share price suggest the market was paying for growth in 2021 that it no longer believes is worth a premium.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Tariff and input-cost pressure on Healthcare margins.</strong> The fiscal 2026 tariff estimate rose to ~$55M pre-tax and cost 70bps of gross margin in Q3. Q1 fiscal 2027 benefited from $4M of refunds; that is not a recurring line.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Ethylene oxide liability.</strong> AST's most profitable franchise uses a sterilant under industry-wide litigation. STERIS settled its Illinois cases for up to $48.15M without admitting liability; any new wave of claims would hit the segment that carries the group's margins.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capex and execution on the North Carolina build.</strong> $600M, 2–3 years to operation, restructuring charges of $55–70M and plant closures in two states. Delays or overruns would extend the period of depressed free cash flow.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Tariffs as a margin tax on medical equipment</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">STERIS's 2026 is a clean case study in what tariffs do to a company with pricing power but not unlimited pricing power. Revenue kept growing at high single digits; gross margin fell 70bps in Q3 fiscal 2026 as "increased tariffs and inflation" outran price and productivity, and the fiscal 2026 tariff estimate rose from ~$45M to ~$55M. CEO Dan Carestio framed the response as "cost discipline" delivering EPS growth "despite increased tariff headwinds." In Q1 fiscal 2027 gross tariff costs were $14M against $12M a year earlier, with $4M of refunds received. The market has treated this as a structural hit to the multiple rather than a temporary one.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Ethylene oxide: essential and litigated</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">TAIL RISK</span></div>
+    <p class="biz-desc">Ethylene oxide sterilizes roughly 20 billion medical devices a year and accounts for about half of all sterile device sterilization globally, per Medical Design &amp; Outsourcing. It is also the subject of hundreds of personal-injury claims across the industry alleging harm from long-term, low-level emissions. STERIS's exposure so far has centred on a Waukegan, Illinois plant its Isomedix unit ran from 2005 to 2008: after a January 2025 mistrial, it agreed in March 2025 to pay up to $48.15M to resolve substantially all pending Cook County claims, excluded from adjusted earnings. The method is hard to replace for many heat- and radiation-sensitive devices, which is part of AST's moat; the litigation is the price of that moat.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Procedure volumes — the demand side is holding</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">SUPPORTIVE</span></div>
+    <p class="biz-desc">The bull and bear cases agree on demand. Management said on the Q1 fiscal 2027 call that it "had not seen a slowdown in hospital procedure activity," with strong growth in ambulatory surgery centres and endoscopy, and Healthcare service and consumables grew 10% and 9%. <strong>The bull framing:</strong> a company whose demand is steady and whose cost problem is partly policy-driven is being priced as if its growth were in doubt. <strong>The bear framing:</strong> part of the endoscopy strength reflects a screening push the CEO himself called of uncertain sustainability, and a stock that de-rated through a year of steady demand is telling you the multiple, not the demand, was the problem. Gross margin and AST organic growth over the next two quarters are where the two framings get tested.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/ste/history/</strong> — the September 21, 2026 settled close of $206.97 (open 205.36, high 207.46, low 203.32, Adj. Close 206.97, +0.94% on the prior close of $205.04). Confirmed by the quote page at stockanalysis.com/stocks/ste/, which shows "At close: Sep 21, 2026, 4:00 PM EDT" at $206.97.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, annual financials, forecast and analyst actions, company profile) for price, valuation, margins, returns, balance sheet, dividends, consensus and industry label; STERIS's Q1 fiscal 2027 release (GlobeNewswire, August 5, 2026) and stocktitan.net for segment revenue and income, cash flow and guidance; a Yahoo Finance summary of the Q1 fiscal 2027 call for the CFO's name, backlog, tariff, capex, buyback and North Carolina details; STERIS's fiscal 2026 fourth-quarter and third-quarter releases (GlobeNewswire) for full-year results, tariff estimates and quotes; Wikipedia for company history and S&amp;P 500 inclusion date; search-result summaries of the April 2024 Dental sale announcement; Barchart (via FinancialContent, March 16, 2026) and Yahoo Finance for performance context and peer and industry multiples; Medical Design &amp; Outsourcing for the ethylene oxide settlement; MarketsandMarkets for named sterilization-equipment competitors and market-size estimates; digrin.com/stocks/detail/STE/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin.com's unadjusted "Real price" column, plus a final point at the September 21, 2026 settled close of $206.97. The July and August 2026 month-ends ($228.40, $232.64) were cross-checked against StockAnalysis daily rows, and June 2026 ($210.57) against Yahoo Finance daily data. <strong>No interior months were reconstructed or estimated.</strong> The only split in the history (2:1, August 1998) predates the window. Competitor market caps and all market shares are shown as "n/v" (not verified). Market-cap rankings were not sourced. Full-year fiscal 2026 segment revenue was not retrieved, so Section 02 uses Q1 fiscal 2027; the Healthcare figure ($1,050.0M) is as reported in rounded form. The Dental sale's closing date was not confirmed in the sources fetched. Five-year S&amp;P 500 returns were not verified and no numeric comparison is given. The total-return figure in Section 07 is an estimate.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and adjusted figures are company-defined non-GAAP measures. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [204.28,233.74,218.53,243.41,224.40,240.00,241.77,224.05,228.20,206.15,225.65,201.38,166.28,172.58,185.74,184.69,206.51,188.03,191.28,188.55,199.97,224.98,225.55,229.59,219.42,209.98,200.94,219.85,218.95,232.91,224.82,204.56,222.88,219.54,238.76,241.10,242.54,221.85,219.06,205.56,220.65,219.26,226.65,224.74,245.21,240.22,226.49,245.06,247.44,235.70,266.28,253.52,262.60,252.35,221.13,216.88,212.73,210.57,228.40,232.64,206.97];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 3,  label: 'Dec 2021 — early high $243.41 after Cantel deal',        color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — five-year low $166.28, RSI 31.3',             color: '#ef4444' },
+  { idx: 21, label: 'Jun 2023 — recovery $224.98 (+12.5% month)',             color: '#22c55e' },
+  { idx: 50, label: 'Nov 2025 — month-end high $266.28',                      color: '#22c55e' },
+  { idx: 54, label: 'Mar 2026 — tariff/margin de-rating, $221.13 (−12.4%)',   color: '#f59e0b' },
+  { idx: 57, label: 'Jun 2026 — fourth straight down month, $210.57',         color: '#ef4444' },
+  { idx: 59, label: 'Aug 2026 — Q1 FY27 beat, guide held; $232.64',           color: '#3b82f6' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $206.97',                   color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
