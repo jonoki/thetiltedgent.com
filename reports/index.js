@@ -14,7 +14,7 @@
             i:$('.sect',el).textContent.trim(),
             sector:el.closest('.sgroup').getAttribute('data-s'),
             sp:el.getAttribute('data-sp'), ndx:el.hasAttribute('data-ndx'),
-            dow:el.getAttribute('data-dow')};
+            dow:el.getAttribute('data-dow'), gl:el.getAttribute('data-gl')};
   });
   TOTAL=cards.length;
   cards.forEach(function(c){
@@ -58,6 +58,7 @@
     if(st.idx==='sp'  && !c.sp)  return false;
     if(st.idx==='ndx' && !c.ndx) return false;
     if(st.idx==='dow' && !c.dow) return false;
+    if(st.idx==='gl'  && !c.gl)  return false;
     if(st.sector!=='all' && c.sector!==st.sector) return false;
     if(st.q){
       var s=st.q, sc=s.replace(/[^a-z0-9]/g,'');
@@ -72,6 +73,7 @@
     if(st.idx==='sp')  return c.sp ? Date.parse(c.sp) : null;
     if(st.idx==='dow') return c.dow ? Date.parse(c.dow) : null;
     if(st.idx==='ndx') return null;          // no published NDX addition dates
+    if(st.idx==='gl')  return null;          // global names sit in no US index
     return c.ts;
   }
   function sorted(list){
@@ -138,8 +140,8 @@
     }else{
       countEl.innerHTML='<b>'+TOTAL+'</b> reports, grouped by sector';
     }
-    if(n>0 && st.sort!=='az' && st.idx==='ndx'){
-      countEl.innerHTML+=' <span style="opacity:.7">&middot; Nasdaq-100 addition dates aren\'t published, so these are ordered A&ndash;Z</span>';
+    if(n>0 && st.sort!=='az' && (st.idx==='ndx'||st.idx==='gl')){
+      countEl.innerHTML+=' <span style="opacity:.7">&middot; '+(st.idx==='gl'?'Global names sit in no US index, so':'Nasdaq-100 addition dates aren\'t published, so')+' these are ordered A&ndash;Z</span>';
     }
     announce(n===0?'No reports match your filters.':n+' of '+TOTAL+' reports shown.');
 
@@ -203,7 +205,7 @@
   var p=new URLSearchParams(location.search);
   if(p.get('q')){q.value=p.get('q');st.q=q.value.trim().toLowerCase();}
   if(p.get('i')&&[].some.call(fInd.options,function(o){return o.value===p.get('i');})){fInd.value=p.get('i');st.ind=fInd.value;}
-  if(['sp','ndx','dow'].indexOf(p.get('x'))>-1){fIdx.value=p.get('x');st.idx=fIdx.value;}
+  if(['sp','ndx','dow','gl'].indexOf(p.get('x'))>-1){fIdx.value=p.get('x');st.idx=fIdx.value;}
   if(['old','new'].indexOf(p.get('sort'))>-1){fSort.value=p.get('sort');st.sort=fSort.value;}
   var s=p.get('s'); if(s&&$('.chip[data-f="'+s.replace(/[^a-z0-9]/g,'')+'"]')) st.sector=s;
   apply(false);
