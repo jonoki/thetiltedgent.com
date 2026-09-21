@@ -32,9 +32,6 @@ DLTR OMC LUV EXE CMS RL STZ STE CHTR FICO
 ### sess-2026-09-21-i · claimed 2026-09-21 (local Claude Code session)
 JBHT L NRG BG CASY BRO FSLR IFF EIX PKG
 
-### sess-2026-09-21-h · claimed 2026-09-21 (local Claude Code session)
-DRI ULTA SW PPG VLTO CHD GPN TPR VRSK KEY
-
 ### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
 AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
 
@@ -106,6 +103,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-h · done 2026-09-21 (local Claude Code session)
+DRI ULTA SW PPG VLTO CHD GPN TPR VRSK KEY
+- All 10 published, each independently checked (GPN: two unverifiable analyst calls replaced).
 
 ### sess-2026-09-21-e · done 2026-09-21 (local Claude Code session)
 WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
