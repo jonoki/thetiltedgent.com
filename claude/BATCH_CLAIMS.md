@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-g2 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
+NVO RY TD BNS BN ENB CNQ CNI CP
+
 ### sess-2026-09-21-g1 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
 TSM BABA HSBC NVS SAP TM SHEL TTE BHP MUFG
 
