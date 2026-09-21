@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FERG — Ferguson Enterprises Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #E07A2E;
+  --accent-dim: #E07A2E33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 18, 2026 (Friday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">FERG</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Industrial Distribution</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $41.48B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);border:1px solid #22c55e44;padding:3px 10px;border-radius:4px;">S&amp;P 500: ADDED — effective before the open, August 5, 2026 (replaced Electronic Arts)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NASDAQ-100: not a member (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Ferguson Enterprises Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$214.43</div>
+      <div class="price-change" style="color:var(--green);">+$0.17 (+0.08%)</div>
+      <div class="price-date">Close, Friday September 18, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours quote for that session not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 751 Lakefront Commons, Newport News, Virginia</div>
+    <div class="meta-item"><span>Employees:</span> ~35,000 associates, 1,700+ locations</div>
+    <div class="meta-item"><span>Founded:</span> 1887 (NYSE listing 2021; US holdco since Aug 1, 2024)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 9, 2026 (Q3 2026, per StockAnalysis)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Ferguson is the plumber's and the HVAC contractor's warehouse: a distributor of pipe, valves, fittings, water heaters, heating and cooling equipment, waterworks infrastructure and industrial supplies to trade professionals across the United States and Canada. It does not make much of what it sells — it makes the part show up at the job site, on time, in the right quantity, with credit terms attached. Quarter ended June 30, 2026 net sales were <strong>$8.751B, up 4.6%</strong> (3.8% organic, 1.0% from acquisitions), and the United States was <strong>95.3%</strong> of that. Trailing-twelve-month revenue is <strong>$31.45B</strong> with net income of <strong>$1.99B</strong> and diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$10.24</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The story of the last five years is a <strong>change of address</strong>. The group was founded in 1887 and spent most of its listed life in London; over the last five years it has walked west: an additional NYSE listing in 2021, the primary listing moved from London to New York in 2022, a new Delaware holding company — Ferguson Enterprises Inc. — slotted on top on <strong>August 1, 2024</strong> in a one-for-one share exchange, the fiscal year moved from a July to a December year-end (with a five-month transition period ended December 31, 2025), and the London secondary listing cancelled effective <strong>July 20, 2026</strong>. Eleven days later S&amp;P Dow Jones Indices announced that Ferguson would join the <strong>S&amp;P 500 on August 5, 2026</strong>, replacing Electronic Arts. The US index membership was, in effect, the prize at the end of that walk. The stock rose from a $234.33 July close to $250.08 on the next trading day — and then gave all of it back and more: at $214.43 it is <strong>21.1% below its 52-week high of $271.64</strong>. The question for a new index member is whether it bought the stock a buyer, or only a date.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Kevin Murphy</div>
+      <div class="card-note">CEO, quoted in the Q2 2026 release (August 10, 2026): "Our associates continued to execute for our customers, driving market outperformance in the second quarter." Per trade press coverage of the same print: "We delivered another strong quarter of non-residential growth and we returned to growth in residential despite the challenging market backdrop." Listed as Kevin M. Murphy on the StockAnalysis profile.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">William Brundage</div>
+      <div class="card-note">CFO (also Treasurer and a Director per the StockAnalysis profile), named as Chief Financial Officer in the Q2 2026 8-K. He owns the guide: FY2026 adjusted operating margin of 9.5%–9.8%, interest expense of ~$200M, capex of $375–425M and a ~26% effective tax rate.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">~100% institutional</div>
+      <div class="card-note">StockAnalysis reports institutional ownership of 100.75% (figures above 100% are an artefact of overlapping 13F filings and short positions) and insider ownership of 0.15%. Named top holders were <strong>not sourced</strong> this session and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Ferguson reports two segments — <strong>United States</strong> and <strong>Canada</strong> — and manages the US business through customer groups. The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) net sales</strong>: US $8,343M plus Canada $408M ties to reported total revenue of $8,751M. Within the US, management describes the book as roughly <strong>half residential, half non-residential</strong>. Dollar sales by customer group were not disclosed in the sources fetched; only growth rates, plus Waterworks' 24% share of US sales, are shown.</p>
+  <div class="seg-bar">
+    <div style="flex:95.3;background:#E07A2E;">UNITED STATES 95.3%</div>
+    <div style="flex:4.7;background:#a78bfa;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#E07A2E;"></span> United States — $8,343M (Q2'26), +5.0% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span>; adjusted operating profit $925M</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Canada — $408M (4.7%), −1.9% YoY; adjusted operating profit $22M</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Two sentences carry the whole segment picture: the US earns an adjusted operating margin of about 11.1% ($925M ÷ $8,343M) and Canada about 5.4% ($22M ÷ $408M). Inside the US, the non-residential half grew 8% while the residential half grew 2%.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #E07A2E;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Waterworks</div>
+        <span class="biz-badge dominant">LARGEST CUSTOMER GROUP</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24%</div><div class="biz-stat-label">Of US Sales</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Pipe, valves, hydrants, meters and fittings for the municipal water and sewer systems that sit under every street — sold to utilities and to the contractors who dig for them. It is Ferguson's largest customer group at <strong>24% of US sales</strong>, and the one least tied to the housing cycle: water mains get replaced on public budgets and regulatory timetables. The Q2 2026 print shows why a big engine can still be the quiet one — growth <strong>decelerated to 3% from 15%</strong> a year earlier. A tough comparison, not a broken business, is the most obvious reading; the sources fetched do not say which.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Core &amp; Main</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">HVAC</div>
+        <span class="biz-badge growth">REBOUNDING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+11%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Furnaces, air conditioners, heat pumps, ductwork and parts for the contractors who install and replace them. The logic of selling HVAC alongside plumbing is that many contractors buy both, and a single counter that sells both can win more of the account. Q2 2026 growth of <strong>11%</strong> compares with <strong>1%</strong> a year earlier. Replacement demand — a unit fails in July and must be swapped that week — makes HVAC less discretionary than new-build housing.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Watsco</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Commercial/Mechanical, Industrial and Fire &amp; Fabrication</div>
+        <span class="biz-badge growth">NON-RESIDENTIAL ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+15%</div><div class="biz-stat-label">Comm./Mech.</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+18%</div><div class="biz-stat-label">Industrial</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−13%</div><div class="biz-stat-label">Fire &amp; Fab.</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Mechanical contractors building hospitals, offices and large projects; industrial plants buying pipe, valves and flow-control gear; and fire-protection fabrication. This is where Q2 2026's growth came from: <strong>Industrial +18%</strong> (accelerating from +6% a year earlier) and <strong>Commercial/Mechanical +15%</strong>, offset by <strong>Fire &amp; Fabrication −13%</strong>. The September 2026 acquisition of <strong>FloWorks</strong> (~$1.6B price, ~$1B annual revenue, ~$45M of expected synergies) deepens exactly this lane — valves and flow control for power generation, semiconductors, pharmaceuticals, data centres, LNG, refining and chemicals.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Residential — Trade Plumbing and Ferguson Home</div>
+        <span class="biz-badge emerging">FLAT TO DOWN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">0%</div><div class="biz-stat-label">Res. Trade Plumbing</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−1%</div><div class="biz-stat-label">Ferguson Home</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~50%</div><div class="biz-stat-label">Residential, % US</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The original Ferguson: plumbing supply for residential contractors, and showroom and online sales of fixtures and finishes for remodels. Residential as a whole is about half of US revenue and grew <strong>2%</strong> in Q2 2026 — "returned to growth," in the CEO's words — but the two named residential groups printed <strong>flat</strong> (Residential Trade Plumbing) and <strong>−1%</strong> (Ferguson Home). With price inflation described as "in the low single digits," flat revenue means fewer units moving. This half of the company is the housing-turnover and remodel cycle, and it has not turned.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and market-share figures not sourced this session — no estimate is presented.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating metrics that actually matter</h3>
+  <p class="prose">A distributor's income statement is a function of three things: volume through the branches, the price it can pass through, and the gross margin it keeps on the spread. Watch <strong>organic growth</strong>, <strong>gross margin</strong>, and how much of the growth was <strong>bought</strong>.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Organic Growth (Q2'26)</div>
+      <div class="card-value" style="color:var(--green);">+3.8%</div>
+      <div class="card-note">Of total growth of 4.6%: acquisitions added 1.0% and a Canadian divestment subtracted 0.2%. US organic growth was 4.0%. Price inflation was "in the low single digits," so real volume growth is small.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Gross Margin (Q2'26)</div>
+      <div class="card-value">31.0%</div>
+      <div class="card-note">Down 20 bps YoY. First-half 2026 gross margin was flat at 31.0%. For a distributor, holding gross margin through a mixed demand environment is the proof of pricing discipline.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Acquisitions YTD</div>
+      <div class="card-value">$583M</div>
+      <div class="card-note">Seven deals in H1 2026 ($573M across five in Q2), with ~$1.4B of annualised revenue acquired year to date per the release, before FloWorks (~$1.6B). Bolt-on M&amp;A is a core part of the growth model.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Net Debt / Adj. EBITDA</div>
+      <div class="card-value" style="color:var(--amber);">1.3x → ~1.8x</div>
+      <div class="card-note">Net debt of $4.468B at June 30, 2026 (1.3x). Management put pro-forma leverage at ~1.8x after FloWorks, and $1.2B of senior unsecured notes were priced in August 2026.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Branch density (1,700+ locations)</span>
+    <span class="moat-pill">Purchasing scale ($31B sales)</span>
+    <span class="moat-pill">Contractor credit &amp; relationships</span>
+    <span class="moat-pill">Breadth: plumbing + HVAC + waterworks</span>
+    <span class="moat-pill">Bolt-on M&amp;A machine</span>
+    <span class="moat-pill">Distribution-centre logistics</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A distributor's moat is <strong>availability</strong>. The contractor on a job site does not shop for the cheapest ball valve; he shops for the one he can have in forty minutes, on account, from a counter person who knows what he needed last time. That is a density game: more branches, more inventory, more trucks, spread across more sales — and $31B of trailing revenue buys purchasing terms smaller rivals cannot match. The same scale funds the roll-up: Ferguson buys regional distributors, plugs them into its supply chain and earns a better margin on their volume than they could. Management calls this its "scale-advantaged business model." The vulnerability is that none of it creates demand. When housing turnover stalls, the densest branch network in the country sells fewer water heaters.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Half the business is a housing bet.</strong> Residential is roughly 50% of US revenue and grew 2% in Q2 2026, with Residential Trade Plumbing flat and Ferguson Home down 1%. The non-residential half is doing the work; if project activity cools before housing recovers, there is no second engine.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Cash conversion slipped.</strong> First-half 2026 operating cash flow was $716M versus $1,123M a year earlier. Trailing free cash flow of $1.12B is a 3.55% FCF margin, against a 6.32% net margin — earnings are running ahead of cash, typically as working capital (inventory and receivables) builds.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Leverage is rising into a soft tape.</strong> FloWorks takes net debt/EBITDA from 1.3x to ~1.8x by management's estimate. Comfortable for an investment-grade distributor, but it narrows the room for buybacks and further deals if demand weakens.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Index inclusion already priced — and reversed.</strong> The S&amp;P 500 announcement lifted the stock from $234.33 to $250.08 in a day; it closed August at $224.51 and has since fallen to $214.43. Index demand is a one-time purchase. It is gone from here.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which Ferguson has been a constituent since August 5, 2026. Ferguson is NYSE-listed and therefore not a NASDAQ-100 constituent. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated. Trailing figures are StockAnalysis's twelve months to June 30, 2026; ratios are recomputed at the $214.43 close where noted.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>FERG</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>20.94</td><td>—</td><td>—</td><td>$214.43 ÷ $10.24 trailing EPS = 20.94. A low-single-digit-growth distributor at a market-like multiple.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>18.96</td><td>—</td><td>—</td><td>$214.43 ÷ consensus FY2026 EPS of $11.31. StockAnalysis's own forward figure is 18.14 (computed at $216.14).</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>n/a</td><td>—</td><td>—</td><td>Not reported by StockAnalysis; not estimated here.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$10.24</td><td>—</td><td>—</td><td>Up 9.9% YoY on revenue up 2.2% — margin, buybacks (2.46% buyback yield) and a lower share count doing the lifting. Consensus FY2027 EPS is $12.53 (+10.8%).</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+2.2%</td><td>—</td><td>—</td><td>TTM. Latest quarter +4.6% (3.8% organic); FY2026 guidance raised to "mid-single digit" from "low to mid-single digit."</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of the goods sold, as a percentage of revenue. For a distributor, the spread between buying and selling price.">Gross Margin</span></td><td>30.63%</td><td>—</td><td>—</td><td>TTM. Remarkably stable: 30.35%–30.67% in every fiscal year from FY2022 to FY2025. Q2 2026 was 31.0%.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating profit as a percentage of revenue.">Operating Margin</span></td><td>8.54%</td><td>—</td><td>—</td><td>TTM GAAP. Q2 2026 adjusted operating margin 10.7%; FY2026 guide 9.5%–9.8% adjusted. Down from 9.85% in FY2022 (July year-end).</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>6.32%</td><td>—</td><td>—</td><td>$1.99B TTM net income on $31.45B revenue. Thin by design — distribution is a volume business.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.66%</td><td>—</td><td>—</td><td>$3.56 annualised ($0.89/quarter) ÷ $214.43. Payout ratio 34.76%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>2.89%</td><td>—</td><td>—</td><td>5.57M shares. Low — the sell-off is not a crowded short.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>1.11</td><td>—</td><td>—</td><td>$6.89B total debt (StockAnalysis basis) against $437M cash. The company's own net debt figure is $4.468B, 1.3x adjusted EBITDA; the gap is most likely leases counted as debt by the data provider (not verified).</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.73</td><td>—</td><td>—</td><td>Quick ratio 0.74 — most current assets are inventory, as they should be for a distributor.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$1.12B</td><td>—</td><td>—</td><td>TTM ($1.65B operating cash flow − $537M capex). ~2.7% FCF yield on the $41.48B market cap. Calendar 2025 FCF was $1.618B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>n/v</td><td>—</td><td>—</td><td>Not sourced this session. Price-to-book is 6.69 on $32.05 book value per share.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>17.58%</td><td>—</td><td>—</td><td>High for a distributor: inventory turns and thin fixed assets make each dollar of capital work hard.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means historically more volatile than the index.">Beta</span></td><td>1.11</td><td>—</td><td>—</td><td>Slightly more cyclical than the market — consistent with a construction-linked business.</td></tr>
+      <tr><td>52-Week Range</td><td>$212.30 – $271.64</td><td>—</td><td>—</td><td>As shown by StockAnalysis on September 21, 2026; the $212.30 low was printed intraday that day, after this report's as-of close. $214.43 sits 21.1% below the high.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the comparisons. First, the <strong>fiscal-year change</strong>: Ferguson moved from a July 31 to a December 31 year-end and filed a transition report for the five months ended December 31, 2025. "FY2026" now means calendar 2026, and year-on-year comparisons that straddle the change should be read with care. Second, <strong>GAAP versus adjusted</strong> runs in both directions: Q2 2026 GAAP operating profit of $893M was below adjusted $932M, yet GAAP diluted EPS of $3.43 was above adjusted $3.39 — the adjustments are small either way. Third, <strong>acquisitions</strong>: seven deals in H1 2026 and FloWorks in September add inorganic growth that FY2026 guidance, as issued on August 10, explicitly excludes for FloWorks.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">22 analysts per StockAnalysis. Its September 2026 rating breakdown sums to 23; both figures are shown as published.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$287.48</div><div class="card-note"><span style="color:var(--green);">+34.1% upside</span> from $214.43. Median target $290 (+35.2%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$235 – $325</div><div class="card-note">+9.6% to +51.6%. Even the lowest target on the board sits above the current price — the Street has not followed the stock down.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">15 / 8 / 0</div><div class="card-note">12 Strong Buy + 3 Buy, 8 Hold, 0 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:65.2;background:#22c55e;"></div>
+    <div style="flex:34.8;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 15 (65.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 8 (34.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Wells Fargo — Sam Reid</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$295</span> maintained (Sep 18, 2026). Issued on the as-of date, with the stock at $214.43 — a target 37.6% above the tape.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Wolfe Research — Nigel Coe</strong> · Peer Perform (Hold), no target · coverage initiated/assumed (Sep 15, 2026). Notably, September 15 was also the stock's worst day of the month (−3.24%).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Jefferies — Philip Ng</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$295</span> (Sep 14, 2026), after coverage was resumed with a Buy earlier in September.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Bernstein — Connor Cerniglia</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$325</span> (Sep 3, 2026) — the high target, raised from $310 after the Q2 print. On the other side, <strong>Berenberg</strong> held its Hold rating and <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$250</span> target on Sep 8, 2026, and <strong>BofA</strong> trimmed its target to $315 from $325 in August while keeping a Buy.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 9, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (date per StockAnalysis)</div>
+        <div class="tl-desc">The first quarter with FloWorks in the numbers, and the first chance to update guidance for it. Watch three lines: organic growth in the residential half (flat-to-down in Q2), gross margin against the 31.0% Q2 level, and operating cash flow — H1 2026 was $716M versus $1,123M a year earlier.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FloWorks acquisition completed</div>
+        <div class="tl-desc">~$1.6B for a business with ~$1B of annual revenue and ~$45M of targeted synergies, serving valves and flow control into power, semiconductors, pharma, data centres, LNG and chemicals. It pushes the mix further toward the non-residential half that is currently growing, and pro-forma leverage to ~1.8x.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Net sales $8.751B (+4.6%), adjusted EPS $3.39 (+5.3%), guidance raised to mid-single-digit sales growth and 9.5%–9.8% adjusted operating margin. The stock closed that day at $263.78 (+2.8%), then fell 4.6% the next session to $251.51 and kept falling: August closed at $224.51.</div>
+        <div class="tl-impact down">Reaction already happened: Aug 10 → Sep 18 −18.7%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 5, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Joined the S&amp;P 500</div>
+        <div class="tl-desc">Announced by S&amp;P Dow Jones Indices on July 31, 2026, effective before the open on August 5, replacing Electronic Arts, which was being acquired by an investor consortium. The stock went from $234.33 at the July 31 close to $250.08 on August 3.</div>
+        <div class="tl-impact up">Reaction already happened: +6.7% in a day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 20, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">London secondary listing cancelled</div>
+        <div class="tl-desc">The last step of a move that began with the 2021 NYSE listing: Ferguson is now solely NYSE-listed and North America-headquartered — the precondition for the S&amp;P 500 membership that followed.</div>
+        <div class="tl-impact neutral">Structural — completed</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">FERG — Monthly Closes, Sep 2021 → Sep 18, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 18, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes (NYSE, USD) + Sep 18, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#E07A2E;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 18, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$139.52</strong> to the September 18, 2026 settled close of <strong>$214.43</strong>, FERG gained <strong>53.7% on price</strong>, before dividends. The whole window is NYSE trading in US dollars — the 2024 redomicile swapped Ferguson plc shares one-for-one into Ferguson Enterprises Inc. shares under the same ticker, so the series has no per-share break. The shape: a 42.6% fall from the December 2021 high to the September 2022 low, a doubling off that low into mid-2024, a sharp December 2024–March 2025 drawdown, and a 2025–26 run that peaked at a $267.71 month-end in April 2026. Since then the stock has made lower highs.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>40.1</strong> — soft, not oversold. Across the five years it never closed a month below 30: the lows were 32.4 in March 2025 and 33.4 in September 2022, and the high was 82.7 in March 2024. The 10-month moving average is about <strong>$237.34</strong> and the 3-month about <strong>$224.42</strong>, both above the price: the trend on this chart has turned down, and the index-inclusion bounce did not change that.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Post-pandemic high — $179.39 month-end close</div><div class="tl-desc">FY2022 (July year-end) revenue grew 25.33% to $28.57B at a 9.85% operating margin — the best margin in the five-year window.</div><div class="tl-impact up">Peak of 2021–22</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock low — $102.93</div><div class="tl-desc">−42.6% from December 2021; the cause was not verified from the sources fetched. The primary listing had just moved from London to New York in 2022. RSI bottomed at 33.4.</div><div class="tl-impact down">Five-year low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">$218.43 — the move to the US pays off</div><div class="tl-desc">Up 112% from the 2022 low, with monthly RSI at 82.7, the most overbought reading of the window.</div><div class="tl-impact up">RSI 82.7</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2024</div><div class="tl-content"><div class="tl-title">Ferguson Enterprises Inc. becomes the listed parent</div><div class="tl-desc">On August 1, 2024 the Delaware holdco replaced Ferguson plc in a one-for-one share exchange. No change to share count per holder, so the chart runs straight through it.</div><div class="tl-impact neutral">Structural — no price discontinuity</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024 – Mar 2025</div><div class="tl-content"><div class="tl-title">Drawdown to $160.23</div><div class="tl-desc">−25.8% from the November 2024 close of $215.93, including a −19.6% December. The cause of that move was not verified from the sources fetched for this report, so none is asserted.</div><div class="tl-impact down">−25.8% in four months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2026</div><div class="tl-content"><div class="tl-title">Five-year high month-end — $267.71</div><div class="tl-desc">Up 67% from the March 2025 low. May then fell 15.6% to $225.97 — the second-worst month in the window — cause not verified from sources fetched.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">S&amp;P 500 entry and a beat-and-raise — then lower</div><div class="tl-desc">Index inclusion on August 5 and raised guidance on August 10 took the stock to a $263.78 close; it ended the month at $224.51.</div><div class="tl-impact down">Aug 10 high → month-end −14.9%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 18, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $214.43</div><div class="tl-desc">Down 19.9% from the April 2026 month-end high and 8.5% below the July close that preceded the index announcement.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year index returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: FERG is <strong>up 53.7% on price over five years</strong> and <strong>down 5.75% over the trailing year</strong> (StockAnalysis 52-week change, measured at the $216.14 September 21 quote), with the whole of the trailing-year loss arriving after the index announcement. Peer valuations (Core &amp; Main, Watsco and other distributors) were not sourced and are not compared.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>A 17.58% ROIC distributor with gross margins that have not left a 30.3%–30.7% band in four fiscal years, now fully American, fully in the S&amp;P 500, and 21% off its high for no reason visible in its own numbers — Q2 beat, guidance went up, non-residential grew 8% and Industrial 18%. At 18.96x consensus 2026 EPS and with every one of the 22 covering analysts' targets above the price, the sell-off reads as index-flow round-tripping. FloWorks adds ~$1B of revenue in exactly the data-centre, power and process markets that are growing, and when housing turnover eventually recovers the residential half has operating leverage to spare.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Half the company is flat housing — Residential Trade Plumbing 0%, Ferguson Home −1% — and the other half is carrying a cycle that may already be late. Operating cash flow fell from $1,123M to $716M in the first half, trailing FCF is only $1.12B (a ~2.7% yield), leverage is rising to ~1.8x on the FloWorks deal, and the stock still trades at nearly 21x trailing earnings for a business whose trailing revenue grew 2.2%. The S&amp;P 500 bid has been paid in full. The market has been selling a beat-and-raise for six weeks — and the price is usually the first to know.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Residential stagnation.</strong> About half of US revenue, growing 2% in aggregate with its two named customer groups at 0% and −1% in Q2 2026. Without a housing-turnover or remodel recovery, group growth depends on non-residential alone.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Non-residential cycle and project timing.</strong> Industrial +18% and Commercial/Mechanical +15% are strong prints that can reverse as large projects complete; Fire &amp; Fabrication is already −13%. FloWorks increases exposure to the same project-driven end-markets.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Cash conversion and leverage.</strong> H1 2026 operating cash flow down 36% ($716M vs $1,123M) while net debt/EBITDA heads to ~1.8x after FloWorks, with $1.2B of new notes priced in August. If working capital does not unwind in H2, buybacks and bolt-on M&amp;A — two of the three legs of the equity story — slow.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Two halves, two cycles</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Ferguson's Q2 2026 is a clean picture of a split construction economy. Non-residential — commercial buildings, industrial plants, large mechanical projects — grew 8%, with Industrial at +18% and Commercial/Mechanical at +15%. Residential grew 2%, with price inflation "in the low single digits" meaning volumes were roughly flat. A distributor sells into both, so its reported growth is an average of a boom and a stall. The investment question is which cycle turns first: if the residential half recovers while non-residential holds, growth accelerates; if the project cycle cools while housing stays stuck, it does the opposite.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Index inclusion — the round trip</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">The path to the S&amp;P 500 took five years and four structural steps — NYSE listing (2021), primary listing to New York (2022), US holdco (August 1, 2024), London delisting (July 20, 2026). The payoff was a one-day move from $234.33 to $250.08 and a peak close of $263.78 on results day. By September 18 the stock was at $214.43, below where it stood before the announcement. Index buying is a single, price-insensitive purchase; once it is done, the stock trades on fundamentals again, and the post-inclusion drift has been one-way.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Roll-up economics — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">Seven bolt-ons in H1 2026 and ~$1.4B of annualised acquired revenue year to date, then FloWorks at ~$1.6B. <strong>The bull framing:</strong> a scaled distributor earns more on an acquired branch's volume than the seller could — better purchasing, better logistics, cross-selling HVAC into plumbing accounts — and a 17.58% ROIC says that the machine works. <strong>The bear framing:</strong> acquired growth flatters a revenue line whose organic rate is 3.8% with low-single-digit price inflation inside it, and it is being funded while cash conversion is weakening. The way to adjudicate is not the P/E; it is organic growth and free cash flow over the next four quarters. Both are reported. Neither has yet given a clean signal.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, September 18, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/ferg/history/</strong> — the September 18, 2026 settled close of $214.43 (open 213.24, high 215.38, low 213.01, volume 2,018,264, Adj. Close present, +0.08% on the prior close of $214.26). Corroborated by the "Previous Close" field on stockanalysis.com/stocks/ferg/. The September 21, 2026 row on the history page had no adjusted close and a partial volume at the time of fetching, so that session is not used as the as-of price.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual financials, forecast, price history) for price, valuation, margins, returns, balance sheet, consensus, named analyst actions and Sector/Industry labels; Ferguson's Q2 2026 earnings release (corporate.ferguson.com, August 10, 2026) and the related 8-K summary on stocktitan.net for segment sales and profit, guidance, capital returns, net debt and CEO/CFO names; mdm.com and investing.com coverage of the Q2 2026 print for customer-group growth rates, Waterworks' share of US sales, FloWorks terms and pricing commentary; press.spglobal.com (July 31, 2026) for the S&amp;P 500 addition; corporate.ferguson.com (2024) and SEC filings for the redomicile and one-for-one share exchange; digrin.com/stocks/detail/FERG/price ("Real Price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from September 2021 through August 2026 taken from the "Real Price" column at digrin.com (July 2026 $234.33 and August 2026 $224.51 cross-checked against StockAnalysis daily closes), plus a final point at the September 18, 2026 settled close of $214.43. <strong>No interior months were reconstructed or estimated.</strong> Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Customer-group dollar sales, segment market shares, TAM, peer market caps, ROE and named institutional holders were not sourced and are shown as "n/v" or omitted. Market capitalisation ($41.48B) is computed as 193.45M shares outstanding × $214.43. The 52-week range is as displayed by StockAnalysis on September 21, 2026 and its low was set intraday that day. The Q2 2026 release summary also referenced calendar-2025 annual sales of $31.3B, while StockAnalysis shows $30.80B for the twelve months to December 31, 2025; the difference was not reconciled and neither figure is used in the analysis. Causes of the December 2024 and May 2026 price declines were not verified and are not asserted.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and consensus estimates are estimates. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com "Real Price") + Sep 18, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 18 26'];
+const prices = [139.52,151.21,152.43,179.39,158.79,152.24,134.12,124.71,119.56,110.71,126.08,115.49,102.93,109.26,117.23,126.97,142.34,144.10,133.75,140.82,144.91,157.31,161.62,161.56,164.47,150.20,171.34,193.07,187.86,211.45,218.43,209.90,205.74,193.65,222.65,205.71,198.57,196.74,215.93,173.57,181.12,177.50,160.23,169.66,182.34,217.75,223.33,231.15,224.58,248.50,251.67,222.63,252.46,260.76,233.26,267.71,225.97,237.33,234.33,224.51,214.43];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 3,  label: 'Dec 2021 — post-pandemic high $179.39',                    color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — five-year low close $102.93',                   color: '#ef4444' },
+  { idx: 30, label: 'Mar 2024 — $218.43, RSI 82.7',                             color: '#22c55e' },
+  { idx: 35, label: 'Aug 2024 — US holdco (1-for-1 exchange, Aug 1)',           color: '#3b82f6' },
+  { idx: 42, label: 'Mar 2025 — drawdown low $160.23',                          color: '#ef4444' },
+  { idx: 55, label: 'Apr 2026 — five-year high month-end $267.71',              color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — joined S&P 500 (Aug 5); Q2 beat & raise',       color: '#f59e0b' },
+  { idx: 60, label: 'Sep 18, 2026 — settled close $214.43',                     color: '#E07A2E' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(224,122,46,0.22)');
+grad.addColorStop(1, 'rgba(224,122,46,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#E07A2E', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#E07A2E'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
