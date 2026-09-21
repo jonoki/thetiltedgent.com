@@ -23,6 +23,14 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-a · claimed 2026-09-21 (local Claude Code session, direct git push)
+Next 10 uncovered by market cap (stockanalysis S&P 500 list fetched 2026-09-21; repo had 328 reports):
+
+BE VMRK FERG P ILMN BIIB RMD VMC JBL CCI
+
+- VMC is rebuilt fresh rather than committing the Sep 4 file Oki holds (stale close).
+- Skipped as share-class duplicates: GOOG, FOX, NWS. FISV is still the FI rename job, not claimed.
+
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
