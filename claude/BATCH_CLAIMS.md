@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-o · claimed 2026-09-21 (local Claude Code session)
+SOLV PTC DOC EG MAA IVZ AIZ TXT TYL REG
+
 ### sess-2026-09-21-n · claimed 2026-09-21 (local Claude Code session)
 IEX LDOS INVH NWSA RVTY BALL ROL HST APA KIM
 
