@@ -30,9 +30,6 @@ AEM CLS FLUT SONY SE RACE SPOT NU HDB UL
 ### sess-2026-09-21-g2 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
 NVO RY TD BNS BN ENB CNQ CNI CP
 
-### sess-2026-09-21-g1 · claimed 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
-TSM BABA HSBC NVS SAP TM SHEL TTE BHP MUFG
-
 ### sess-2026-09-21-f · claimed 2026-09-21 (local Claude Code session)
 SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
 
@@ -113,6 +110,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-g1 · done 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
+TSM BABA HSBC NVS SAP TM SHEL TTE BHP MUFG
+- All 10 published (373 reports), Global filter live. Every report independently checked. Sep 21 settled close throughout.
 
 ### sess-2026-09-21-b · done 2026-09-21 (local Claude Code session)
 RDDT EXR HPQ ZTS MTD PCG WTW CFG CBOE TDY
