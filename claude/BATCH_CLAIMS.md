@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-21-e · claimed 2026-09-21 (local Claude Code session)
+WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
+
 ### sess-2026-09-21-d · claimed 2026-09-21 (local Claude Code session)
 WRB AWK VICI DTE CPAY LH FE CINF FFIV Q
 
