@@ -29,14 +29,8 @@ JBHT L NRG BG CASY BRO FSLR IFF EIX PKG
 ### sess-2026-09-21-h · claimed 2026-09-21 (local Claude Code session)
 DRI ULTA SW PPG VLTO CHD GPN TPR VRSK KEY
 
-### sess-2026-09-21-f · claimed 2026-09-21 (local Claude Code session)
-SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
-
 ### sess-2026-09-21-e · claimed 2026-09-21 (local Claude Code session)
 WST OTIS TPL INCY ES DOV XYL CNP EXPD PFG
-
-### sess-2026-09-21-d · claimed 2026-09-21 (local Claude Code session)
-WRB AWK VICI DTE CPAY LH FE CINF FFIV Q
 
 ### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
 AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
@@ -109,6 +103,14 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-f · done 2026-09-21 (local Claude Code session)
+SYF RF HUBB — DRI ULTA SW PPG VLTO CHD GPN released to the pool unstarted (session switched to the Global set)
+- SYF RF HUBB published; the other 7 were released to the pool (DRI ULTA SW PPG VLTO CHD GPN re-claimed in sess-2026-09-21-h).
+
+### sess-2026-09-21-d · done 2026-09-21 (local Claude Code session)
+WRB AWK VICI DTE CPAY LH FE CINF FFIV Q
+- All 10 published. 5 builders were killed by an interrupt and relaunched; every report independently checked.
 
 ### sess-2026-09-21-g3 · done 2026-09-21 (local Claude Code session) · GLOBAL (NYSE-listed, not S&P 500 / Nasdaq-100)
 AEM CLS FLUT SONY SE RACE SPOT NU HDB UL
