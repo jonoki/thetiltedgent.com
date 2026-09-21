@@ -39,7 +39,7 @@ def check(path):
     else:
         out['n_labels'] = out['n_prices'] = None; out['price_match'] = False
     # P/E arithmetic
-    pe = re.search(r'Trailing\s*<span[^>]*>P/E</span>.*?<td[^>]*>\s*([\d.]+)', t, re.S) or re.search(r'Trailing P/E.*?<td[^>]*>\s*([\d.]+)', t, re.S)
+    pe = re.search(r'Trailing\s*<span[^>]*>P/E</span>.*?<td[^>]*>\s*([\d.]+)', t, re.S) or re.search(r'Trailing P/E.*?<td[^>]*>\s*(?:<[^>]+>\s*)*([\d.]+)', t, re.S)   # value may sit inside a <span>
     # anchor on the row's label cell first: the loose pattern fires on "TTM EPS" in the P/E row's context text
     # and then reads the next row's value (VMC read its Forward P/E as EPS)
     eps = re.search(r'>\s*EPS\s*\(TTM\)\s*(?:</span>)?\s*</td>\s*<td[^>]*>\s*\$?(-?[\d.]+)', t) \
@@ -50,7 +50,7 @@ def check(path):
         except Exception:
             pass
     # 52-week range
-    r = re.search(r'52-Week Range.*?\$?([\d,]+\.\d+)\s*[–\-—]\s*\$?([\d,]+\.\d+)', t, re.S)
+    r = re.search(r'52-Week Range.*?\$?([\d,]+\.\d+)\s*(?:[–\-—]|&ndash;|&mdash;)\s*\$?([\d,]+\.\d+)', t, re.S)
     if r and price:
         lo, hi = num(r.group(1)), num(r.group(2)); out['range_ok'] = lo <= price <= hi; out['range'] = (lo, hi)
     date = re.search(r'Static data as of ([A-Za-z]+ \d+, \d{4})', t)
