@@ -35,9 +35,6 @@ EFX CDW EVRG TSN FIS ESS ZBH CHRW FDXF DD
 ### sess-2026-09-21-k · claimed 2026-09-21 (local Claude Code session)
 VTRS BBY AMCR LYB NI SNA GIS LEN IP SBAC
 
-### sess-2026-09-21-j · claimed 2026-09-21 (local Claude Code session)
-DLTR OMC LUV EXE CMS RL STZ STE CHTR FICO
-
 ### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
 AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
 
@@ -109,6 +106,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-j · done 2026-09-21 (local Claude Code session)
+DLTR OMC LUV EXE CMS RL STZ STE CHTR FICO
+10/10 published, all independently checked
 
 ### sess-2026-09-21-i · done 2026-09-21 (local Claude Code session)
 JBHT L NRG BG CASY BRO FSLR IFF EIX PKG
