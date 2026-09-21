@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HUBB — Hubbell Incorporated | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">HUBB</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Electrical Equipment &amp; Parts</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $24.17B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);border:1px solid #22c55e44;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER since October 18, 2023 (replaced Organon)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NASDAQ-100: not a member (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Hubbell Incorporated</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$457.49</div>
+      <div class="price-change" style="color:var(--green);">+$10.57 (+2.37%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $456.00 (−0.33%) at 5:21 PM EDT — not used in this report</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 40 Waterview Drive, Shelton, Connecticut</div>
+    <div class="meta-item"><span>Employees:</span> 18,000 (StockAnalysis profile)</div>
+    <div class="meta-item"><span>Founded:</span> 1888 by Harvey Hubbell II (incorporated 1905)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 27, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Between the power station and the wall socket sits a great deal of hardware nobody photographs: insulators and arresters on transmission towers, connectors and anchors on distribution lines, smart meters on the side of the house, and the wiring devices, fittings and grounding gear inside every commercial building and data hall. Hubbell makes that hardware. Founded by Harvey Hubbell II in 1888 and headquartered in Shelton, Connecticut, it reports two segments — <strong>Utility Solutions</strong> (grid infrastructure and grid automation, including the Aclara metering business acquired in 2018) and <strong>Electrical Solutions</strong> (wiring, connectors and industrial electrical products for non-residential buildings). FY2025 revenue was <strong>$5.845B, up 3.84%</strong>, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$16.54</strong>, up 14.94%.</p>
+  <p class="prose" style="margin-top:16px;">2026 changed the pace. Management's own summary of the second quarter was "grid modernization, load growth and datacenter investment" — three phrases for one story, which is that the U.S. suddenly needs a lot more electricity delivered to a lot more places. Q2 2026 sales rose <strong>15% to $1.712B</strong> (10% organic), data-center sales grew roughly <strong>65%</strong>, and in early June Hubbell closed the roughly <strong>$3.0B acquisition of NSI Industries</strong>, funded with a term loan, senior notes and commercial paper. Full-year guidance went from 8–11% sales growth to <strong>16–18%</strong>. The stock, meanwhile, has done something less obvious: it compounded from <strong>$180.67 in September 2021 to $457.49</strong> — +153% on price — but it now sits <strong>19.1% below its 52-week high of $565.50</strong> and fell 7.4% across the two sessions after that raised guidance landed. The central debate is whether a premium multiple (27x trailing) on a newly levered balance sheet is a fair price for a multi-year grid build-out, or whether the market has already paid for the growth it is now receiving.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman, President &amp; CEO</div>
+      <div class="card-value" style="font-size:20px;">Gerben Bakker</div>
+      <div class="card-note">Title per the StockAnalysis company profile; quoted in the Q2 2026 results release (July 28, 2026): "Hubbell delivered strong performance in the second quarter, with double digit growth in sales, adjusted operating profit and adjusted earnings per share."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Joseph Capozzoli</div>
+      <div class="card-note">Senior Vice President &amp; CFO per the StockAnalysis profile and the Q2 2026 call coverage. He owns the part of the story the market is now watching: pro forma net debt-to-EBITDA of roughly 2.9x after NSI, with debt paydown planned over 24–30 months and ~90% free-cash-flow conversion guided for 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">98.24% institutional</div>
+      <div class="card-note">Insider ownership 0.36%; short interest 3.04M shares, 5.75% of float, 6.30 days to cover (StockAnalysis statistics). Named top holders were not retrieved from the sources fetched and are not listed.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) segment net sales</strong> from the company's results release. The two segments sum to $1,711.8M, which ties to reported total net sales. Q2 includes about one month of NSI Industries (about $35M of June sales, per call coverage). The release summary fetched does not say which segment carries NSI; its fittings and connector products and Electrical Solutions' ~6.5-point acquisition contribution (≈$36M on $549M) point to Electrical — an inference, not a disclosure.</p>
+  <div class="seg-bar">
+    <div style="flex:59.9;background:#2DD4BF;">UTILITY 59.9%</div>
+    <div style="flex:40.1;background:#f59e0b;">ELECTRICAL 40.1%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Utility Solutions — $1,025.8M (Q2'26), +10% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span>, +6% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Electrical Solutions — $686.0M, +25% YoY, +18% organic</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The smaller segment is now the faster one. Electrical Solutions' 18% organic growth is where the data-center demand shows up; Utility Solutions is bigger, higher-margin and steadier.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Utility Solutions</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,025.8M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+10%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.6%</div><div class="biz-stat-label">Adj. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">59.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two businesses under one roof. <strong>Grid Infrastructure</strong> — the transmission, substation and distribution components utilities buy by the truckload — grew about <strong>12%</strong> in Q2. <strong>Grid Automation</strong> — meters, advanced metering infrastructure and protection and control products — grew about <strong>1%</strong>, and call coverage describes it as having "returned to year-over-year growth." The rest of the quarter points the same way: segment book-to-bill of about <strong>1.2x</strong>, transmission and substation guided to double-digit growth for the year, 550-kilovolt projects shipping in the second half of 2026 and the first 765-kilovolt project shipping in 2027. Management says transmission and substation project quoting "has approximately doubled over the past couple of years." GAAP operating margin was 22.8%; adjusted was 25.6% versus 25.5% a year earlier. Full-year organic growth guide: 7–9%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and segment market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Preformed Line Products</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Itron</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Landis+Gyr</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Electrical Solutions</div>
+        <span class="biz-badge growth">FASTEST GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$686.0M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+25%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.2%</div><div class="biz-stat-label">Adj. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">40.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Wiring devices, connectors, fittings and industrial controls sold through wholesale and retail channels into commercial and industrial buildings — and, increasingly, into data centers. Q2 net sales rose <strong>25% to $686.0M</strong> from $549M, with <strong>18% organic growth</strong> and about 6.5 points from acquisitions. Data-center sales grew about <strong>65%</strong> in the quarter and are expected to grow about 50% for the year, driven by "added capacity, product introductions and content gains." NSI Industries (segment assignment inferred, see above) brings electrical fittings (Bridgeport Fittings), grounding and connector products (Polaris) and network-infrastructure exposure. The cost of that growth is visible in the margin: GAAP operating margin fell <strong>480 bps to 16.7%</strong> and adjusted margin fell <strong>130 bps to 21.2%</strong>. Full-year organic growth guide: 12–14%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and segment market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Eaton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">nVent Electric</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Legrand</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that matter</h3>
+  <p class="prose">For a components maker riding a capex cycle, watch <strong>orders</strong>, <strong>price</strong> and <strong>leverage</strong> — not just the sales line.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Utility Book-to-Bill</div>
+      <div class="card-value">~1.2x</div>
+      <div class="card-note">Orders running about 20% ahead of shipments in Utility Solutions in Q2 2026 — the backlog is growing, which is what underpins the raised second-half outlook.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Data-Center Sales</div>
+      <div class="card-value" style="color:var(--green);">~+65%</div>
+      <div class="card-note">Q2 2026 growth; roughly +50% expected for the full year. The fastest-growing end market in the portfolio, and the one most exposed to the hyperscaler spending cycle.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Price Realization (FY26)</div>
+      <div class="card-value">3–4 pts</div>
+      <div class="card-note">Price increases were implemented in April and July; expected full-year price contribution was raised from an initial ~2 points. Pricing is helping sales; the Electrical margin decline shows it is not fully covering cost and mix.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Pro Forma Net Debt / EBITDA</div>
+      <div class="card-value" style="color:var(--amber);">~2.9x</div>
+      <div class="card-note">After the ~$3.0B NSI deal, funded with a $900M term loan, $1.9B of senior notes and commercial paper. Management plans to pay it down over 24–30 months.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Utility spec approvals &amp; installed base</span>
+    <span class="moat-pill">Aclara metering footprint</span>
+    <span class="moat-pill">Wholesale distribution reach</span>
+    <span class="moat-pill">Breadth of catalogue</span>
+    <span class="moat-pill">Pricing power (3–4 pts in 2026)</span>
+    <span class="moat-pill">Trade brands (Hubbell, Bridgeport, Polaris)</span>
+    <span class="moat-pill">138-year operating history</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>being the part nobody wants to re-qualify</strong>. A connector or arrester on a utility line is a low-cost item whose failure is very expensive, so utilities standardise on approved products and rarely switch to save a few percent. The evidence that this protects price is in the 2026 numbers: two price increases in four months and full-year price realization raised to 3–4 points, while Utility Solutions' adjusted margin held at 25.6%. The vulnerability is that the same customers set the pace. Utility capex budgets and hyperscaler build-outs decide the volume, and Hubbell does not control either.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The balance sheet just changed.</strong> Total debt is $5.56B against $394.7M of cash (debt-to-equity 1.42, debt/EBITDA 3.56 on StockAnalysis's TTM basis); management's pro forma figure is ~2.9x net debt/EBITDA. That is manageable for a business converting ~90% of adjusted net income to free cash flow, but it removes the cushion that made Hubbell a sleep-well industrial, and it ties the next two years of cash to deleveraging.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Growth is buying margin compression in Electrical.</strong> Electrical Solutions grew 25% but its adjusted operating margin fell 130 bps and GAAP margin fell 480 bps; group adjusted operating margin fell 50 bps to 23.9%. Acquired businesses, integration costs and mix can explain this; the sources fetched do not break it down, so the size of each is not known.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Grid Automation lags.</strong> Grid Infrastructure grew about 12% in Q2; Grid Automation, the meter and controls business, grew about 1%. The "smart grid" half of the Utility segment is not yet sharing in the build-out at the same rate.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">A premium price leaves little room for a miss.</strong> At 27.1x trailing earnings and a 3.73% free-cash-flow yield, the stock prices in the raised guide. The two-session 7.4% decline after the Q2 beat-and-raise shows how little credit a good quarter now earns.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which HUBB has been a constituent since October 18, 2023. Values are from StockAnalysis statistics and financials at the September 21, 2026 close unless stated. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>HUBB</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>27.1</td><td>—</td><td>—</td><td>$457.49 ÷ $16.90 TTM diluted EPS = 27.07 (StockAnalysis shows 27.08). A growth-stock multiple on an electrical-hardware company.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of future earnings per share.">Forward P/E</span></td><td>21.1</td><td>—</td><td>—</td><td>StockAnalysis next-twelve-month figure. On consensus FY2026 EPS of $20.46 (an adjusted-basis estimate): $457.49 ÷ $20.46 = 22.4.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>2.11</td><td>—</td><td>—</td><td>You pay twice the usual rate per point of expected growth. The market is paying for how long the growth lasts, not just how fast it is.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share, GAAP diluted.">EPS (TTM)</span></td><td>$16.90</td><td>—</td><td>—</td><td>GAAP diluted, +9.55%. FY2025 was $16.54. Adjusted EPS runs well above GAAP — Q2 2026 adjusted $5.52 vs GAAP $4.52.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+10.6%</td><td>—</td><td>—</td><td>TTM revenue $6.22B. Q2 2026 +15% (10% organic, 5% acquisitions). FY2026 guide 16–18% total, 9–11% organic.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of making the product, as a percentage of revenue.">Gross Margin</span></td><td>35.3%</td><td>—</td><td>—</td><td>Up from 27.51% in FY2021 and 29.94% in FY2022 — the clearest trace of the pricing power built since the 2022 inflation spike.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>20.6%</td><td>—</td><td>—</td><td>TTM operating income $1.28B. Q2 2026 adjusted operating margin 23.9% (−50 bps YoY); FY2026 adjusted guide 23.1–23.4%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>14.5%</td><td>—</td><td>—</td><td>TTM net income $900.6M.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.24%</td><td>—</td><td>—</td><td>$5.68 per share, payout ratio 33.62%, +7.58% YoY, 18 consecutive years of growth. Last ex-dividend date August 31, 2026.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>5.75%</td><td>—</td><td>—</td><td>3.04M shares, 6.30 days to cover — a meaningful bearish position for a company with an all-Buy/Hold analyst board.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Higher means more financial leverage.">Debt-to-Equity</span></td><td>1.42</td><td>—</td><td>—</td><td>$5.56B total debt vs $3.92B equity and $394.7M cash; net debt $5.16B. Debt/EBITDA 3.56 (TTM EBITDA $1.52B, which includes only about a month of NSI).</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.61</td><td>—</td><td>—</td><td>Quick ratio 0.83 — inventory is a large part of current assets, as expected for a manufacturer.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$901.4M</td><td>—</td><td>—</td><td>TTM (operating cash flow $1.07B less $166.8M capex). A 3.73% FCF yield on the $24.17B market cap. FY2025 FCF $874.7M.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>24.4%</td><td>—</td><td>—</td><td>Part of this is leverage: equity is $3.92B against $5.56B of debt.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>13.6%</td><td>—</td><td>—</td><td>The gap to ROE (24.4%) is the leverage effect; ROIC is the better guide to the business itself.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span></td><td>19.35</td><td>—</td><td>—</td><td>Enterprise value $29.33B. Flattered on the way up by NSI debt being in EV while only about a month of NSI EBITDA is in the TTM figure.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.89</td><td>—</td><td>—</td><td>Slightly less volatile than the market, historically.</td></tr>
+      <tr><td>52-Week Range</td><td>$403.82 – $565.50</td><td>—</td><td>—</td><td>The $457.49 close sits 19.1% below the high and 13.3% above the low. 52-week price change +3.64% (StockAnalysis).</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">The main distortion is the gap between <strong>GAAP and adjusted</strong> earnings, which widened with NSI. Q2 2026 GAAP diluted EPS was <strong>$4.52</strong> against adjusted <strong>$5.52</strong> — a $1.00 gap in one quarter — and the FY2026 guide is <strong>$17.25–$17.55 GAAP versus $20.25–$20.55 adjusted</strong>, about $3.00 a share apart. The item-by-item reconciliation was not retrieved from the sources fetched, so it is not broken down here. That gap matters for valuation: at $457.49 the stock is about 22x the adjusted guide midpoint but about 26x the GAAP guide midpoint. Second, <strong>NSI is only partly in the numbers</strong>: it contributed about $35M of sales in June 2026, and management guides +$0.20 of EPS in 2026 and +$0.80 in 2027. Trailing metrics (TTM revenue, EBITDA, margins) therefore understate the post-deal business while the balance sheet already carries all of the debt.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">13 analysts polled by S&amp;P Global via StockAnalysis.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$565.73</div><div class="card-note"><span style="color:var(--green);">+23.66% upside</span> from $457.49. Median $575 (+25.69%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$502 – $630</div><div class="card-note">+9.73% to +37.71%. Even the lowest target on the board is above the current price — the Street thinks the stock has fallen too far.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">7 / 6 / 0</div><div class="card-note">7 Strong Buy + 0 Buy, 6 Hold, 0 Sell, 0 Strong Sell. A near-even split between enthusiasm and neutrality — and nobody bearish on the record, against a 5.75% short float.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:53.8;background:#22c55e;"></div>
+    <div style="flex:46.2;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 7 (53.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 6 (46.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Consensus estimates: FY2026 revenue $6.87B (+17.53%), EPS $20.46 (+12.37%); FY2027 revenue $7.56B (+10.08%), EPS $22.91 (+11.97%).</p>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Bernstein</strong> (analyst not named on the source) · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$584</span> maintained (Sep 21, 2026). Reiterated on the day of this report's close — a target 27.7% above it.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Morgan Stanley — Christopher Snyder</strong> · Hold (StockAnalysis mapping) · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$565 → $575</span> (Sep 2, 2026). A neutral house raising its target is the Hold-camp view in one line: the business is fine, the price already knows.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Robert W. Baird — Luke Junk</strong> · Initiates at Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$550</span> (Aug 20, 2026). New coverage arriving during the post-earnings slide.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Oppenheimer — Christopher Glynn</strong> · Hold, no target listed (Jul 29, 2026), the day after Q2 results. <strong>UBS</strong> maintained Hold with a <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$515</span> target on Jun 16, 2026 — the analyst is not named on the source.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The first full quarter with NSI inside the numbers. Watch three things: whether Electrical Solutions' margin stabilises after the 130 bps adjusted decline, whether Utility book-to-bill stays above 1.0, and whether the $20.25–$20.55 adjusted EPS guide is held or raised again.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026 – 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">High-voltage transmission shipments</div>
+        <div class="tl-desc">550-kilovolt projects ship in the second half of 2026; the first 765-kilovolt project ships in 2027. These are the extra-high-voltage lines that move bulk power across regions — the category where quoting activity has "approximately doubled over the past couple of years."</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2026 – 2028</div>
+      <div class="tl-content">
+        <div class="tl-title">NSI integration and deleveraging</div>
+        <div class="tl-desc">Management targets 2–3% sales synergies and 3–5% cost synergies over three years, EPS accretion of $0.20 in 2026 and $0.80 in 2027, and paying leverage down from ~2.9x over 24–30 months. Hitting these dates is the test of whether the deal was priced right.</div>
+        <div class="tl-impact neutral">Execution milestone</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Sales $1.712B (+15%, 10% organic), adjusted EPS $5.52 (+12%), full-year guidance raised to $20.25–$20.55 adjusted EPS. The stock closed at $497.96 on July 27, $483.66 on July 28 and $460.96 on July 29 — <strong>−7.4% over two sessions</strong> despite the raise. The sources fetched give no stated reason; the margin line (adjusted operating margin −50 bps, Electrical −130 bps) is the most visible weak spot in the release.</div>
+        <div class="tl-impact down">Reaction already happened: −7.4% in two sessions</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Jun 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">NSI Industries acquisition closes (~$3.0B)</div>
+        <div class="tl-desc">Funded with a $900M term loan, $1.9B of senior notes and commercial paper. It adds electrical fittings, grounding and connector brands and network-infrastructure exposure to Electrical Solutions. June 2026 month-end close was $523.20, the highest month-end in the five-year window.</div>
+        <div class="tl-impact up">June +10.5% month</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 18, 2023</div>
+      <div class="tl-content">
+        <div class="tl-title">Joined the S&amp;P 500</div>
+        <div class="tl-desc">Hubbell moved up from the S&amp;P MidCap 400, replacing Organon &amp; Co. (S&amp;P Dow Jones Indices announcement, October 13, 2023). The stock closed that October at $270.10, down 13.8% on the month — index inclusion was not a one-way ticket.</div>
+        <div class="tl-impact neutral">Index membership</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">HUBB — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$180.67</strong> to the September 21, 2026 settled close of <strong>$457.49</strong>, HUBB gained <strong>153.2% on price</strong> — about <strong>20.4% a year</strong> compounded, before dividends. There has been no stock split since 1996, so the per-share series is clean. The shape: a choppy first half of 2022 that bottomed at $178.25, a run from there to $460.09 by November 2024, two sharp air pockets (October 2023 and February–March 2025), and a 2026 that peaked at a $523.20 June month-end before handing back 12.6%.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows a stock that spent most of 2023–2024 running hot — it printed <strong>84.8 in June 2023</strong> and 81.6 in March 2024 — and has only once come near oversold, at <strong>30.9 in March 2025</strong>. It now reads <strong>45.8</strong>, neutral. The 10-month moving average, about <strong>$482.24</strong>, sits above the current price — the longer trend is overhead rather than underneath.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Feb 2022</div><div class="tl-content"><div class="tl-title">Window low — $178.25 month-end close</div><div class="tl-desc">The lowest point of the five years. FY2022 then delivered 17.97% revenue growth and gross margin rising from 27.51% to 29.94% as price increases caught up with inflation.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2023</div><div class="tl-content"><div class="tl-title">Breakout — $331.56 (+17.4% in a month)</div><div class="tl-desc">The biggest monthly gain of 2023, taking RSI to 84.8, the most overbought reading in the series. FY2023 EPS grew 37.94% to $13.89.</div><div class="tl-impact up">+17.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">S&amp;P 500 entry month — $270.10 (−13.8%)</div><div class="tl-desc">Hubbell joined the S&amp;P 500 on October 18, 2023, and the stock still fell 13.8% in the month, 18.5% below the June 2023 close. It recovered within two months.</div><div class="tl-impact down">−13.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">Then-high — $460.09</div><div class="tl-desc">The top of the 2023–2024 run: from $234.68 at December 2022 to $460.09 in under two years.</div><div class="tl-impact up">+96% from Dec 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb–Mar 2025</div><div class="tl-content"><div class="tl-title">Air pocket — $330.91, RSI 30.9</div><div class="tl-desc">Two consecutive double-digit monthly losses (−12.2% and −10.9%) took the stock 28.1% below the November 2024 close. The sources fetched do not attribute the move; FY2025 revenue growth did slow to 3.84%. It recovered to $437.48 by July 2025.</div><div class="tl-impact down">−28.1% from Nov 2024</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Month-end high — $523.20, NSI closes</div><div class="tl-desc">The highest month-end close in the window, the month the ~$3.0B NSI deal closed. The 52-week intraday high of $565.50 was set earlier in the year.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Aug 2026</div><div class="tl-content"><div class="tl-title">Beat, raise — and sell</div><div class="tl-desc">July −9.7% to $472.55 through the Q2 print, August −4.1% to $453.00, including a 4.05% single-day drop on August 18 for which no cause was found in the sources fetched.</div><div class="tl-impact down">−13.4% over two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $457.49</div><div class="tl-desc">Up 2.37% on the day and 1.0% on the August close; 3.0% above the December 2025 close of $444.11. September has swung between $438.53 and $464.75 at the close.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year index returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) and the <strong>NASDAQ-100</strong> were not obtained from the sources fetched, so no numeric comparison is given. What the sourced data does show: HUBB is <strong>up 153.2% on price over five years</strong> (about 20.4% a year) but only <strong>+3.64% over the last 52 weeks</strong> per StockAnalysis, and 19.1% below its 52-week high. The five-year record is exceptional; the last twelve months are a pause. Peer valuation multiples were not retrieved, so whether 27x trailing is expensive <em>relative to</em> other electrical-equipment names is not assessed here. HUBB is NYSE-listed and therefore not eligible for the NASDAQ-100.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Hubbell sells into the part of the power system that has to be rebuilt no matter which technology wins: transmission, substations, distribution and the electrical fit-out of data centers. Orders are ahead of shipments (Utility book-to-bill ~1.2x), data-center sales are growing about 50% this year, price realization was raised to 3–4 points, and full-year guidance moved from 8–11% to 16–18% sales growth. Extra-high-voltage projects ship from late 2026 into 2027, and NSI adds +$0.80 of EPS in 2027 on management's numbers. At ~22x the adjusted guide midpoint and with every one of 13 analysts at Buy or Hold and the lowest target 9.7% above the price, the post-earnings slide looks like a better entry to a multi-year build-out.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The growth is real, and it is priced. At 27.1x trailing GAAP earnings, a PEG of 2.11 and a 3.73% free-cash-flow yield, the stock needs the cycle to run for years. Meanwhile the quality of the numbers slipped: group adjusted operating margin fell 50 bps, Electrical fell 130 bps adjusted and 480 bps GAAP, GAAP and adjusted EPS guides are $3 apart, and the balance sheet went from comfortable to 1.42x debt-to-equity to buy NSI. The stock's response to a beat-and-raise — down 7.4% in two sessions — says the marginal buyer is already full. If hyperscaler capex or utility budgets pause, a levered, premium-multiple components maker is exactly where that pause gets priced first.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">End-market concentration in one capex cycle.</strong> Grid modernization, load growth and data centers are management's own three growth drivers — and they are the same macro story. Utility capex plans and hyperscaler build-outs decide the volume; a slowdown in either hits both segments at once.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Leverage and integration.</strong> ~$3.0B of acquisition funded with debt takes pro forma net leverage to ~2.9x, with a 24–30-month paydown plan. Integration slippage, missed synergies (2–3% sales, 3–5% cost) or higher refinancing costs would land directly on per-share earnings.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Margin and valuation compression together.</strong> The multiple is 27x trailing while Electrical margins are falling. If the next quarters show volume growth without margin recovery, the market can cut both the earnings estimate and the multiple at the same time.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Grid build-out: more power, delivered further</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">STRUCTURAL TAILWIND</span></div>
+    <p class="biz-desc">Hubbell's own framing — "grid modernization, load growth and datacenter investment" — describes a grid being asked to carry more electricity to new places. The company-level evidence: transmission and substation quoting has roughly doubled over a couple of years, transmission and substation are guided to double-digit growth in 2026, and 550-kilovolt and 765-kilovolt projects are on the shipping schedule. For a components supplier this is the best kind of demand: many small, specified parts per mile of line, bought by customers who value reliability over price.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Data centers: the fastest line, the least predictable</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">CYCLICAL EXPOSURE</span></div>
+    <p class="biz-desc">Data-center sales grew about 65% in Q2 2026 and are expected to grow about 50% for the year, on "added capacity, product introductions and content gains." That growth drove Electrical Solutions' 18% organic rate. It also ties part of Hubbell's growth to the capital budgets of a small number of very large buyers. The share of total sales that data centers now represent was not disclosed in the sources fetched, so the size of that exposure cannot be measured here.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Price, cost and the premium multiple</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">VALUATION CONSTRAINT</span></div>
+    <p class="biz-desc">Gross margin rose from 27.51% in FY2021 to 35.34% TTM — pricing power made visible — and 2026 brought two more price increases. But Q2's group adjusted operating margin still fell 50 bps. <strong>The bull framing:</strong> margins dipped because of acquisition mix and one month of NSI, and a book-to-bill above 1.0 with 3–4 points of price should restore them. <strong>The bear framing:</strong> the easy pricing is done, the multiple assumes it isn't, and a levered balance sheet leaves less room to wait. The way to settle it is not the P/E; it is the Electrical Solutions adjusted margin over the next two quarters.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/hubb/history/</strong> — the September 21, 2026 settled close of $457.49 (open 451.36, high 458.27, low 446.24, Adj. Close 457.49 present, +2.37% on the prior close of $446.92). Confirmed by the stockanalysis.com/stocks/hubb/ quote page, "At close: Sep 21, 2026, 4:00 PM EDT," $457.49. The after-hours quote ($456.00) is not used anywhere in this report.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual financials, forecast and analyst actions) for price, valuation, margins, returns, balance sheet, dividend, short interest, ownership, consensus and Sector/Industry labels; Hubbell's Q2 2026 results release (GlobeNewswire, July 28, 2026) for segment sales, growth, margins, EPS, cash flow, NSI terms, guidance and the CEO quote; Yahoo Finance "Hubbell Q2 Earnings Call Highlights" for data-center growth, book-to-bill, pricing, NSI details, synergy targets, leverage and the CFO name; S&amp;P Dow Jones Indices press release of October 13, 2023 and Wikipedia's List of S&amp;P 500 companies for index membership and date added; Wikipedia (Hubbell Incorporated) for founding history and the 2018 Aclara acquisition; digrin.com/stocks/detail/HUBB/price ("Real Price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from the unadjusted "Real Price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $457.49. The July and August 2026 month-ends ($472.55 on July 31, $453.00 on August 31) were cross-checked against StockAnalysis daily rows and match. <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close fourteen trading days into September, not a month-end. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Segment market shares, TAM, market-cap rankings, named institutional holders and competitor market caps were not sourced and are shown as "n/v" or "not sourced"; competitors are listed by name only. Five-year S&amp;P 500 and NASDAQ-100 returns were not verified and no numeric relative-performance figure is given. The trailing P/E is recomputed at the report price ($457.49 ÷ $16.90 TTM EPS). Employee count (18,000) is from the StockAnalysis profile; Wikipedia gives 17,700 as of 2024.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and adjusted figures exclude items included under GAAP. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [180.67,199.37,195.70,208.27,187.29,178.25,183.77,195.36,189.86,178.58,219.02,206.30,223.00,237.48,254.06,234.68,228.91,251.54,243.31,269.32,282.46,331.56,312.00,326.05,313.41,270.10,300.00,328.93,335.57,380.67,415.05,370.52,388.89,365.48,395.65,399.92,428.35,427.03,460.09,418.89,423.01,371.59,330.91,363.18,389.58,408.41,437.48,430.99,430.31,470.00,431.43,444.11,487.94,511.63,490.74,508.17,473.61,523.20,472.55,453.00,457.49];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 5,  label: 'Feb 2022 — 5-year low close $178.25',                     color: '#ef4444' },
+  { idx: 21, label: 'Jun 2023 — +17.4% month to $331.56; RSI 84.8',           color: '#22c55e' },
+  { idx: 25, label: 'Oct 2023 — joins S&P 500 (Oct 18); $270.10 (−13.8%)',    color: '#f59e0b' },
+  { idx: 38, label: 'Nov 2024 — then-high $460.09',                           color: '#22c55e' },
+  { idx: 42, label: 'Mar 2025 — $330.91, −28.1% from Nov 2024; RSI 30.9',     color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — NSI closes; 5-yr high close $523.20',         color: '#22c55e' },
+  { idx: 58, label: 'Jul 2026 — Q2 beat & raise; $472.55 (−9.7% month)',      color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $457.49',                   color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
