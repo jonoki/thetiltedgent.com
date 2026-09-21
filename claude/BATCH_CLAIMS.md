@@ -23,14 +23,6 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
-### sess-2026-09-21-a · claimed 2026-09-21 (local Claude Code session, direct git push)
-Next 10 uncovered by market cap (stockanalysis S&P 500 list fetched 2026-09-21; repo had 328 reports):
-
-BE VMRK FERG P ILMN BIIB RMD VMC JBL CCI
-
-- VMC is rebuilt fresh rather than committing the Sep 4 file Oki holds (stale close).
-- Skipped as share-class duplicates: GOOG, FOX, NWS. FISV is still the FI rename job, not claimed.
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -100,4 +92,11 @@ HBAN RJF NTRS
 
 ## DONE
 
-_(none yet)_
+### sess-2026-09-21-a · 2026-09-21 · all 10 published (338 reports)
+BE VMRK FERG P ILMN BIIB RMD VMC JBL CCI — as of the Sep 18 close (CCI: Sep 21).
+
+- VMRK = Equity Residential renamed on the AvalonBay merger (closed Aug 17, 2026); pre-Aug chart points are EQR, 1:1.
+- P = Everpure, Inc., formerly Pure Storage (PSTG, renamed Apr 2026). digrin's "P" page is old Pandora Media — use Yahoo or digrin PSTG.
+- BE, ILMN, P joined the S&P 500 on Sep 21, 2026.
+- Next unclaimed by market cap (21 Sep list): RDDT EXR HPQ ZTS MTD PCG WTW CFG CBOE TDY AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO.
+- The ledger's older OPEN/POOL lists above are mostly published now; diff against reports/ before trusting them.
