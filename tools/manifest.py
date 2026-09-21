@@ -81,6 +81,7 @@ def parse_index_cards(repo):
         a = m.group('attrs')
         sp = re.search(r'data-sp="([\d-]+)"', a)
         dow = re.search(r'data-dow="([\d-]+)"', a)
+        gl = re.search(r'data-gl="([A-Z ]+)"', a)   # Global (non-US-index) names carry their home exchange
         out[m.group('slug')] = {
             'ticker': m.group('tick'),
             'card_name': htmllib.unescape(m.group('name')),
@@ -90,6 +91,7 @@ def parse_index_cards(repo):
                 'sp500_added': sp.group(1) if sp else None,
                 'nasdaq100': 'data-ndx' in a,
                 'dow30_added': dow.group(1) if dow else None,
+                'global_exchange': gl.group(1) if gl else None,
             },
         }
     return out
@@ -321,6 +323,7 @@ def extract(path, repo, cards):
         'sp500_added': card.get('indices', {}).get('sp500_added'),
         'ndx': bool(card.get('indices', {}).get('nasdaq100')),
         'dow30_added': card.get('indices', {}).get('dow30_added'),
+        'global_exchange': card.get('indices', {}).get('global_exchange'),
         'as_of': as_of,
         'price': price,
         'change_pct': change_pct,
