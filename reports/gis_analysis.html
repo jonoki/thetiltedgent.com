@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIS — General Mills, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">GIS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Staples / Packaged Foods</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $18.93B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #1226</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER — date added 1957-03-04</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NASDAQ-100: NOT A MEMBER (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">General Mills, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$35.41</div>
+      <div class="price-change">−$0.91 (−2.51%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $35.46 (+0.14%) at 6:16 PM EDT, per StockAnalysis</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Number One General Mills Blvd, Minneapolis, Minnesota</div>
+    <div class="meta-item"><span>Employees:</span> 30,000</div>
+    <div class="meta-item"><span>Founded:</span> 1866 (StockAnalysis profile; Wikipedia's S&amp;P 500 list gives 1856)</div>
+    <div class="meta-item"><span>Fiscal Year Ends:</span> May</div>
+    <div class="meta-item"><span>Next Earnings:</span> September 23, 2026 (Q1 FY2027)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">General Mills is the company behind the cereal aisle's most familiar boxes — Cheerios, Betty Crocker, Pillsbury — plus Häagen-Dazs and, since its pet-food push, Blue Buffalo. It sells through grocery stores, e-commerce, foodservice operators and specialty retailers, in four reported segments: North America Retail, North America Pet, North America Foodservice and International. Fiscal 2026, the 53-week year that ended May 31, 2026, delivered net sales of <strong>$18.43B, down 5.45%</strong>, organic net sales <strong>down 2%</strong>, and a GAAP diluted loss of <strong>−$0.16 per share</strong> against <strong>$4.10</strong> the year before. Adjusted diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding. 'Adjusted' strips out items management treats as non-recurring, such as impairments and divestiture gains.">EPS</span> was <strong>$3.55</strong>, down 16% in constant currency.</p>
+  <p class="prose" style="margin-top:16px;">That loss is an accounting event, not a cash one — but it is an honest confession. On July 1, 2026 General Mills wrote down <strong>$1.5B of North America Pet goodwill</strong> and <strong>$250M on the Nudges and True Chews brands</strong>, took a <strong>$1,032M valuation loss</strong> on the Brazil business it was selling, and had already impaired the Uncle Toby's brand by $53M. Goodwill is the premium you paid for a business over its hard assets; writing it down is management telling you the premium was too much. At the same time the company has been shrinking on purpose: the U.S. yogurt business went to <strong>Groupe Lactalis</strong> (a $1,046M gain booked in Q1 FY2026), Canadian yogurt went to <strong>Sodiaal International</strong> (a $96M gain in Q3 FY2025), and Brazil has been sold to <strong>Café Três Corações</strong>. The stock tells the rest: <strong>$88.63 at the April 2023 month-end peak, $35.41 now</strong> — down 60% — with a 6.89% dividend yield that is the market asking whether the $2.44 payout survives a fiscal 2027 in which management itself guides adjusted operating profit <strong>down 8% to 13%</strong>. The next data point lands on <strong>September 23, 2026</strong>, two trading days after this snapshot.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jeff Harmening</div>
+      <div class="card-note">Named as CEO in the Q3 and Q4 FY2026 press releases and as Chairman and CEO on the StockAnalysis profile. On the Q4 release (July 1, 2026): "We finished fiscal 2026 on a positive note, delivering fourth-quarter adjusted results that met our expectations." He says the company is "laser focused on increasing our efficiency" and shifting emphasis from price investments to product innovation and renovation.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Kofi A. Bruce</div>
+      <div class="card-note">CFO per the StockAnalysis key-executives list; not named in the Q4 FY2026 release text retrieved. Dana M. McNabb is listed as Chief Operating Officer and a director. The CFO's numbers to defend: free-cash-flow conversion of ~95% of adjusted after-tax earnings in FY2027 and at least $750M of cost savings in the same year.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">75.7% – 88.7%</div>
+      <div class="card-note">MarketBeat puts institutional ownership at 75.71%; StockAnalysis at 88.72% — the sources disagree and both are shown. Largest holders by value per MarketBeat (as of Aug 19, 2026): <strong>Vanguard Group</strong> ($3.13B), <strong>BlackRock</strong> ($2.18B), <strong>State Street</strong> ($1.54B), <strong>Charles Schwab Investment Management</strong> ($915.95M) and <strong>Geode Capital Management</strong> ($704.17M) — an index-heavy register, as you would expect of an S&amp;P 500 member since 1957.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Four segments, one of them the whole story. The mix below uses <strong>full-year fiscal 2026 segment net sales</strong> (year ended May 31, 2026) from the company's Q4 FY2026 release, which reports them rounded to $0.1B; the four sum to $18.4B, which ties to reported net sales. Percentages are computed from those rounded figures. Remember two distortions in every growth rate: FY2026 had a <strong>53rd week</strong> (worth about 2 points of full-year net sales), and the <strong>yogurt divestitures</strong> removed revenue from North America Retail — which is why organic growth, which strips out both, is the cleaner number.</p>
+  <div class="seg-bar">
+    <div style="flex:57.6;background:#2DD4BF;">NA RETAIL 57.6%</div>
+    <div style="flex:16.3;background:#a78bfa;">INTL 16.3%</div>
+    <div style="flex:14.1;background:#22c55e;">PET 14.1%</div>
+    <div style="flex:12.0;background:#f59e0b;">FOODSVC 12.0%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> North America Retail — $10.6B (FY26), −11% reported, −3% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> International — $3.0B, +9% reported, +3% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> North America Pet — $2.6B, +6% reported, −3% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> North America Foodservice — $2.2B, −6% reported, −1% organic</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Segment operating profit, FY2026: North America Retail $2.2B (−20%), Pet $499M (flat), Foodservice $333M (−6%), International $189M (+96%). Retail is 58% of sales and roughly two-thirds of segment profit — as goes the cereal and baking aisle, so goes General Mills.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Retail</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$10.6B</div><div class="biz-stat-label">FY26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−11%</div><div class="biz-stat-label">YoY (−3% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">57.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Cereal, snacks, convenient meals, dough and baking products sold into U.S. and Canadian grocery. The reported −11% overstates the damage — the U.S. yogurt sale to Lactalis sits inside it — but the −3% organic figure is the honest one, and segment operating profit fell <strong>20% to $2.2B</strong>. Management spent fiscal 2026 running what it calls its "Remarkability playbook": investing in product, packaging and consumer value (read: price) to buy volume back. The Q4 quarter showed the first stabilisation — organic sales flat, segment profit <strong>+7% to $506M</strong> — but that quarter carried the 53rd week. Earlier in the year, the WSJ described Big Food as squeezed "by everything from inflation to GLP-1s," and reporting around the stock has pointed to shoppers trading down to cheaper private label. That is the structural question for this segment: whether branded volume can be bought back at a price that still leaves a margin.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Category size and share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">J.M. Smucker</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$12.80B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Conagra Brands</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$7.11B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Post Holdings</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$3.41B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">International</div>
+        <span class="biz-badge growth">ONLY ORGANIC GROWER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3.0B</div><div class="biz-stat-label">FY26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+9%</div><div class="biz-stat-label">YoY (+3% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Everything outside North America, including the Häagen-Dazs business and — until this month — Brazil. It was the only segment to grow organically in FY2026 (+3%), and segment profit nearly doubled to <strong>$189M (+96%)</strong>, but off a thin base: $189M on $3.0B of sales is a 6% segment margin against roughly 21% in North America Retail. The portfolio is being pruned: the Brazil business (Yoki and Kitano brands) was sold to Café Três Corações for a base price of R$800 million, with a <strong>$1,032M non-cash valuation loss</strong> booked in fiscal 2026; StockAnalysis carries a Business Wire headline that the sale completed in early September 2026. The Uncle Toby's brand was impaired by $53M. Expect reported International sales to step down in FY2027 as Brazil drops out.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Mondelez International</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$76.79B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Pet</div>
+        <span class="biz-badge emerging">GOODWILL IMPAIRED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2.6B</div><div class="biz-stat-label">FY26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+6%</div><div class="biz-stat-label">YoY (−3% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">14.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Blue Buffalo and the treat brands Nudges and True Chews. This was meant to be the growth engine — "pet humanization" is still on management's list of priorities — and the reported +6% looks like it. Strip out acquisitions and the extra week and it was <strong>−3% organic</strong>, with segment profit <strong>flat at $499M</strong>. In fiscal 2026 the company wrote down <strong>$1.5B of North America Pet goodwill</strong> and <strong>$250M</strong> on the Nudges and True Chews brand intangibles. At $2.6B of sales, a $1.75B write-down is not a rounding error; it is a revised view of what the segment will earn. Q4 was better — segment profit +14% to $160M — but on organic sales still down 3%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session. No pet-food competitor was named on the pages fetched, so none is shown.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Foodservice</div>
+        <span class="biz-badge emerging">SMALLEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2.2B</div><div class="biz-stat-label">FY26 Net Sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−6%</div><div class="biz-stat-label">YoY (−1% organic)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Products sold to foodservice operators — the away-from-home channel. Net sales fell 6% (−1% organic) and segment profit fell 6% to <strong>$333M</strong>, a ~15% segment margin. The Q4 quarter was the best of the four segments on profit growth (+22% to $101M, sales −1%, organic flat). It is the least-discussed piece of the company and the least likely to move the stock either way.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session — no estimate or named competitor is presented.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two numbers that actually matter</h3>
+  <p class="prose">For a packaged-food company the income statement is noisy — divestitures, impairments, extra weeks. Judge it on <strong>organic sales</strong> (is the brand portfolio selling more?) and on <strong>free cash flow against the dividend</strong> (can it keep paying?).</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">FY26 Organic Net Sales</div>
+      <div class="card-value" style="color:var(--red);">−2%</div>
+      <div class="card-note">Q4 was flat. The FY2027 guide is <strong>−1.5% to +0.5%</strong> — management is not promising growth, only that the decline stops. In February 2026 the FY2026 organic guide had been cut from −1% to +1% down to −1.5% to −2%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">FY26 Free Cash Flow</div>
+      <div class="card-value">$1.63B</div>
+      <div class="card-note">Down from $2.29B in FY2025 and $2.53B in FY2024. Dividends paid were $1.3B and buybacks $500M — together more than FCF. StockAnalysis puts the FCF payout ratio at <strong>80.21%</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">FY27 Adjusted EPS Guide</div>
+      <div class="card-value" style="color:var(--amber);">$3.00 – $3.20</div>
+      <div class="card-note">Versus $3.55 in FY2026. Management attributes ~11 points of EPS headwind to lapping the 53rd week, normalising incentive pay and the divestitures. The $2.44 dividend is 76–81% of that range.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cost Savings Target</div>
+      <div class="card-value">$3B by FY30</div>
+      <div class="card-note">Cumulative, with <strong>at least $750M in FY2027</strong>. This is the lever that has to pay for price investment without eating the dividend.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">30+ major brands</span>
+    <span class="moat-pill">Cheerios · Betty Crocker · Pillsbury</span>
+    <span class="moat-pill">Häagen-Dazs · Blue Buffalo</span>
+    <span class="moat-pill">Grocery shelf scale</span>
+    <span class="moat-pill">127 years of uninterrupted dividends</span>
+    <span class="moat-pill">~95% FCF conversion target</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>habit plus shelf space</strong>. A brand that has been in the pantry for decades gets bought without a second thought, and a manufacturer with more than 30 major brands gets a hearing from every grocery buyer. That is what produced a 15.7% operating margin before impairments on $18.4B of sales even in a bad year. The weakness is that habit is exactly what breaks when the price gap to private label widens, or when appetite itself shrinks — and the $1.75B Pet write-down shows that buying growth has not been a reliable escape route.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Volume has to be bought back.</strong> FY2026 organic sales fell 2% and North America Retail profit fell 20% while the company invested in price and value. The February 17, 2026 outlook cut blamed weak consumer sentiment and a volume recovery that was progressing "slower and more expensively" than expected. The FY2027 guide still has organic sales at −1.5% to +0.5%.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Appetite and trade-down.</strong> Coverage of the stock repeatedly cites two forces: shoppers switching to cheaper private label, and weight-loss drugs (GLP-1s) reducing how much people eat. Neither shows up as a line item, so neither can be measured precisely from the reported numbers. Both show up in organic volume.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">A levered balance sheet under a big dividend.</strong> Total debt $13.94B against $453.8M of cash; debt-to-equity 1.89, debt-to-EBITDA 3.84, current ratio 0.68. On September 3, 2026, Campbell's cut its dividend 36% to accelerate debt reduction, and GIS fell 3.25% that day on the read-across. General Mills has not signalled a cut — it declared $0.61 in July — but the market is now pricing the possibility.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">The pet thesis has been marked down.</strong> The $1.5B North America Pet goodwill impairment and the $250M Nudges/True Chews charge mean the growth premium once paid for pet has been partly written off. Pet organic sales fell 3% in FY2026.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which GIS has been a member since 1957-03-04 (per Wikipedia's constituent list); GIS is NYSE-listed and so is not eligible for the NASDAQ-100. Values are TTM, which here equals fiscal 2026 (year ended May 31, 2026), from StockAnalysis unless stated. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated. Note that StockAnalysis's operating income ($2.89B) excludes the impairment charges; the company's own GAAP figure for FY2026 is an <strong>operating loss of $886M</strong>.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>GIS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. Not meaningful when trailing EPS is negative.">Trailing P/E</span></td><td>n/m</td><td>—</td><td>—</td><td>GAAP TTM EPS is negative (−$0.16), so the ratio is not meaningful. On FY2026 <em>adjusted</em> EPS of $3.55: $35.41 ÷ $3.55 = 9.97x (non-GAAP).</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the expected earnings per share over the next year.">Forward P/E</span></td><td>11.83</td><td>—</td><td>—</td><td>StockAnalysis figure. Cross-check: $35.41 ÷ $3.07 consensus FY2027 EPS = 11.53x; ÷ $3.10 guidance midpoint = 11.42x. The forward multiple is higher than the adjusted trailing one because earnings are expected to fall.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Undefined when growth is negative.">PEG Ratio</span></td><td>n/a</td><td>—</td><td>—</td><td>Not meaningful: consensus FY2027 EPS is −13.49% versus FY2026.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — GAAP diluted.">EPS (TTM)</span></td><td>−$0.16</td><td>—</td><td>—</td><td>GAAP diluted, FY2026, versus $4.10 in FY2025. Driven by the $1.5B Pet goodwill, $250M and $53M brand, and $1,032M Brazil charges, partly offset by the $1,046M U.S. yogurt gain. Adjusted: $3.55.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>−5.45%</td><td>—</td><td>—</td><td>FY2026 $18.43B vs $19.49B. Includes yogurt divestitures (negative) and a 53rd week (~+2 points). Organic: −2%.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of making the product, as a percentage of revenue.">Gross Margin</span></td><td>33.73%</td><td>—</td><td>—</td><td>Down from 34.60% in FY2025 and 35.00% in FY2024 — the footprint of price investment and cost inflation.</td></tr>
+      <tr><td><span class="tip" title="Operating margin as computed by StockAnalysis: operating income before impairment charges, as a percentage of revenue.">Operating Margin</span></td><td>15.71%</td><td>—</td><td>—</td><td>Pre-impairment, per StockAnalysis; 17.27% in FY2025 and 18.97% in FY2024. GAAP operating result was a loss.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax, interest and write-downs.">Net Profit Margin</span></td><td>−0.47%</td><td>—</td><td>—</td><td>Net loss of $87.6M on $18.43B. 11.72% in FY2025.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>6.89%</td><td>—</td><td>—</td><td>$2.44 annualised ($0.61/quarter) ÷ $35.41. 69% of FY2026 adjusted EPS; 79% of the FY2027 guide midpoint ($3.10). FCF payout 80.21%.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>8.60%</td><td>—</td><td>—</td><td>46.00M shares, 5.60 days to cover. High for a consumer-staples large cap.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Higher means more financial leverage.">Debt-to-Equity</span></td><td>1.89</td><td>—</td><td>—</td><td>$13.94B debt vs $453.8M cash; net debt $13.49B. Debt/EBITDA 3.84. Equity shrank with the write-downs.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Below 1.0 means short-term obligations exceed short-term assets.">Current Ratio</span></td><td>0.68</td><td>—</td><td>—</td><td>Quick ratio 0.35. Common for packaged food, which runs on supplier credit and commercial paper, but it leaves the company reliant on access to funding markets.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$1.63B</td><td>—</td><td>—</td><td>Operating cash flow $2.17B less capex $539.9M. That is an 8.6% FCF yield on the $18.93B market cap ($1.626B ÷ $18.93B).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>−1.03%</td><td>—</td><td>—</td><td>Negative because of the GAAP net loss.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the debt and equity capital employed in the business.">ROIC</span></td><td>−3.46%</td><td>—</td><td>—</td><td>StockAnalysis figure; negative on GAAP results including impairments.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — market cap plus net debt, divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span></td><td>9.49</td><td>—</td><td>—</td><td>EV $32.42B on EBITDA $3.45B. Net debt is 42% of enterprise value.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>−0.03</td><td>—</td><td>—</td><td>StockAnalysis figure. A near-zero beta means the stock's moves have been unrelated to the market's, not that it is low-risk — it fell 29.67% over 52 weeks.</td></tr>
+      <tr><td>52-Week Range</td><td>$31.75 – $51.33</td><td>—</td><td>—</td><td>$35.41 is 31.0% below the high and 11.5% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Fiscal 2026 is almost entirely one-offs. <strong>Charges:</strong> $1,500M North America Pet goodwill impairment, $250M Nudges and True Chews brand impairment, $53M Uncle Toby's brand impairment, and a $1,032M non-cash valuation loss on the Brazil business. <strong>Gains:</strong> $1,046M on the sale of U.S. yogurt to Groupe Lactalis in Q1 FY2026 — which is why that quarter showed net income of $1,204M on revenue of $4.52B. <strong>Calendar:</strong> a 53rd week added ~7 points to Q4 net sales and ~2 points to the year. The practical consequence: GAAP EPS (−$0.16) and adjusted EPS ($3.55) tell very different stories, and FY2027 comparisons will be flattered on GAAP and penalised on adjusted as the extra week and divested sales roll off. Share repurchases were $500M in FY2026; the share count fell 3.55% year over year.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">20 analysts polled by S&amp;P Global via StockAnalysis. MarketBeat's panel also reads Hold.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$37.67</div><div class="card-note"><span style="color:var(--green);">+6.38% upside</span> from $35.41. Median target $37 (+4.49%). Add the 6.89% yield and the consensus implied total return is about 13% — for a stock nobody wants to call a Buy.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$31 – $47</div><div class="card-note">−12.45% to +32.73%.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">4 / 12 / 4</div><div class="card-note">1 Strong Buy + 3 Buy, 12 Hold, 2 Sell + 2 Strong Sell. As many sells as buys — unusual for a consumer-staples large cap.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:20;background:#22c55e;"></div>
+    <div style="flex:60;background:#f59e0b;"></div>
+    <div style="flex:20;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 4 (20%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 12 (60%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 4 (20%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">RBC Capital — Nik Modi</strong> · Buy (maintains) · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$45</span> (Sep 21, 2026). The bull on the board, restated on the day of this snapshot, two days before the print.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Bank of America — Peter Galbo</strong> · Hold (maintains) · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$43</span> (Sep 18, 2026). <strong>Evercore ISI — David Palmer</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$39 → $38</span> (Sep 14). <strong>Jefferies — Scott Marks</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$36 → $35</span> (Sep 10). <strong>Barclays — Andrew Lazar</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$36</span> (Sep 9).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">J.P. Morgan — Thomas Palmer</strong> · Sell (reiterates) · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$35</span> (Sep 16, 2026), and <strong>UBS — Peter Grom</strong> · Sell (maintains) · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$33</span> (Sep 16, 2026). Two bears reaffirming on the same day, a week before earnings.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Bernstein — Alexia Burland Howard</strong> · Sell (maintains) · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$31</span> (Jul 17, 2026) — the lowest target on the StockAnalysis board, and 12% below the current price.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 FY2027 earnings</div>
+        <div class="tl-desc">The first quarter without the 53rd week, without U.S. yogurt and without Brazil. What to watch: organic sales against the −1.5% to +0.5% full-year guide, whether the $3.00–$3.20 adjusted EPS range survives, progress on the ≥$750M FY2027 cost-savings target, and any language about the dividend.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">$3B cost-savings programme — at least $750M this year</div>
+        <div class="tl-desc">Targeted cumulatively by fiscal 2030. Management's stated plan is to shift spending from price investment to "product innovation and renovation news" — better-for-you attributes, bold flavours and pet humanisation. If savings arrive on schedule, they fund both reinvestment and the dividend.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Early Sep 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Brazil sale completed</div>
+        <div class="tl-desc">A Business Wire headline carried on StockAnalysis reports the completion of the sale of the Brazil business, including the Yoki and Kitano brands, to 3corações (Café Três Corações). The agreed base price was R$800 million; the $1,032M valuation loss was already taken in FY2026.</div>
+        <div class="tl-impact neutral">Portfolio simplification</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Campbell's cuts its dividend 36% — GIS falls on read-across</div>
+        <div class="tl-desc">Campbell's cut its quarterly dividend to $0.25 from $0.39 to accelerate debt reduction. General Mills had no news of its own but closed down 3.25% at $39.26; Kraft Heinz also fell. September is down 14.1% month to date.</div>
+        <div class="tl-impact down">Reaction already happened: −3.25% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 FY2026 results, impairments and FY2027 guide</div>
+        <div class="tl-desc">Q4 net sales $4.6B (+1%, organic flat), adjusted EPS $0.95 (+27% constant currency), but a $2.1B GAAP operating loss on the Pet goodwill, brand and Brazil charges. FY2027 guidance: organic sales −1.5% to +0.5%, adjusted operating profit −8% to −13%, adjusted EPS $3.00–$3.20. Quarterly dividend of $0.61 declared.</div>
+        <div class="tl-impact neutral">July close $35.75 vs June $34.80</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 17, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 outlook cut</div>
+        <div class="tl-desc">Organic sales guide lowered to −1.5% to −2% (from −1% to +1%); adjusted operating profit and EPS to −16% to −20% (from −10% to −15%). The company cited weak consumer sentiment and a volume recovery progressing more slowly and expensively than planned. Shares fell 3.6% that morning.</div>
+        <div class="tl-impact down">Reaction already happened</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">GIS — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">Over the five years from the September 2021 month-end close of <strong>$59.82</strong> to the September 21, 2026 settled close of <strong>$35.41</strong>, GIS lost <strong>40.8% of its price</strong>. Adding back roughly $11.40 per share of dividends (the sum of fiscal 2022–2026 dividends per share, not reinvested — an estimate) brings the total return to roughly <strong>−22%</strong>. The shape is a round trip that kept going: a steady climb to <strong>$88.63 in April 2023</strong> — then an almost uninterrupted three-year slide as volumes softened and revenue began to shrink. From that peak the stock is down 60%.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI was below 30 for most of 2025 and early 2026 and bottomed at <strong>6.6 in May 2026</strong> — about as oversold as a monthly series gets. The August 2026 rally (+15.2%, to $41.20) lifted it to 49.9; September's 14.1% fall has taken it back to <strong>34.1</strong>. The sources fetched do not explain the August move. The 10-month moving average sits at about <strong>$39.15</strong>, above the price: the long-term trend is still down, and the August bounce did not change it.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2022</div><div class="tl-content"><div class="tl-title">Momentum peak — $85.30, RSI 93.2</div><div class="tl-desc">The most overbought reading of the window, set during the 2022 market decline. FY2023 revenue grew 5.80%, the last year of growth in this series.</div><div class="tl-impact up">RSI 93.2</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2023</div><div class="tl-content"><div class="tl-title">Five-year high — $88.63 month-end close</div><div class="tl-desc">The top of the inflation-pricing cycle. The stock has not been back since.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">Last rally — $73.85</div><div class="tl-desc">A brief rebound that failed. FY2025 revenue fell 1.87% and EPS fell 4.87%; the stock went on to close 16 of the next 20 months lower than it started them.</div><div class="tl-impact neutral">Lower high</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">$37.22 — worst month of the window (−17.7%)</div><div class="tl-desc">The month of the Q3 FY2026 release (March 18): net sales −8%, diluted EPS $0.56 (−50%), adjusted EPS −37% in constant currency. This followed the February 17 outlook cut.</div><div class="tl-impact down">−17.7% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">Month-end low — $33.81, RSI 6.6</div><div class="tl-desc">The lowest month-end close in the five-year series and the most oversold RSI reading. The 52-week intraday low of $31.75 is lower still.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Relief rally — $41.20 (+15.2%)</div><div class="tl-desc">The best month of the five-year series. Cause not established by the sources fetched.</div><div class="tl-impact up">+15.2% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $35.41</div><div class="tl-desc">The August gain given back in three weeks, including the September 3 Campbell's read-across and a 2.51% fall on the snapshot day itself, two days before Q1 FY2027 earnings.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) were not obtained from the sources fetched, so no numeric comparison figure is given. What can be stated from sourced data: GIS is <strong>down 40.8% on price over five years</strong>, <strong>down 29.67% over 52 weeks</strong> and <strong>down 23.8% year to date</strong> (from $46.50 at December 2025 month-end). Among the packaged-food names listed alongside it by CompaniesMarketCap, General Mills at $18.93B is larger than J.M. Smucker ($12.80B), Conagra ($7.11B) and Post Holdings ($3.41B), and a quarter the size of Mondelez ($76.79B). The September 3 session showed how tightly the group now trades together: one peer's dividend cut moved the others.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay about 10x trailing adjusted earnings and 11.8x forward for a portfolio of brands that have been in American kitchens for generations, with a 6.89% dividend backed by 127 years without interruption and $1.63B of free cash flow even in a year of write-downs. The worst of the portfolio surgery is done: yogurt and Brazil are gone, the Pet goodwill has been marked to a more honest number, and the 53rd week and divestitures are known headwinds already inside the FY2027 guide. Q4 showed organic sales stabilising at flat and adjusted operating profit up 13% in constant currency. If the $3B cost programme delivers its ≥$750M this year and volumes hold, earnings can trough in FY2027 — and an 8.6% FCF yield does not need growth to work.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Organic sales have fallen and are guided to fall again; adjusted EPS is guided down another 10–15% to $3.00–$3.20; the dividend already consumes 80% of free cash flow; and the balance sheet carries $13.9B of debt at 3.8x EBITDA with a 0.68 current ratio. The company spent a year buying volume with price and got −2% organic for it. The $1.75B Pet write-down says the growth leg was overpaid for. Campbell's has just shown what happens when a food company's cash flow stops covering both debt reduction and the dividend. With four Sell ratings, an 8.6% short interest and a Bernstein target of $31, the market is treating the yield as a warning, not a gift.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Volume doesn't come back.</strong> Private-label trade-down and GLP-1-driven changes in eating are cited in coverage of the stock; FY2026 organic sales fell 2% and the FY2027 guide spans −1.5% to +0.5%. A result at the bottom of that range, with price investment still running, would put the $3.00 EPS floor at risk.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Dividend coverage.</strong> $2.44 per share against $3.00–$3.20 of guided adjusted EPS (76–81%) and an 80.21% FCF payout, on a balance sheet with 1.89 debt-to-equity. A peer cut its dividend 36% on September 3. The payout has not been cut here — but the yield says the market is pricing the risk.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">More write-downs.</strong> FY2026 carried $2.8B of impairments and valuation losses. Goodwill and brand intangibles are tested against forecasts; if Pet or other brands underperform the new assumptions, further non-cash charges follow — no cash effect, but a signal the market has already learned to punish.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Big Food's volume problem</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">The WSJ's July 2026 headline — "Big Food Is Running Out of Moves with Shoppers and Investors" — described General Mills as "squeezed by everything from inflation to GLP-1s." The shape of the problem, as the coverage describes it: shoppers trading down to cheaper private label, appetite pressure from weight-loss drugs, and companies having to invest in price to win volume back. General Mills' own numbers trace the arc — gross margin 35.00% in FY2024, 34.60% in FY2025, 33.73% in FY2026 — alongside three straight years of falling revenue.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Portfolio reshaping and dividend stress across the group</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">The response across packaged food has been to sell slower businesses, cut costs and protect the payout. General Mills sold yogurt in the U.S. and Canada and its Brazil business, and has launched a $3B savings programme. Campbell's went further on September 3, 2026, cutting its dividend 36% to pay down debt; its shares fell 9% that day, and General Mills and Kraft Heinz fell with it. The lesson the market drew is that a high yield in this sector is only as safe as the free cash flow behind it after debt service — and that one company's reset gets priced into its peers.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The valuation question — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">At 9.49x EV/EBITDA, ~10x adjusted trailing earnings and an 8.6% FCF yield, General Mills is priced like a business in decline. <strong>The bull framing:</strong> the decline is largely self-inflicted and finite — divestitures, an extra week to lap, and a deliberate price investment — and FY2027 is the trough year management has already guided to. Every dollar of the $750M savings target that sticks is a dollar that doesn't have to come from volume. <strong>The bear framing:</strong> it is a business in decline. Revenue has fallen three years running, the growth acquisition has been written down, and the guide is for lower profit again. The way to adjudicate is not the P/E; it is two numbers per quarter — organic volume and free cash flow after the dividend. The first report under the FY2027 guide arrives on September 23.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/gis/history/</strong> — the September 21, 2026 row: open 36.27, high 36.53, low 35.41, close 35.41, Adj. Close 35.41, −2.51% on the prior close of $36.32. Confirmed by the quote page stockanalysis.com/stocks/gis/ ("$35.41, at close: Sep 21, 2026, 4:00 PM EDT"). The quote page shows volume of 9,955,278 versus 9,869,323 on the history row; the difference does not affect the price. After-hours quote ($35.46) is shown for information only and is not used in any calculation.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile and executives, annual and quarterly income statements, forecast, analyst ratings) for price, valuation, margins, returns, balance sheet, consensus, named analyst actions and Sector/Industry labels; General Mills' Q4 FY2026 press release (investors.generalmills.com, July 1, 2026) for segment results, impairments, divestiture gains, the 53rd week, FY2027 guidance, cost savings, dividend and CEO quotes; General Mills' Q3 FY2026 release (March 18, 2026); investing.com (Feb 17, 2026) for the FY2026 outlook cut; 247wallst.com (Sep 3, 2026) for the Campbell's dividend cut and peer moves; digrin.com/stocks/detail/GIS/price ("Real Price" column) for month-end closes; marketbeat.com for institutional holders and ownership; companiesmarketcap.com for the global market-cap rank and peer market caps; Wikipedia's List of S&amp;P 500 companies for index membership and date added. The WSJ headline and quote are as carried in StockAnalysis's news feed.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin.com's "Real Price" column, plus a final point at the September 21, 2026 settled close of $35.41. July and August 2026 month-ends ($35.75, $41.20) were cross-checked against StockAnalysis daily rows and match. <strong>No interior months were reconstructed or estimated.</strong> The only split in the period of record is a 2:1 split on June 9, 2010, before this window. Industry-average and S&amp;P 500 benchmark columns in Section 04 are "—" because no sourced values were obtained. Segment market shares and industry sizes are "n/v" or omitted. Segment mix percentages are computed from segment sales reported rounded to $0.1B. Peer names and market caps are CompaniesMarketCap's similar-companies list (Campbell's and Kraft Heinz are named from 247wallst.com and MarketBeat); they are market capitalisations, not segment revenues or shares, and are not a verified segment-by-segment competitor map. The segment operating profit figures are company-reported; StockAnalysis's operating income excludes impairments and differs from the company's GAAP operating loss of $886M. Institutional ownership differs between MarketBeat (75.71%) and StockAnalysis (88.72%); both are shown. The founding year differs between StockAnalysis (1866) and Wikipedia's constituent list (1856). The global market-cap rank (#1226) is from CompaniesMarketCap at the same $35.41 price; US and NYSE ranks were not sourced. The five-year dividend add-back is an estimate from fiscal-year dividends per share.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and adjusted figures are non-GAAP. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com "Real Price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [59.82,61.80,61.77,67.38,68.68,67.43,67.72,70.73,69.85,75.45,74.79,76.80,76.61,81.58,85.30,83.85,78.36,79.51,85.46,88.63,84.16,76.70,74.74,67.66,63.99,65.24,63.66,65.14,64.91,64.18,69.97,70.46,68.75,63.26,67.14,72.29,73.85,68.02,66.26,63.77,60.14,60.62,59.79,56.74,54.26,51.81,48.98,49.33,50.42,46.61,47.35,46.50,46.26,45.23,37.22,35.31,33.81,34.80,35.75,41.20,35.41];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 14, label: 'Nov 2022 — momentum peak $85.30, RSI 93.2',              color: '#22c55e' },
+  { idx: 19, label: 'Apr 2023 — five-year high $88.63',                       color: '#22c55e' },
+  { idx: 36, label: 'Sep 2024 — last rally $73.85',                           color: '#3b82f6' },
+  { idx: 54, label: 'Mar 2026 — Q3 FY26 print month; $37.22 (−17.7%)',       color: '#ef4444' },
+  { idx: 56, label: 'May 2026 — month-end low $33.81, RSI 6.6',               color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q4 FY26: $2.8B charges, FY27 guide; $35.75',  color: '#f59e0b' },
+  { idx: 59, label: 'Aug 2026 — relief rally $41.20 (+15.2%)',                color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $35.41',                    color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
