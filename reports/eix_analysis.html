@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EIX — Edison International | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #E8733A;
+  --accent-dim: #E8733A33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">EIX</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Utilities / Electric Utilities</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $21.15B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500 constituent — listed date added March 4, 1957</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;margin-left:6px;">Not a NASDAQ-100 member (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Edison International</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$54.95</div>
+      <div class="price-change">−$0.36 (−0.65%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $54.95 (0.00%) per stockanalysis.com quote page</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Rosemead, California</div>
+    <div class="meta-item"><span>Employees:</span> 13,725</div>
+    <div class="meta-item"><span>Founded:</span> 1886 roots; Edison International name since 1996</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 27, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">On the evening of January 7, 2025, a fire started in Eaton Canyon above Altadena. By the time it was contained 24 days later it had burned 14,021 acres, destroyed roughly 9,400 structures and killed at least 17 people (sources differ: Edison's newsroom says 17; Wikipedia and the LA Times report 19). Edison International closed December 2024 at <strong>$79.84</strong>. It closed January 2025 at <strong>$54.00</strong>. Twenty months later, on Monday September 21, 2026, it closed at <strong>$54.95</strong>. Everything that has happened to this company since — a higher rate base, a higher dividend, strong core earnings growth — has netted to roughly zero for the share price. This report explains why.</p>
+  <p class="prose" style="margin-top:16px;">Edison International is the holding company for <strong>Southern California Edison (SCE)</strong>, which delivers power to "15 million people in 50,000 square miles across central, coastal and Southern California." It is a <span class="tip" title="A utility whose prices are set by a regulator. It earns an allowed return on the capital it invests (its 'rate base'), rather than a market price for a product.">regulated utility</span>: SCE invests in poles, wires and substations, the regulator adds that investment to its <span class="tip" title="Rate base — the net value of utility assets on which the regulator lets the company earn a return. Grow the rate base and, all else equal, earnings grow with it.">rate base</span>, and SCE earns an authorised return on it — <strong>10.03% on CPUC-regulated equity, 10.30% on FERC-regulated transmission</strong>. Management projects the rate base growing from $47.6B (2025) to $67.9B (2030), roughly <strong>7% a year</strong>, and reaffirmed 2026 core EPS guidance of <strong>$5.90–$6.20</strong> on July 30, 2026.</p>
+  <p class="prose" style="margin-top:16px;">That is the boring half. The other half is a liability with no number on it. SCE's own words: "Absent additional evidence, SCE believes that it is likely that its equipment was associated with the ignition of the Eaton Fire." The company says it is "currently unable to estimate potential losses." California's <span class="tip" title="A state fund created under AB 1054 to pay eligible wildfire claims against the state's investor-owned utilities, so that one fire does not bankrupt a utility. Utilities reimburse it only if found imprudent.">Wildfire Fund</span> — $21B when the fire started, topped up by $18B of new money in 2025 under SB 254 — stands between the claims and Edison's balance sheet. On <strong>August 31, 2026</strong>, the legislature's wildfire bill (SB 492) took shape without the protections investors wanted, and EIX fell <strong>23% in a day</strong> — its worst session since the 2001 California energy crisis. The next day the bill died without a vote on the session's final day (CalMatters). The stock now trades at <strong>5.7x trailing GAAP earnings</strong> and yields <strong>6.39%</strong>. The market is not pricing a utility. It is pricing a claim.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Pedro J. Pizarro</div>
+      <div class="card-note">President &amp; CEO, named on the Q2 2026 results release (July 30, 2026). On the Q2 call he put the stakes plainly: "if there is insufficient action in 2026, there is a strong likelihood that the day after or a few days after, you know, we could see credit rating downgrades for the investor-owned utilities in California." Four weeks later the session ended with no action: SB 492 died without a vote on September 1 (CalMatters).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Aaron D. Moss</div>
+      <div class="card-note">Executive Vice President and CFO per the StockAnalysis company profile; also named as CFO in the Q2 2026 earnings-call transcript (Motley Fool). He owns the financing plan that matters most here: $38–41B of 2026–2030 capex funded by $36–38B of operating cash flow and $9–12B of incremental debt, with <strong>no new equity</strong> forecast.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Institutional Ownership</div>
+      <div class="card-value" style="font-size:20px;">95.42%</div>
+      <div class="card-note">Per stockanalysis.com. Named top holders were not sourced for this report. Short interest is a modest <strong>4.04% of float</strong> (3.25 days to cover). For a stock that just fell 23% in a day, that is low: the selling came from long holders heading for the exit, not from a crowded short.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">For a utility, "segments" are regulators. SCE's earnings base is its rate base, and the rate base splits by who sets the return: the <strong>California Public Utilities Commission (CPUC)</strong> for distribution and generation, and the <strong>Federal Energy Regulatory Commission (FERC)</strong> for high-voltage transmission. The bar below uses management's <strong>2026 weighted-average rate base of $50.8B</strong> from the Q2 2026 presentation. The holding company, EIX Parent &amp; Other, has no rate base and is a net cost centre.</p>
+  <div class="seg-bar">
+    <div style="flex:85;background:#E8733A;">CPUC RATE BASE 85%</div>
+    <div style="flex:15;background:#22c55e;">FERC 15%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#E8733A;"></span> SCE — CPUC-jurisdictional: $43.2B (2026 forecast), authorised ROE 10.03%, equity ratio 52%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> SCE — FERC transmission: $7.6B (2026 forecast), authorised ROE 10.30%, equity ratio 47.5%</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Earnings follow the rate base almost mechanically. 2026 core EPS guidance breaks into SCE <strong>$6.81–$7.07</strong> and EIX Parent &amp; Other <strong>−$0.91 to −$0.87</strong> (mainly holding-company interest). Everything that goes wrong or right in this stock beyond that arithmetic is wildfire.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #E8733A;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">SCE — CPUC-Regulated Distribution &amp; Generation</div>
+        <span class="biz-badge dominant">CORE EARNINGS ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$43.2B</div><div class="biz-stat-label">2026 Rate Base</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.03%</div><div class="biz-stat-label">Allowed ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">$58.4B</div><div class="biz-stat-label">2030 Plan</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">85%</div><div class="biz-stat-label">Rate Base Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The wires that reach 15 million people. Returns here are set through the <span class="tip" title="General Rate Case — the multi-year proceeding in which the CPUC decides how much SCE may spend and recover in rates.">General Rate Case</span>; the 2025 GRC decision, adopted in Q3 2025, is the main reason Q2 2026 core EPS rose to $1.54 from $0.97 a year earlier. Much of the capital is now wildfire defence: as of June 30, 2026 SCE had hardened roughly 90% of its high-fire-risk distribution system — 14,760+ circuit miles, of which ~7,590 miles are underground and 7,170+ are covered conductor — with up to ~970 miles still planned through 2028. The irony of this business is that the same wildfire risk that threatens the equity also grows the rate base that pays it.</p>
+    <div class="biz-tam"><strong>Rate base path (CPUC, $B):</strong> 2025 40.1 · 2026 43.2 · 2027 46.4 · 2028 49.8 · 2029 53.8 · 2030 58.4 — management forecast, Q2 2026 presentation.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">PG&amp;E (PCG)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--red);">−18%</div><div class="comp-bubble-label">Aug 31 move</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Sempra (SRE)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--red);">−2%</div><div class="comp-bubble-label">Aug 31 move</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Utilities ETF (XLU)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val" style="color:var(--red);">−1%</div><div class="comp-bubble-label">Aug 31 move</div></div><div><div class="comp-bubble-val">—</div><div class="comp-bubble-label">Benchmark</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">SCE — FERC-Regulated Transmission</div>
+        <span class="biz-badge growth">HIGHER ALLOWED RETURN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$7.6B</div><div class="biz-stat-label">2026 Rate Base</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.30%</div><div class="biz-stat-label">Allowed ROE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">$9.5B</div><div class="biz-stat-label">2030 Plan</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15%</div><div class="biz-stat-label">Rate Base Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">High-voltage lines regulated by FERC under a formula rate that updates each year. It is a smaller slice with a slightly higher authorised return, and it grows with CAISO-awarded transmission projects (about $2B identified beyond 2030) and the load growth management expects from electrification: "~30–40% load growth by 2035 and nearly doubling by 2045." It is also, awkwardly, the part of the system at the centre of the Eaton Fire: SCE's statement on causation refers to "its transmission facilities in the preliminary area of origin."</p>
+    <div class="biz-tam"><strong>Rate base path (FERC, $B):</strong> 2025 7.5 · 2026 7.6 · 2027 8.0 · 2028 8.3 · 2029 8.8 · 2030 9.5 — management forecast.</div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">EIX Parent &amp; Other</div>
+        <span class="biz-badge emerging">HOLDING-COMPANY DRAG</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−$0.91 to −$0.87</div><div class="biz-stat-label">2026 EPS Guide</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−$0.08</div><div class="biz-stat-label">Q2'26 Trio Loss</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Holding-company debt (5.4% weighted pre-tax rate per management), preferred dividends, and the remnants of non-utility ventures. In Q2 2026 it booked an $0.08 per share non-core loss on the "Trio disposition" — the exit from the former Edison Energy advisory business — and it houses Edison Insurance Services, which carried a $0.13 per share non-core charge for wildfire claims in H1 2025. Nothing here drives the investment case; it is simply the cost of the structure.</p>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The Eaton Fire ledger — what is known</h3>
+  <p class="prose">Edison has not booked an estimate for Eaton Fire losses. What it has disclosed is the flow of its voluntary <strong>Wildfire Recovery Compensation Program (WRCP)</strong>, which pays claimants quickly in exchange for giving up litigation. These are the figures to track, quarter by quarter.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">WRCP Offers Extended</div>
+      <div class="card-value">$860M+</div>
+      <div class="card-note">As of Aug 28, 2026: 2,500+ offers to nearly 6,300 claimants, from 4,450+ claims representing 13,600+ individuals, trusts and entities. Up from $775M+ as of July 24. Claims deadline: <strong>November 30, 2026</strong>.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">WRCP Paid</div>
+      <div class="card-value">$460M+</div>
+      <div class="card-note">To 3,100+ claimants as of Aug 28, 2026. 77%+ of offers accepted, under 2% declined, per Edison's newsroom. Individual payments ranged from $15,000 to $15.1 million.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Claims in Litigation</div>
+      <div class="card-value" style="color:var(--red);">~30,000</div>
+      <div class="card-note">Per the Q2 2026 call and 24/7 Wall St. Separately, Los Angeles County, Pasadena and Sierra Madre sued SCE in March 2025, and the U.S. Department of Justice sued SCE in September 2025 (Wikipedia).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Subrogation Settlements</div>
+      <div class="card-value" style="color:var(--amber);">~55¢ / $</div>
+      <div class="card-note">Settlements with two insurers at roughly 55 cents on the dollar (Q2 2026 call; TIKR). <span class="tip" title="Subrogation — after an insurer pays a policyholder, it steps into the policyholder's shoes and sues whoever caused the loss (here, allegedly the utility) to recover what it paid.">Subrogation</span> is the single biggest unknown: the insurers' own payouts are the largest block of claims.</div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:16px;font-size:13px;">Third-party loss estimates for the whole fire, not Edison's liability: insured property losses of up to <strong>$15.2B</strong> and a UCLA study range of <strong>$24B–$45B</strong> in total losses (LA Times, July 23, 2025, via Yahoo); Wikipedia cites <strong>$27.5B</strong>. None of these is an Edison estimate, and utility liability is not the same number as total economic loss.</p>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Legal monopoly franchise</span>
+    <span class="moat-pill">15M people, 50,000 sq mi</span>
+    <span class="moat-pill">Regulated ROE 10.03% / 10.30%</span>
+    <span class="moat-pill">~7% rate base growth to 2030</span>
+    <span class="moat-pill">Electrification load growth</span>
+    <span class="moat-pill">Wildfire Fund backstop</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A utility's moat is its franchise: no competitor is going to string a second set of wires down the same street. SCE's customers cannot leave, the regulator lets it earn a return on everything it prudently builds, and California's electrification push gives it a long list of things to build. On those terms this is as protected as a business gets. The problem is that California law exposes utilities to <span class="tip" title="Inverse condemnation — a California legal doctrine under which a utility whose equipment causes a fire can be liable for property damage even without proof of negligence, because it is treated like a public entity taking private property.">inverse condemnation</span>, so the moat that protects revenue does nothing to protect the equity from a fire its equipment starts. The Wildfire Fund was built to fill exactly that gap. August 31 was the market's verdict that it may not be large enough.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">An unquantified liability sits ahead of the equity.</strong> Edison's funding stack, per its Q2 2026 slide: the first $1B of Eaton claims comes from customer-funded self-insurance (including a $12.5M shareholder contribution); then reimbursement from the Wildfire Fund up to its remaining capacity; above that capacity, SB 254 gives the ability to securitise, subject to CPUC approval. If the CPUC later finds SCE acted imprudently, it must pay the Fund back. Every layer depends on a regulator or a court not yet heard from.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">SB 492 died and left the Fund's weaknesses in place.</strong> The bill died without a vote on September 1, 2026 (CalMatters). As reported by TIKR and 24/7 Wall St (not confirmed on a primary source), the version on the table had dropped Governor Newsom's proposal to shield utilities from insurer subrogation suits, left out a $6B per-incident cap on Fund withdrawals, left the 2028 sunset in place and added no mechanism to refill the Fund once it runs dry. A single fire could use up the Fund that is meant to protect every California investor-owned utility.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Credit ratings at the bottom of investment grade.</strong> TIKR reports SCE at BBB- (not confirmed on a rating-agency page), the bottom rung of investment grade, with Moody's and S&amp;P having warned that a weak legislative outcome could trigger downgrades. Pizarro himself said downgrades were a "strong likelihood" if action fell short. A move to junk would raise the cost of the $9–12B of incremental debt in the financing plan, and that cost flows straight into EPS.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Affordability.</strong> Rate base growth is only earnings growth if the CPUC keeps approving it, and SCE's customers are already paying Wildfire Fund charges, extended through 2035 with continuation charges planned from 2036 to 2045 (PBS SoCal). Every dollar of wildfire cost passed to ratepayers makes the next rate case harder.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>; EIX is NYSE-listed and not a NASDAQ-100 constituent. For a regulated utility the metrics that matter are rate base, allowed return, leverage and dividend cover, and they lead the table. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—". <strong>Read the trailing P/E with care:</strong> the $9.69 TTM EPS is GAAP and includes large one-off wildfire cost recoveries booked in 2025 (see below). On management's 2026 <em>core</em> EPS guidance the multiple is about 9x.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>EIX</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Rate base — the asset value on which the regulator allows SCE to earn a return. Weighted-average basis, management forecast.">SCE Rate Base (2026)</span></td><td>$50.8B</td><td>—</td><td>—</td><td>Management forecast, 85% CPUC / 15% FERC. Projected at $67.9B by 2030 (base case), roughly 7% a year.</td></tr>
+      <tr><td><span class="tip" title="Authorised return on equity — the return the regulator allows on the equity-funded share of rate base.">Allowed ROE (CPUC / FERC)</span></td><td>10.03% / 10.30%</td><td>—</td><td>—</td><td>With authorised equity ratios of 52% (CPUC) and 47.5% (FERC). These set the earnings ceiling on the regulated business.</td></tr>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by GAAP earnings per share over the last twelve months.">Trailing P/E</span></td><td>5.67</td><td>—</td><td>—</td><td>$54.95 ÷ $9.69 TTM EPS = 5.67. Flattered by 2025 wildfire recoveries — not a like-for-like multiple.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>8.97</td><td>—</td><td>—</td><td>StockAnalysis, on consensus 2026 EPS of $6.12. On the $6.05 midpoint of management's $5.90–$6.20 core guidance: $54.95 ÷ $6.05 = 9.08 (our calculation).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — GAAP net income per share for the last four reported quarters.">EPS (TTM)</span></td><td>$9.69</td><td>—</td><td>—</td><td>GAAP. FY2025 GAAP EPS was $11.55; H1 2025 alone included $3.49/share of "wildfire-related recoveries, net of claims and expenses" (pre-tax, non-core). H1 2026 core EPS was $2.97 vs $2.34.</td></tr>
+      <tr><td><span class="tip" title="Management's non-GAAP earnings measure excluding items it classifies as non-core, such as wildfire claims and recoveries.">Core EPS Guidance (2026)</span></td><td>$5.90–$6.20</td><td>—</td><td>—</td><td>Reaffirmed July 30, 2026. 2027 guide $6.25–$6.65; 2028 guide $6.74–$7.14; 5–7% core EPS CAGR 2025–2030.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+10.74%</td><td>—</td><td>—</td><td>TTM revenue $19.42B. For a utility, revenue mostly passes through fuel and purchased power; rate base is the better growth gauge.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>6.39%</td><td>—</td><td>—</td><td>$3.51 annualised on $54.95, up 6.05% YoY. Management cites 22 consecutive years of dividend growth and a 45–55% payout target on SCE core earnings.</td></tr>
+      <tr><td><span class="tip" title="Dividends per share divided by earnings per share.">Payout Ratio</span></td><td>36.23%</td><td>—</td><td>—</td><td>On inflated GAAP TTM EPS. On the $6.05 core guidance midpoint the payout is about 58% ($3.51 ÷ $6.05; our calculation).</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>2.28</td><td>—</td><td>—</td><td>$43.54B total debt against $242M cash. Enterprise value $64.44B — three times the market cap. Normal for a utility; what matters is the rating on that debt.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>−$389M</td><td>—</td><td>—</td><td>Negative every year FY2021–FY2025 (−$5.49B in 2021). Structural for a utility in a capex cycle: the dividend is funded by debt as much as by cash flow.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>19.73%</td><td>—</td><td>—</td><td>TTM, GAAP — well above the 10.03% allowed return because of the one-off recoveries. Not repeatable.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span></td><td>7.22</td><td>—</td><td>—</td><td>StockAnalysis, TTM.</td></tr>
+      <tr><td><span class="tip" title="Gross margin — for a utility this mostly reflects fuel and purchased-power pass-through, not pricing power.">Gross Margin</span></td><td>61.00%</td><td>—</td><td>—</td><td>Operating margin 31.18%, profit margin 19.28% (TTM). Less informative for a regulated utility than allowed ROE.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.66</td><td>—</td><td>—</td><td>Typical for a utility that funds itself continuously in the debt markets. Liquidity depends on market access, which depends on the credit rating.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>4.04%</td><td>—</td><td>—</td><td>Short ratio 3.25 days. Moderate.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>0.61</td><td>—</td><td>—</td><td>Backward-looking and misleading here: a 0.61-beta stock does not fall 23% in a session. The risk is event risk, not market risk.</td></tr>
+      <tr><td>52-Week Range</td><td>$52.00 – $81.62</td><td>—</td><td>—</td><td>Per StockAnalysis. The current $54.95 sits 5.7% above the low and 32.7% below the high. 50-day MA $68.77, 200-day MA $68.37.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">The gap between GAAP and core earnings is the whole story of the income statement. In the first half of 2025 SCE booked <strong>$1,343M</strong> (pre-tax, <strong>$3.49 per share</strong>) of "wildfire-related recoveries, net of claims and expenses", tied to cost recovery for earlier fires — management's slides reference the TKM Settlement Agreement and Woolsey recovery. That pushed H1 2025 GAAP EPS to $4.62 against core EPS of $2.34, and it is why FY2025 GAAP EPS ($11.55) and TTM EPS ($9.69) are far above anything the regulated business earns in a normal year. In the other direction, SCE books a recurring non-core "Wildfire Fund expense" of about $0.09 per share a quarter, and Q2 2026 included a $0.08 per share loss on the Trio disposition. Management expects to have recovered <strong>$11B+ of historical costs by end-2027</strong>, including a planned Woolsey securitisation. None of this includes any Eaton Fire loss accrual, because none has been booked.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">17 analysts, per stockanalysis.com. TIKR counts 18 analysts (4 buys, 1 outperform, 10 holds, 3 sells) — a different panel.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$67.14</div><div class="card-note"><span style="color:var(--green);">+22.18% upside</span> from $54.95. Median target $64 (+16.47%). Several targets have not yet been cut since August 31, so the average is probably stale.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$50 – $86</div><div class="card-note">−9.01% to +56.51%. The $86 high predates the SB 492 collapse. Mizuho cut from exactly $86 to $70 on August 31.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">3 / 11 / 3</div><div class="card-note">2 Strong Buy + 1 Buy, 11 Hold, 0 Sell + 3 Strong Sell (September 2026). The Street has moved to the middle and is waiting.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:17.6;background:#22c55e;"></div>
+    <div style="flex:64.7;background:#f59e0b;"></div>
+    <div style="flex:17.6;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 3 (17.6%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 11 (64.7%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 3 (17.6%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Bank of America — Ross Fowler</strong> · Downgrade to Hold · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$81 → $51</span> (Sep 1, 2026). A 37% target cut in one move, and one of the few targets below the current price. This is what a liability-first valuation looks like.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Mizuho — Anthony Crowdell</strong> · Downgrade to Neutral/Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$86 → $70</span> (Aug 31, 2026). Cut on the day of the 23% drop. $70 still implies about 27% upside, so this is a call on risk, not on value.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Morgan Stanley — David Arcaro</strong> · Sell (reiterated) · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$65 → $60</span> (Sep 18, 2026). <strong>Wells Fargo — Shahriar Pourreza</strong> reiterated Sell, $62, on Aug 31. Note that both bears have targets <em>above</em> today's price.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">The Hold cluster</strong> · <strong>J.P. Morgan — Aidan Kelly</strong> <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$82 → $61</span> (Sep 2); <strong>Truist — Richard Sunderland</strong> <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$77 → $63</span> (Sep 3); <strong>UBS — Gregg Orrill</strong> <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$75 → $63</span> (Sep 1). <strong>Argus — Marie Ferguson</strong> downgraded to Hold on Aug 26, before the SB 492 text emerged.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Pending</div>
+      <div class="tl-content">
+        <div class="tl-title">Rating-agency response to SB 492</div>
+        <div class="tl-desc">Pizarro warned of downgrades "the day after or a few days after" insufficient action, and TIKR reports both Moody's and S&amp;P had flagged the risk. SCE is already at BBB- per TIKR. Whether the agencies act, and how far, is the next hard data point. No rating action after the bill's failure was confirmed in the sources fetched for this report.</div>
+        <div class="tl-impact down">Key downside risk</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 27, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">Watch three things: whether management keeps the $5.90–$6.20 core guide and "no equity" financing plan after SB 492's failure; the WRCP offer and payment totals (last: $860M+ offered, $460M+ paid); and any change to the "unable to estimate" position on Eaton losses.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">WRCP claims deadline</div>
+        <div class="tl-desc">After this date the voluntary program stops taking claims. The final count of program claims against the ~30,000 in litigation is the first real read on how much of the liability settles on Edison's schedule and how much goes to court.</div>
+        <div class="tl-impact neutral">Liability sizing</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Legacy cost recovery completes</div>
+        <div class="tl-desc">Management expects to have recovered $11B+ of historical costs by end-2027, including the Woolsey securitisation. Wildfire memo-account recoveries should be nearly complete, which would strengthen the balance sheet and credit metrics.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2028</div>
+      <div class="tl-content">
+        <div class="tl-title">Wildfire Fund sunset</div>
+        <div class="tl-desc">With SB 492 dead, the 2028 sunset reported by TIKR and 24/7 Wall St stays in place (not confirmed on a primary source). Unless it is extended, it is a hard date by which the legislature has to come back to the issue. That is a risk, and also a second chance.</div>
+        <div class="tl-impact neutral">Legislative rematch</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 31, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">SB 492 omits utility protections; dies Sep 1 without a vote</div>
+        <div class="tl-desc">EIX closed at $53.98, down 23.07%, on volume of 24.6M shares — its worst day since 2001 (daytraders.com; Bloomberg). PG&amp;E fell 18% the same day, Sempra 2% and the utilities ETF 1%. The stock bounced 8.93% the next session and has traded between $54.56 and $59.33 at the close since.</div>
+        <div class="tl-impact down">Reaction already happened: −23.1%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — core EPS $1.54 vs $0.97</div>
+        <div class="tl-desc">GAAP EPS $1.39 vs $0.89; net income $534M vs $343M. Guidance for 2026, 2027 and 2028 reaffirmed. The core business was delivering. The stock closed July at $73.37.</div>
+        <div class="tl-impact up">Beat; overtaken by legislation</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">EIX — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · unadjusted for dividends · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#E8733A;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$55.47</strong> to the September 21, 2026 settled close of <strong>$54.95</strong>, EIX is <strong>down 0.9% on price over five years</strong>. The dividend was the only return, running from $2.69 a share in 2021 to $3.51 annualised now. The endpoints hide a round trip. The stock climbed to <strong>$87.75 in November 2024</strong>, the high of the window, fell 32.4% in January 2025 when the Eaton Fire burned, recovered to $74.74 by February 2026 after strong Q4 2025 results, and then gave it all back in one session on August 31, 2026. Current price is 37.4% below the November 2024 peak.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI has two floors in this series. It printed <strong>24.8 in January 2025</strong>, the most oversold reading of the five years, and <strong>29.7 in August 2026</strong>. It now reads <strong>32.0</strong>: just above oversold. The 10-month moving average is about <strong>$66.64</strong>, some 21% above the price. The long-term trend is broken, and the oversold reading describes how fast the stock fell. It says nothing about whether the fall was right.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock low — $56.58</div><div class="tl-desc">A 16.5% monthly fall from $67.77 during the 2022 market sell-off. RSI 37.4.</div><div class="tl-impact down">−16.5% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2024</div><div class="tl-content"><div class="tl-title">Five-year high — $87.75</div><div class="tl-desc">The best month-end close of the five-year window, two months before the Eaton Fire. RSI 69.9.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2025</div><div class="tl-content"><div class="tl-title">Eaton Fire — $54.00 (−32.4% in a month)</div><div class="tl-desc">The fire started January 7, 2025 near SCE equipment. December's $79.84 became January's $54.00. RSI hit 24.8, the lowest of the series.</div><div class="tl-impact down">−32.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">Post-fire trough — $51.60</div><div class="tl-desc">Lowest month-end close of the five years. The legislature added $18B to the Wildfire Fund through SB 254 later in 2025 (PBS SoCal).</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">Recovery — $74.74 (+20.0% in a month)</div><div class="tl-desc">Followed Q4 2025 results on February 18, with core EPS of $1.86, up 77.1% (Barchart via FinancialContent). The 52-week high as of mid-March was $75.50, set February 24, 2026.</div><div class="tl-impact up">+20.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">SB 492 — $53.98 (−26.4% in a month)</div><div class="tl-desc">Nearly all of the month's loss came on August 31, when the stock fell 23.07% on the wildfire bill. It closed below the Eaton-Fire month's $54.00.</div><div class="tl-impact down">−26.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $54.95</div><div class="tl-desc">Up 1.8% from the August close. The stock has traded in a narrow range while it waits for the rating agencies and the Q3 print.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) and for a utilities index were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: EIX is <strong>roughly flat on price over five years</strong> and <strong>down 1.24% over 52 weeks</strong> (StockAnalysis), while the S&amp;P 500 ETF traded at $765.76 on August 31, 2026 (24/7 Wall St). The one-day comparison is the most telling. On August 31 EIX fell 23%, PG&amp;E 18%, Sempra 2%, the utilities ETF 1% and the S&amp;P 500 ETF 0.47%. The damage was concentrated in the two California investor-owned utilities with wildfire exposure. It was not a sector event.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying about 9x management's 2026 core EPS guidance ($5.90–$6.20) for a monopoly with a $50.8B rate base growing ~7% a year, 10.03%/10.30% allowed returns, 2027 and 2028 guidance already on the table, no equity issuance planned through 2030, and a 6.39% dividend yield. The Eaton liability is real, but it sits behind a customer-funded first $1B, a Wildfire Fund recapitalised by SB 254, and a securitisation option for anything above it. The program is settling claims fast: $860M+ offered, 77%+ acceptance, and subrogation settled at around 55 cents on the dollar with two insurers. As TIKR put it: "Sacramento raised Edison's cost of capital. It did not erase the earnings underneath it." If the liability is contained within the Fund, a 9x multiple on a regulated earnings stream is a very large discount.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The bull case is a sum of things a regulator or court has not yet decided. Edison itself says it is likely its equipment was involved and that it cannot estimate losses. Third-party estimates of total losses run from $24B to $45B (UCLA), against a Fund that held $21B at the time of the fire. The legislature just adjourned without passing SB 492, so nothing new caps withdrawals, blocks subrogation or refills the Fund. SCE's rating sits at BBB- (per TIKR), one notch from junk, with the CEO on record that downgrades were likely without action. A downgrade raises the cost of $9–12B of planned new debt, and if the CPUC later finds imprudence, SCE must repay the Fund. Bank of America's $51 target says the discount may not be large enough.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Eaton Fire liability exceeds available Fund capacity.</strong> No Edison estimate exists. The protection depends on the Fund's remaining capacity, CPUC approval of any securitisation, and a prudence finding. Any shortfall lands on the equity.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Credit downgrade below investment grade.</strong> SCE is at BBB- per TIKR. Losing investment grade would raise funding costs across a $38–41B capex plan and could put the "no equity" financing plan under pressure.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Regulatory and political backlash on affordability.</strong> Wildfire charges are already on customer bills through 2045 under SB 254's continuation account (PBS SoCal). A CPUC under affordability pressure could squeeze allowed returns or capex approvals in the 2029 GRC. That would slow the rate base growth the bull case relies on.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">California's wildfire liability regime</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Under California's inverse condemnation doctrine a utility can owe for fire damage its equipment causes even without negligence. That rule pushed PG&amp;E into bankruptcy in 2019 and produced AB 1054 and the Wildfire Fund. The Fund was meant to be a shared backstop for all the state's investor-owned utilities. The Eaton Fire tested whether one fire could use it up; state officials warned the claims could "fully exhaust the Fund" (LA Times, July 2025). SB 254 in 2025 added $18B, with ratepayer charges extended through 2035 and continuation charges planned for 2036–2045. SB 492 in August 2026 was meant to finish the job. Instead, per TIKR and 24/7 Wall St, it dropped the subrogation shield, the $6B per-incident withdrawal cap and any refill mechanism, and kept the 2028 sunset. The bill then died without a vote on September 1 (CalMatters).</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Subrogation: the insurers' claim on the utility</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">When a homeowner's insurer pays out, it can sue the utility to get its money back. Those subrogation claims are typically the largest block of wildfire liability. Past utility settlements have run at 50 to 70 cents on the dollar, and a 40-cent cap was proposed in 2025 (LAist, August 2025). Edison has settled with two insurers at about 55 cents. Governor Newsom's proposal to end subrogation suits against utilities failed on August 31, 2026 (Motley Fool). As long as that door stays open, insurers — the best-capitalised claimants — can pursue Edison, or the Fund, for most of what they paid.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Electrification and grid hardening</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">The long-run case for SCE is load growth. Management expects demand up ~30–40% by 2035 and nearly doubling by 2045 as transport and buildings electrify, supporting a $38–41B five-year capex plan and ~7% rate base growth. Wildfire mitigation is part of that capital: ~90% of high-fire-risk distribution is already hardened, and a risk-prioritised 2029+ plan is in the RAMP filing. <strong>The bull framing:</strong> every mile hardened lowers the odds of the next Eaton and earns an allowed return. <strong>The bear framing:</strong> hardening reduces future risk but does nothing about the liability already incurred, and each capex dollar adds to bills the state is already struggling to justify.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/eix/history/</strong> — the September 21, 2026 settled close of $54.95 (open 55.05, high 55.74, low 54.67, volume 3,675,567, Adj. Close 54.95 present, −0.65% on the prior close of $55.31). Confirmed by the quote page at stockanalysis.com/stocks/eix/, which shows $54.95 "At close" Sep 21, 2026, 4:00 PM EDT.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, financials, forecast, ratings) for price, valuation, margins, balance sheet, dividend, consensus and named analyst actions; Edison International Q2 2026 results release and earnings presentation (newsroom.edison.com, download.edison.com, July 30, 2026) for GAAP/core EPS, non-core items, guidance, rate base, allowed ROEs, capex and financing plan, grid hardening, the Eaton funding stack and SCE's causation statement; Edison newsroom (Aug 28, 2026) for WRCP statistics; Motley Fool Q2 2026 call transcript for the Pizarro quote, CFO name, litigation claim count and subrogation settlements; TIKR, 24/7 Wall St, Motley Fool, daytraders.com and Bloomberg (headline) for the August 31 move and SB 492 contents; CalMatters and Utility Dive (September 2026) for SB 492 dying without a vote on September 1; LA Times via Yahoo, LAist and PBS SoCal for Wildfire Fund size, SB 254 and loss estimates; Wikipedia for Eaton Fire facts, lawsuits and S&amp;P 500 constituent data; sce.com for service territory; Barchart via FinancialContent for Q4 2025 core EPS; digrin.com/stocks/detail/EIX/price ("Real Price", unadjusted) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from September 2021 through August 2026 from digrin.com's unadjusted "Real Price" column, plus a final point at the September 21, 2026 settled close of $54.95. The August 2026 ($53.98) and July 2026 ($73.37) month-ends match stockanalysis.com. Several 2021–2025 month-ends were cross-checked against Yahoo Finance monthly closes and match. July and August 2022 both show $67.77 in both digrin and Yahoo; this is kept as reported. <strong>No months were reconstructed or estimated.</strong> Industry-average and S&amp;P 500 benchmark columns are "—" because no sourced values were obtained. Market-cap ranks, named institutional holders and peer market caps were not sourced. Forward P/E on core guidance and core-basis payout ratio are our own calculations and labelled as such. The credit rating (BBB-) comes from TIKR's reporting and was not confirmed on an agency page. The Eaton Fire death toll differs by source (17 per Edison's newsroom; 19 per Wikipedia and the LA Times). The Wildfire Fund's current remaining balance was not sourced. Loss estimates are third-party figures for the whole fire, not Edison liability estimates. Edison has booked none.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Core EPS is a non-GAAP measure. Legal and regulatory outcomes described here are uncertain and may differ materially. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [55.47,62.93,65.28,68.25,62.79,63.42,70.10,68.79,69.91,63.24,67.77,67.77,56.58,60.04,66.66,63.62,68.90,66.21,70.59,73.60,67.52,69.45,71.96,68.85,63.29,63.06,66.99,71.49,67.48,68.02,70.73,71.06,76.85,71.81,80.01,87.03,87.09,82.40,87.75,79.84,54.00,54.44,58.92,53.51,55.65,51.60,52.12,56.13,55.28,55.38,58.89,60.02,62.28,74.74,73.18,69.49,69.94,74.45,73.37,53.98,54.95];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — sell-off low $56.58',                          color: '#ef4444' },
+  { idx: 38, label: 'Nov 2024 — five-year high $87.75',                        color: '#22c55e' },
+  { idx: 40, label: 'Jan 2025 — Eaton Fire; $54.00 (−32.4%), RSI 24.8',        color: '#ef4444' },
+  { idx: 45, label: 'Jun 2025 — five-year low close $51.60',                   color: '#f59e0b' },
+  { idx: 53, label: 'Feb 2026 — Q4 2025 results; $74.74 (+20.0%)',             color: '#22c55e' },
+  { idx: 59, label: 'Aug 2026 — SB 492; Aug 31 −23.1%, month $53.98',          color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $54.95',                     color: '#E8733A' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(232,115,58,0.22)');
+grad.addColorStop(1, 'rgba(232,115,58,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#E8733A', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#E8733A'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
