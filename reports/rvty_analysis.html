@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RVTY — Revvity, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">RVTY</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Diagnostics &amp; Research</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $16.02B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Global: #1410</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #22D3EE44;padding:3px 10px;border-radius:4px;">S&amp;P 500 date added: May 31, 1985 · traded as PKI until May 16, 2023</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Revvity, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$143.59</div>
+      <div class="price-change" style="color:var(--green);">+$0.14 (+0.10%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $143.59 (0.00%), 6:30 PM EDT</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 77 4th Avenue, Waltham, Massachusetts</div>
+    <div class="meta-item"><span>Employees:</span> 11,000</div>
+    <div class="meta-item"><span>Founded:</span> 1937 (per StockAnalysis; renamed Revvity 2023)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 26, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Revvity is what was left of <strong>PerkinElmer</strong> after PerkinElmer sold itself in pieces. In 2022–23 the company sold its applied, food and enterprise-services businesses — <em>and the PerkinElmer name</em> — to New Mountain Capital for about <strong>$2.45 billion</strong>. The part that stayed public, the life-sciences and diagnostics business, needed a new name; it picked Revvity ("revolution" plus <em>vita</em>, Latin for life), and on <strong>May 16, 2023</strong> the ticker changed from <strong>PKI</strong> to <strong>RVTY</strong>. It is the same listed company and the same share series — which is why the price chart below runs straight through the rename. Today Revvity sells instruments, reagents, software and screening tests to drug developers, academic and government labs, and clinical laboratories: FY2025 revenue was <strong>$2.86B</strong>, split almost exactly in half between <strong>Life Sciences ($1.43B)</strong> and <strong>Diagnostics ($1.43B)</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The story of the last five years is a hangover and then a sober-up. Revenue peaked at <strong>$3.83B in FY2021</strong>, when pandemic testing was pouring through the Diagnostics business, then fell <strong>13.5%</strong> in FY2022 and <strong>17.0%</strong> in FY2023 as that testing disappeared. It has been flat to slightly up since: $2.755B in FY2024, $2.856B in FY2025. The stock followed the revenue down — from a <strong>$201.06</strong> month-end close in December 2021 to <strong>$82.85</strong> in October 2023 — and then spent two and a half years going nowhere. What changed in 2026 is the direction of the news: guidance raised in August, a lower-margin China business put up for sale, and an AI-driven drug-discovery bid for its screening instruments. The stock has gone from an <strong>$86.62</strong> close at the end of April 2026 to <strong>$143.59</strong> — up <strong>66%</strong> in under five months, and now trading <em>above</em> every analyst average target on file. The question this report keeps coming back to: how much of the next two years has the market already paid for?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Prahlad Singh</div>
+      <div class="card-note">President and CEO, named in the Q2 2026 results release and on the StockAnalysis company profile. On the Q2 2026 call he described AI models becoming "part of the experimental cycle itself, continuously learning from results" — the pitch behind the screening-instrument order surge.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Max Krakowiak</div>
+      <div class="card-note">CFO, per the StockAnalysis company profile (listed as Maxwell Krakowiak) and the Q1 2026 earnings coverage. Owns the margin story: adjusted operating margin guided to <strong>28.7%</strong> for FY2026 on a pro forma basis.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">88.71% institutional</div>
+      <div class="card-note">Insiders hold 0.41%; float is 102.49M of 111.59M shares outstanding (StockAnalysis). Named top holders were not retrieved from the sources fetched and are not listed here.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Revvity reports two segments, <strong>Life Sciences</strong> and <strong>Diagnostics</strong>. The mix below uses <strong>Q2 2026 (quarter reported August 4, 2026) reported segment revenue</strong>: $359M + $371M = $730M, which ties to total reported revenue. Growth figures are the company's <em>pro forma organic</em> rates, which strip out the China immunodiagnostics business being sold (see below). For FY2025 the two segments were $1.43B each.</p>
+  <div class="seg-bar">
+    <div style="flex:49.2;background:#22D3EE;">LIFE SCIENCES 49.2%</div>
+    <div style="flex:50.8;background:#22c55e;">DIAGNOSTICS 50.8%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Life Sciences — $359M (Q2'26), −3% pro forma organic <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Diagnostics — $371M (Q2'26), +11% pro forma organic YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Half the company grew 11% and the other half shrank 3% in the same quarter. The Life Sciences dip was driven by a 20% fall in Signals software revenue that management attributed to contract timing — while the instrument backlog, per the Q2 call, sits at a three-to-four-year high.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Life Sciences</div>
+        <span class="biz-badge dominant">SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$359M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−3%</div><div class="biz-stat-label">PF Organic YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">31.1%</div><div class="biz-stat-label">Adj. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">49.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Tools for drug discovery and research: reagents, cell-imaging and screening instruments, and the Signals scientific-software suite, sold to pharma, biotech, academic and government labs. Q2 2026 was a tale of three lines on the earnings call: reagents and instruments each grew low single digits, while Signals software fell 20% on contract timing even as its annualised recurring measures grew. The part investors are paying for is <strong>high-content screening</strong> — the Opera Phenix line saw double-digit order growth, with management saying order velocity is "outpacing near-term production capacity" and that non-traditional AI companies building drug-discovery platforms are now buying alongside pharma. This is also the segment most exposed to research budgets: on the Q4 2025 call CEO Prahlad Singh listed changes in NIH funding, evolving tariffs and pharma-policy uncertainty among the headwinds the company absorbed in 2025. FY2025 revenue was $1.43B, +2% reported and organic.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and segment market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Thermo Fisher Scientific</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$243.57B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Danaher</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$151.73B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Agilent Technologies</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$45.66B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Diagnostics</div>
+        <span class="biz-badge growth">GROWTH ENGINE IN 2026</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$371M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+11%</div><div class="biz-stat-label">PF Organic YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30.4%</div><div class="biz-stat-label">Adj. Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">50.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Newborn and reproductive-health screening, immunodiagnostics and genetic testing, sold under brands that include EUROIMMUN. This was the segment that rode — and then lost — pandemic testing. In Q2 2026 it grew <strong>11% pro forma organic</strong>: reproductive health grew mid-teens, helped by newborn screening and the <strong>Genomics England</strong> contract; newborn-screening reagents grew high single digits despite falling birth rates; and immunodiagnostics outside China grew high single digits. Inside China it was the opposite — double-digit declines under what the company called persistent policy-induced headwinds — which is why Revvity has agreed to sell its <strong>China immunodiagnostics business</strong> (about <strong>6% of FY2025 revenue</strong>) to a local management-led buyer group, keeping a minority stake, with closing expected by the end of 2027. FY2025 Diagnostics revenue was $1.43B, +5% reported.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and segment market share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Bio-Rad Laboratories</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$10.08B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Illumina</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$36.06B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Danaher</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$151.73B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Why "pro forma" is on every number</h3>
+  <p class="prose">Since May 2026 Revvity reports two sets of figures: <strong>reported</strong> (everything it owns today) and <strong>pro forma</strong> (excluding the China immunodiagnostics business it has agreed to sell). The gap is not trivial. In Q2 2026 reported revenue was <strong>$730M</strong> and pro forma <strong>$711M</strong>; GAAP operating margin was 12.2% reported and 13.2% pro forma. Full-year guidance moved from <strong>$2.96–$2.99B</strong> of revenue in February (including China) to <strong>$2.83–$2.86B</strong> pro forma in August. Nothing was lost in that change — the business is just being measured without the piece that is leaving. It does mean year-on-year comparisons need care.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Q2 2026 Adjusted EPS</div>
+      <div class="card-value">$1.41</div>
+      <div class="card-note">Versus GAAP EPS of <strong>$0.48</strong> from continuing operations. Includes about <strong>$0.11</strong> from <strong>$16M of tariff refunds</strong> received in the quarter — roughly half of which management said it is reinvesting.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q2 2026 Free Cash Flow</div>
+      <div class="card-value">$184M</div>
+      <div class="card-note">A <strong>117%</strong> cash conversion, per the Q2 call. At the September 15, 2026 healthcare conference management pointed to cash-flow conversion above 90% as a standing target.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">FY2026 Guidance (pro forma)</div>
+      <div class="card-value" style="font-size:20px;">$5.30–$5.40</div>
+      <div class="card-note">Adjusted EPS, raised $0.10 in August, with organic growth raised to <strong>4–5%</strong> (from 3–4%) and adjusted operating margin of <strong>28.7%</strong>. Q3 2026 guide: 4–6% organic growth, ~29% margin.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Debt Paydown</div>
+      <div class="card-value" style="font-size:20px;">€500M retired</div>
+      <div class="card-note">Repaid in mid-July 2026; management said net leverage is approaching 2x. Balance sheet today: $1.02B cash against $3.34B debt (StockAnalysis).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Newborn-screening installed base</span>
+    <span class="moat-pill">Consumable reagents on placed instruments</span>
+    <span class="moat-pill">High-content screening franchise</span>
+    <span class="moat-pill">Signals scientific software</span>
+    <span class="moat-pill">Regulated diagnostic assays</span>
+    <span class="moat-pill">Sales reach in 160+ countries</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The durable part of Revvity is the <strong>razor-and-blade</strong> shape of much of its revenue: once a newborn-screening lab or a pharma screening group has validated a workflow on Revvity instruments, it keeps buying the reagents that run on them. Newborn-screening reagents growing high single digits in Q2 2026 <em>despite falling birth rates</em> is the clearest evidence of that stickiness. The weaker part is that Revvity is a mid-sized player in a field of giants — Thermo Fisher ($243.6B market cap) and Danaher ($151.7B) are each roughly ten to fifteen times its $16.0B size — and much of Life Sciences depends on customers' research budgets, which are cyclical and, in the case of academic and government labs, political.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Research budgets are someone else's decision.</strong> On the Q4 2025 call management named NIH funding changes, tariffs and pharma-policy uncertainty among 2025's headwinds, and nothing fetched says they have gone away. Life Sciences already shrank 3% organically in Q2 2026; a cut in academic or government spending lands here first.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">China is being exited, not fixed.</strong> The immunodiagnostics sale removes a shrinking business, but it takes until the end of 2027 to close, and the company keeps a minority stake. Until then the declining business still sits in reported numbers.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">GAAP earnings are thin.</strong> TTM GAAP EPS is <strong>$2.09</strong> against FY2026 adjusted guidance of $5.30–$5.40. Return on equity is <strong>3.21%</strong> and ROIC <strong>4.39%</strong>. The adjusted numbers are what the market prices, but the gap between them and GAAP is more than half of earnings.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">The price has run ahead of the Street.</strong> At $143.59 the stock is 11.8% above the $128.47 average analyst target and above the median ($126). Only the $165 top target sits meaningfully above the current price.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which RVTY is a constituent (listed on Wikipedia's S&amp;P 500 table with a date added of May 31, 1985, long before the Revvity name). RVTY is NYSE-listed and is <strong>not</strong> a NASDAQ-100 member. Figures are from StockAnalysis at the September 21, 2026 close unless noted; industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>RVTY</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>68.7</td><td>—</td><td>—</td><td>$143.59 ÷ $2.09 TTM GAAP EPS = 68.70. StockAnalysis shows 68.60 (unrounded EPS). Distorted by the wide GAAP/adjusted gap — see the forward multiple.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>25.4</td><td>—</td><td>—</td><td>StockAnalysis's forward figure on adjusted estimates. On the FY2026 consensus adjusted EPS of $5.35: $143.59 ÷ $5.35 = 26.8.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>2.48</td><td>—</td><td>—</td><td>Well above 1.0: consensus has adjusted EPS growing 5.7% in 2026 and 10.1% in 2027.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of GAAP profit per share.">EPS (TTM)</span></td><td>$2.09</td><td>—</td><td>—</td><td>GAAP, down 11.5% YoY. FY2025 GAAP EPS was $2.07; FY2025 adjusted EPS was $5.06.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+4.05%</td><td>—</td><td>—</td><td>TTM revenue $2.91B. FY2026 pro forma guidance: 4–5% organic growth.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of producing what was sold, as a percentage of revenue.">Gross Margin</span></td><td>54.98%</td><td>—</td><td>—</td><td>TTM, GAAP. Down from 64.51% in FY2021, the pandemic-testing year.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue. 'Adjusted' excludes items management treats as non-recurring or non-cash.">Operating Margin</span></td><td>15.92%</td><td>—</td><td>—</td><td>TTM GAAP. Adjusted operating margin was 28.9% in Q2 2026 and is guided to 28.7% for FY2026; management spoke of the upper 20s at the September 15 conference.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>8.16%</td><td>—</td><td>—</td><td>TTM net income $237.55M, down 16.7% YoY.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span></td><td>20.94</td><td>—</td><td>—</td><td>Enterprise value $18.34B on TTM EBITDA of $875.83M.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>0.20%</td><td>—</td><td>—</td><td>$0.28 a year, unchanged every year FY2021–FY2025. Next ex-dividend date October 23, 2026. Payout ratio 13.37%. The larger return of cash is buybacks: StockAnalysis shows a 6.21% buyback yield.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>6.15%</td><td>—</td><td>—</td><td>6.31M shares short (5.65% of shares outstanding), down from 7.05M the prior month. Short ratio 4.14 days of average volume.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.46</td><td>—</td><td>—</td><td>$3.34B debt, $1.02B cash, net debt $2.32B, after retiring €500M in July 2026.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.80</td><td>—</td><td>—</td><td>Quick ratio 1.36. Comfortable.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$558.1M</td><td>—</td><td>—</td><td>TTM: $627.63M operating cash flow less $69.52M capex. FCF margin 19.17%; about a 3.5% FCF yield on the $16.02B market cap (558.11 ÷ 16,020, my arithmetic).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>3.21%</td><td>—</td><td>—</td><td>Low: a large acquired-goodwill equity base against thin GAAP profit. PB ratio 2.22.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>4.39%</td><td>—</td><td>—</td><td>Below any reasonable cost of capital on a GAAP basis.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means historically more volatile than the index.">Beta</span></td><td>1.09</td><td>—</td><td>—</td><td>Roughly market-like. 14-day RSI on StockAnalysis: 69.32.</td></tr>
+      <tr><td>52-Week Range</td><td>$81.22 – $149.52</td><td>—</td><td>—</td><td>The $143.59 close sits 4.0% below the high (set intraday on September 17, 2026) and 76.8% above the low. 52-week price change: +65.58%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the 2026 figures. First, the <strong>China immunodiagnostics sale</strong>: the company now guides and reports on a pro forma basis that excludes a business worth about 6% of FY2025 revenue, so reported and pro forma numbers differ. Second, <strong>tariff refunds</strong>: $16M received in Q2 2026 added about $0.11 to pro forma adjusted EPS, and management chose to reinvest roughly half. Third, the <strong>GAAP-to-adjusted gap</strong> is wide — Q2 2026 GAAP EPS of $0.48 versus adjusted $1.41 — so which EPS you use changes the P/E from ~69x to ~27x. The itemised reconciliation was not retrieved for this report. FY2023 GAAP net income of $693M was also well above the years around it and should not be read as a normal year.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">19 analysts, per StockAnalysis. Note the label sits on top of a breakdown where Hold outnumbers Strong Buy 13 to 6.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$128.47</div><div class="card-note"><span style="color:var(--red);">−10.5% downside</span> from $143.59. Median target $126 (−12.3%). StockAnalysis figures including Goldman Sachs's Sep 21 target change. The rally has overtaken the consensus.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$110 – $165</div><div class="card-note">−23.4% to +14.9%. Only the top of the range is above today's price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">6 / 13 / 0</div><div class="card-note">6 Strong Buy + 0 Buy, 13 Hold, 0 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:31.6;background:#22c55e;"></div>
+    <div style="flex:68.4;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 6 (31.6%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 13 (68.4%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">KeyBanc Capital Markets</strong> · Overweight · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$125 → $165</span> (Sep 4, 2026, analyst Paul Knight, per StockAnalysis). The top target on the Street, citing stronger Q2 trends and AI-driven screening demand in pre-clinical life sciences. The only target comfortably above today's price.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Baird</strong> · Outperform · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$144</span> (reported in Sep 15, 2026 coverage; note date not found). A bullish rating whose target the stock has essentially reached.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Goldman Sachs</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$100 → $140</span> (Sep 21, 2026, per StockAnalysis). <strong>UBS</strong> · Neutral · <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$140</span> (coverage initiated Sep 9, 2026). Two neutral houses with targets just under the current price.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">RBC Capital Markets</strong> · Sector Perform · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$135</span> (coverage launch, early September 2026, per Investing.com). The sceptic's version: RBC questioned whether 6–8% long-term organic growth is durable.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The company guided Q3 to 4–6% organic growth and an adjusted operating margin of about 29%. With the stock above consensus targets, the bar is the guide <em>and</em> evidence that screening-instrument orders are turning into shipments — management said demand is outrunning near-term production capacity. Watch whether Life Sciences returns to growth after Q2's −3%.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Ex-dividend date</div>
+        <div class="tl-desc">$0.07 a quarter ($0.28 a year). At a 0.20% yield it is a formality rather than a reason to own the stock.</div>
+        <div class="tl-impact neutral">Scheduled</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Human Cell Design acquisition expected to close</div>
+        <div class="tl-desc">A France-based company with human pancreatic beta-cell models for diabetes, obesity and GLP-1 metabolic-disease research. Small, but it puts Revvity's screening tools closer to the most crowded area of drug development. Terms were not found in the sources fetched.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">By end-2027</div>
+      <div class="tl-content">
+        <div class="tl-title">China immunodiagnostics divestiture closes</div>
+        <div class="tl-desc">Sale to a local management-led buyer group, with Revvity keeping a minority stake. Removes a business in double-digit decline from reported results; the pro forma numbers already show what the company looks like without it.</div>
+        <div class="tl-impact neutral">Portfolio clean-up</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Healthcare conference margin targets — reaction already happened</div>
+        <div class="tl-desc">Management outlined operating margins in the upper 20s and cash-flow conversion above 90% at a global healthcare conference; KeyBanc had lifted its target to $165 on September 4. The stock closed at <strong>$140.19, up 9.1%</strong> from $128.49, and touched an intraday 52-week high of $149.52 two sessions later.</div>
+        <div class="tl-impact up">Reaction already happened: +9.1% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 beat and raise — reaction already happened</div>
+        <div class="tl-desc">Adjusted EPS $1.41, organic-growth guidance raised to 4–5%, adjusted EPS guidance raised to $5.30–$5.40. The stock still fell on the day, from $115.22 to $111.39 (−3.3%), as coverage focused on soft revenue guidance — and then climbed to $128.67 by month-end.</div>
+        <div class="tl-impact down">Reaction already happened: −3.3% on the day, +14.4% in August</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">RVTY (PKI until May 2023) — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · one continuous share series across the PKI → RVTY rename (no split or share exchange) · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">Over the five years from the September 2021 close of <strong>$173.29</strong> to the September 21, 2026 settled close of <strong>$143.59</strong>, the stock lost <strong>17.1% of its price</strong>. The $0.28 annual dividend adds back only about $1.40 a share over the period, so total return is roughly <strong>−16%</strong>. The shape is a U: a <strong>58.8%</strong> slide from the $201.06 December 2021 month-end to the $82.85 October 2023 low as pandemic testing revenue vanished, two and a half years of range-trading between roughly $87 and $128, and then a 2026 break-out that has taken the stock <strong>66%</strong> off its April low.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI now reads <strong>81.2</strong> — the highest reading anywhere in the five-year series and firmly overbought. The extreme at the other end was <strong>17.0 in October 2023</strong>. The 10-month moving average is about <strong>$107.87</strong>, 25% below the price: the trend is unambiguously up, and stretched. Momentum this strong can persist, but it is the same signal that sat at 17 near the bottom — the price has moved faster than the fundamentals, in both directions.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Pandemic peak — $201.06 month-end close (as PKI)</div><div class="tl-desc">FY2021 revenue of the business that is now Revvity was $3.83B, up 43.7%, with an operating margin of 37%. It was the top of a testing boom that could not last.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">2022</div><div class="tl-content"><div class="tl-title">The testing hangover — $120.33 by September</div><div class="tl-desc">Revenue fell 13.5% in FY2022; GenomeWeb's Q4 2022 headline put the drop at 28% for the quarter on declining COVID-19 testing. The stock lost 40% from the December 2021 close to September 2022.</div><div class="tl-impact down">−40% peak to Sep 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2023</div><div class="tl-content"><div class="tl-title">PKI becomes RVTY — $115.32</div><div class="tl-desc">The applied, food and enterprise-services businesses and the PerkinElmer name went to New Mountain Capital for about $2.45B, and the remaining company began trading as Revvity on May 16, 2023. Same shares, new name.</div><div class="tl-impact neutral">Rename, not a new stock</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Guidance cut — $82.85, RSI 17.0</div><div class="tl-desc">Q3 2023 revenue fell 5.8% to $670.7M, adjusted EPS of $1.18 missed, and full-year guidance was cut to $2.72–$2.74B of revenue. The stock fell 16.1% in the session and 25.2% in the month — the five-year low close.</div><div class="tl-impact down">−25.2% month · 5-yr low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2025</div><div class="tl-content"><div class="tl-title">False dawn — $126.13</div><div class="tl-desc">The stock recovered to within reach of its post-rename range, then slid for most of 2025 to an $87.65 September close as FY2025 growth came in at 3.7%.</div><div class="tl-impact neutral">Recovery that did not hold</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr–May 2026</div><div class="tl-content"><div class="tl-title">The turn — $86.62 → $104.55</div><div class="tl-desc">April 2026 closed at $86.62. Q1 2026 results on May 5 beat, and the company announced it would sell the China immunodiagnostics business; pro forma organic growth was 6%. May closed up 20.7%.</div><div class="tl-impact up">+20.7% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2026</div><div class="tl-content"><div class="tl-title">Margin targets and target hikes — $143.59</div><div class="tl-desc">A +9.1% day on September 15 after the conference (KeyBanc's $165 target had come on September 4), a $149.52 intraday high on September 17, and a $143.59 settled close on September 21 — up 11.6% on the August month-end and 48.4% on the December 2025 close.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year index returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) were not obtained from the sources fetched, so no numeric comparison figure is given. What can be stated from sourced data: RVTY is <strong>down 17.1% on price over five years</strong> and <strong>up 65.58% over the trailing year</strong>. Against the peers named in stock-research coverage, it is small: a $16.02B market value next to Thermo Fisher at $243.57B, Danaher at $151.73B, Agilent at $45.66B and Illumina at $36.06B, and above Bio-Rad at $10.08B. The one-year move is the notable thing — Revvity's 66% compares with one-year changes shown on CompaniesMarketCap of +38.7% for Thermo Fisher, +28.2% for Agilent, +33.2% for Bio-Rad and +135.3% for Illumina.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The pandemic hangover is over and the business underneath is growing again: pro forma organic growth guided to 4–5% for 2026 and 4–6% for Q3, Diagnostics up 11% in Q2, adjusted operating margin near 29%, free-cash-flow conversion of 117% in Q2, and a €500M debt repayment already done. The China exit removes the one part that was shrinking. The AI angle is concrete rather than a slide: high-content screening orders grew double digits and demand is running ahead of production capacity. On FY2026 adjusted EPS the stock is about 27x, and consensus has adjusted EPS growing 10% in 2027. If margins reach the upper 20s on growing revenue, earnings can catch up with the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The price already made the move. At $143.59 the stock is about 12% above the average analyst target, the 6-month RSI is 81 (the highest in five years), and the rally has come from a 66% re-rating in under five months rather than a matching change in earnings. On GAAP, the stock trades at 68.7x trailing EPS with ROIC of 4.4%. Life Sciences shrank 3% last quarter, research budgets depend on NIH funding and pharma policy, and part of Q2's beat came from tariff refunds that will not repeat. RBC's question — whether 6–8% long-term organic growth is durable — is the right one, and the answer is not in yet.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Valuation has outrun the Street.</strong> A price above the consensus average and median targets means further gains need analysts to keep raising numbers. A Q3 in line with guidance may not be enough.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Research-funding and policy exposure.</strong> NIH funding changes, tariffs and pharma-policy uncertainty were named by management as 2025 headwinds. Life Sciences — half of revenue — shrank 3% organically in Q2 2026.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Quality of the 2026 beat.</strong> Tariff refunds added about $0.11 to Q2 adjusted EPS; the GAAP/adjusted gap is wide; and the China divestiture will not close until the end of 2027. Pro forma numbers are clean on paper, and reported numbers will lag them for a while.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">AI as a buyer of lab equipment</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">Most AI stories in 2026 are about software replacing people. Revvity's is the opposite: AI-driven drug discovery needs <em>more</em> experimental data, generated fast, which means automated cell imaging and screening. On the Q2 2026 call management described "Lab-in-the-Loop" workflows in which AI models become part of the experiment cycle, reported double-digit order growth in high-content screening, and said non-traditional AI customers are now ordering instruments alongside pharma and biotech. KeyBanc's $165 target cites the same thing. The open question is scale: screening instruments are one line inside a $359M-a-quarter segment that shrank last quarter.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">China diagnostics and research-budget policy</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Revvity's decision to sell its China immunodiagnostics business followed double-digit declines there and what the company called persistent policy-induced headwinds; it concluded that the investment needed to defend the position would be better spent elsewhere. In the US, management's list of 2025 headwinds included changes in NIH funding, evolving tariffs and pharma-policy uncertainty. Tariffs have cut both ways this year — Revvity received $16M of refunds in Q2 — which is a reminder of how much of this sector's earnings path is set outside the companies.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22D3EE;">
+    <div class="biz-header"><div class="biz-name">The valuation debate — bull and bear framing</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">THE CENTRAL QUESTION</span></div>
+    <p class="biz-desc">At $143.59 Revvity trades at about <strong>25–27x adjusted earnings</strong>, <strong>20.9x EV/EBITDA</strong> and a <strong>~3.5% free-cash-flow yield</strong>. <strong>The bull framing:</strong> this is a business re-rating from "post-COVID problem" to "AI-exposed tools company with 29% adjusted margins", and multiples in that bucket are higher than where the stock started the year. <strong>The bear framing:</strong> a 66% move in five months on 4–5% organic growth is sentiment, not arithmetic; the consensus target of about $128 says the Street has not followed; and a six-month RSI of 81 has historically been a place to be careful rather than greedy. The way to settle it is not the multiple — it is whether Life Sciences grows again in Q3 and whether margins reach the upper 20s on reported, not just pro forma, numbers.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/rvty/history/</strong> — the September 21, 2026 settled close of $143.59 (open 144.53, high 145.55, low 142.30, volume 2,062,011, Adj. Close 143.59 present, +0.10% on the prior close of $143.45). Corroborated by the StockAnalysis quote page, which shows $143.59 "At close" at 4:00 PM EDT on Sep 21, 2026, and an after-hours print of $143.59.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual financials, forecast) for price, valuation, margins, returns, balance sheet, consensus, executives and Sector/Industry labels; Revvity's Q2 2026 results release (via BioSpace, August 4, 2026) for segment revenue, pro forma figures, the China immunodiagnostics divestiture, tariff refunds and guidance; the Q2 2026 earnings call transcript (fool.com) for segment drivers, screening demand, free cash flow and debt repayment; Q4/FY2025 results coverage (indianpharmapost.com) for FY2025 segment revenue and initial 2026 guidance; Q1 2026 coverage (finance.biggo.com) for the divestiture rationale and Q1 figures; ad-hoc-news.de and stockstotrade.com for the September 15, 2026 conference targets, analyst actions and the Human Cell Design deal; investing.com for the October 2023 guidance cut; Wikipedia (Revvity; List of S&amp;P 500 companies) for the 2023 sale, the May 16, 2023 ticker change and the S&amp;P 500 date added; stockstory.org for the named competitor set; companiesmarketcap.com for the global rank and peer market capitalisations.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 taken from the unadjusted "Real price" column at digrin.com/stocks/detail/RVTY/price, plus a final point at the September 21, 2026 settled close of $143.59. Pre-May 2023 points are the same listed shares traded under the PKI ticker; the 2023 sale of businesses to New Mountain Capital was for cash and did not change the share series. The July and August 2026 month-ends ($112.52, $128.67) were cross-checked against StockAnalysis daily rows. <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close fourteen trading days into September, not a month-end, and is labelled accordingly. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Segment market shares and TAM figures are shown as "n/v" (not verified) rather than approximated. Competitor figures are market capitalisations from companiesmarketcap.com as fetched on September 21, 2026 (they may reflect intraday rather than closing prices), not revenues or shares. Analyst dates and targets are from the StockAnalysis forecast page (KeyBanc, UBS, Goldman Sachs; consensus as fetched on September 22, 2026, which includes Goldman's September 21 change), Investing.com (RBC) and StocksToTrade/ad-hoc-news coverage of September 15 (Baird, whose note date was not found). The FCF yield is my arithmetic from StockAnalysis figures. US and NYSE market-cap ranks were not sourced.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and pro forma figures exclude a business the company still owns. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price"; PKI ticker until May 16, 2023) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [173.29,176.89,182.16,201.06,172.17,179.61,174.46,146.61,149.67,142.22,153.17,135.06,120.33,133.58,139.73,140.22,137.53,124.57,133.26,130.49,115.32,118.79,122.95,117.03,110.70,82.85,88.90,109.31,107.18,109.59,105.00,102.47,109.26,104.86,125.61,122.54,127.75,118.59,116.14,111.61,126.13,112.15,105.80,93.43,90.42,96.72,87.90,90.11,87.65,93.59,104.41,96.75,108.80,98.31,87.61,86.62,104.55,111.26,112.52,128.67,143.59];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 3,  label: 'Dec 2021 — pandemic-testing peak $201.06 (as PKI)',        color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — testing hangover, $120.33',                     color: '#ef4444' },
+  { idx: 20, label: 'May 2023 — PKI renamed RVTY (May 16); $115.32',            color: '#3b82f6' },
+  { idx: 25, label: 'Oct 2023 — guidance cut; 5-yr low $82.85, RSI 17.0',       color: '#ef4444' },
+  { idx: 40, label: 'Jan 2025 — false dawn $126.13',                            color: '#f59e0b' },
+  { idx: 55, label: 'Apr 2026 — $86.62 before the turn',                        color: '#ef4444' },
+  { idx: 56, label: 'May 2026 — Q1 beat, China IDX sale; $104.55 (+20.7%)',     color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $143.59, RSI 81.2',           color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
