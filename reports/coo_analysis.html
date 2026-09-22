@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COO — The Cooper Companies, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #26C6DA;
+  --accent-dim: #26C6DA33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">COO</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NASDAQ</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Medical Instruments &amp; Supplies</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $10.29B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NASDAQ: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #26C6DA44;padding:3px 10px;border-radius:4px;">S&amp;P 500 member since Sep 23, 2016 · not a NASDAQ-100 constituent</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Cooper Companies, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$54.12</div>
+      <div class="price-change">−$1.17 (−2.12%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours quote for that session not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 6101 Bollinger Canyon Road, San Ramon, California</div>
+    <div class="meta-item"><span>Employees:</span> 15,000</div>
+    <div class="meta-item"><span>Founded:</span> 1958 per Wikipedia (current name since 1987)</div>
+    <div class="meta-item"><span>Next Earnings:</span> Q4 FY2026 — date not announced in sources fetched</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Cooper is two companies wearing one ticker. <strong>CooperVision</strong> makes soft contact lenses, including torics for astigmatism and multifocals. <strong>CooperSurgical</strong> sells fertility products and services, cryostorage, and office and surgical devices for women's health. The fiscal year ends October 31. Trailing-twelve-month revenue through July 2026 was <strong>$4.24B, up 4.73%</strong>, with a 65.9% gross margin. At the September 21, 2026 close of $54.12 the equity is worth about <strong>$10.29B</strong> (our calculation: $54.12 × 190.16M shares).</p>
+  <p class="prose" style="margin-top:16px;">The story of the last twelve months is a table that thought it was holding a draw. On December 4, 2025, after the close and alongside fourth-quarter results, and under pressure from activists <strong>JANA Partners</strong> and <strong>Browning West</strong>, the board opened a formal strategic review; MarketScreener reported an 8% gain in the shares on the news. The market's working assumption was that something would be sold or split. On <strong>September 9, 2026</strong> the river came: the board kept CooperSurgical, fiscal 2026 revenue guidance was cut to $4.229–$4.252B from $4.285–$4.321B, and adjusted EPS guidance fell to $4.51–$4.55 from $4.58–$4.66. The stock fell <strong>6.22% on September 9</strong> — before the 16:17 ET release — and another <strong>14.67% on September 10</strong>, a two-day move from $67.69 to $54.17. Nine days later JANA published a letter demanding an external CEO search. The central question is now simple to state: is the CooperVision slowdown a one-off U.S. distributor destocking, as management says, or the first sign that the lens franchise has stopped taking share?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Albert G. White III</div>
+      <div class="card-note">President and CEO, per the StockAnalysis profile and the Q3 FY2026 release. His read of the quarter: "earnings exceeding expectations, record free cash flow, solid fertility growth at CooperSurgical, and a favorable completion of a significant tax matter." On the call he pinned the CooperVision guidance cut on U.S. channel inventory alone: "the entire reason for the reduction in the revenue guidance for CooperVision was tied to just channel inventory. That's it." (Motley Fool call transcript). JANA's September 18 letter asks the board to start an external search for his replacement.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Brian G. Andrews</div>
+      <div class="card-note">Executive Vice President, CFO and Principal Accounting Officer, per the StockAnalysis profile. Division heads: Gerard H. Warner III (CooperVision) and Holly R. Sheffield (CooperSurgical). Colleen Jay succeeded Robert Weiss as board chair effective January 2, 2026 (announced December 4, 2025). Walter M. Rosebrough, Jr. joined as an independent director on January 3, 2026 under a cooperation agreement with Browning West (company release, December 23, 2025).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Shareholder Base</div>
+      <div class="card-value" style="font-size:20px;">111.5% institutional</div>
+      <div class="card-note">StockAnalysis reports institutional ownership of 111.49%. Readings above 100% usually come from double-counted lent or shorted shares. The two holders who matter are the activists. <strong>JANA Partners</strong> wants a new CEO, a new chair and a review of selling the fertility and medical-device assets. <strong>Browning West</strong> pushed for alternatives for CooperSurgical and signed a cooperation agreement with the company. The size of JANA's stake is not disclosed in its September 18, 2026 release.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Cooper reports two segments. The mix below uses <strong>Q3 FY2026 revenue (quarter ended July 31, 2026)</strong> from the company's September 9, 2026 release. The two segments sum to $1,066.2M, which ties to reported revenue of $1.066B. Growth rates are organic unless noted.</p>
+  <div class="seg-bar">
+    <div style="flex:67.2;background:#26C6DA;">COOPERVISION 67.2%</div>
+    <div style="flex:32.8;background:#a78bfa;">COOPERSURGICAL 32.8%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#26C6DA;"></span> CooperVision — $717.0M (Q3 FY26), flat <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> CooperSurgical — $349.2M, +2% reported / +3% organic</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">For years the lens business was the reason to own the stock. It grew 8% reported and 4% organic in Q2 FY2026, then went flat in Q3. The smaller, less-loved surgical business is now the one growing.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #26C6DA;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">CooperVision</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$717.0M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">0%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">67.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Contact lenses sold through eye-care practitioners and distributors, a repeat-purchase habit business. In Q3 FY2026, torics and multifocals, the higher-value specialty lenses, brought in <strong>$363.8M (+2% organic)</strong>. Spheres and other lenses brought in <strong>$353.2M (−1% organic)</strong>. By region: Americas <strong>$281.6M (−2%)</strong>, EMEA <strong>$309.4M (+5%)</strong>, Asia Pacific <strong>$126.0M (−5%)</strong>. Management's explanation is that it deliberately cut inventory held by U.S. distributors while patient demand held: on the call the CEO said U.S. consumption "has been running pretty steady all year in the mid-single digits" (Motley Fool transcript), and the release says the channel-inventory reduction "will continue to impact Q4". Full-year CooperVision guidance is now <strong>$2.828–$2.842B, 1–2% organic growth</strong>.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Contact-lens market size and share not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Alcon</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$31.36B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bausch + Lomb</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$6.00B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">CooperSurgical</div>
+        <span class="biz-badge growth">RETAINED AFTER REVIEW</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$349.2M</div><div class="biz-stat-label">Q3 FY26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+3%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">32.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two halves. <strong>Fertility</strong> ($141.2M, +5% organic) covers IVF lab consumables, genomic testing and cryostorage. Much of it was acquired: Generate Life Sciences for $1.6B in December 2021 and Cook Medical's reproductive-health business for $875M in March 2022 (dates and prices per Wikipedia). <strong>Office &amp; surgical</strong> ($208.0M, +2% organic) sells devices used in gynecology and obstetrics. This is the division the strategic review put up for evaluation. The board concluded that "offers received" did not beat continued ownership. It is also where the litigation sits: a $271.6M net pre-tax charge in Q2 FY2026 to resolve claims from a December 2023 voluntary recall of embryo culture media. Full-year CooperSurgical guidance is <strong>$1.401–$1.410B, 4–5% organic growth</strong>.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Fertility and women's-health device market size not sourced this session. No estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Competitors</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Not sourced</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:8px;font-size:12px;">*Peer market caps are our calculation: September 21, 2026 close × shares outstanding from StockAnalysis. Alcon $64.87 × 483.40M; Bausch + Lomb $16.80 × 357.17M.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The guidance trail — revenue guidance nudged up once, then cut twice</h3>
+  <p class="prose">This is the fiscal 2026 outlook as it was reissued each quarter. The pattern explains the September repricing better than any single number does.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Dec 2025 — initial</div>
+      <div class="card-value" style="font-size:20px;">$4.30–$4.34B</div>
+      <div class="card-note">Adjusted EPS $4.45–$4.60, alongside the strategic review announcement and about $50M of expected annual savings from a Q4 restructuring (per MarketScreener).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Mar 5, 2026 — Q1</div>
+      <div class="card-value" style="font-size:20px;color:var(--green);">$4.306–$4.346B</div>
+      <div class="card-note">Revenue guidance edged up; adjusted EPS raised to $4.58–$4.66 and FCF guidance to $600–$625M. Q1 revenue $1.024B, +3% organic; CooperVision +3% organic.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Jun 4, 2026 — Q2</div>
+      <div class="card-value" style="font-size:20px;">$4.285–$4.321B</div>
+      <div class="card-note">Revenue of $1.082B, +5% organic; adjusted EPS $1.21 (+26%). GAAP EPS was −$0.40 after the $271.6M litigation charge.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sep 9, 2026 — Q3</div>
+      <div class="card-value" style="font-size:20px;color:var(--red);">$4.229–$4.252B</div>
+      <div class="card-note">Organic growth 2–3%; adjusted EPS cut to $4.51–$4.55. Q4 guidance in the release: revenue $1.057–$1.080B and adjusted EPS $1.05–$1.09.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Repeat-purchase lens habit</span>
+    <span class="moat-pill">Practitioner-fitted prescriptions</span>
+    <span class="moat-pill">Toric &amp; multifocal specialty mix</span>
+        <span class="moat-pill">Fertility lab consumables footprint</span>
+    <span class="moat-pill">65.9% gross margin</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">Contact lenses are one of healthcare's better subscription businesses without a subscription. A wearer is fitted by a practitioner, gets a prescription for a specific brand and parameters, and reorders the same lens for years. Switching needs a new fitting. Specialty lenses (torics, multifocals) are harder to fit, carry better pricing, and made up just over half of CooperVision's Q3 revenue. That habit is what a 65.9% gross margin rests on. The weakness is that the habit protects the <em>wearer</em>, not the <em>shipment</em>. Revenue is recognised when distributors buy, and when distributors decide to hold less stock, reported growth can go to zero while nobody's eyes change.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Credibility is now a line item.</strong> Revenue guidance has been lowered twice in a row. JANA's letter cites "negative surprises, expectation mismanagement and poor capital allocation." The market now discounts whatever management says the next number will be, and that is the cost of the channel-inventory explanation even if it proves correct.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Buybacks at the wrong price.</strong> In Q3 FY2026 Cooper repurchased 4.9M shares at an average $69.16, about 28% above the $54.12 close, weeks before the guidance cut. JANA names repurchases ahead of disappointing announcements explicitly. The authorisation has since been raised from $2B to $3B, with about $1.5B remaining.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">CooperVision regional softness beyond the U.S.</strong> The distributor story explains the Americas (−2% organic). It does not explain Asia Pacific at −5% organic. EMEA at +5% is holding the division flat.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Recall litigation tail.</strong> The Q2 FY2026 charge of $271.6M (net of $52.5M expected insurance recoveries) resolved claims tied to the December 2023 embryo culture media recall. The amount is reserved, but a fertility franchise carrying recall history is harder to sell at a premium. The board's decision to keep CooperSurgical may partly reflect that.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which COO has been a constituent since September 23, 2016. <strong>COO is not a NASDAQ-100 constituent</strong>: it is absent from the component list as of July 1, 2026. Company figures are from StockAnalysis (TTM through July 31, 2026). Price-based ratios are recomputed at the $54.12 September 21 close. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>COO</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>18.7</td><td>—</td><td>—</td><td>$54.12 ÷ $2.90 TTM EPS = 18.66. The EPS is flattered by a $307.2M tax benefit and depressed by a $271.6M pre-tax litigation charge, so treat this number loosely.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>11.9</td><td>—</td><td>—</td><td>$54.12 ÷ FY2026 consensus EPS of $4.53 (adjusted, per StockAnalysis). FY2026 ends October 31, 2026, so this is essentially a current-year multiple.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>~1.7</td><td>—</td><td>—</td><td>StockAnalysis shows 1.75 at an intraday September 22 price of $55.19. Rescaled to the $54.12 close, that is about 1.72 (our calculation).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$2.90</td><td>—</td><td>—</td><td>GAAP diluted. Quarterly: $0.42 (Q4 FY25), $0.66, −$0.40, $2.24. Adjusted EPS guidance for FY2026 is $4.51–$4.55, a gap that shows how much one-offs are moving the GAAP line.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+4.73%</td><td>—</td><td>—</td><td>TTM revenue $4.237B. The latest quarter grew +0.56% reported and +1% organic. FY2026 guidance is 2–3% organic.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of goods sold, as a percentage of revenue.">Gross Margin</span></td><td>65.93%</td><td>—</td><td>—</td><td>TTM. Q3 FY2026 non-GAAP gross margin was 67%, down 60bps YoY.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>13.46%</td><td>—</td><td>—</td><td>Above the 12.93% operating margin because of the discrete U.K. tax benefit. Q3 FY2026 non-GAAP operating margin was 26%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>None</td><td>—</td><td>—</td><td>No current dividend (StockAnalysis). Capital is returned through buybacks: $339.1M in Q3 FY2026 alone.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>4.65%</td><td>—</td><td>—</td><td>Short ratio 5.05 days to cover. Moderate, meaning the bear case is not a crowded trade.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.34</td><td>—</td><td>—</td><td>$2.80B total debt against $154.7M cash (StockAnalysis). The Q3 release shows $628.1M short-term and $1,916.1M long-term debt.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.22</td><td>—</td><td>—</td><td>Adequate, not generous; $628.1M of short-term debt sits in current liabilities.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$678M</td><td>—</td><td>—</td><td>TTM, a 16.0% FCF margin. That is a ~6.6% FCF yield on the $10.29B market cap (our calculation). Q3 FCF was $273.0M, +66% YoY. Management reaffirmed a target of more than $2.2B FCF over FY2026–2028.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>6.84%</td><td>—</td><td>—</td><td>Low against a large equity base (book value $43.81/share).</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>5.03%</td><td>—</td><td>—</td><td>Below most estimates of a large-cap cost of capital: on a GAAP basis, returns have not caught up with the capital deployed.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.82</td><td>—</td><td>—</td><td>5-year beta. A 0.82-beta stock just fell 20% in two sessions: beta measures market sensitivity, not company-specific surprises.</td></tr>
+      <tr><td>52-Week Range</td><td>$51.01 – $89.83</td><td>—</td><td>—</td><td>The low was set intraday on September 10, 2026. The $54.12 close sits 6% above the low and 40% below the high.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Two items dominate the trailing GAAP numbers and cancel roughly on paper. First, the <strong>Q2 FY2026 litigation charge</strong>: $271.6M net pre-tax, booked in SG&amp;A ($324.1M of accrued liabilities less $52.5M of expected insurance recoveries). It turned Q2 into a GAAP loss of $77.9M (−$0.40/share) against adjusted EPS of $1.21. Second, the <strong>Q3 FY2026 tax benefit</strong>: $307.2M from the favourable completion of a U.K. transfer-pricing examination. It lifted Q3 GAAP EPS to $2.24 against $1.15 adjusted. Anyone screening COO on a trailing P/E is looking at a figure built from these two events. The adjusted run-rate ($4.51–$4.55 guided for FY2026) is the cleaner base.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">16 analysts via StockAnalysis (read Sep 22; the latest action shown is dated Sep 13).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$66.21</div><div class="card-note"><span style="color:var(--green);">+22.3% upside</span> from $54.12 (our calculation). The median target is $65.50 (+21.0%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$58 – $75</div><div class="card-note">+7.2% to +38.6%. Even the lowest target is above the price, which usually means targets have not finished catching down.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 11 / 0</div><div class="card-note">3 Strong Buy + 2 Buy, 11 Hold, 0 Sell, 0 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:31.25;background:#22c55e;"></div>
+    <div style="flex:68.75;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (31.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 11 (68.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">William Blair — Steven Lichtman</strong> · Downgrade to Hold (Sep 10, 2026). The only rating change among the post-earnings actions StockAnalysis lists. Target not given on the source.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Mizuho — Anthony Petrone</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$85 → $75</span> (Sep 11, 2026). The high target on the board, cut by $10.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Jefferies — Young Li</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$85 → $70</span> (Sep 10, 2026). <strong>Stifel — Jonathan Block</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$85 → $70</span> (dated Sep 13, 2026 on StockAnalysis). Two bulls kept their ratings and cut targets by 18%.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">UBS — Patrick Wood</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$75 → $66</span> (Sep 10, 2026). Reiterated Hold.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Q4 FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Fiscal Q4 results — the channel-inventory test</div>
+        <div class="tl-desc">The quarter ends October 31, 2026; the release date has not been announced in the sources fetched. The test is simple. If U.S. distributor destocking is over, Americas CooperVision growth should stop being negative. If it isn't, the "that's it" explanation fails. Guided Q4 adjusted EPS is $1.05–$1.09 (company release).</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Open</div>
+      <div class="tl-content">
+        <div class="tl-title">Board response to JANA</div>
+        <div class="tl-desc">JANA's letter asks for an external CEO search, a new board chair and an evaluation of selling the fertility and medical-device assets. The board kept CooperSurgical nine days before the letter, so the demand for a sale now runs directly against that decision. A leadership change or a renewed sale process would each be a discrete event.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — about $1.5B remaining</div>
+        <div class="tl-desc">The authorisation was expanded from $2B to $3B with the Q3 release. About $1.5B remaining is roughly 15% of the $10.29B market cap (our calculation). Buying at $54 instead of $69 would give each dollar spent about 28% more shares.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 18, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">JANA Partners letter — reaction already happened</div>
+        <div class="tl-desc">JANA cites "chronic underperformance" and says "investor trust has been broken." The stock closed up 2.82% that day at $55.29, then gave it back with a 2.12% fall to $54.12 on September 21.</div>
+        <div class="tl-impact up">Reaction already happened: +2.82%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 9–10, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026, guidance cut, CooperSurgical retained</div>
+        <div class="tl-desc">Revenue $1.066B (+1% organic), adjusted EPS $1.15 (+4%), record FCF of $273.0M. Revenue and EPS guidance were both cut, and the strategic review ended with CooperSurgical kept. The stock fell 6.22% on September 9 before the after-close release, then 14.67% on September 10 on 18.65M shares of volume, a two-day fall of about 20%.</div>
+        <div class="tl-impact down">Reaction already happened: −20% in two sessions</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Strategic review opened</div>
+        <div class="tl-desc">Announced December 4, 2025 with fourth-quarter results. Under pressure from JANA and Browning West, the board opened a formal review of the businesses, structure and capital allocation, including possible divestitures and mergers. MarketScreener reported an 8% gain in the shares. The review is now closed, and the takeover premium it built into the price has come back out.</div>
+        <div class="tl-impact neutral">Closed Sep 9, 2026</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">COO — Monthly Closes, Sep 2021 → Sep 21, 2026 (split-adjusted)</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 month-end closes + Sep 21, 2026 settled close · pre-Feb 2024 closes divided by 4 for the 4:1 split (Feb 20, 2024) · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#26C6DA;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">On a split-adjusted basis, COO went from a September 2021 month-end close of <strong>$103.33</strong> to the September 21, 2026 settled close of <strong>$54.12</strong>, a <strong>47.6% price decline</strong> over five years. The company paid no dividend to offset it. The September 21 close is the lowest point in the 61-point series. The path had two halves. Through September 2024 the stock was range-bound, with a 2022 low of $65.97 (September 2022) and a five-year month-end high of <strong>$110.34 in September 2024</strong>. From there it lost half its value in two years: the September 2021 → September 2024 leg was roughly flat (+6.8%), and all of the damage came after.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>26.4</strong>, in oversold territory. The deepest reading in the window was <strong>19.95 in September 2022</strong>, and May–September 2025 spent five straight months below 30. The 10-month moving average sits near <strong>$71.09</strong>, 31% above the price. The move from the August month-end ($70.09) to September 21 ($54.12) is <strong>−22.8%</strong>, larger than any full-month move in the prior five years. Oversold readings in this chart have come right before rebounds (late 2022) and during long bleeds (mid-2025) alike. RSI shows how hard the selling has been, not what happens next.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">2022 low — $65.97 split-adjusted, RSI 19.95</div><div class="tl-desc">Unadjusted close $263.90. The most oversold monthly reading in the five-year window, followed by a recovery to $95.36 by April 2023.</div><div class="tl-impact down">Window RSI low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2024</div><div class="tl-content"><div class="tl-title">4:1 stock split</div><div class="tl-desc">Effective February 20, 2024 (StockAnalysis). January 2024's unadjusted $373.03 corresponds to $93.26 on this chart's basis; February closed at $93.60. No economic event, but any per-share series from before this date must be divided by four.</div><div class="tl-impact neutral">Mechanical</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">Five-year high — $110.34</div><div class="tl-desc">The highest month-end in the window, with RSI at 70.2, the only overbought print. Everything since has been downhill.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2025</div><div class="tl-content"><div class="tl-title">$68.28 — −16.4% in a month</div><div class="tl-desc">The largest monthly drop in the window before September 2026. The cause was not examined in the sources fetched this session.</div><div class="tl-impact down">−16.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">Strategic review — $81.96</div><div class="tl-desc">The activist-driven review lifted the stock off its mid-2025 floor: November and December added 11.5% and 5.2%. It peaked at $83.67 at the February 2026 month-end.</div><div class="tl-impact up">Deal premium priced in</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–May 2026</div><div class="tl-content"><div class="tl-title">Fade despite a raise — $71.50 → $61.21</div><div class="tl-desc">Q1 on March 5 raised EPS guidance, yet March closed −14.5% and April −12.0%. The price was already telling you the market wanted a transaction, not a beat.</div><div class="tl-impact down">−27% Feb→May</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Q2 growth print — $71.71 (+17.2%)</div><div class="tl-desc">Q2 FY2026 on June 4: revenue +5% organic and adjusted EPS +26%, through a GAAP loss driven by the litigation charge. It was the best month in the window.</div><div class="tl-impact up">+17.2% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $54.12</div><div class="tl-desc">After the Q3 guidance cut, the end of the strategic review and the JANA letter. 35% below the February 2026 month-end and 51% below the September 2024 high.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) and the <strong>NASDAQ-100</strong> were not obtained from the sources fetched, so no numeric comparison is given. From sourced data: COO is <strong>down 47.6% on price over five years</strong>, with no dividend offset. Against its two listed lens peers, our calculation at the September 21 close values Cooper at <strong>$10.29B</strong>, versus Alcon at $31.36B and Bausch + Lomb at $6.00B.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying about 11.9x current-year adjusted earnings and a ~6.6% trailing free-cash-flow yield for a business with a 65.9% gross margin, record quarterly FCF of $273.0M and a reaffirmed target of more than $2.2B of FCF over FY2026–2028. If management is right that the CooperVision cut is purely distributor destocking against mid-single-digit patient demand, the revenue shortfall is a timing gap that reverses. The $1.5B remaining buyback then retires shares at $54 instead of $69. There are also two activists on the register, and one of them is now asking for a new CEO and a sale of the fertility assets. Even the lowest analyst target, $58, is above the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Revenue guidance has been cut twice in a row, the deal premium is gone, and the explanation for the miss is the one that is hardest to verify from outside. Asia Pacific CooperVision at −5% organic is not a U.S. distributor problem. ROIC of 5.03% says the capital in the business is not earning its cost. Management bought $339.1M of stock at an average $69.16 weeks before a 20% drop, which is the capital-allocation record the next buyback will be judged against. The trailing P/E of 18.7 rests on a tax benefit and a litigation charge, not a clean earnings base. And a board that just refused to sell CooperSurgical is now being asked by an activist to do exactly that.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">CooperVision growth does not come back.</strong> The division went from +4% organic in Q2 to flat in Q3, with guidance of 1–2% organic for the year. If Q4 does not show the U.S. channel normalising, the market will treat the slowdown as share loss, not stocking.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Governance fight distracts the business.</strong> JANA wants a new CEO and chair; Browning West already has a cooperation agreement. A drawn-out public fight can freeze decisions just as the lens business needs execution.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">CooperSurgical's value stays trapped.</strong> The board said the offers it received were not good enough. If fertility growth (+5% organic) slows, or recall-litigation history keeps weighing on buyer interest, the sum-of-the-parts case weakens with no transaction to crystallise it.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Channel inventory vs. patient demand in contact lenses</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">KEY DEBATE</span></div>
+    <p class="biz-desc">Contact-lens companies sell to distributors and practitioners, not directly to the wearer. Reported revenue can therefore diverge from what patients actually buy for a quarter or two. Management says U.S. consumption grew mid-single digits while shipments fell because distributor inventory was pulled down deliberately (Q3 call, per the Motley Fool transcript). If that is right, it is a one-off: once distributors reach their new target stock level, shipments track consumption again. The market's 20% two-day reaction says investors did not give that explanation full credit, partly because EMEA (+5%) and Asia Pacific (−5%) moved in opposite directions in the same quarter.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Activism and the conglomerate discount</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">POTENTIAL TAILWIND</span></div>
+    <p class="biz-desc">The activists' thesis is that a lens franchise and a fertility/women's-health device business are worth more apart than together. JANA earlier floated combining CooperVision with Bausch + Lomb, and Browning West pushed for alternatives for CooperSurgical (per Investing.com, November 2025). The strategic review tested that thesis with real bidders and the board declined. <strong>The bull framing:</strong> the review showed there is buyer interest, and JANA now argues the fertility and device assets would earn premium valuations under different ownership. <strong>The bear framing:</strong> the offers were apparently not high enough, and a process that has already run once rarely produces a better price the second time.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #26C6DA;">
+    <div class="biz-header"><div class="biz-name">Quality of earnings in a noisy year</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">READ THE ADJUSTMENTS</span></div>
+    <p class="biz-desc">FY2026 GAAP earnings contain a $271.6M litigation charge and a $307.2M tax benefit, two items the size of a normal quarter's net income. Neither says anything about how many lenses Cooper sold. The numbers that do are organic growth (2–3% guided for the year), non-GAAP gross margin (67% in Q3, down 60bps) and free cash flow ($678M TTM). On those three, Cooper is a slower-growing but still very profitable business. The dispute is over what multiple slower growth deserves.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/coo/history/</strong>, the September 21, 2026 settled close of $54.12 (open 55.13, high 55.53, low 54.10, volume 4,183,367, Adj. Close present, −2.12% on the prior close of $55.29). It is corroborated by the "Previous Close" field on stockanalysis.com/stocks/coo/. The September 22, 2026 session was still in progress at the time of writing and its print is not used anywhere in this report.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual and quarterly financials, forecast and analyst actions; peer prices and share counts) for price, valuation, margins, returns, balance sheet, consensus, executives and the Sector/Industry labels. CooperCompanies' Q1, Q2 and Q3 FY2026 earnings releases (globenewswire.com, March 5, June 4 and September 9, 2026) for segment revenue, organic growth, guidance, the litigation charge, the tax benefit, buybacks and the CEO quote. prnewswire.com for JANA Partners' September 18, 2026 letter. CooperCompanies' December 4, 2025 releases (fourth-quarter results with initial FY2026 guidance and the ~$50M savings figure; new chair and strategic review) and September 9, 2026 strategic-review completion release (via Vision Monday for the "offers received" wording). marketscreener.com for the 8% share reaction to the review announcement. The Motley Fool's Q3 FY2026 call transcript for the CEO's channel-inventory and U.S. consumption remarks. Wikipedia (List of S&amp;P 500 companies; Nasdaq-100; The Cooper Companies) for the index add date, NASDAQ-100 non-membership, founding and acquisitions. digrin.com/stocks/detail/COO/price for month-end closes. Board changes: CooperCompanies' December 23, 2025 release (via BioSpace) for Walter M. Rosebrough, Jr. and the Browning West cooperation agreement. The activists' earlier proposals (JANA's suggested combination with Bausch + Lomb; Browning West's November 19, 2025 letter): Investing.com. StockAnalysis lists the company as founded in 1980; Wikipedia gives 1958, which is used here.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. 60 month-end closes from September 2021 through August 2026 come from the unadjusted "Real Price" column at digrin.com, with every month before February 2024 divided by 4 for the 4:1 split effective February 20, 2024, so the whole series is on one post-split basis consistent with the $54.12 header price. The final point is the September 21, 2026 settled close. It is not a month-end and is labelled as such. The July and August 2026 month-ends ($72.32, $70.09) were cross-checked against StockAnalysis daily rows. <strong>No interior months were reconstructed or estimated.</strong> The series is not dividend-adjusted. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Market share, TAM and market-cap rankings are marked "n/v" or "not sourced". The market cap and peer market caps are our calculations at September 21 closes. The PEG ratio is rescaled from StockAnalysis's intraday figure. The employee count (15,000) is the StockAnalysis profile figure; its as-of date was not shown.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price"; pre-Feb 2024 ÷ 4 for the 4:1 split of Feb 20, 2024) + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [103.33,104.23,94.12,104.73,99.58,102.25,104.4,90.26,87.69,78.28,81.75,71.86,65.97,68.35,79.09,82.67,87.23,81.74,93.34,95.36,92.88,95.86,97.81,92.5,79.5,77.94,84.23,94.61,93.26,93.6,101.46,89.06,94.31,87.3,93.33,105.73,110.34,104.68,104.46,91.93,96.55,90.38,84.35,81.67,68.28,71.16,70.69,67.4,68.56,69.91,77.93,81.96,81.38,83.67,71.5,62.9,61.21,71.71,72.32,70.09,54.12];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — 2022 low $65.97 (split-adj.), RSI 19.95',       color: '#ef4444' },
+  { idx: 29, label: 'Feb 2024 — 4:1 split effective Feb 20; $93.60',            color: '#3b82f6' },
+  { idx: 36, label: 'Sep 2024 — five-year high $110.34, RSI 70.2',              color: '#22c55e' },
+  { idx: 44, label: 'May 2025 — $68.28 (−16.4% month)',                         color: '#ef4444' },
+  { idx: 51, label: 'Dec 2025 — strategic review opened; $81.96',               color: '#22c55e' },
+  { idx: 57, label: 'Jun 2026 — Q2 FY26; $71.71 (+17.2% month)',                color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $54.12 after Q3 guidance cut', color: '#26C6DA' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(38,198,218,0.22)');
+grad.addColorStop(1, 'rgba(38,198,218,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#26C6DA', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#26C6DA'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
