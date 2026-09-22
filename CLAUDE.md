@@ -52,6 +52,13 @@ The chrome pages are `index.html`, `reports/index.html`, `reports/view.html` and
 - Use about 60 monthly closes (a 5-year monthly series), never daily closes under a 5-year heading.
 - Never trust an agent's self-reported "verified". Named analyst calls only if seen on a fetched page.
 
+## Recurring runs learn from their own mistakes
+
+- Briefs for builders, checkers and refreshes live in `claude/briefs/` (BUILD, CHECK, REFRESH). Use them; don't rewrite them per session.
+- `claude/REPORT_PITFALLS.md` is the running log of every error class checkers have had to correct, with the rule that prevents each. Every builder and checker reads it first. At the end of every run the orchestrator tallies the checkers' `PITFALLS:` tags into it and copies any repeated rule into the briefs (retro protocol at the bottom of that file).
+- Earnings refreshes wait for the T+2 settled close (second full session after the release) so the call, day-2 follow-through and analyst revisions are in; news-driven updates wait for the first full session after the news. Details in `claude/briefs/REFRESH.md`.
+- `py -3 tools/chart_audit.py <slug>` must show 0 wrong chart points before anything publishes.
+
 ## Working agreements
 
 - Push straight to `main`; small, descriptive commits.

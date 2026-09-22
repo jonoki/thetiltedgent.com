@@ -37,3 +37,16 @@ lengths, final chart value == header price, P/E ≈ price ÷ EPS, and that the
 Run it on new reports **before** pushing. Two reports (AEP, DLR) reached the
 live site with no doctype, html, head or body tags at all, because they were
 built five days before this check existed; they were repaired on 15 Sep 2026.
+
+## `chart_audit.py` — every chart point vs Yahoo month-end closes
+
+    py -3 tools/chart_audit.py                 # whole library
+    py -3 tools/chart_audit.py aapl intc       # named reports
+
+`verify.py` only checks that the last chart point equals the header price. This
+checks all the others: a point is wrong when it is more than 3% from Yahoo's
+split-adjusted month-end close *and* from its dividend-adjusted close. It also
+lists series that are dividend-adjusted without saying so. Read-only on the
+repo; caches Yahoo responses under `$TEMP/ttg_chart_audit/`. Required at 0
+wrong points on every new build and every refresh (see `claude/briefs/`).
+The 22 Sep 2026 run found reconstructed month-ends on ~60 live reports.
