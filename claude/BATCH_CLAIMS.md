@@ -23,24 +23,6 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
-### sess-2026-09-21-o · claimed 2026-09-21 (local Claude Code session)
-SOLV PTC DOC EG MAA IVZ AIZ TXT TYL REG
-
-### sess-2026-09-21-n · claimed 2026-09-21 (local Claude Code session)
-IEX LDOS INVH NWSA RVTY BALL ROL HST APA KIM
-
-### sess-2026-09-21-m · claimed 2026-09-21 (local Claude Code session)
-GEN GPC BEN AKAM LNT TSCO J FTV ZBRA NVR
-
-### sess-2026-09-21-l · claimed 2026-09-21 (local Claude Code session)
-EFX CDW EVRG TSN FIS ESS ZBH CHRW FDXF DD
-
-### sess-2026-09-21-k · claimed 2026-09-21 (local Claude Code session)
-VTRS BBY AMCR LYB NI SNA GIS LEN IP SBAC
-
-### sess-2026-09-21-c · claimed 2026-09-21 (local Claude Code session)
-AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -109,6 +91,30 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-21-o · done 2026-09-22 (local Claude Code session)
+SOLV PTC DOC EG MAA IVZ AIZ TXT TYL REG
+- All 10 published 22 Sep, each independently checked (l/m/n builds were orphaned by the 21 Sep interrupt).
+
+### sess-2026-09-21-n · done 2026-09-22 (local Claude Code session)
+IEX LDOS INVH NWSA RVTY BALL ROL HST APA KIM
+- All 10 published 22 Sep, each independently checked (l/m/n builds were orphaned by the 21 Sep interrupt).
+
+### sess-2026-09-21-m · done 2026-09-22 (local Claude Code session)
+GEN GPC BEN AKAM LNT TSCO J FTV ZBRA NVR
+- All 10 published 22 Sep, each independently checked (l/m/n builds were orphaned by the 21 Sep interrupt).
+
+### sess-2026-09-21-l · done 2026-09-22 (local Claude Code session)
+EFX CDW EVRG TSN FIS ESS ZBH CHRW FDXF DD
+- All 10 published 22 Sep, each independently checked (l/m/n builds were orphaned by the 21 Sep interrupt).
+
+### sess-2026-09-21-k · done 2026-09-22 (local Claude Code session)
+VTRS BBY AMCR LYB NI SNA GIS LEN IP SBAC
+- Published 21 Sep by the claiming session except SBAC (built 21 Sep, independently checked and published 22 Sep); claim closed 22 Sep.
+
+### sess-2026-09-21-c · done 2026-09-22 (local Claude Code session)
+AEE IR HAL ECHO FOXA SMCI DGX DG WSM ATO
+- Published 21 Sep by the claiming session; claim closed 22 Sep.
 
 ### sess-2026-09-21-j · done 2026-09-21 (local Claude Code session)
 DLTR OMC LUV EXE CMS RL STZ STE CHTR FICO
