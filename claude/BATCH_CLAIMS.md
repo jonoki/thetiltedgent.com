@@ -27,9 +27,6 @@ work, so the claim goes in first and the research goes second.
 NDSN PNR PNW PODD PPL PSKY SJM SWK SWKS TECH TRMB UDR UHS WY
 - The last 14 S&P 500 companies not covered (GOOG/FOX/NWS are second share classes of covered companies).
 
-### sess-2026-09-22-s · claimed 2026-09-22 (local Claude Code session)
-HRL HSIC IT JKHY LII LULU MAS MKC MOS NCLH
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -98,6 +95,10 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-22-s · done 2026-09-22 (local Claude Code session)
+HRL HSIC IT JKHY LII LULU MAS MKC MOS NCLH
+- All 10 published 22 Sep, each independently checked.
 
 ### sess-2026-09-22-r · done 2026-09-22 (local Claude Code session)
 DPZ DVA ERIE FDS FRT GDDY GL GNRC HAS HII
