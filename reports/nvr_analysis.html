@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NVR — NVR, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">NVR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Discretionary / Residential Construction</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $16.49B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">S&amp;P 500: #432 of 503</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #2DD4BF44;padding:3px 10px;border-radius:4px;">S&amp;P 500 member since September 26, 2019 · no stock split on record</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">NVR, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$6,188.95</div>
+      <div class="price-change" style="color:var(--green);">+$38.48 (+0.63%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $6,188.95 (0.00%, 6:30 PM EDT)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Plaza America Tower I, Suite 500, Reston, Virginia</div>
+    <div class="meta-item"><span>Employees:</span> 6,300</div>
+    <div class="meta-item"><span>Founded:</span> 1980 (as NVHomes)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 13, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">One share of NVR costs <strong>$6,188.95</strong>. There are only <strong>2.66 million</strong> of them, and the company has never split the stock — it is, per Wikipedia, the second most expensive share on US exchanges behind Berkshire Hathaway's Class A. That price tag is what a long habit of buying back shares — with no split and no dividend — looks like on a quote screen: the share count keeps shrinking, so each share keeps getting bigger. NVR builds single-family homes, townhomes and condominiums under the <strong>Ryan Homes, NVHomes and Heartland Homes</strong> names across the eastern and southeastern United States, and runs a mortgage-banking and title arm that finances most of the homes it sells. FY2025 revenue was <strong>$10.44B, down 2.33%</strong>, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$436.55</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The history has a bust in it. NVR began in 1980 as NVHomes, bought Ryan Homes (founded in Pittsburgh in 1948) in 1986, and filed for bankruptcy in April 1992 during the early-1990s recession, emerging in September 1993. The company that came out the other side was built not to repeat the mistake: HousingWire calls it <strong>"land light by design"</strong> — it controls <strong>184,400 lots</strong> largely through option contracts and deposits rather than owning dirt outright. That turns a land-price collapse from a balance-sheet event into a write-off of deposits. In 2026 the model is being tested from the other side. Demand is not collapsing — Q2 2026 new orders rose <strong>9%</strong> — but the price of each order is: average new-order price fell <strong>5% to $437,100</strong>, homebuilding gross margin fell to <strong>19.2% from 21.5%</strong>, and Q2 diluted EPS fell <strong>23% to $83.96</strong>. The stock sits <strong>36.9% below its September 2024 month-end high</strong>. The question is whether this is a cyclical margin squeeze in a business that prints cash through the cycle, or a new, lower plateau for what an East Coast starter home can earn.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Eugene Bredow</div>
+      <div class="card-note">President and CEO per the StockAnalysis company profile; Wikipedia also names Eugene Bredow as CEO. Paul C. Saville is Executive Chairman of the Board.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Daniel D. Malzahn</div>
+      <div class="card-note">Senior Vice President, CFO and Treasurer per the StockAnalysis profile. He runs the capital-return engine: 144,896 shares repurchased for $989.7M in the first half of 2026 alone.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">91.23% institutional</div>
+      <div class="card-note">Insiders own 1.14%; float is 2.62M shares. Named top holders were not retrieved from the sources fetched and are not listed. Average daily volume is only ~39,751 shares (20-day) — at this share price, roughly $250M a day.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">NVR reports <strong>two businesses — Homebuilding and Mortgage Banking</strong> — and splits homebuilding into four regional segments. The bar below uses <strong>FY2025 segment revenue</strong> as reported by StockAnalysis (six lines summing to $10.44B; "Other" is shown in the grey slice). Homebuilding is 96.7% of revenue; mortgage banking is small in revenue but it is the reason NVR can tell a buyer what the monthly payment will be.</p>
+  <div class="seg-bar">
+    <div style="flex:41.9;background:#2DD4BF;">MID ATLANTIC 41.9%</div>
+    <div style="flex:25.3;background:#22c55e;">SOUTH EAST 25.3%</div>
+    <div style="flex:18.0;background:#f59e0b;">MID EAST 18.0%</div>
+    <div style="flex:11.5;background:#3b82f6;">N.EAST 11.5%</div>
+    <div style="flex:2.2;background:#a78bfa;"></div>
+    <div style="flex:1.1;background:#64748b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Mid Atlantic — $4,372M (FY25), −1.2% <span class="tip" title="Year over year — versus the same period one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> South East — $2,645M, −6.9% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Mid East — $1,875M, +0.7% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> North East — $1,202M, +3.1% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Mortgage Banking — $229.7M (2.2%), −1.0% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Other — $119.3M (1.1%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The 2026 damage is concentrated. In Q2 2026 the Mid Atlantic — the largest region — fell <strong>22.1% YoY</strong> to $879.5M, while the Mid East and South East were each up about 0.8%. The region that is 42% of the company is where the slowdown lives.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Homebuilding — Mid Atlantic</div>
+        <span class="biz-badge dominant">LARGEST REGION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$4,372M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−22.1%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">41.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The home turf. NVR started as Northern Virginia Homes, and the Washington metropolitan area alone was 22% of 2021 revenue (Wikipedia). FY2025 revenue of $4.37B was nearly flat (−1.2%), but Q2 2026 revenue fell to <strong>$879.5M from $1,129M</strong> a year earlier. The company's own explanation for the group-wide margin decline — "higher lot costs, pricing pressure due to continued affordability challenges and weak consumer sentiment" — applies with most force where a region is this large a share of the book. Regional-level orders and margins were not retrieved, so the split between fewer closings and lower prices inside this region is not shown.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> regional housing-market size and NVR's regional share not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">D.R. Horton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$38.95B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">PulteGroup</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$22.30B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennar</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$18.81B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Homebuilding — South East</div>
+        <span class="biz-badge dominant">SHARE NOT DISCLOSED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,645M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+0.8%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">25.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The second-largest region and the one that took the first hit: FY2025 revenue fell <strong>6.9%</strong> to $2.65B, the weakest of the four regions that year. In Q2 2026 it stabilised at $666.0M, up 0.8% on a weak comparison. This is the region where NVR competes most directly with the large national production builders on entry-level product.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">D.R. Horton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$38.95B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennar</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$18.81B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Century Communities</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Homebuilding — Mid East &amp; North East</div>
+        <span class="biz-badge growth">MOST RESILIENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,077M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+0.8% / −9.1%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two smaller regions shown together. <strong>Mid East</strong> ($1,875M in FY2025, +0.7%) and <strong>North East</strong> ($1,202M, +3.1%) were the only regions that grew in FY2025. North East is the growth story of the decade — revenue up from $767.8M in FY2021 to $1,202M in FY2025, +57% — but it cooled in Q2 2026, down 9.1% to $280.8M. Mid East held flat at $453.4M (+0.8%).</p>
+    <div class="biz-tam"><strong>Industry size:</strong> not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">PulteGroup</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$22.30B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">KB Home</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Mortgage Banking</div>
+        <span class="biz-badge emerging">CAPTIVE LENDER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$229.7M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−7.8%</div><div class="biz-stat-label">Q2'26 YoY</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">85%</div><div class="biz-stat-label">Capture Rate</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">2.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">NVR's in-house lender and title business. It originates mortgages for NVR's own buyers — the <strong>capture rate</strong> (share of NVR buyers who finance through it) was <strong>85% in Q2 2026 versus 87%</strong> a year earlier. Q2 closed loan production was <strong>$1.35B, down 13%</strong>, and pre-tax income was <strong>$25.4M, down 14%</strong> from $29.6M. Small in revenue, strategically large: when affordability is the constraint, the lender is where rate buydowns and financing incentives are engineered, and a captive lender lets the builder see the buyer's payment math before the contract is signed.</p>
+    <div class="biz-tam"><strong>Competitors:</strong> none named on the pages fetched for this business line — no comparison is shown.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating metrics that actually matter</h3>
+  <p class="prose">A homebuilder's income statement lags its sales office by two to three quarters. Judge it on <strong>orders, price per order, backlog and cancellations</strong>. All figures below are Q2 2026 (quarter ended June 30, 2026) from the company's July 23, 2026 release.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">New Orders</div>
+      <div class="card-value">5,885</div>
+      <div class="card-note"><span style="color:var(--green);">+9% YoY</span> from 5,379 units — but at an average price of <strong>$437,100, down 5%</strong>. Volume up, price down: the classic signature of a builder buying its sales pace with incentives.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Backlog</div>
+      <div class="card-value">10,998 units</div>
+      <div class="card-note"><span style="color:var(--green);">+9% in units</span>, +5% in dollars to <strong>$4.99B</strong>. Dollar backlog growing slower than unit backlog is the price cut already baked into future revenue.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Cancellation Rate</div>
+      <div class="card-value" style="color:var(--green);">15%</div>
+      <div class="card-note">Down from 17% in Q2 2025. Buyers who sign are sticking — the demand problem is price, not flight.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Homebuilding Gross Margin</div>
+      <div class="card-value" style="color:var(--red);">19.2%</div>
+      <div class="card-note">Versus 21.5% a year earlier, including about <strong>$21.7M of contract land deposit impairments</strong>. Settlements fell 8% to 5,058 units at an average $450,700 (−3%).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Land-light lot options (184,400 lots)</span>
+    <span class="moat-pill">Net-cash balance sheet</span>
+    <span class="moat-pill">Captive mortgage (85% capture)</span>
+    <span class="moat-pill">Mid-Atlantic density</span>
+    <span class="moat-pill">ROIC 36.7%</span>
+    <span class="moat-pill">Relentless buybacks (−7.9% shares YoY)</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>capital discipline</strong>, not bricks. Most builders make money twice — once on the house, once on the land they bought years earlier — and lose money twice when the cycle turns. NVR mostly declines the land bet: it pays deposits to control lots and buys them as it needs them, which is why it earns a <strong>36.74% return on invested capital</strong> and carries only $1.09B of debt against $1.09B of cash. The cost is visible in 2026: when a lot contract no longer pencils, the deposit is written off (about $21.7M in Q2), and when land sellers reprice, NVR pays "higher lot costs" rather than enjoying a cheap land bank. The protection is against catastrophe, not against margin pressure.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Price is doing the work volume used to do.</strong> New-order price down 5%, settlement price down 3%, gross margin down 230 bps year-over-year. The company names the causes itself: higher lot costs, affordability, weak consumer sentiment. None of the three is in NVR's control.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Community count is not keeping up with lots.</strong> HousingWire reports 442 communities at quarter-end, up only 4% year-over-year and below the 450 level of the second half of 2025, while controlled lots rose to 184,400 from 171,400. More lots feeding the same number of sales offices is inventory, not growth.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The cash pile is being spent.</strong> Cash fell to $1.1B at June 30, 2026 from $1.7B a year earlier and $2.6B at the end of 2024 (HousingWire). Net cash is now just $3.48M. Buybacks of $989.7M in six months are running ahead of TTM free cash flow of $1.05B on an annualised basis — the pace can slow, but the cushion that funded it is largely gone.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Geographic concentration.</strong> 41.9% of revenue comes from one region, and that region fell 22.1% in Q2 2026. A national builder can offset a soft metro; NVR's footprint is 14 states plus Washington, D.C., primarily on the East Coast.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which NVR has been a constituent since September 26, 2019. NVR is NYSE-listed and is not a NASDAQ-100 member. Industry-average and S&amp;P 500 comparison values were not obtained from the sources fetched and are shown as "—" rather than estimated. Trailing figures are TTM to June 30, 2026 (StockAnalysis).</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>NVR</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>15.98</td><td>—</td><td>—</td><td>$6,188.95 ÷ $387.29 TTM EPS = 15.98. A trough-ish multiple on earnings that are themselves falling.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by an estimate of future earnings per share.">Forward P/E</span></td><td>15.88</td><td>—</td><td>—</td><td>StockAnalysis figure. On consensus FY2026 EPS of $361.10 (estimate) it is 17.14; on FY2027's $409.46 (estimate) it is 15.11.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>9.74</td><td>—</td><td>—</td><td>Meaningless near a cyclical earnings trough — the growth denominator is tiny. StockAnalysis shows 3-year EPS growth of 4.00%.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$387.29</td><td>—</td><td>—</td><td>Down 18.45% YoY, versus net income down 24.9% — the gap is the 7.92% fall in share count.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>−10.14%</td><td>—</td><td>—</td><td>TTM revenue $9.63B. Q2 2026 −10.88%; consensus FY2026 revenue $9.21B (−11.77%, estimate), FY2027 $9.88B (+7.28%, estimate).</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of building and selling the homes (land, lots, construction), as a percentage of revenue.">Gross Margin</span></td><td>21.84%</td><td>—</td><td>—</td><td>Consolidated TTM. Down from 26.70% in FY2022 and 25.64% in FY2024; Q2 2026 was 20.32%. The line where the affordability squeeze shows first.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>11.85%</td><td>—</td><td>—</td><td>Operating margin 15.68%. Q2 2026 net margin was 10.10%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>n/a</td><td>—</td><td>—</td><td>NVR pays no dividend. All capital return is buybacks: buyback yield <strong>7.92%</strong>.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>4.12%</td><td>—</td><td>—</td><td>108,108 shares short; 3.31 days to cover.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.32</td><td>—</td><td>—</td><td>$1.09B total debt (senior notes $908.2M) against $1.09B cash — net cash of $3.48M. Shareholders' equity $3.39B.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>5.67</td><td>—</td><td>—</td><td>Quick ratio 1.75 — most current assets are homes under construction and lots.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for buybacks and debt repayment.">Free Cash Flow</span></td><td>$1.05B</td><td>—</td><td>—</td><td>TTM; capex only $20.2M. FCF yield 6.34%. FY2025 FCF was $1,097M, down from $1,852M in FY2022.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>31.54%</td><td>—</td><td>—</td><td>High partly because buybacks keep shrinking equity: P/B is 4.89 on book value of $1,266.24 per share.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>36.74%</td><td>—</td><td>—</td><td>The land-light model in one number: little capital tied up in land.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.91</td><td>—</td><td>—</td><td>5-year beta. Altman Z-score 13.62; Piotroski F-score 4.</td></tr>
+      <tr><td>52-Week Range</td><td>$5,501.01 – $8,200.00</td><td>—</td><td>—</td><td>$6,188.95 sits 12.5% above the low and 24.5% below the high. 52-week change −23.54%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Two items shape the reported numbers. First, <strong>contract land deposit impairments</strong> of about $21.7M in Q2 2026 were charged to cost of sales and are part of the 230 bps gross-margin decline — the cost of walking away from lot contracts that no longer work at today's prices. Second, <strong>buybacks</strong>: 54,716 shares for $357.8M in Q2 and 144,896 shares for $989.7M in the first half — roughly 5.4% of the current 2.66M share count in six months. Per-share metrics are therefore flattered relative to absolute profit: H1 2026 net income fell 31% while H1 diluted EPS fell 26%. Beyond those, no material non-recurring items were identified in the sources fetched.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">6 analysts per StockAnalysis. Thin coverage for an S&amp;P 500 name.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$6,782</div><div class="card-note"><span style="color:var(--green);">+9.58% upside</span> from $6,188.95. Median target $7,000 (+13.10%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$5,664 – $7,446</div><div class="card-note">−8.48% to +20.31%. A narrow band for a cyclical — the debate is about how deep the margin trough is, not whether the business survives it.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">2 / 3 / 1</div><div class="card-note">August 2026: 2 Strong Buy, 0 Buy, 3 Hold, 0 Sell, 1 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:33.3;background:#22c55e;"></div>
+    <div style="flex:50.0;background:#f59e0b;"></div>
+    <div style="flex:16.7;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 2 (33.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 3 (50.0%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (16.7%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Truist Financial — Jonathan Bettenhausen</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$6,400</span> (Sep 16, 2026). The most recent call on the board, and it implies only +3.4% from here.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">BTIG — Ryan Gilbert</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$7,446</span> (standing target at Sep 21, 2026). The highest target on the board; the date and prior level of BTIG's last change before Sep 21 were not confirmed on the pages fetched.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Bank of America — Rafe Jadrosich</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$7,200 → $7,000</span> (Jul 24, 2026). A bull trimming, not capitulating.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">UBS — John Lovallo</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$7,700 → $7,400</span> (Jul 24, 2026). And <strong>Wolfe Research — Trevor Allinson</strong> maintained Hold with no price target on Apr 23, 2026. Every dated target change shown here since July has been a cut.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 13, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">The test of the Q2 order growth. Q2 orders rose 9% at a 5% lower price; if Q3 shows orders still up and new-order price stabilising, the margin trough is in sight. Watch homebuilding gross margin against Q2's 19.2%, the size of any further land deposit impairments, the cancellation rate against 15%, and the community count against 442.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback pace versus a shrinking cash cushion</div>
+        <div class="tl-desc">$989.7M of repurchases in H1 2026 cut the share count 7.92% year-over-year. With net cash now essentially zero ($3.48M), future buybacks must come out of current free cash flow ($1.05B TTM). A slower pace would be prudent — and would remove the per-share tailwind that has cushioned EPS against falling net income.</div>
+        <div class="tl-impact neutral">Watch the Q3 repurchase figure</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Consensus expects the rebound</div>
+        <div class="tl-desc">Consensus has FY2026 EPS falling 17.28% to $361.10, then rising 13.39% to $409.46 in FY2027 on revenue up 7.28% (all estimates). The 9% unit-backlog growth is the evidence for the rebound; the 5% dollar-backlog growth is the caveat.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Revenue $2.33B (vs $2.60B), diluted EPS $83.96 (−23%), orders +9%, gross margin 19.2%. The stock fell 3.06% on the day to $6,155.02 (intraday low $5,919.25), rebounded 4.22% on July 24, and closed July at $6,147.05 — a 9.8% monthly decline that gave back all of June's rally. Analysts cut targets on July 24.</div>
+        <div class="tl-impact down">Reaction already happened: July −9.8%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 2026 — the first leg down</div>
+        <div class="tl-desc">Q1 revenue fell 21.40% to $1.91B and diluted EPS fell 28.55% to $67.76. The stock closed March at $6,589.83 (−12.3% in the month), then April at $6,315.87 and May at $6,104.80, where the 6-month RSI reached 23.7.</div>
+        <div class="tl-impact down">Reaction already happened: Mar–May −18.8%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">NVR — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$4,794.08</strong> to the September 21, 2026 settled close of <strong>$6,188.95</strong>, NVR gained <strong>29.1% on price</strong> — and with no dividend, price return is total return. NVR has no stock split on record, so the per-share series is continuous. The shape is a full housing cycle in five years: a 2022 rate-shock trough at <strong>$3,987.08</strong> (September 2022), a 146% run to <strong>$9,811.80</strong> by September 2024, and two years of grinding lower as the margin tailwind of the pandemic housing boom reversed. The stock is 36.9% below that peak and 15.1% below its December 2025 close.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>36.6</strong> — weak but not oversold. It touched <strong>23.7 in May 2026</strong>, the lowest reading of the five-year window and below the September 2022 trough reading of 37.3, which says the 2026 decline was more persistent month-to-month than the 2022 crash, even though it was shallower. The 10-month moving average at about <strong>$6,692</strong> sits above the price and is still falling: the long-term trend is down, and June 2026's +11.6% rally failed at it.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2021</div><div class="tl-content"><div class="tl-title">Boom peak — $5,908.87</div><div class="tl-desc">The top of the pandemic housing run, with FY2021 revenue up 18.56% and EPS up 39.27%.</div><div class="tl-impact up">+13.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Rate-shock trough — $3,987.08</div><div class="tl-desc">A 32.5% fall from December 2021 — yet FY2022 EPS came in at $491.82 (+53.46%). The market sold the future, not the results.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">All-time-window high — $9,811.80</div><div class="tl-desc">FY2024 EPS reached $506.69 on revenue up 10.38% and a 25.64% gross margin. RSI hit 84.9, the most overbought reading in the series.</div><div class="tl-impact up">+146% from Sep 2022</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024 – May 2025</div><div class="tl-content"><div class="tl-title">The margin unwind begins — $7,115.93</div><div class="tl-desc">An 11.4% drop in December 2024 started a slide to $7,115.93 by May 2025 as quarterly EPS growth turned negative (Q1 2025 −18.54%).</div><div class="tl-impact down">−27.5% from peak</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–May 2026</div><div class="tl-content"><div class="tl-title">Second leg down — $6,104.80, RSI 23.7</div><div class="tl-desc">Q1 2026 revenue −21.40%, EPS −28.55%. March fell 12.3%, the worst single month of the five-year window.</div><div class="tl-impact down">Most oversold reading of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun–Jul 2026</div><div class="tl-content"><div class="tl-title">Failed rally — $6,813.40 then $6,147.05</div><div class="tl-desc">June rose 11.6%; the Q2 print on July 23 (gross margin 19.2%, EPS −23%) took July down 9.8% and erased it.</div><div class="tl-impact down">Reaction already happened</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $6,188.95</div><div class="tl-desc">September has traded between $6,088.28 and $6,373.95 on closing prices, waiting for the October 13 print.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Precise five-year and one-year index returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison figure is given. What can be stated from sourced data: NVR is <strong>up 29.1% on price over five years</strong>, <strong>down 23.54% over the trailing year</strong>, with market capitalisation down <strong>29.4% year-over-year</strong> — more than the price, because the buyback shrank the share count. Among the homebuilders named in HousingWire's Q2 coverage that are also S&amp;P 500 members, NVR's $16.49B market value compares with D.R. Horton at $38.95B, PulteGroup at $22.30B and Lennar at $18.81B (StockAnalysis S&amp;P 500 list, September 21, 2026 close).</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 15.98x trailing earnings for a builder that earns a 36.74% return on invested capital, carries no net debt, and has never needed to own the land it builds on. Orders are up 9%, unit backlog is up 9%, and cancellations have fallen to 15% — buyers are there; they just need a lower price. Consensus sees EPS bottoming at $361.10 in FY2026 and recovering to $409.46 in FY2027 (estimates). Through the whole downturn the company has kept retiring stock — 7.92% of shares in a year — so when margins recover, each share owns more of the recovery. Every analyst target but one sits above the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Earnings are falling for a second straight year (EPS −13.84% in FY2025, −18.45% TTM, consensus −17.28% for FY2026) and gross margin has slid from 26.70% to 21.84%. Order growth is being bought with price: new-order price −5%, dollar backlog growing slower than unit backlog. The largest region fell 22.1% in Q2. The net-cash cushion that funded the buyback is gone — cash from $2.6B to $1.1B in eighteen months — so the per-share support weakens just as land deposit write-offs start. The 10-month moving average is falling, every target change since July has been a cut, and a 15.98x multiple on falling earnings is not cheap until the earnings stop falling.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Affordability-driven margin compression.</strong> Homebuilding gross margin 19.2% in Q2 2026 versus 21.5% a year earlier, attributed by the company to higher lot costs, pricing pressure and weak consumer sentiment. Each further point of margin on roughly $9–10B of revenue is on the order of $90–100M of pre-tax profit (arithmetic on TTM revenue of $9.63B).</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Lot-deposit write-offs.</strong> The land-light model's failure mode: $21.7M of contract land deposit impairments in Q2 2026. With 184,400 lots controlled, more contracts may be abandoned or renegotiated if prices keep falling.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Regional concentration and capital-return fatigue.</strong> The Mid Atlantic is 41.9% of revenue and fell 22.1% in Q2. Meanwhile net cash has fallen to $3.48M; if buybacks slow, EPS loses the share-count tailwind that turned a 24.9% TTM net-income decline into an 18.45% EPS decline.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Affordability is the binding constraint</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">NVR's own release names the problem in one sentence: gross margin "was negatively impacted by higher lot costs, pricing pressure due to continued affordability challenges and weak consumer sentiment, and by contract land deposit impairments." That combination — input costs up, selling prices down — is the squeeze. It shows in the numbers as volume holding while price gives: orders +9%, new-order price −5%, settlement price −3%. A builder can sell its way through an affordability problem only by cutting price or subsidising the mortgage, and both land in gross margin.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Land-light meets its limits</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">HousingWire's Q2 headline — "NVR is land light by design, Q2 2026 reveals the strategy has limits" — frames the debate. Controlling lots through options keeps capital light and protected in a crash, but it means NVR buys lots at today's negotiated price rather than from a cheap land bank, and it pays for flexibility through deposit write-offs when contracts stop making sense. HousingWire notes lots controlled rose to 184,400, up 76% since Q4 2019, while communities rose only 4% to 442. The same article discusses Lennar, D.R. Horton, PulteGroup, KB Home and Century Communities as the peer set, and notes Century reported 330 communities (+11%) with a 20% adjusted gross margin.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The quality premium — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">At 4.89x book and 10.73x <span class="tip" title="Enterprise Value to EBITDA — the whole capital structure divided by earnings before interest, tax, depreciation and amortisation.">EV/EBITDA</span>, NVR is not priced like a distressed cyclical. <strong>The bull framing:</strong> this is the builder that came out of a 1992 bankruptcy and redesigned itself never to be forced into one again; it has the highest-return model in the group, a captive lender with 85% capture, and a management team that turns every soft patch into a buyback opportunity. Buying the best operator at the bottom of its margin cycle is how the stock went from $3,987 to $9,812 last time. <strong>The bear framing:</strong> the premium assumes the margin recovers to where it was. If affordability keeps new-home prices capped while lot costs keep rising, the 2021–2024 margins were the anomaly, and the stock is priced for a recovery that is not coming. The way to adjudicate is the next two quarters of new-order average price and gross margin. Both are reported. Neither has yet turned.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/nvr/history/</strong> — the September 21, 2026 settled close of $6,188.95 (open 6,200.00, high 6,257.52, low 6,128.93, volume 37,426, Adj. Close present, +0.63% on the prior close of $6,150.47). Confirmed by the quote page stockanalysis.com/stocks/nvr/, which shows $6,188.95 "At close: Sep 21, 2026, 4:00 PM EDT".</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual and quarterly financials including segment revenue, forecast and named analyst actions, S&amp;P 500 constituent list) for price, valuation, margins, returns, balance sheet, consensus, executives and peer market caps; NVR's Q2 2026 earnings release (PR Newswire / TradingView, July 23, 2026) for orders, backlog, cancellation rate, settlements, gross margin, impairments, mortgage banking, buybacks and balance-sheet items; housingwire.com (Q2 2026 coverage) for lots controlled, community count, cash history and the named peer set; digrin.com/stocks/detail/NVR/price (unadjusted "Real Price" column) for month-end closes; press.spglobal.com (September 20, 2019) for the S&amp;P 500 addition effective September 26, 2019, replacing Jefferies Financial Group; Wikipedia for company history.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 taken from the unadjusted "Real Price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $6,188.95. The July and August 2026 month-ends were cross-checked against StockAnalysis daily rows (July 31: $6,147.05; August 31: $6,315.23 — both match). <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close fourteen trading days into September, not a month-end, and is labelled accordingly. Industry-average and S&amp;P 500 benchmark columns in Section 04 are shown as "—" because no sourced values were obtained. Segment market shares and TAM figures are shown as "n/v" (not verified). Competitor figures are market capitalisations, not revenues or shares; KB Home and Century Communities market caps were not retrieved. Q2 2026 consolidated revenue is $2.33B per the company release and $2,342M per StockAnalysis's quarterly table; the release figure is used in prose. The global and US market-cap ranks were not sourced; the S&amp;P 500 rank (#432 of 503) is StockAnalysis's list ordering by market cap. The margin-sensitivity figure in Top Risks is simple arithmetic on TTM revenue, not a company or analyst estimate. Consensus figures for FY2026/FY2027 are analyst estimates.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Consensus figures are forecasts, not results, and backlog is contracted sales not yet settled rather than revenue recognised. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [4794.08,4894.80,5225.34,5908.87,5327.22,4958.44,4467.27,4376.21,4450.62,4004.14,4393.10,4140.06,3987.08,4237.75,4639.01,4612.58,5270.00,5173.62,5572.19,5840.00,5554.22,6350.62,6306.44,6377.33,5963.30,5412.62,6155.39,7000.45,7075.29,7625.57,8099.96,7438.85,7680.73,7588.56,8607.48,9172.46,9811.80,9152.81,9235.58,8178.90,8016.18,7245.58,7244.39,7125.75,7115.93,7385.66,7549.49,8117.65,8034.66,7210.82,7507.29,7292.77,7635.73,7517.79,6589.83,6315.87,6104.80,6813.40,6147.05,6315.23,6188.95];
+
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 3,  label: 'Dec 2021 — boom peak $5,908.87',                          color: '#22c55e' },
+  { idx: 12, label: 'Sep 2022 — rate-shock trough $3,987.08',                  color: '#ef4444' },
+  { idx: 36, label: 'Sep 2024 — window high $9,811.80, RSI 84.9',              color: '#22c55e' },
+  { idx: 44, label: 'May 2025 — margin unwind, $7,115.93 (−27.5% from peak)',  color: '#f59e0b' },
+  { idx: 56, label: 'May 2026 — second leg down, $6,104.80, RSI 23.7',         color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 miss; $6,147.05 (−9.8% month)',             color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $6,188.95',                  color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v.toLocaleString('en-US'); } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
