@@ -23,6 +23,9 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-22-s · claimed 2026-09-22 (local Claude Code session)
+HRL HSIC IT JKHY LII LULU MAS MKC MOS NCLH
+
 ### sess-2026-09-22-r · claimed 2026-09-22 (local Claude Code session)
 DPZ DVA ERIE FDS FRT GDDY GL GNRC HAS HII
 
