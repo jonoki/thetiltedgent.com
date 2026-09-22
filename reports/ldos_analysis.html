@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LDOS — Leidos Holdings, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #26C6DA;
+  --accent-dim: #26C6DA33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">LDOS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Information Technology Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $16.09B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500 member since Aug 9, 2019</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;margin-left:6px;">NASDAQ-100: not a member (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Leidos Holdings, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$128.23</div>
+      <div class="price-change" style="color:var(--green);">+$0.54 (+0.42%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $128.23 (0.00%) per StockAnalysis quote page</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 1750 Presidents Street, Reston, Virginia</div>
+    <div class="meta-item"><span>Employees:</span> 47,000</div>
+    <div class="meta-item"><span>Founded:</span> 1969 as Science Applications Inc. (IPO Oct 2006 as SAIC)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 3, 2026 (Q3 FY2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Leidos is the company that runs a surprising amount of the US government's plumbing: intelligence-community software and cyber operations, the medical disability exams the Department of Veterans Affairs relies on, border-screening systems, missile-warning satellites and, since March 2026, power-grid engineering. It began in 1969 as Bob Beyster's employee-owned Science Applications Inc. in La Jolla, listed as SAIC in October 2006, renamed itself <strong>Leidos</strong> in 2013 when it spun off a smaller company that kept the SAIC name, and more than doubled in 2016 by merging with Lockheed Martin's Information Systems &amp; Global Solutions business. The listed entity is the legal successor to the pre-2013 SAIC, so its price history runs unbroken — with a 1-for-4 reverse split on September 30, 2013, well outside this report's five-year window.</p>
+  <p class="prose" style="margin-top:16px;">FY2025 revenue was <strong>$17.17B, up 3.07%</strong>, with GAAP diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$11.14</strong>. Then 2026 happened to the share price, not to the income statement. The stock closed 2025 at <strong>$180.40</strong> and June 2026 at <strong>$102.97</strong> — a 43% fall in six months — as Jefferies (June 3) and Bank of America (June 17) downgraded it, the Defense Health Agency moved to buy electronic-health-record software directly rather than through Leidos as lead integrator, and management warned of a "soft patch" in Q2. Then the Q2 print on August 4 beat, guidance went up, and the stock rose <strong>10.01%</strong> in a day. At $128.23 it trades at <strong>12.0x trailing earnings</strong> with a <strong>$48.7B backlog</strong> — 2.8 years of revenue already under contract. The debate is simple to state: is the Health business the start of a pattern of the government cutting out the integrator, or a one-segment problem inside a portfolio that is growing everywhere else?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Tom Bell</div>
+      <div class="card-note">CEO effective May 3, 2023 (Wikipedia), succeeding Roger Krone; quoted as CEO on the Q2 FY2026 release (Aug 4, 2026): "We're seeing meaningful growth emerge across our Defense Tech, Energy Infrastructure, and Cyber growth pillars." On the call he said the administration is "very keen to have a fixed-price outcome-based results" model and that Leidos is "very comfortable" with it.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Christopher R. Cage</div>
+      <div class="card-note">EVP and CFO per the StockAnalysis company profile. He owns the leverage story after the ENTRUST deal — gross leverage 2.5x at quarter-end, $300M of acquisition commercial paper already repaid — and, per Trefis, was the one who told investors to "brace for a soft patch," calling Q2 "the likely low point this year in revenue growth and margin."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">80.83% institutional</div>
+      <div class="card-note">Insiders hold 0.65% (StockAnalysis). Named top institutional holders were not retrieved this session and are not listed. Short interest is a modest <strong>2.91% of float</strong> — the 2026 sell-off was long holders leaving, not shorts piling in.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">From fiscal 2026 Leidos reorganised into four reportable segments — <strong>Intelligence &amp; Digital, Health, Homeland and Defense</strong>. Because the realignment is new, the mix below uses <strong>Q2 FY2026 (quarter ended July 3, 2026) segment revenue</strong> from the August 4, 2026 release; the four segments sum to $4,558M, which ties to reported revenue. Year-ago comparisons are the company's own recast figures.</p>
+  <div class="seg-bar">
+    <div style="flex:32.9;background:#26C6DA;">INTEL &amp; DIGITAL 32.9%</div>
+    <div style="flex:23.8;background:#22c55e;">HEALTH 23.8%</div>
+    <div style="flex:22.3;background:#f59e0b;">HOMELAND 22.3%</div>
+    <div style="flex:21.0;background:#a78bfa;">DEFENSE 21.0%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#26C6DA;"></span> Intelligence &amp; Digital — $1,499M (Q2'26), +6.5% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Health — $1,086M, −7.6% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Homeland — $1,018M, +32.0% YoY (+15.1% organic)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Defense — $955M, +6.2% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The awkward fact: the segment that is shrinking is also the one that earns the most. Health's 23.4% operating margin is more than double any other segment's, so every dollar it loses costs the group far more profit than a dollar gained in Defense adds.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #26C6DA;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Intelligence &amp; Digital</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,499M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.5%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.5%</div><div class="biz-stat-label">Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">32.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Software, AI/ML and cyber work for the intelligence community and the wider national-security apparatus. Q2 growth came from recent contract awards and higher volumes on Intelligence Community mission support, plus $9M from Kudu Dynamics (acquired May 2025) up to its one-year anniversary. Leidos announced a partnership with CoreWeave for "secure cloud and sovereign AI solutions for the intelligence community and Department of War," and launched an AI cybersecurity platform, Parcata, on July 29. Operating margin 9.5% (10.1% non-GAAP). The CFO flagged this as the segment "most vulnerable if there are some continued disruptions at year-end" — i.e., a continuing resolution or shutdown.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Booz Allen Hamilton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CACI</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Accenture</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Health</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">HIGHEST MARGIN · SHRINKING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,086M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−7.6%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23.4%</div><div class="biz-stat-label">Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">23.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Two big franchises. The first is VA medical disability exams through QTC — "a network of more than 15,000 providers and 90 clinics conducting 2.8 million examinations annually," per the CFO. Revenue fell because a fourth vendor was fully brought onto the VBA Medical Disability Examination regions contract, and the VA "decided to suspend incentive payments for all vendors for the rest of this year." A new VBA RFP is expected, with bids near year-end and decisions "early next year in all likelihood." The second is MHS GENESIS, the military health record: Leidos completed the original contract "on time and under budget," but the Defense Health Agency is now buying software directly from commercial vendors, and Leidos continues under a sole-source bridge contract. This segment is the bear case in one card — the most profitable business Leidos owns, with its two anchors both being re-bid or re-shaped.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Deloitte</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">private</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Accenture</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Homeland</div>
+        <span class="biz-badge growth">FASTEST GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,018M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+32.0%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.0%</div><div class="biz-stat-label">Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Homeland grew 32.0% reported and <strong>15.1% organically</strong> — the gap is acquired revenue. The big acquisition of the year, ENTRUST Solutions Group (about $2.4B per Wikipedia, closed March 27, 2026), brought energy-infrastructure engineering and $371M of backlog, and contributed $141M of group revenue in Q2; management now calls Energy Infrastructure one of three "growth pillars." Q2 awards here included CBP Medium Energy Mobile Systems ($270M) — border screening. GAAP operating margin 9.0% (12.1% non-GAAP).</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Parsons</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">CACI</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Defense</div>
+        <span class="biz-badge emerging">BOOK-TO-BILL 2.2x</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$955M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.8%</div><div class="biz-stat-label">Op. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The smallest segment and the one with the fullest order book: Q2 book-to-bill of <strong>2.2x</strong> and 1.9x trailing twelve months. Management's "Defense Tech" growth pillar overlaps it (the release and call do not map every program to a segment): a $1B framework agreement for 3,000 low-cost containerized munitions by 2030 (management puts the addressable market "in excess of $44 billion over the next 10 years"), a medium unmanned surface vessel in testing with a "potential production award in Q4," 18 additional missile-warning satellites under Golden Dome, and a small cruise missile in flight test. Q2 awards included F-16 avionics support ($475M), Air Force electronic warfare ($350M) and a Navy hypersonics test bed ($88M). The catch is fixed-price development risk: a schedule delay on one such program is what drove the Q2 "soft patch" warning, per Trefis. Lowest GAAP margin of the four at 8.8%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> LCCM addressable market "in excess of $44 billion over the next 10 years" — management estimate, not independently verified.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Booz Allen Hamilton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Parsons</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two operating metrics that actually matter</h3>
+  <p class="prose">A government contractor's income statement is last year's wins. Judge it on <strong>backlog</strong> and <strong>awards</strong> — and on what is waiting for a decision.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Total Backlog</div>
+      <div class="card-value">$48.7B</div>
+      <div class="card-note"><span style="color:var(--green);">+5% YoY</span>. Against TTM revenue of $17.63B that is <strong>2.8 years of revenue</strong> under contract. Funded backlog — money actually appropriated — is $10.2B, up 44%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q2 Awards</div>
+      <div class="card-value">$4.9B</div>
+      <div class="card-note">Book-to-bill 1.1x for the quarter and 1.1x trailing twelve months — the company is signing slightly more than it bills. Defense alone ran 2.2x.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Proposals Awaiting Decision</div>
+      <div class="card-value">$23B</div>
+      <div class="card-note">"$23 billion currently awaiting adjudication by various government agencies," per the Q2 call — larger than a full year of revenue. How many of these land, and when, is what drives the 2027 growth rate.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q2 Free Cash Flow</div>
+      <div class="card-value">$761M</div>
+      <div class="card-note">Operating cash flow $793M in the quarter. FY2026 operating cash flow guidance raised to ~$1.85B from ~$1.80B.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">$48.7B contracted backlog</span>
+    <span class="moat-pill">Security clearances at scale</span>
+    <span class="moat-pill">Incumbency on mission systems</span>
+    <span class="moat-pill">QTC exam network (15,000 providers)</span>
+    <span class="moat-pill">Defense hardware IP (Dynetics)</span>
+    <span class="moat-pill">Fixed-price delivery track record</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat in government services is <strong>incumbency</strong>. Nobody else holds the clearances, knows the undocumented systems, or can take over a live intelligence or health program without risking an outage the agency will be blamed for. That is why the backlog is 2.8 years deep. But incumbency protects you only until the customer decides the job should be done differently — and 2026 showed exactly that. The DHA did not fire Leidos from MHS GENESIS; it finished the contract "on time and under budget" and then decided to buy the software itself. The VA did not drop QTC; it added a fourth vendor and suspended incentive payments. Neither is a failure of delivery. Both are the customer changing the shape of the contract.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The government is cutting out the integrator in Health.</strong> Bank of America's June 2026 downgrade cited pressure on the "once blooming" healthcare portfolio as the DHA prioritises direct supplier relationships. Health is 23.8% of revenue at a 23.4% operating margin — roughly 44% of segment operating income in Q2 ($254M of $572M). Its shrinkage hits profit far harder than revenue.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Fixed-price development risk.</strong> The administration wants "fixed-price outcome-based results," and management says it is "very comfortable" with that. But a schedule slip on a fixed-price Defense program is what caused the Q2 soft patch. On fixed-price work the contractor, not the customer, eats the overrun.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Budget timing.</strong> Management expects "a continuing resolution of some kind" at the October 1 fiscal year-end rather than a shutdown, and names Intelligence &amp; Digital as the most exposed segment. Continuing resolutions delay new starts; they do not cancel them, but they push revenue right.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">More leverage than it used to carry.</strong> The ~$2.4B ENTRUST deal took gross leverage to 2.5x and debt-to-equity to 1.23, with $6.58B of total debt against $748M of cash. Comfortable for a business with steady government cash flows — but it narrows the room for buybacks while the Health question plays out.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which LDOS has been a member since August 9, 2019; it is NYSE-listed and not in the NASDAQ-100. Values are from StockAnalysis at the $128.23 close unless noted. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>LDOS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>11.97</td><td>—</td><td>—</td><td>$128.23 ÷ $10.71 TTM EPS = 11.97. The Motley Fool (Jun 18, 2026) put the five-year average P/E at 20.6.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-twelve-month earnings per share.">Forward P/E</span></td><td>10.63</td><td>—</td><td>—</td><td>StockAnalysis figure. On consensus FY2026 EPS of $12.40 it is $128.23 ÷ $12.40 = 10.3x; company guides non-GAAP EPS of $12.20–$12.50.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>1.91</td><td>—</td><td>—</td><td>Low multiple, but consensus EPS growth is low too: +3.4% for FY2026 and +2.8% for FY2027.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$10.71</td><td>—</td><td>—</td><td>GAAP diluted, up 1.2% YoY. Q2 GAAP EPS $2.81; non-GAAP $3.26 (+2%).</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+3.4%</td><td>—</td><td>—</td><td>TTM, $17.63B. Q2 was +7% reported, +4% organic; FY2026 guidance raised to $18.20–$18.40B.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering the service, as a percentage of revenue.">Gross Margin</span></td><td>17.8%</td><td>—</td><td>—</td><td>Thin by design — cost-plus and time-and-materials government work passes most cost through. Up from 14.7% in FY2021.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>11.8%</td><td>—</td><td>—</td><td>TTM. Q2 adjusted EBITDA margin 13.8%; FY2026 guide "mid 13%".</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>7.8%</td><td>—</td><td>—</td><td>TTM net income $1.38B, down 1.9% YoY.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.34%</td><td>—</td><td>—</td><td>$1.72 annual on $128.23; payout ratio 16.1%; 7 years of growth. Went ex-dividend Sep 15, 2026.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>2.91%</td><td>—</td><td>—</td><td>Low. Short ratio 2.44 days.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>1.23</td><td>—</td><td>—</td><td>$6.58B debt, $748M cash, net debt $5.83B; debt/EBITDA 2.57x. Enterprise value $21.92B.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>1.63</td><td>—</td><td>—</td><td>Quick ratio 1.15. Receivables are owed mostly by the US government.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>$2.16B</td><td>—</td><td>—</td><td>TTM, 12.3% of revenue; capex only $137M. P/FCF 7.48 — a ~13.4% FCF yield on the $16.09B market cap (1 ÷ 7.48). FY2025 FCF was $1.63B.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>27.8%</td><td>—</td><td>—</td><td>Flattered by leverage (D/E 1.23).</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the debt and equity capital employed.">ROIC</span></td><td>14.3%</td><td>—</td><td>—</td><td>The cleaner measure: about half the ROE once debt is counted as capital.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.57</td><td>—</td><td>—</td><td>5-year. The stock still fell 46% from its November 2025 month-end to June 2026 — low beta measures correlation with the market, not company-specific risk.</td></tr>
+      <tr><td>52-Week Range</td><td>$98.86 – $205.77</td><td>—</td><td>—</td><td>$128.23 sits 37.7% below the high and 29.7% above the low. 52-week change −31.6%.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the reported figures. <strong>Acquisitions:</strong> ENTRUST (closed March 27, 2026) added $141M of Q2 revenue and is why reported growth (+7%) runs ahead of organic (+4%); Homeland's GAAP margin (9.0%) also trails its non-GAAP margin (12.1%). <strong>FY2023:</strong> net income collapsed to $199M (EPS $1.44) before recovering to $1.25B in FY2024 — the five-year EPS line is not a smooth series, and the "+540%" FY2024 EPS growth figure is a rebound, not a trend. The cause of the FY2023 drop was not retrieved this session. <strong>Cash conversion:</strong> Q2 free cash flow of $761M was 185% of net income — a timing-driven quarter, not a run-rate; full-year operating cash flow guidance is ~$1.85B. Share repurchases were only $66–72M in Q2 (the release and the call use different figures) after the 2022 authorisation was exhausted; a new authorisation is in place.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">17 analysts via StockAnalysis. The label flatters the split: 10 of 17 say Hold.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$156.60</div><div class="card-note"><span style="color:var(--green);">+22.1% upside</span> from $128.23. Median $160 (+24.8%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$125 – $225</div><div class="card-note">−2.5% to +75.5%. Even the lowest target sits within 3% of the current price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">7 / 10 / 0</div><div class="card-note">4 Strong Buy + 3 Buy, 10 Hold, 0 Sell, 0 Strong Sell (September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:41.2;background:#22c55e;"></div>
+    <div style="flex:58.8;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 7 (41.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 10 (58.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Jefferies — Sheila Kahyaoglu</strong> · Downgrade Buy → Hold · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$185 → $140</span> (Jun 3, 2026, per GuruFocus). StockStory summarised the concern as "the company's profit margins could be difficult to maintain due to uncertainty around U.S. defense spending." Jefferies has since moved its target from $110 to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$145</span> at Hold (Aug 9, 2026, StockAnalysis); the date of the intermediate cut to $110 was not confirmed.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Bank of America</strong> · Downgrade Buy → Neutral · PT cut to <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$125</span> (Jun 17, 2026, per MarketScreener; the prior target was not confirmed). Cited "mounting pressure on the group's health portfolio" and, per other coverage, the "once blooming" healthcare portfolio and the DHA's move to direct supplier relationships. The stock closed the week down 12.3% ($122.16 on Jun 12 to $107.12 on Jun 18, Yahoo daily closes). BofA raised its target to <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$135</span> at Hold on Sep 18, 2026 (analyst Mariana Perez Mora, StockAnalysis).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Wells Fargo — David E. Strauss</strong> · Hold · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$120 → $165</span> (Aug 14, 2026, StockAnalysis). A 38% target increase without a rating change — the post-Q2 reset in one line.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Argus</strong> · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$225</span> (raised around January 2026, per StockStory). This matches the current high target on the StockAnalysis board.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Federal fiscal year-end</div>
+        <div class="tl-desc">Management expects "a continuing resolution of some kind" rather than a shutdown, and the Secretary of Defense is "projecting that the vast majority of his unobligated funds from the reconciliation budget of 2025 will be on contract before October 1," per Tom Bell. A shutdown would hit Intelligence &amp; Digital first.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Nov 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026 Earnings</div>
+        <div class="tl-desc">Management called Q2 "the likely low point this year in revenue growth and margin." Q3 is the test of that claim: watch Health's decline rate, Defense margin as the delayed fixed-price program resumes, and whether book-to-bill holds above 1.0x.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Medium unmanned surface vessel production decision</div>
+        <div class="tl-desc">The Navy's next-generation medium USV is in testing with a "potential production award in Q4." A production win would be the clearest evidence that the Defense Tech pillar can grow into a bigger share of the company.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late 2026 – early 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">VA disability-exam re-competition</div>
+        <div class="tl-desc">Draft RFP expected "any day," formal RFP 30–60 days after, bids "close to the end of the year," decisions "early next year in all likelihood." The single biggest binary for the Health segment's margin.</div>
+        <div class="tl-impact down">Key risk event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 14, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">$875M Navy contract for personnel connectivity</div>
+        <div class="tl-desc">Announced per the StockAnalysis news feed. The stock rose 3.08% that day, then gave it back over the following sessions.</div>
+        <div class="tl-impact up">Reaction already happened: +3.1%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 FY2026 — beat and raise</div>
+        <div class="tl-desc">Revenue $4.56B (+7%, +4% organic), non-GAAP EPS $3.26, adjusted EBITDA margin 13.8%, $4.9B of awards, backlog $48.7B. Guidance raised to $18.20–$18.40B revenue and $12.20–$12.50 non-GAAP EPS. The stock closed up <strong>10.01%</strong> at $130.60, and August finished +21.3% — the best month in the five-year series.</div>
+        <div class="tl-impact up">Reaction already happened: +10.0% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jun 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Double downgrade and the DHA decision</div>
+        <div class="tl-desc">Jefferies (June 3) and Bank of America (June 17) both cut to Hold/Neutral as news spread that the Defense Health Agency would move away from Leidos as lead systems integrator for its electronic health record, a role held since 2015. June closed at $102.97, the lowest month-end since July 2023.</div>
+        <div class="tl-impact down">Reaction already happened: June −19.4%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">LDOS — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#26C6DA;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$96.13</strong> to the September 21, 2026 settled close of <strong>$128.23</strong>, LDOS gained <strong>33.4% on price</strong>, before dividends. The endpoints hide the round trip. For two and a half years the stock went nowhere — it closed May 2023 at $78.06, below where it started. Then it ran: from $110.47 in January 2024 to $183.16 in October 2024, and after a pullback, to a month-end peak of <strong>$191.10 in November 2025</strong>. 2026 took almost all of that back — $102.97 by June, <strong>46% below the peak</strong> — before the Q2 print recovered part of it.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI fell to <strong>15.2 in June 2026</strong>, the most oversold reading in the five-year series and well below the 25.7 of May 2023. It has since recovered to <strong>40.9</strong> — neutral, leaning weak. The 10-month moving average sits at roughly <strong>$146.33</strong>, well above the price, and the 200-day average per StockAnalysis is $150.19 against a 50-day of $127.75. The short-term bounce is real; the longer trend has not turned.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">May 2023</div><div class="tl-content"><div class="tl-title">Five-year low month-end — $78.06</div><div class="tl-desc">A −16.3% month, in the same fiscal year that net income fell to $199M. RSI 25.7. The stock was 19% below its September 2021 level.</div><div class="tl-impact down">−16.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan–Oct 2024</div><div class="tl-content"><div class="tl-title">The re-rating — $110.47 to $183.16</div><div class="tl-desc">A 66% run in nine months as FY2024 EPS rebounded to $9.22 and gross margin expanded from 14.5% to 16.8%. Monthly RSI reached 93.7 in October 2024.</div><div class="tl-impact up">+66% in nine months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2025</div><div class="tl-content"><div class="tl-title">Month-end peak — $191.10</div><div class="tl-desc">FY2025 closed with EPS of $11.14 (+20.8%) and gross margin at 18.1%. This is the high-water mark of the chart.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb–May 2026</div><div class="tl-content"><div class="tl-title">The slide — $188.28 to $127.80</div><div class="tl-desc">Four straight down months. Q1 results beat and guidance rose, but the CFO warned Q2 would be "the likely low point this year in revenue growth and margin" because of a fixed-price Defense program delay.</div><div class="tl-impact down">−32% over four months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Capitulation — $102.97, RSI 15.2</div><div class="tl-desc">Jefferies and BofA downgrades two weeks apart, and the DHA's move away from Leidos as lead EHR integrator. Worst month of the window: −19.4%.</div><div class="tl-impact down">−19.4% month · RSI 15.2</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Q2 beat and raise — $140.21 (+21.3%)</div><div class="tl-desc">+10.01% on August 4 alone. Best month of the five-year series.</div><div class="tl-impact up">+21.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $128.23</div><div class="tl-desc">September has given back 8.5% of August's gain, including −3.88% on September 2 and −2.50% on September 18 (on about three times normal volume — the cause was not found in the sources fetched).</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison is given. What the sourced data does show: LDOS is <strong>up 33.4% on price over five years</strong>, <strong>down 31.6% over the trailing 52 weeks</strong>, and <strong>down 28.9% year-to-date</strong> (from the $180.40 December 2025 close). On valuation, the Motley Fool noted the stock at about 10x trailing earnings in June against a five-year average of 20.6x, and Trefis put the peer-group median P/E at 24x — both mid-June figures, before the Q2 rally. At 11.97x trailing today, the discount has narrowed but not closed.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 12.0x trailing earnings and ~10.6x forward for a business with a $48.7B backlog (2.8 years of revenue), $23B of proposals awaiting decision, a 2.2x book-to-bill in Defense, and a ~13% free-cash-flow yield. The 2026 collapse was a Health problem priced as a company problem: three of four segments grew in Q2, one by 32%. Management raised guidance twice. The Defense Tech pillar — munitions, unmanned vessels, missile-warning satellites — is where the growth is, and a Q4 production award on the medium USV would prove it. If Health merely stabilises after the VA re-bid, the multiple has room to move back toward its own five-year average.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The bear case is that Health is not a one-off but a template. The customer paying the highest margins just decided to buy the software itself and added a fourth exam vendor. If other agencies follow — "direct supplier relationships," in BofA's framing — the integrator's margin is the thing that gets competed away. Meanwhile growth is shifting toward fixed-price Defense work that has already slipped once, leverage has risen to 2.5x gross after ENTRUST, and consensus EPS growth is only 3.4% this year and 2.8% next. A low multiple on low growth is not obviously cheap. Ten of seventeen analysts say Hold.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Health segment erosion.</strong> Down 7.6% in Q2 at a 23.4% operating margin, with the VA exam contract heading to re-competition (decisions expected early 2027) and MHS GENESIS on a bridge contract. The most profitable quarter of revenue in the company is the least secure.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Fixed-price execution.</strong> The growth businesses — munitions, vessels, satellites — increasingly run on fixed-price terms the administration favours. One schedule slip already produced a guided "soft patch." A cost overrun lands directly on Leidos's margin.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Federal budget timing.</strong> A continuing resolution (management's base case) or a shutdown at October 1 delays new starts and pushes revenue right, with Intelligence &amp; Digital most exposed. Backlog does not turn into revenue until money is appropriated — funded backlog is $10.2B of the $48.7B.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Agencies buying direct — the integrator squeeze</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">The MHS GENESIS decision is the clearest example this year of a federal customer deciding it no longer needs a prime integrator between itself and the commercial software vendor. Leidos delivered the program; the DHA then chose to procure software directly and keep Leidos on a sole-source bridge. Whether this spreads is the question for every services contractor with high-margin integration work. It is not yet visible in the other three segments — Intelligence &amp; Digital, Homeland and Defense all grew in Q2 — but it is precisely what BofA's downgrade priced in.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Fixed-price, outcome-based contracting</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING SHIFT</span></div>
+    <p class="biz-desc">Tom Bell says the administration is "very keen to have a fixed-price outcome-based results" model. For a contractor that can deliver, fixed-price work carries better margins than cost-plus; for one that slips, it carries the overrun. Leidos is leaning in — it is rolling out software tools aimed at fixed-price sales and pitching open-interface work ("Operation Jailbreak") that runs on non-Leidos hardware. The Jefferies downgrade framed the same shift from the other side: margins "could be difficult to maintain due to uncertainty around U.S. defense spending."</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Defense tech and energy infrastructure</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">The growth pillars management names — Defense Tech, Energy Infrastructure and Cyber — are where the order book is filling: Defense book-to-bill of 2.2x, missile-warning satellites under Golden Dome, a $1B munitions framework, and grid engineering via ENTRUST. The bull framing is that Leidos is turning from a services company that happens to build some hardware into a defense-technology company with a services base. The bear framing is that this is a shift from a high-margin, low-risk Health business to lower-margin, higher-risk fixed-price hardware. Both can be true; the Q3 and Q4 margin prints will show which dominates.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/ldos/history/</strong> — the September 21, 2026 settled close of $128.23 (open 127.79, high 129.16, low 126.94, volume 1,094,830, Adj. Close present, +0.42% on the prior close of $127.69). Confirmed by the quote page at stockanalysis.com/stocks/ldos/, which shows "At close: Sep 21, 2026, 4:00 PM EDT" at $128.23.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, annual financials, forecast, news headlines) for price, valuation, margins, returns, balance sheet, consensus, executives and Sector/Industry labels; Leidos's Q2 FY2026 earnings release (prnewswire.com, August 4, 2026) for segment revenue and margins, awards, backlog, guidance, acquisitions and the CEO quote; the Q2 FY2026 earnings call transcript (fool.com) for Health, Defense, budget and capital-allocation commentary; gurufocus.com (Jun 3, 2026) and marketscreener.com (Jun 17, 2026) for the Jefferies and BofA downgrade dates and targets; fool.com (Jun 18, 2026), finance.yahoo.com / StockStory (Jun 15, 2026) and trefis.com (Jun 16, 2026) for downgrade commentary, the DHA decision and the Q2 "soft patch" guidance; Wikipedia (Leidos) for company history, the ENTRUST price, CEO succession and the competitor list; Wikipedia (List of S&amp;P 500 companies) and S&amp;P Dow Jones Indices (press.spglobal.com, Aug 1, 2019) for the August 9, 2019 S&amp;P 500 addition; digrin.com/stocks/detail/LDOS/price (unadjusted "Real price" column) for month-end closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin.com's unadjusted "Real price" column, plus a final point at the September 21, 2026 settled close of $128.23. The July and August 2026 month-ends ($115.60, $140.21) were cross-checked against StockAnalysis daily rows and match. <strong>No interior months were reconstructed or estimated.</strong> Industry-average and S&amp;P 500 columns in Section 04 are "—" because no sourced values were obtained. Competitors are those named on the Wikipedia Leidos page (Accenture, Booz Allen Hamilton, CACI, Deloitte) and in StockStory's coverage (Parsons); their market values and shares were not sourced and are shown as "n/v". Market-cap rankings were not sourced. The GICS classification on the Wikipedia S&amp;P 500 list is Industrials / Diversified Support Services; this report uses StockAnalysis's Technology / Information Technology Services label. StockAnalysis gives the 52-week range as $98.86–$205.77; both are intraday extremes, confirmed on Yahoo's monthly history (high $205.77 in November 2025, low $98.86 in June 2026). A June 2026 StockStory article gave $199.55 (November 2025), which appears to be a different measure; the intraday figure is used. The Motley Fool article described Leidos as "debt-free"; StockAnalysis shows $6.58B of debt, which is used here. Q2 share repurchases appear as $72M in the release summary and $66M on the call. Segment assignment of individual awards and programs follows the release and call where stated; where not stated, programs are described at company level.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and backlog is contract value awarded rather than revenue recognised. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [96.13,99.98,87.91,88.90,89.45,101.84,108.02,103.51,104.50,100.71,107.00,95.05,87.47,101.59,109.33,105.19,98.84,97.07,92.06,93.26,78.06,88.48,93.53,97.51,92.16,99.12,107.32,108.24,110.47,127.86,131.09,140.22,147.05,145.88,144.40,158.51,163.00,183.16,165.40,144.06,142.03,129.97,134.94,147.18,148.52,157.76,159.65,180.92,188.96,190.47,191.10,180.40,188.28,175.10,155.52,149.22,127.80,102.97,115.60,140.21,128.23];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 20, label: 'May 2023 — five-year low month-end $78.06',                  color: '#ef4444' },
+  { idx: 37, label: 'Oct 2024 — $183.16 after a 66% nine-month run',              color: '#22c55e' },
+  { idx: 50, label: 'Nov 2025 — month-end peak $191.10',                          color: '#22c55e' },
+  { idx: 56, label: 'May 2026 — Q2 "soft patch" warning; $127.80',               color: '#f59e0b' },
+  { idx: 57, label: 'Jun 2026 — Jefferies & BofA downgrades, DHA; $102.97, RSI 15.2', color: '#ef4444' },
+  { idx: 59, label: 'Aug 2026 — Q2 beat & raise (+10.01% Aug 4); $140.21',        color: '#22c55e' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $128.23',                       color: '#26C6DA' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(38,198,218,0.22)');
+grad.addColorStop(1, 'rgba(38,198,218,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#26C6DA', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#26C6DA'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
