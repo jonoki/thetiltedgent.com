@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIS — Fidelity National Information Services, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">FIS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Information Technology Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $18.15B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500: member since November 10, 2006</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Fidelity National Information Services, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$35.19</div>
+      <div class="price-change">−$0.43 (−1.21%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours $35.44 (+0.71%) per StockAnalysis — not used in any calculation</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 347 Riverside Avenue, Jacksonville, Florida</div>
+    <div class="meta-item"><span>Employees:</span> 44,000 (StockAnalysis profile)</div>
+    <div class="meta-item"><span>Founded:</span> 1968 (as Systematics, Little Rock)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 4, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">FIS is the plumbing under a large slice of the banking system: <span class="tip" title="Core banking — the system of record that holds a bank's deposit and loan accounts, posts every transaction and calculates interest. Replacing it is a multi-year project.">core banking</span> platforms, digital banking, payment processing, card issuing and capital-markets software sold to financial institutions worldwide. The lineage runs from Systematics, founded in Little Rock in 1968, through ALLTEL, to Fidelity National Financial, which bought the business in 2003 and renamed it Fidelity Information Services. It then grew by acquisition — Certegy (2006), eFunds (2007), Metavante (2009), SunGard ($9.1B, 2015) and, at the top of the cycle, Worldpay for <strong>$43 billion in 2019</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The Worldpay bet is the story of the last five years. FIS sold 55% of Worldpay to GTCR at an <strong>$18.5 billion valuation</strong>, closing February 1, 2024. Then, in April 2025, it agreed a swap: sell its remaining 45% stake to Global Payments and buy Global Payments' <strong>Issuer Solutions business (formerly TSYS)</strong> for a <strong>$13.5 billion enterprise value</strong> — $12 billion net after $1.5 billion of tax assets — paying with the Worldpay stake (valued at $6.6 billion pre-tax in the April 2025 announcement) plus about <strong>$7.7 billion of cash</strong> (as reported at closing), funded with new debt — the April 2025 release planned $8 billion of new borrowing. That closed ahead of schedule, announced January 12, 2026. The card-issuing business now goes to market as <strong>FIS Total Issuing Solutions</strong>.</p>
+  <p class="prose" style="margin-top:16px;">So FIS swapped a merchant-acquiring stake for a card-processing business, and paid the difference in debt. On paper, it worked: TTM revenue is <strong>$12.20B, up 18.3%</strong>, Q2 2026 GAAP revenue rose 29%, and trailing EPS is <strong>$6.50</strong>, which puts the stock at <strong>5.4x trailing earnings</strong>. That multiple is an illusion. About $2.2 billion of the $3.37 billion TTM net income is the one-off gain on the Worldpay sale in Q1 2026. The market is looking past it. The stock closed at <strong>$35.19</strong> on September 21, 2026, its 52-week low, down 47% from the $66.46 close at the end of 2025 and 71% below the September 2021 month-end. The question is whether a heavily indebted, cash-generative processor at a ~15% free-cash-flow yield is a value trap or a mispriced annuity. The August guidance cut is where the answer starts.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Stephanie Ferris</div>
+      <div class="card-note">CEO, President and Director (StockAnalysis profile; Wikipedia). On the Issuer Solutions close: "We are pleased to have closed this strategic acquisition ahead of schedule, enabling us to start 2026 in a strong position to deliver greater value." On the August 2026 guidance cut, per TIKR: "No, we think this is on us. We don't see any trends in market that are changing here… the miss is on us. It's not a market condition."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">James Kehoe</div>
+      <div class="card-note">CFO per the StockAnalysis executive list. He runs the deleveraging: share buybacks were paused in Q1 2026 to bring gross leverage toward a <strong>~2.8x target</strong>, with total debt at $21.2B on June 30, 2026. Chairman is Jeffrey A. Goldstein (Wikipedia).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">100.37% institutional</div>
+      <div class="card-note">StockAnalysis reports institutional ownership above 100% of shares outstanding, which usually reflects double-counting from share lending and timing differences in filings. Insider ownership is 0.13%. Named largest holders were not sourced this session.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">FIS reports <strong>Banking Solutions</strong>, <strong>Capital Market Solutions</strong> and <strong>Corporate and Other</strong>. The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026)</strong> segment revenue from the Q2 earnings release. Corporate and Other was $84M (−26%), per the same release. Banking Solutions grew 44% GAAP but 6.1% pro forma. That gap means the acquired Issuer Solutions business is reported inside Banking Solutions. This is our inference from the numbers; the release excerpt we fetched does not say it directly.</p>
+  <div class="seg-bar">
+    <div style="flex:73.5;background:#22D3EE;">BANKING 73.5%</div>
+    <div style="flex:24.0;background:#f59e0b;">CAP MKTS 24.0%</div>
+    <div style="flex:2.5;background:#64748b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Banking Solutions — $2,483M (Q2'26), +44% GAAP, +6.1% pro forma</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Capital Market Solutions — $810M, +3.5% GAAP, +3.2% adjusted</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Corporate &amp; Other — $84M, −26%, 2.5%</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Pro forma, the whole company grew <strong>5.3%</strong> in Q2 2026. That is the organic number to watch. The +29% headline growth is mostly the acquisition.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Banking Solutions (incl. Total Issuing Solutions)</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,483M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.1%</div><div class="biz-stat-label">Pro Forma Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">45.8%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">73.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This segment sells core processing, digital and mobile banking, payments, and now card issuing to banks. In Q2 2026 its adjusted EBITDA was <strong>$1.1 billion, up 50%</strong>, at a <strong>45.8% margin, up 179 bps</strong>. The issuing business came from Global Payments. FIS says it processes more than 40 billion transactions a year for 150+ financial institution and corporate partners in 75+ countries, and sizes the global issuer market at <strong>$28 billion</strong>. FIS expects the deal to add <strong>$500 million of adjusted free cash flow in 2026 and $700 million by 2028</strong>. In the Q2 release, CEO Stephanie Ferris said: "Banks are investing decisively behind modernization and AI, and they are choosing FIS as their partner." There have been client wins: Barclays US Consumer Bank extended its core banking agreement and will deploy the Profile platform (FIS release, April 15, 2026), and one article refers to "record core banking contract wins".</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Global issuer market opportunity $28B (FIS's own figure). Core-banking TAM not sourced.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Fiserv</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Jack Henry</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Capital Market Solutions</div>
+        <span class="biz-badge dominant">HIGHEST MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$810M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3.2%</div><div class="biz-stat-label">Adj. Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">51.9%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This is mostly the old SunGard: trading, treasury, fund administration and post-trade software for asset managers, banks and corporates. It has the best margin in the group: Q2 2026 adjusted EBITDA was $420 million (+2.8%) at <strong>51.9%, down 32 bps</strong>. It also caused the August guidance cut. FIS lowered its full-year Capital Markets growth outlook to <strong>3–3.5% from 5.5%</strong>, and the CEO called the shortfall execution, not market conditions ("the miss is on us"). Revenue was $823M in Q1 2026 and $810M in Q2, so it went down between the two quarters.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The numbers that decide the story</h3>
+  <p class="prose">This is a levered cash machine. Three figures matter most: the contracted backlog, the cash, and the debt.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Remaining Performance Obligations</div>
+      <div class="card-value">~$25.5B</div>
+      <div class="card-note">Contracted revenue not yet recognised, per the Q1 2026 10-Q (via StockTitan). That is about 2.1x TTM revenue. Core-banking contracts run for years.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow (TTM)</div>
+      <div class="card-value">$2.82B</div>
+      <div class="card-note">$2.98B operating cash flow minus $154M capex (StockAnalysis). On an $18.15B market cap that is a <strong>~15.5% FCF yield</strong> (our calculation). FY2026 guidance is <strong>$2.15–2.25B</strong> on the company's own adjusted definition. Q2 FCF was $525M, up 220%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Debt</div>
+      <div class="card-value" style="color:var(--amber);">$21.26B</div>
+      <div class="card-note">Against $744M of cash, so net debt is $20.51B, more than the whole equity market value. Debt/EBITDA is 5.86x on StockAnalysis's TTM basis. The company targets ~2.8x gross leverage on its own adjusted EBITDA.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Goodwill</div>
+      <div class="card-value">$24.59B</div>
+      <div class="card-note">Up from $17.76B at year-end 2025 after the Issuer Solutions purchase (Q1 2026 10-Q). FIS has written down acquisitions before: FY2023 net income was −$6.655B. A large goodwill balance is a lasting accounting risk.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Core-banking switching costs</span>
+    <span class="moat-pill">~$25.5B contracted backlog</span>
+    <span class="moat-pill">Issuer processing scale (40B+ txns/yr)</span>
+    <span class="moat-pill">Multi-year processing contracts</span>
+    <span class="moat-pill">Regulated-client compliance depth</span>
+    <span class="moat-pill">45–52% segment EBITDA margins</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is the <strong>cost of leaving</strong>. A bank's core system holds every account and posts every transaction, and a card issuer's processor authorises every swipe. Changing either is a multi-year conversion with regulators watching and customers ready to leave if one payment fails. That is why this revenue is recurring and why segment margins run 45–52%. The weakness is on the other side of the balance sheet. The business is steady, but the capital structure is not. FIS has spent two decades buying growth. The biggest purchase, Worldpay, cost $43B. A majority was sold at an $18.5B valuation, and the rest went to Global Payments in a deal Wikipedia puts at $22B for the whole of Worldpay. The latest swap was paid for with new debt.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Leverage.</strong> $21.26B of debt, $744M of cash, a 0.53 current ratio and an Altman Z-score of 0.35 (StockAnalysis). The buyback is paused until leverage comes down toward ~2.8x. Until then, all free cash goes to lenders and the 5.0% dividend, not to shareholders through buybacks.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Execution credibility.</strong> In August 2026 the company cut adjusted EPS guidance to $6.15–6.24 from $6.22–6.32 and revenue guidance to $13.63–13.70B from $13.77–13.85B (TIKR). The CEO said the shortfall was self-inflicted. A company that says its own execution caused a miss needs several clean quarters to earn back trust.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Integration of a $13.5B acquisition.</strong> Issuer Solutions is now about half-way into its first year inside FIS. The $500M incremental FCF target for 2026 is the test.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Sector de-rating.</strong> The whole fintech-processing group has been repriced. Two days after FIS's August cut, Fiserv cut its 2026 adjusted EPS forecast to $7.20–7.40 from $8.00–8.30 and its shares fell 12% (TIKR). The market is now pricing bank processors as ex-growth.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The benchmark index is the <strong>S&amp;P 500</strong>. FIS is NYSE-listed and so is not in the NASDAQ-100. Industry-average and S&amp;P 500 comparison values were not taken from the sources fetched and are shown as "—". One adjustment matters more than all the rest. <strong>Trailing EPS includes an estimated ~$2.2 billion gain, net of tax, on the Worldpay stake sale</strong> (FIS's own Q1 2026 release), booked in Q1 2026 (GAAP Q1 EPS $4.58). Take that out and trailing GAAP EPS is roughly $2.3. That is our estimate: $2.2B ÷ ~520M diluted shares ≈ $4.2 per share. On that basis the stock trades at about 15x trailing earnings, not 5.4x. The forward P/E below uses adjusted EPS, which excludes the gain.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>FIS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>5.41</td><td>—</td><td>—</td><td>$35.19 ÷ $6.50 TTM EPS = 5.41 (StockAnalysis shows 5.42). The gain inflates it. Excluding the Worldpay gain, it is ~15x (estimate, see above).</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the estimate of earnings per share over the next twelve months.">Forward P/E</span></td><td>5.48</td><td>—</td><td>—</td><td>StockAnalysis next-twelve-month basis on adjusted EPS. On the 2026 consensus adjusted EPS of $6.19 it is $35.19 ÷ $6.19 = 5.68x. Adjusted EPS is a company non-GAAP measure.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: P/E divided by expected earnings growth.">PEG Ratio</span></td><td>0.45</td><td>—</td><td>—</td><td>StockAnalysis. Consensus adjusted EPS growth is 7.71% for 2026 and 8.20% for 2027.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$6.50</td><td>—</td><td>—</td><td>Quarterly GAAP EPS: Q3'25 $0.50, Q4'25 $0.98, Q1'26 $4.58, Q2'26 $0.45, which sums to $6.51 (StockAnalysis TTM $6.50). FY2025 GAAP EPS was $0.73.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+18.3%</td><td>—</td><td>—</td><td>TTM $12.20B. Q2 2026 GAAP +29%, adjusted +31%, <strong>pro forma +5.3%</strong>. FY2026 pro forma guidance 4.5–5.0%.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus direct cost of revenue, as a percentage of revenue.">Gross Margin</span></td><td>35.84%</td><td>—</td><td>—</td><td>TTM. Q2 2026 gross profit $1,174M on $3,377M revenue.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>21.72%</td><td>—</td><td>—</td><td>TTM GAAP. Adjusted EBITDA margin for Q2 2026 was 41.7%, up 193 bps. Adjusted EBITDA is a non-GAAP measure.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>27.65%</td><td>—</td><td>—</td><td>Distorted by the Worldpay gain. Q2 2026 alone: $231M on $3,377M = 6.8% (our calculation).</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>5.00%</td><td>—</td><td>—</td><td>$1.76 annualised ($0.44/quarter, up from $0.40). Last ex-date Sep 11, 2026. Payout ratio 27.08% of GAAP EPS. The payout is much higher against gain-excluded earnings.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the tradable float.">Short Interest (% float)</span></td><td>3.31%</td><td>—</td><td>—</td><td>2.73 days to cover. Modest. The bear case is being expressed by selling the stock rather than by shorting it.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>1.33</td><td>—</td><td>—</td><td>$21.26B total debt, $744M cash. Debt/EBITDA 5.86x (StockAnalysis TTM basis). EV $38.66B, about twice the market cap.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.53</td><td>—</td><td>—</td><td>Quick ratio 0.38. Low, and it depends on steady operating cash flow and access to debt markets.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: operating cash flow minus capital expenditure.">Free Cash Flow</span></td><td>$2.82B</td><td>—</td><td>—</td><td>TTM, +9.34%. P/FCF 6.43. FCF/share $5.47. FY2026 company guide $2.15–2.25B; 2028 target above $3.0B (TIKR).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>22.35%</td><td>—</td><td>—</td><td>Inflated by the one-off gain. ROA 4.28%.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by debt plus equity employed.">ROIC</span></td><td>6.60%</td><td>—</td><td>—</td><td>This is the more honest return figure. It is single-digit because goodwill from twenty years of acquisitions sits in the capital base.</td></tr>
+      <tr><td><span class="tip" title="Beta: sensitivity of the stock to moves in the overall market.">Beta</span></td><td>0.80</td><td>—</td><td>—</td><td>A backward-looking measure. The stock is down 45.95% over 52 weeks (StockAnalysis).</td></tr>
+      <tr><td>52-Week Range</td><td>$35.19 – $69.14</td><td>—</td><td>—</td><td>The September 21 close <strong>is</strong> the 52-week low. 50-day MA $41.24, 200-day MA $48.24, daily RSI 26.18 (StockAnalysis).</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported figures. First, the <strong>Worldpay gain</strong>: FIS reported Q1 2026 GAAP EPS of $4.58 and net income of $2,366M, which includes an estimated $2.2 billion gain, net of tax, on the Worldpay minority-stake sale (FIS Q1 2026 release). Net proceeds were about $5.8 billion. Second, <strong>acquisition accounting</strong>: goodwill rose to $24.585B after the $13.47B preliminary Issuer Solutions purchase price, and adjusted EPS ($1.48 in Q2) is more than three times GAAP EPS ($0.45). The reconciling items were not itemised in the sources fetched. Third, <strong>the year-ago base</strong>: Q2 2025 was a GAAP net loss of $470M. That makes year-over-year GAAP comparisons for 2025–26 unreliable. The cause of the Q2 2025 loss was not sourced this session.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">29 analysts per StockAnalysis. A thin Buy: 13 bullish against 14 Hold and 1 Sell.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$50.00</div><div class="card-note"><span style="color:var(--green);">+42.1% upside</span> from $35.19. Median $49.50 (+40.7%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$37 – $77</div><div class="card-note">+5.1% to +118.8%. Even the lowest target on the board is above the current price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">13 / 14 / 1</div><div class="card-note">9 Strong Buy + 4 Buy, 14 Hold, 1 Sell, 0 Strong Sell (28 ratings, as of Aug 2026, StockAnalysis).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:46.4;background:#22c55e;"></div>
+    <div style="flex:50.0;background:#f59e0b;"></div>
+    <div style="flex:3.6;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 13 (46.4%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 14 (50.0%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 1 (3.6%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Piper Sandler — Bill Carcache</strong> · Initiated at Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$42</span> (Sep 10, 2026). The newest initiation (UBS maintained Hold at $49 on Sep 21). The stock has since fallen below this cautious target.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">RBC — Daniel Perlin</strong> · Buy maintained · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$53</span> (Aug 28, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">TD Cowen — Bryan Bergin</strong> · Buy maintained · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$58 → $53</span> (Aug 25, 2026). The rating stayed and the target came down, which fits the post-guidance-cut pattern.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Wells Fargo</strong> · Downgraded to Equal Weight · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$58 → $46</span> (Aug 25, 2026, per Investing.com: Overweight → Equal Weight on Capital Markets execution and no near-term catalysts).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">This is the first print after the August cut. Three things to watch. First, Capital Markets growth against the lowered 3–3.5% outlook. Second, pro forma revenue growth against the 4.5–5.0% guide. Third, progress on leverage toward ~2.8x. A second guidance cut would confirm the bear case. A clean quarter would start to repair credibility.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">FY2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Issuer Solutions cash target — $500M incremental FCF</div>
+        <div class="tl-desc">FIS said the deal would add $500 million of adjusted free cash flow in 2026 and $700 million by 2028. Full-year FCF guidance is $2.15–2.25B, and H1 delivered $999M. Hitting the target would show that the debt-funded swap is paying for itself.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Deleveraging, then the buyback returns</div>
+        <div class="tl-desc">Share repurchases were paused in Q1 2026 ($42M bought back in Q2, per the Q2 release) so cash could go to debt reduction toward ~2.8x gross leverage. When buybacks restart at a ~15% FCF yield, each dollar retires a lot of equity. How long that takes depends on FCF, and that is the thing the market doubts.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results and guidance cut — reaction already happened</div>
+        <div class="tl-desc">Revenue $3.377B (+29% GAAP, +5.3% pro forma), adjusted EPS $1.48 (+8.8%), adjusted EBITDA margin 41.7%. Headline guidance was cut: adjusted EPS to $6.15–6.24 and revenue to $13.63–13.70B, with Capital Markets growth lowered to 3–3.5%. Shares fell as much as 10% premarket (TIKR). The July month-end close of $44.77 fell to $40.77 by the end of August.</div>
+        <div class="tl-impact down">Reaction already happened: August −8.9%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Issuer Solutions acquired, Worldpay stake sold</div>
+        <div class="tl-desc">The deal closed ahead of schedule: $13.5B enterprise value for Global Payments' issuer business, paid with FIS's 45% Worldpay stake plus about $7.7B of cash (as reported), funded with new debt. The stock's January month-end close was $55.25, down 16.9% from December's $66.46.</div>
+        <div class="tl-impact down">Reaction already happened: January −16.9%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">FIS — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$121.68</strong> to the September 21, 2026 settled close of <strong>$35.19</strong>, FIS lost <strong>71.1% of its price</strong> (our calculation from the monthly series). Dividends paid over the period were not totalled this session, so no total-return figure is given. The fall came in two legs with a recovery in between. The first leg ran from 2021 to October 2023 (a $49.11 month-end). The market gave up on the Worldpay merger, and the stock traded at less than half its 2021 level before the GTCR sale was agreed. Then came a clean rebuild to <strong>$89.73 in October 2024</strong>, once the Worldpay separation closed and the story became a simpler bank-processor story. The second leg has run from mid-2025 to now, through the Issuer Solutions swap and the August guidance cut.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reached <strong>10.99 at the June 2026 close</strong>, the most oversold reading in the five-year series. The +15.1% July rebound lifted it to 31.8, and it has since slid back to <strong>21.1</strong>. The 10-month moving average is about <strong>$46.87</strong>, 33% above the current price. The long-term trend is down and has shown no sign of turning. A bounce off oversold readings has already failed once this year.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2021</div><div class="tl-content"><div class="tl-title">Window start — $121.68</div><div class="tl-desc">This is two years after the $43B Worldpay acquisition. The stock never came back to this level in the five-year window.</div><div class="tl-impact neutral">Start of window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2022</div><div class="tl-content"><div class="tl-title">$95.23 — −20.6% in a month</div><div class="tl-desc">The worst single month in the window. We did not source the specific cause this session.</div><div class="tl-impact down">−20.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2023</div><div class="tl-content"><div class="tl-title">Trough — $49.11</div><div class="tl-desc">This came after FY2023's −$6.655B net loss and the July 2023 agreement to sell 55% of Worldpay to GTCR at an $18.5B valuation, less than half of what FIS paid for it. November rebounded +19.4%.</div><div class="tl-impact down">First-leg low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2024</div><div class="tl-content"><div class="tl-title">Recovery high — $89.73</div><div class="tl-desc">This was the high of the rebuild after the GTCR sale closed on February 1, 2024 and left FIS a simpler bank-and-capital-markets processor. RSI reached 80.9, the most overbought reading in the window.</div><div class="tl-impact up">+83% from Oct 2023</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2025</div><div class="tl-content"><div class="tl-title">Issuer Solutions swap announced — $78.88</div><div class="tl-desc">FIS agreed to sell its remaining Worldpay stake to Global Payments and buy TSYS's issuer business. Month-end closes stayed between $78.88 and $81.41 through July 2025, then the slide began ($69.81 in August).</div><div class="tl-impact neutral">Deal agreed</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">Deal closes — $55.25 (−16.9%)</div><div class="tl-desc">The transaction closed on January 9 and was announced on January 12. The month-end fell 16.9% from December's $66.46.</div><div class="tl-impact down">−16.9% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">$38.88 — RSI 10.99</div><div class="tl-desc">The lowest month-end in the series and the most oversold reading. July rebounded +15.1% to $44.77.</div><div class="tl-impact down">Most oversold</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $35.19, new low</div><div class="tl-desc">This is below the June low, after the August guidance cut and a September slide that took the stock from $41.89 (Sep 4) to $35.19 in ten sessions. It is also the 52-week low.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">We did not obtain five-year returns for the <strong>S&amp;P 500</strong> from the sources fetched, so no numeric comparison is given. What the sourced data does show: FIS is <strong>down 71.1% on price over the chart window</strong> and <strong>down 45.95% over 52 weeks</strong> (StockAnalysis), while the S&amp;P 500 rose over the same period. Against peers, the one comparison we could source is Fiserv. It cut its 2026 adjusted EPS forecast to $7.20–7.40 from $8.00–8.30 two days after FIS's August cut, and its shares fell 12% (TIKR). The derating is sector-wide, not specific to FIS. FIS's own discount comes on top of that, from its debt and its self-described execution miss.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay 5.5–5.7x forward adjusted earnings and get a ~15% trailing free-cash-flow yield and a 5.0% dividend. The business is recurring bank processing with 45–52% segment EBITDA margins, ~$25.5B of contracted backlog and 5–6% pro forma growth. Every analyst target on StockAnalysis's panel, down to $37, sits above the current price. The deleveraging math is simple. About $2.2B of annual FCF against ~$21B of debt closes the leverage gap within a few years, and then the buyback comes back at a depressed share price. If Issuer Solutions delivers its $500M FCF uplift and Capital Markets stabilises, today's price will look like peak pessimism about a sector.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The headline P/E is fiction: ~15x once the Worldpay gain is removed. The adjusted multiple leaves out costs that GAAP counts, on assets FIS paid for with real debt. Net debt of $20.5B is larger than the equity. The current ratio is 0.53 and the Altman Z-score 0.35. Management cut guidance in August and said the miss was its own. FIS has a long record of buying growth and writing it down, and Worldpay was bought for $43B and a majority sold at an $18.5B valuation. The new $13.5B acquisition put goodwill up to $24.6B. The chart has made a new low below the June trough, and a bounce off an oversold reading has already failed once.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Leverage meets execution.</strong> $21.26B of debt leaves little room for another miss. A second guidance cut on November 4 would push out the deleveraging timeline, keep the buyback paused and put pressure on the dividend's standing as the main shareholder return.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Integration and goodwill.</strong> Issuer Solutions is a $13.5B bet in its first year. If the $500M/$700M FCF targets slip, the $24.6B goodwill balance becomes an impairment risk. FIS has taken large write-downs before (FY2023 net loss $6.655B).</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capital Markets slowdown.</strong> The highest-margin segment (51.9%) drove the August cut. Growth guidance fell to 3–3.5% from 5.5%, and revenue went down from Q1 to Q2. If it keeps slowing, the group mix and margin story get worse.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The processor derating</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">In August 2026 two of the biggest US bank-technology processors cut their outlooks within days of each other. FIS cut on August 4. Fiserv cut its adjusted EPS forecast to $7.20–7.40 from $8.00–8.30 two days later, and its shares fell 12% (TIKR). TIKR notes that FIS now trades at 6.53x next-twelve-month earnings against 13.85x in mid-2025. The multiple has halved. That says the market is pricing durability, not this year's numbers. Both companies point to strong demand, and the FIS CEO said "We don't see any trends in market that are changing here." Investors are treating the stability of the base business as unproven.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Consolidation by swap</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">STRUCTURAL SHIFT</span></div>
+    <p class="biz-desc">The January 2026 three-way transaction reshaped the industry. Global Payments bought Worldpay, combining the stakes of GTCR and FIS. FIS took Global Payments' issuer processing. Each company narrowed its focus: Global Payments toward merchant acquiring, FIS toward the bank and card-issuer side. For FIS that means more exposure to bank IT budgets and card volumes, less to merchant payments, and a lot more debt.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The cash-yield argument</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">At $35.19, FIS's $18.15B market cap is about 6.4x trailing FCF of $2.82B. The company guides to more than $3.0B by 2028. <strong>The bull framing:</strong> this is a sector-wide sentiment low applied to a contractual annuity, and cash will de-risk the balance sheet whatever the multiple does. <strong>The bear framing:</strong> an enterprise value of $38.66B, twice the market cap, means equity holders own the leveraged residual. A small miss in FCF becomes a large miss in equity value. The next two prints on FCF conversion and leverage will decide which framing is right.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/fis/history/</strong> — the September 21, 2026 settled close of $35.19 (open 35.82, high 36.17, low 35.19, volume 6,087,776, Adj. Close present, −1.21% on the prior close of $35.62). Confirmed by the quote page at stockanalysis.com/stocks/fis/ ("At close: Sep 21, 2026, 4:00 PM EDT") and by Yahoo Finance's history page.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, company profile, quarterly and annual financials, forecast and analyst actions) for price, valuation, margins, balance sheet, consensus and sector/industry labels; FIS press releases (fisglobal.com) for the Issuer Solutions/Worldpay completion (January 12, 2026) and Q2 2026 results; the FIS Q1 2026 earnings exhibit and the Q1 2026 10-Q summary at stocktitan.net (Worldpay gain, proceeds, purchase price, goodwill, RPO); tikr.com for the August 2026 guidance cut, CEO quote, Wells Fargo and TD Cowen actions, Fiserv comparison, FY2026 FCF guidance history and 2028 FCF target; Wikipedia for company history, the S&amp;P 500 add date (November 10, 2006) and chairman; finance.yahoo.com (Simply Wall St article, Sep 18, 2026) for the "record core banking contract wins" reference.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from September 2021 through August 2026 from the "Close" column of Yahoo Finance monthly history (finance.yahoo.com/quote/FIS/history/?frequency=1mo), plus a final point at the September 21, 2026 settled close of $35.19. Digrin's unadjusted "Real price" column matches Yahoo's Close for every month checked (e.g. Sep 2021 $121.68, May 2026 $42.99); digrin's other "Price" column is dividend-adjusted (May 2026 $42.50) and was not used. The August 31 ($40.77) close was also matched against StockAnalysis daily rows. <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close fourteen trading days into September, not a month-end. Industry-average and S&amp;P 500 benchmark columns are "—" because no sourced values were obtained. Competitor market caps and segment market shares are "n/v". Global/US market-cap ranks were not sourced. The ~15x gain-excluded P/E and the ~15.5% FCF yield are our calculations and are labelled as such. The employee count (44,000) is StockAnalysis's profile figure and may not reflect the Issuer Solutions headcount.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results; adjusted figures are company non-GAAP measures. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (Yahoo Finance monthly "Close") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [121.68,110.74,104.50,109.15,119.92,95.23,100.42,99.15,104.50,91.67,102.16,91.37,75.57,82.99,72.58,67.85,75.04,63.37,54.33,58.72,54.57,54.70,60.38,55.86,55.27,49.11,58.64,60.07,62.26,69.19,74.18,67.92,75.88,75.36,76.83,82.45,83.75,89.73,85.30,80.77,81.47,71.12,74.68,78.88,79.61,81.41,79.41,69.81,65.94,62.52,65.77,66.46,55.25,50.96,46.91,46.53,42.99,38.88,44.77,40.77,35.19];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 0,  label: 'Sep 2021 — window start $121.68',                          color: '#94a3b8' },
+  { idx: 5,  label: 'Feb 2022 — $95.23 (−20.6% month)',                         color: '#ef4444' },
+  { idx: 25, label: 'Oct 2023 — first-leg trough $49.11',                       color: '#ef4444' },
+  { idx: 37, label: 'Oct 2024 — recovery high $89.73; RSI 80.9',                color: '#22c55e' },
+  { idx: 43, label: 'Apr 2025 — Issuer Solutions / Worldpay swap agreed',       color: '#f59e0b' },
+  { idx: 52, label: 'Jan 2026 — deal closes; $55.25 (−16.9% month)',            color: '#f59e0b' },
+  { idx: 57, label: 'Jun 2026 — $38.88, RSI 10.99',                             color: '#ef4444' },
+  { idx: 59, label: 'Aug 2026 — guidance cut; $40.77',                          color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $35.19 (52-wk low)',          color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
