@@ -23,6 +23,13 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-22-q · claimed 2026-09-22 (local Claude Code session)
+BAX BF.B BXP CF CLX COO CPT CRL CSGP DECK
+
+### sess-2026-09-22-p · claimed 2026-09-22 (local Claude Code session)
+MGM WYNN AES ALB ALGN ALLE AOS APTV ARE AVY
+- MGM and WYNN are casino operators: included at Oki's explicit instruction (22 Sep 2026), an exception to the no-gambling-operators voice rule for these two reports only.
+
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
