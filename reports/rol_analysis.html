@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROL — Rollins, Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">ROL</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Environmental &amp; Facilities Services</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $15.57B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #2DD4BF44;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER since October 1, 2018</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Rollins, Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$32.35</div>
+      <div class="price-change">−$0.08 (−0.25%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours Sep 21: $32.35, unchanged (StockAnalysis)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 2170 Piedmont Road N.E., Atlanta, Georgia</div>
+    <div class="meta-item"><span>Employees:</span> 21,946</div>
+    <div class="meta-item"><span>Founded:</span> 1948 (per StockAnalysis; renamed from Rollins Broadcasting in 1965)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026, estimated date)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Rollins is the parent of <strong>Orkin</strong> and a family of pest-control brands — HomeTeam Pest Defense, Western Pest Services, Clark, Critter Control, Fox, Northwest Exterminating, Waltham, Orkin Canada, Orkin UK, Orkin Australia and more — serving <strong>more than 2.8 million customers</strong> from over 850 locations with roughly 22,000 employees. The business is a route: a technician drives a van to the same house or restaurant every month or quarter, and the customer pays for the absence of a problem. FY2025 revenue was <strong>$3.76B, up 10.99%</strong>, and the Q2 2026 release carried the headline <strong>"99th Consecutive Quarter of Revenue Growth."</strong> Trailing-twelve-month revenue is $3.92B (+9.9%), net income $531.7M and GAAP <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> <strong>$1.10</strong> (+8.9%).</p>
+  <p class="prose" style="margin-top:16px;">So why has the stock halved? Because for years the market paid Rollins the price of a sure thing. In January 2026 the stock traded at about <strong>45 times free cash flow</strong> (Motley Fool); it closed that month at <strong>$63.34</strong>. Then the certainty wobbled. Q1 2026 grew organically 6.6% against a 7–8% full-year plan; margins slipped; the CFO resigned in May; and on <strong>July 22, 2026</strong> Q2 missed — adjusted EPS $0.32 against a $0.34 consensus, residential organic growth 3.6% against the 5.4% the Street expected — and organic growth guidance came down to <strong>at least 6%</strong>. The stock fell 9.3% the next day and closed Monday, September 21 at <strong>$32.35</strong>, down 41.7% in 52 weeks while earnings per share are still growing. Nothing here is broken in the way a bankruptcy is broken. What broke was the premium. At the poker table, the player who pays top dollar for a "lock" loses the most when it turns out to be merely a strong hand — and that is the trade this report examines.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Jerry Gahlhoff, Jr.</div>
+      <div class="card-note">President and CEO, quoted in both the Q1 and Q2 2026 releases. His Q2 diagnosis was specific: slower growth "in parts of our residential pest control business, specifically brands more reliant on consumer-initiated demand through search, digital media and inbound calls, as lead volume declined," while relationship channels — home builders and door-to-door — "delivered solid organic growth."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Will Harkins</div>
+      <div class="card-note">EVP and CFO since June 15, 2026, promoted from Chief Accounting Officer after Kenneth Krause resigned "to pursue an opportunity with a company in an unrelated industry" (company release dated May 27, 2026; 8-K filed May 26). ROL fell 5.2% on May 27, the day of the announcement ($53.16 → $50.38, Yahoo daily closes). His first quarter as CFO was the miss: "our cost structure remained positioned for a stronger growth environment entering peak season." John F. Wilson is Executive Chairman.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership &amp; Control</div>
+      <div class="card-value" style="font-size:20px;">Rollins family</div>
+      <div class="card-note">The Rollins family's Significant Shareholder Group — the two Rollins voting trusts and the family holding company <strong>LOR, Inc.</strong>, which alone holds 145.3M shares — beneficially owned 182.5M shares, <strong>37.86%</strong> of the outstanding stock, as of March 2, 2026, and controls about 38% of the voting power (2026 proxy statement). Today StockAnalysis shows 62.08% institutional ownership, 1.79% insiders, and a float of 309.07M of 481.15M shares outstanding; roughly 36% of the shares sit outside the float (our arithmetic), consistent with a controlling block. Minority holders ride alongside the family; they do not steer.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Rollins reports revenue by service line: <strong>Residential, Commercial, and Termite &amp; Ancillary</strong>, plus small franchise and other lines. The mix below is <strong>FY2025</strong> (StockAnalysis segment data, $3,761M total); growth rates in the cards are FY2025 vs FY2024 and the Q2 2026 organic rate from the company's release, which is where the story moved.</p>
+  <div class="seg-bar">
+    <div style="flex:45.0;background:#2DD4BF;">RESIDENTIAL 45.0%</div>
+    <div style="flex:33.1;background:#3b82f6;">COMMERCIAL 33.1%</div>
+    <div style="flex:20.8;background:#f59e0b;">TERMITE 20.8%</div>
+    <div style="flex:1.1;background:#a78bfa;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Residential — $1,693M (FY25), +10.3% <span class="tip" title="Year over year — versus the prior fiscal year.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Commercial — $1,245M, +10.6% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Termite &amp; Ancillary — $782M, +13.6% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Franchise &amp; Other — $42M, 1.1%</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The biggest line is the one that slowed. In Q2 2026 residential grew 6.6% reported but only <strong>3.6% organically</strong>; commercial grew 7.2% organically and termite 8.9%. Acquisitions added 2.2 points to group growth in the quarter.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Residential Pest Control</div>
+        <span class="biz-badge dominant">LARGEST LINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,693M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3.6%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">45.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Recurring home pest service plus wildlife removal (Critter Control, Trutech) and mosquito work. Q2 2026 residential revenue was <strong>$485.8M, +6.6%</strong>, of which $14.0M came from acquisitions; organic growth was <strong>3.6%</strong>. The weakness was concentrated: brands that win customers when a homeowner searches online or calls in saw lead volume fall, while builder-installed and door-to-door brands grew. That split matters. A homeowner who types "ants in kitchen" into a search bar is a one-off lead that has to be bought again every season; a Taexx tube built into a new house's walls (HomeTeam passed <strong>2 million installations</strong> in August 2026) is a customer for the life of the home. Management said lead volume improved at the end of June and held into July — the Q3 print is the test.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Rentokil Initial / Terminix</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$5.5B</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Aptive Environmental</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$300M+</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arrow Exterminators</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$400M+</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Commercial Pest Control</div>
+        <span class="biz-badge growth">STEADIEST GROWER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,245M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7.2%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">33.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Restaurants, food processors, warehouses, hospitals and logistics sites — customers for whom a pest is a failed health inspection or a lost retail contract, not an annoyance. Q2 2026 commercial revenue was <strong>$347.9M, +8.6%</strong> reported and <strong>+7.2% organic</strong>. This is the contract-and-compliance end of the business: demand does not depend on a homeowner noticing a bug, and it did not flinch when residential leads dried up. It is also where the global consolidators compete hardest for multi-site accounts.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Rentokil Initial / Terminix</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$5.5B</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Anticimex (EQT-backed)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$1.2B+</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Termite &amp; Ancillary</div>
+        <span class="biz-badge growth">FASTEST GROWER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$782M</div><div class="biz-stat-label">FY25 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+8.9%</div><div class="biz-stat-label">Q2'26 Organic</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20.8%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Termite treatment and the renewable protection plans that follow it, plus ancillary services such as insulation and moisture control. Q2 2026 revenue was <strong>$234.2M, +10.5%</strong> reported and <strong>+8.9% organic</strong>, and it has been the fastest-growing line for years (FY2025 +13.6%). A termite bond is a multi-year warranty, so every new treatment seeds a stream of annual renewals. The ancillary piece is more discretionary and more sensitive to housing turnover.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Rentokil Initial / Terminix</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$5.5B</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Arrow Exterminators</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">~$400M+</div><div class="comp-bubble-label">Revenue (est.)</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Competitor figures are approximate revenues as stated by a June 2026 pest-control consolidation tracker (ctacquisitions.com), not audited numbers; Rentokil's figure is group-wide, not pest-only. Market shares were not sourced.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating metrics that actually matter</h3>
+  <p class="prose">A route business is judged on <strong>organic growth</strong> (new customers plus price, excluding acquisitions) and on <strong>margin</strong> (how full each van's day is). Both moved the wrong way in 2026.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Organic Growth, Q2 2026</div>
+      <div class="card-value" style="color:var(--amber);">5.7%</div>
+      <div class="card-note">Versus 6.6% in Q1 2026. Full-year guidance moved from <strong>7–8%</strong> (April) to <strong>at least 6%</strong> (July), plus 2–3 points from acquisitions.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Operating Margin, Q2 2026</div>
+      <div class="card-value" style="color:var(--red);">18.7%</div>
+      <div class="card-note">Down <strong>110 bps</strong> year on year; adjusted 19.5%, also −110 bps. Employee costs in cost of service rose to 30.5% of revenue from 29.8%; selling and marketing held at 14.1%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow, Q2 2026</div>
+      <div class="card-value">$166M</div>
+      <div class="card-note">−1.2% YoY. First-half FCF was $277M, −10.0%, partly from $40M of tax-payment timing and $9M from semi-annual interest on the 2035 notes (Q1 release).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Consecutive Quarters of Revenue Growth</div>
+      <div class="card-value">99</div>
+      <div class="card-note">Through Q2 2026, per the company. Q3 2026 would be the 100th. The streak survived the miss; the valuation did not.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Route density</span>
+    <span class="moat-pill">Recurring service contracts</span>
+    <span class="moat-pill">Orkin brand</span>
+    <span class="moat-pill">Multi-brand, multi-channel</span>
+    <span class="moat-pill">Serial acquirer of local operators</span>
+    <span class="moat-pill">Termite warranty renewals</span>
+    <span class="moat-pill">Family control, long horizon</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The real moat is <strong>density</strong>. A technician who can service eight homes on one street earns more per hour than a competitor driving across town for one, so the biggest operator in a neighbourhood can price lower and still make more. Rollins compounds that by buying local operators and folding their customers into existing routes — $117M of acquisitions in Q2 2026 alone. The balance sheet funds it: ROIC is 23.5% and debt is 1.07x EBITDA. The vulnerability is that density protects the <em>cost</em> of serving a customer, not the <em>cost of acquiring</em> one. When new customers come through a search ad, the price of that ad is set by everyone bidding for the same click, and that is exactly the channel that broke in Q2.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Digital lead generation is a rented channel.</strong> The Q2 shortfall came from brands "more reliant on consumer-initiated demand through search, digital media and inbound calls." Rollins does not own those channels; it bids for them. Selling and marketing ran at 14.1% of Q2 revenue — the cost of buying growth is already large.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Costs were built for a bigger season.</strong> The CFO said the cost structure "remained positioned for a stronger growth environment entering peak season." Technicians are hired ahead of summer; if the demand does not arrive, they are paid anyway. Operating margin fell 110 bps in Q2 and 120 bps in Q1.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Weather is a revenue line.</strong> Q1 2026 growth was held back by unfavourable January weather (Q1 earnings-call coverage); Q2 one-time services were hit by lower pest pressure (StockAnalysis transcript summary). Bugs follow heat and rain, and no management team controls either.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Management turnover mid-stumble.</strong> The CFO resigned in May, a new CFO took over in June, and the miss followed in July. Continuity was not the issue in the numbers, but it adds noise to the guidance the market now distrusts.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>; ROL has been a constituent since October 1, 2018 and is NYSE-listed, not a NASDAQ-100 member. All ROL figures are StockAnalysis (S&amp;P Global data) at the September 21, 2026 close unless noted. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>ROL</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>29.4</td><td>—</td><td>—</td><td>$32.35 ÷ $1.10 TTM EPS = 29.41. Still a premium multiple — after the price halved.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-twelve-months earnings per share.">Forward P/E</span></td><td>26.6</td><td>—</td><td>—</td><td>StockAnalysis's forward figure. On consensus FY2026 adjusted EPS of $1.17 the multiple is 27.6 ($32.35 ÷ $1.17).</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the P/E divided by the expected earnings growth rate. Below 1.0 is conventionally 'cheap for the growth'.">PEG Ratio</span></td><td>3.45</td><td>—</td><td>—</td><td>High. Consensus sees 8.83% EPS growth a year over three years; the multiple still assumes more durability than that growth rate alone pays for.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$1.10</td><td>—</td><td>—</td><td>+8.9% YoY. Earnings grew while the price fell 41.7% — this is a multiple event, not an earnings collapse.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+9.9%</td><td>—</td><td>—</td><td>TTM, including acquisitions. Q2 2026 +7.9% reported, <strong>+5.7% organic</strong>.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering the service, as a percentage of revenue. Rollins reports it exclusive of depreciation and amortisation.">Gross Margin</span></td><td>52.4%</td><td>—</td><td>—</td><td>TTM. Q2 2026 gross margin 52.8%, down 100 bps YoY as employee, materials and fleet costs outgrew revenue.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>13.6%</td><td>—</td><td>—</td><td>TTM (13.55%). Operating margin 18.7%, EBITDA margin 22.0%.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>2.26%</td><td>—</td><td>—</td><td>$0.73 annual on $32.35; 23 consecutive years of dividend growth; payout ratio 66.4% of earnings, 56.7% of free cash flow.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>4.94%</td><td>—</td><td>—</td><td>15.28M shares short, down from 19.11M the prior month; 3.28 days to cover.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.78</td><td>—</td><td>—</td><td>$1.12B debt, $109M cash. Debt/EBITDA 1.07x and interest cover 21.9x — modest leverage for a cash-generative business.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>0.63</td><td>—</td><td>—</td><td>Below 1.0, typical of a model that collects in advance (unearned revenue) and keeps little inventory; not a liquidity warning on its own.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and acquisitions.">Free Cash Flow</span></td><td>$619M</td><td>—</td><td>—</td><td>TTM, −2.0% YoY; FY2025 $650M. Capex is only $27.8M — the assets are vans and people. FCF yield 3.98%; P/FCF 25.1x.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>37.0%</td><td>—</td><td>—</td><td>High partly because book equity is small ($1.43B) relative to earnings.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>23.5%</td><td>—</td><td>—</td><td>Against a WACC of 7.89% (StockAnalysis estimate). The acquisition machine still earns well above its cost of capital.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.74</td><td>—</td><td>—</td><td>5-year beta. The defensive label is exactly what made the 2026 drawdown so painful for holders who owned it as a low-risk compounder.</td></tr>
+      <tr><td>52-Week Range</td><td>$31.88 – $66.14</td><td>—</td><td>—</td><td>The low was set intraday on September 21 itself; the close of $32.35 sits 51% below the high.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">GAAP and adjusted figures sit close together: Q2 2026 GAAP EPS $0.30 vs adjusted $0.32, operating margin 18.7% vs 19.5%. The gap is mainly acquisition-related amortisation and adjustments detailed in the release's reconciliation. First-half cash flow was depressed by <strong>$40M of tax-payment timing</strong> tied to the company's tax-credit planning strategy and <strong>$9M</strong> from moving the 2035 senior notes to semi-annual interest (Q1 2026 release). Acquisitions contributed $21.8M of Q2 revenue — the reported 7.9% growth includes 2.2 points bought, not grown.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">19 analysts polled by S&amp;P Global via StockAnalysis. In April 2026 the same panel had 12 Buy/Strong Buy and 1 Sell; by September it had 8 and 2.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$45.59</div><div class="card-note"><span style="color:var(--green);">+40.9% upside</span> from $32.35. Median $45 (+39.1%). Targets have been cut hard but still sit far above the price — the Street has not caught down.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$32 – $66</div><div class="card-note">−1.1% to +104.0%. The low target is roughly today's price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">8 / 9 / 2</div><div class="card-note">4 Strong Buy + 4 Buy, 9 Hold, 1 Sell + 1 Strong Sell (September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:42.1;background:#22c55e;"></div>
+    <div style="flex:47.4;background:#f59e0b;"></div>
+    <div style="flex:10.5;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 8 (42.1%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 9 (47.4%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (10.5%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Wells Fargo</strong> · Downgrade to Underweight from Equal Weight · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$46 → $32</span> (July 23, 2026, the day after Q2, per Investing.com), citing softer residential growth over three quarters. The lowest target on the board — and the one the stock has already reached.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">BofA — Curtis Nagle</strong> · Downgrade to Underperform from Buy · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$55 → $35</span> on July 23, 2026, the day after Q2, citing "weaker residential trends that reduce visibility around a recovery and reacceleration in organic growth" (Investing.com). A Buy-to-Sell double downgrade in one step.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">J.P. Morgan — Tomohiko Sano</strong> · Downgrade to Neutral from Overweight · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$70 → $45</span> (reported July 24, 2026), citing weakening residential demand and a slower-than-expected margin recovery. <strong>RBC Capital</strong> (Ashish Sabadra) moved to Sector Perform, PT $52 → $40 (July 23); <strong>Argus</strong> (John Eade) to Hold (Aug 5, per StockAnalysis); <strong>UBS</strong> (Joshua Chan) Neutral, PT $50 → $43.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Barclays — Manav Patnaik</strong> · Overweight · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$72 → $45</span>, calling Q2 "disappointing." <strong>Piper Sandler</strong> also kept Overweight while cutting $72 → $46. The remaining bulls kept the rating and gave up a third of the target.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Sep 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Management meetings with investors (William Blair, Zurich)</div>
+        <div class="tl-desc">Per TheFly. On September 16 Rollins also announced that President and CEO Jerry Gahlhoff will present at an upcoming investor conference. Any comment on August and September lead volume will be read closely.</div>
+        <div class="tl-impact neutral">Near-term read</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (estimated date)</div>
+        <div class="tl-desc">The one that matters. Management said lead volume improved at the end of June and held into July. Q3 shows whether residential organic growth recovers from 3.6%, whether the "at least 6%" organic guide holds, and whether margins stop contracting after 110–120 bps declines in each of the first two quarters. It would also be the 100th consecutive quarter of revenue growth.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Acquisitions and cost realignment</div>
+        <div class="tl-desc">Rollins spent $117M on acquisitions in Q2 2026 (including Romex in April) and said it has "implemented organizational and operational changes to improve local execution, strengthen accountability, and better align resources with current demand conditions." If costs come back into line with demand, margin recovery is the fastest lever for earnings.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 miss and guidance cut — reaction already happened</div>
+        <div class="tl-desc">Revenue $1.079B (+7.9%; TheFly lists consensus at $1.09B, while Motley Fool described revenue as a beat — the sources disagree), adjusted EPS $0.32 vs $0.34 expected, residential organic 3.6% vs ~5.4% expected (Motley Fool), organic guidance to at least 6% from 7–8%. The stock fell 9.3% on July 23 and a wave of downgrades followed.</div>
+        <div class="tl-impact down">Reaction already happened: −9.3% on Jul 23</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CFO Kenneth Krause resigns</div>
+        <div class="tl-desc">Resigned to pursue an opportunity in an unrelated industry, effective June 15 (release dated May 27); Chief Accounting Officer Will Harkins promoted. Krause provides advisory services through September 30, 2026. The stock fell 5.2% on May 27, the day of the announcement, and closed May down 14.6% for the month.</div>
+        <div class="tl-impact down">Reaction already happened: May −14.6%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Plaintiff-firm "investigation" notices</div>
+        <div class="tl-desc">A law firm advertised an investor "fraud investigation" of Rollins via Business Wire about six weeks before this report. This is solicitation, not a lawsuit; no filed complaint was verified in the sources fetched.</div>
+        <div class="tl-impact neutral">Headline risk</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">ROL — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 close of <strong>$35.33</strong> to the September 21, 2026 settled close of <strong>$32.35</strong>, ROL lost <strong>8.4% of its price</strong> over five years. Adding back roughly $2.9 per share of dividends (our estimate, summed from StockAnalysis's annual dividend-per-share figures) brings the total return to roughly <strong>flat</strong>. The endpoints hide the shape: a four-year climb from $30.85 (January 2022) to <strong>$63.34 (January 2026)</strong> — a doubling — then a round trip in eight months that handed back the entire gain.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>14.2</strong> at the September 21 close — the most oversold reading anywhere in the five-year series, after four straight month-end readings below 30 (May 28.8, June 22.0, July 18.7, August 17.1). It peaked at <strong>76.9 in November 2025</strong>, two months before the top. The 10-month moving average sits near <strong>$48.91</strong>, more than 50% above the price, and the 3-month average ($35.46) is still falling. Momentum is as stretched to the downside as it has been in five years; that describes the speed of the fall, not where it ends.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jan 2022</div><div class="tl-content"><div class="tl-title">Window low — $30.85 month-end close</div><div class="tl-desc">The rate-shock de-rating of 2022 hit long-duration "quality" stocks, and ROL was one. This is the only month-end in the window below today's close.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2022</div><div class="tl-content"><div class="tl-title">+21.3% in a month — $42.08</div><div class="tl-desc">The largest monthly gain in the series. The catalyst was not identified in the sources fetched.</div><div class="tl-impact up">+21.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">2023–2025</div><div class="tl-content"><div class="tl-title">The compounder years — $36 to $61</div><div class="tl-desc">Revenue grew 14.0% in 2023, 10.3% in 2024 and 11.0% in 2025, and the stock rose with it, closing November 2025 at $61.48 with the monthly RSI at 76.9.</div><div class="tl-impact up">Steady re-rating</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2026</div><div class="tl-content"><div class="tl-title">Peak — $63.34, ~45x free cash flow</div><div class="tl-desc">The highest month-end in the window. The price assumed the 7–8% organic growth plan would be delivered on time.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">First crack — $53.41 (−12.3%)</div><div class="tl-desc">Month-end ahead of a Q1 in which weather slowed January demand; the specific trigger for the March move was not identified in the sources fetched. April recovered to $55.73 after the Q1 release showed an 8%+ organic exit rate in March.</div><div class="tl-impact down">−12.3% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">CFO exit — $47.60 (−14.6%)</div><div class="tl-desc">Kenneth Krause's resignation was disclosed late in the month (−5.2% on the May 27 announcement day); the month was the worst in the series.</div><div class="tl-impact down">−14.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">Q2 miss and guidance cut — $37.97</div><div class="tl-desc">−9.3% on July 23; organic guidance cut to at least 6%; BofA double-downgrade to Underperform.</div><div class="tl-impact down">−9.3% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $32.35</div><div class="tl-desc">Down 48.9% from the January 2026 month-end and 46.1% below the December 2025 close; intraday low of $31.88 was the new 52-week low.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong> were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: ROL is <strong>down 8.4% on price over five years</strong> and <strong>down 41.72% over 52 weeks</strong>, with market capitalisation down 42.8% year over year — while the S&amp;P 500 was positive over the five-year window. Against the listed consolidator Rentokil no market-cap or return comparison was sourced this session. The valuation path is the cleaner comparison: about 45x free cash flow in January 2026, 33x after the Q2 print (Motley Fool), and <strong>25.1x</strong> today (StockAnalysis).</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The business did not break; the price of certainty did. Revenue grew 7.9% in the "bad" quarter, EPS is up 8.9% on a trailing basis, ROIC is 23.5%, free cash flow is $619M on $28M of capex, and the dividend has grown 23 years running. Commercial (+7.2% organic) and termite (+8.9%) are fine; the problem is one channel inside one line, and management says lead volume recovered from late June. Costs that were set for a bigger season can be reset within a season. At 25x free cash flow — down from 45x — a family-controlled route business that has grown revenue for 99 straight quarters is priced as a normal company for the first time in years, and a return to 7%+ organic growth would make that look cheap.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Twenty-nine times trailing earnings is still a premium, and the premium was built on a growth rate the company has now missed twice in a row. Organic guidance fell from 7–8% to at least 6%, margins fell 110–120 bps in each quarter, and the channel that failed — digital, search-driven customer acquisition — is one Rollins rents rather than owns. The analyst panel went from 12 Buys to 8 and from 1 Sell to 2, and the lowest target ($32) is already the price. RSI at 14 says the selling was fast, not that it is finished. If 6% organic is the new normal, a PEG of 3.45 has further to compress.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Residential demand stays soft.</strong> Residential is 45% of revenue and grew 3.6% organically in Q2. If digital lead volume does not recover, the "at least 6%" organic guide is at risk, and the stock is priced on that guide.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Continued margin compression.</strong> Operating margin fell 120 bps in Q1 and 110 bps in Q2 2026. Labour is the largest cost (employee expenses were 30.5% of Q2 revenue in cost of service alone); a service business cannot cut technicians as fast as demand falls without hurting retention and service quality.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Multiple compression is not finished.</strong> The P/E is 29.4 and the PEG 3.45 even after a 42% fall. The stock was never priced on earnings alone; it was priced on reliability. Another miss would test how far a "quality" multiple can fall once the market stops paying for the streak.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">Paying for customers you used to earn</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Rollins's own words split its growth engine in two: brands fed by "consumer-initiated demand through search, digital media and inbound calls" slowed, while "relationship-based channels, such as home builders and door-to-door sales, delivered solid organic growth." The difference is who owns the customer relationship at the start. A builder partnership or a door-knock produces a customer Rollins found; a search lead is a customer Rollins bought, at an auction price it does not control. Selling and marketing already consumes 14.1% of quarterly revenue. The long-run question for residential is whether that mix can shift toward owned channels fast enough — HomeTeam's 2 million built-in Taexx installations are one example of an owned channel.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">A fragmented market still being consolidated</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING DYNAMIC</span></div>
+    <p class="biz-desc">The largest consolidators named in a June 2026 industry tracker are Rollins, Rentokil Initial (which bought Terminix in a roughly $6.7B deal in December 2022, at about 19.8x adjusted EBITDA per the tracker), EQT-backed Anticimex, Goldman Sachs–owned Aptive Environmental, and family-owned Arrow Exterminators and Cook's Pest Control. Private-equity-backed platforms compete with Rollins for the same local businesses, which pushes up acquisition prices. Rollins's advantage is patient, family-controlled capital and a balance sheet at about 1x debt/EBITDA; its constraint is that bought growth (2.2 points of Q2) does nothing for organic growth, which is the number the market now trades on.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">The re-rating — bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">OPEN QUESTION</span></div>
+    <p class="biz-desc">Price-to-free-cash-flow has moved from about <strong>45x in January 2026 to 25.1x</strong> today while free cash flow barely changed ($650M FY2025, $619M TTM). <strong>The bull framing:</strong> this is a sentiment reset on a business whose cash generation is intact; a recurring-revenue compounder with 23.5% ROIC rarely trades at a 4% FCF yield for long. <strong>The bear framing:</strong> the old multiple was the anomaly, not the new one, and the market has simply stopped paying for a streak. The way to decide is not the multiple but two reported numbers — residential organic growth and operating margin — over the next two quarters. Neither has yet given a clean signal.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/rol/history/</strong> — the September 21, 2026 settled close of $32.35 (open 32.42, high 32.71, low 31.88, Adj. Close 32.35, volume 6,536,549, −0.25% on the prior close of $32.43). Confirmed by the quote page at stockanalysis.com/stocks/rol/ ("At close: Sep 21, 2026, 4:00 PM EDT", 32.35).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, financials incl. segment revenue, forecast, company profile, news headlines from TheFly, PRNewswire and Business Wire) for price, valuation, margins, returns, balance sheet, consensus, analyst actions and executives; Rollins's Q1 and Q2 2026 earnings releases (prnewswire.com, April 22 and July 22, 2026) for quarterly results, segment revenue, organic growth, management quotes, customer and employee counts; digrin.com/stocks/detail/ROL/price (unadjusted "Real price" column) for month-end closes; Wikipedia's List of S&amp;P 500 companies for the S&amp;P 500 addition date and GICS classification; Rollins's May 27, 2026 CFO-transition release; Motley Fool (via The Globe and Mail, July 23, 2026) for the Q2 residential expectation and price-to-FCF history; ctacquisitions.com (June 3, 2026) for competitor names and approximate revenues; Rollins's 2026 proxy statement (beneficial ownership as of March 2, 2026) for the family stake; Investing.com and Yahoo Finance (July 23–24, 2026) for the Wells Fargo, BofA, RBC and J.P. Morgan actions; Yahoo Finance daily history for the May 27, 2026 move.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 from digrin's unadjusted "Real price" column (July and August 2026 cross-checked against StockAnalysis daily closes of $37.97 and $36.07), plus a final point at the September 21, 2026 settled close. The last stock split was 3-for-2 on December 11, 2020, before the window; no later split. <strong>No interior months were reconstructed or estimated.</strong> StockAnalysis classifies ROL as Consumer Discretionary / Personal Services; this report uses the S&amp;P GICS classification (Industrials / Environmental &amp; Facilities Services) shown on Wikipedia's constituent list. The dividend add-back in Section 07 is an estimate. Industry-average and S&amp;P 500 benchmark columns in Section 04 are "—" because no sourced values were obtained. Market-cap rankings, segment market shares and TAM were not sourced. Competitor revenues are approximate figures from an industry tracker. The Q3 2026 earnings date is StockAnalysis's estimate. The Barclays and Piper Sandler target cuts are from news headlines without an exact date; both followed the July 22 Q2 release.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [35.33,35.23,33.28,34.21,30.85,32.63,35.05,33.54,35.46,34.92,38.57,33.76,34.68,42.08,40.44,36.54,36.40,35.20,37.53,42.25,39.32,42.83,40.83,39.57,37.33,37.61,40.74,43.67,43.31,44.07,46.27,44.56,45.69,48.79,47.91,50.18,50.58,47.14,50.33,46.35,49.50,52.39,54.03,57.13,57.25,56.42,57.27,56.54,58.74,57.61,61.48,60.02,63.34,60.89,53.41,55.73,47.60,41.74,37.97,36.07,32.35];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 4,  label: 'Jan 2022 — window low $30.85',                             color: '#ef4444' },
+  { idx: 13, label: 'Oct 2022 — +21.3% month, $42.08',                          color: '#22c55e' },
+  { idx: 50, label: 'Nov 2025 — $61.48, RSI 76.9 (series high)',                color: '#f59e0b' },
+  { idx: 52, label: 'Jan 2026 — peak $63.34, ~45x FCF',                         color: '#22c55e' },
+  { idx: 54, label: 'Mar 2026 — $53.41 (−12.3%)',                               color: '#ef4444' },
+  { idx: 56, label: 'May 2026 — CFO resigns; $47.60 (−14.6%)',                  color: '#ef4444' },
+  { idx: 58, label: 'Jul 2026 — Q2 miss, guide cut; $37.97',                    color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $32.35, RSI 14.2',            color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
