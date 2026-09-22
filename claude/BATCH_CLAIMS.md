@@ -23,6 +23,10 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
+### sess-2026-09-22-t · claimed 2026-09-22 (local Claude Code session)
+NDSN PNR PNW PODD PPL PSKY SJM SWK SWKS TECH TRMB UDR UHS WY
+- The last 14 S&P 500 companies not covered (GOOG/FOX/NWS are second share classes of covered companies).
+
 ### sess-2026-09-22-s · claimed 2026-09-22 (local Claude Code session)
 HRL HSIC IT JKHY LII LULU MAS MKC MOS NCLH
 
