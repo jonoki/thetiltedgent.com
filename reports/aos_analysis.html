@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOS — A. O. Smith Corporation | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EC4B6;
+  --accent-dim: #2EC4B633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">AOS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Specialty Industrial Machinery</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $7.74B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #2EC4B644;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER — added July 26, 2017 · not in the NASDAQ-100 (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">A. O. Smith Corporation</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$56.96</div>
+      <div class="price-change" style="color:var(--green);">+$0.01 (+0.02%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours quote for that session not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 11270 West Park Place, Milwaukee, Wisconsin</div>
+    <div class="meta-item"><span>Employees:</span> 11,500</div>
+    <div class="meta-item"><span>Founded:</span> 1874 (as C. J. Smith and Sons)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 27, 2026 (Q3 2026, estimated)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">A. O. Smith was founded in Milwaukee in 1874 as a baby-carriage and bicycle-parts maker and later built car frames. Today it sells something nobody thinks about until it fails: the water heater. It is the largest manufacturer and marketer of water heaters in North America, and it also sells boilers, heat pumps, tanks and water-treatment systems under brands including A. O. Smith, State, Lochinvar, Hague and Aquasana. FY2025 revenue was <strong>$3.83B, up 0.32%</strong> on FY2024, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$3.85</strong>. At the September 21, 2026 close of $56.96, the equity is worth about <strong>$7.74B</strong> (our calculation: 135.91M shares × $56.96).</p>
+  <p class="prose" style="margin-top:16px;">The pitch has always been the <strong>replacement cycle</strong>. Management puts replacement at roughly 80–85% of US residential water-heater demand. When a tank bursts in the basement, the homeowner does not wait for a better interest rate. That steadiness funded 33 consecutive years of dividend growth (per StockAnalysis). The problem is that steady has turned into stuck:</p>
+  <ul class="prose" style="margin-top:8px;padding-left:22px;">
+    <li>Revenue has sat between <strong>$3.75B and $3.85B in every year from FY2022 to FY2025</strong>.</li>
+    <li>China, once the growth engine, has shrunk from $922M of sales in FY2021 to $625M over the trailing twelve months.</li>
+    <li>In 2026 the US residential market softened, and steel costs rose about 20% year over year in Q2.</li>
+  </ul>
+  <p class="prose" style="margin-top:16px;">The stock closed at $56.96, down 36.6% from its September 2024 month-end high of $89.83. The question for the table: is this a quality franchise in a cyclical trough, or a mature business whose one growth story (China) is about to be written off?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chairman &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Stephen M. Shafer</div>
+      <div class="card-note">President and CEO. He added the chairman role when Executive Chairman Kevin Wheeler retired, effective July 1, 2026 (company release, June 22, 2026). On the Q2 2026 call he said of the China review: "all outcomes are still on the table". He promised a conclusion by the next quarterly call.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Carrie L. Anderson</div>
+      <div class="card-note">EVP and CFO. Her appointment, and the retirement of long-time CFO Charles T. Lauber, were announced May 19, 2026. She presented the outlook on the Q2 2026 call (July 30): 2026 sales growth of 2–3% and adjusted EPS of $3.70–$3.85, with Q3 EPS expected below both Q2 and Q4.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Ownership</div>
+      <div class="card-value" style="font-size:20px;">95.5% institutional</div>
+      <div class="card-note">Per StockAnalysis: 95.54% held by institutions and 0.85% by insiders. The company has two share classes, and both Common Stock and Class A Common Stock receive the dividend (July 13, 2026 dividend release). Named top holders were not sourced this session and are not shown.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">A. O. Smith reports two segments, <strong>North America</strong> and <strong>Rest of World</strong>. In Q2 2026 North America sold $820.5M (+5%) and Rest of World sold $194.9M (−19%). The bar below goes one level deeper. It uses the company's product-line breakdown for the <strong>trailing twelve months to June 30, 2026</strong> (StockAnalysis). The five lines sum to $3,839.6M before $34.7M of inter-segment eliminations, which ties to TTM revenue of $3,804.9M. Growth rates compare with the prior twelve-month period.</p>
+  <div class="seg-bar">
+    <div style="flex:64.1;background:#2EC4B6;">NA WATER HEATERS 64.1%</div>
+    <div style="flex:8.6;background:#22c55e;">BOILERS</div>
+    <div style="flex:6.3;background:#a78bfa;">WT</div>
+    <div style="flex:16.3;background:#f59e0b;">CHINA 16.3%</div>
+    <div style="flex:4.8;background:#3b82f6;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> North America water heaters — $2,459.3M (TTM), +2.4%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> North America boilers — $328.6M, +21.9% (8.6%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> North America water treatment — $242.5M, −2.6% (6.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> China — $624.8M, −17.0%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> All other Rest of World — $184.4M, +14.5% (4.8%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Two-thirds of the company is one product in one region. Boilers are the fastest-growing line and China the fastest-shrinking. Everything in the investment case happens between those two.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EC4B6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Water Heaters</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$2,459M</div><div class="biz-stat-label">TTM Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+2.4%</div><div class="biz-stat-label">TTM Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">64.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Residential and commercial tank water heaters, plus a growing range of tankless and heat-pump models. They are sold mainly through independent plumbing wholesalers and home-center retail. Water-heater sales rose 2% in Q2 2026 on carryover pricing. The quarter was also helped by customers <strong>buying ahead of an announced 4–7% price increase</strong>, which management said pulled some Q3 demand into Q2.</p>
+    <p class="biz-desc">Underlying volumes are soft. The company now expects US residential industry volume to be "down low single digits for the year", with both new construction and existing-home sales weak. Emergency replacement is stable. The swing factor is proactive replacement, where a homeowner swaps an old tank before it fails. The CFO put that at about 30% of replacement demand and said it is "more sensitive to consumer spending behavior."</p>
+    <p class="biz-desc">Input costs are squeezing margins. Steel was up about 20% year over year in Q2, and adjusted North America segment margin fell 100bps to 24.4%.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Industry unit volumes and TAM were not sourced this session. No estimate is shown.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Watts Water Technologies</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$11.70B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Lennox International</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$12.57B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Boilers (incl. Leonard Valve)</div>
+        <span class="biz-badge growth">GROWTH ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$329M</div><div class="biz-stat-label">TTM Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+21.9%</div><div class="biz-stat-label">TTM Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.6%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Lochinvar-branded residential and commercial boilers for hospitals, schools, apartments and homes. Boiler sales rose <strong>21% in Q2 2026</strong> and 12% in the first half. Management credited "continued momentum in residential boilers, and a return to growth in commercial boilers." Management kept its full-year boiler growth guide at 6–8%, well below the first-half pace, because Q2 included seasonal early-buy orders and buying ahead of price increases.</p>
+    <p class="biz-desc"><strong>Leonard Valve</strong> makes water-management and digital-control valves. The company bought it in January 2026 with a new term loan. It added $16M of sales in Q2 and is targeted at about $70M for the year.</p>
+    <p class="biz-desc"><em>Note:</em> the TTM product-line figure here appears to include Leonard Valve. Q2 line revenue was $101.7M against $71.2M a year earlier, which is +43%, while management reported 21% boiler-only growth. That is our inference from comparing the two sources, not a company statement.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Watts Water Technologies</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$11.70B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America Water Treatment</div>
+        <span class="biz-badge emerging">RESTRUCTURING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$243M</div><div class="biz-stat-label">TTM Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−2.6%</div><div class="biz-stat-label">TTM Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/v</div><div class="biz-stat-label">Market Share</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Water softeners, whole-home filtration and point-of-use reverse-osmosis systems, sold through dealers, retail and direct to consumers (Aquasana). This was meant to be the second leg of the North America story. Instead, Q2 2026 sales fell 2%, and the company booked <strong>$22.6M of restructuring and impairment charges</strong> to consolidate its footprint and cut the number of brands. It expects $6–8M of annual savings from 2027, plus proceeds from selling certain assets in late 2026. That charge is the whole gap between Q2 GAAP EPS of $0.91 and adjusted EPS of $1.03.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Pentair</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$8.90B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Rest of World — China, India &amp; other</div>
+        <span class="biz-badge" style="background:var(--red-dim);color:var(--red);">UNDER STRATEGIC REVIEW</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$809M</div><div class="biz-stat-label">TTM Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−19%</div><div class="biz-stat-label">Q2'26 Segment</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">5.2%</div><div class="biz-stat-label">Q2 Seg. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">This segment has two parts. China water heaters and water purifiers brought in $624.8M over the trailing twelve months (−17.0%). India and other markets brought in $184.4M (+14.5%); the India business added Pureit, bought from Hindustan Unilever in a deal Wikipedia dates to November 2024.</p>
+    <p class="biz-desc">China sales fell <strong>28% in local currency in Q2 2026</strong> on weak consumer demand. Management called the market "challenging, particularly in the premium segment." Rest of World segment margin fell to <strong>5.2% from 10.5%</strong> a year earlier.</p>
+    <p class="biz-desc">The company has been assessing strategic options for China for "almost a year". The CEO said the result could be a structure where "somebody else leads those changes... or whether we do it in partnership or whether we do it ourselves." Management expects China sales to fall at a low double-digit rate in local currency in 2026. Full-year guidance excludes any outcome of the review.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Not sourced this session.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Chinese appliance majors</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:8px;font-size:12px;">*Peer market caps are our calculation: the September 21, 2026 close × StockAnalysis shares outstanding (WTS $350.62 × 33.38M; LII $363.64 × 34.56M; PNR $55.78 × 159.64M). The peers are our own selection of listed US water, plumbing and HVAC-products companies, not a list the company publishes. Market shares were not sourced.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two numbers that actually matter</h3>
+  <p class="prose">For a hardware maker that lives on replacements, two inputs tell you more than the income statement: <strong>price versus cost</strong> in North America, and <strong>what happens to China</strong>.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">NA Adj. Segment Margin</div>
+      <div class="card-value">24.4%</div>
+      <div class="card-note"><span style="color:var(--red);">−100bps YoY</span> in Q2 2026, with steel up about 20% year over year. The new 4–7% water-heater price increase starts contributing "midway through the third quarter". Management describes it as "on the lower end" of recent increases.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">China Sales, Q2 2026</div>
+      <div class="card-value" style="color:var(--red);">−28%</div>
+      <div class="card-note">In local currency. Rest of World segment earnings fell to $10.2M from $25.3M. The conclusion of the strategic assessment is due by the Q3 call.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow, 1H 2026</div>
+      <div class="card-value">$233M</div>
+      <div class="card-note"><span style="color:var(--green);">+67% YoY</span>, driven mainly by working-capital management, which more than offset lower earnings. Operating cash flow was $254M (+42%).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">2026 Buyback Target</div>
+      <div class="card-value">$300M</div>
+      <div class="card-note">Raised 50% from $200M, and about 3.9% of the $7.74B market cap. The company bought 2.6M shares for $162.4M in 1H 2026. Share count is down 3.71% year over year (StockAnalysis).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">#1 NA water-heater maker</span>
+    <span class="moat-pill">80–85% replacement demand</span>
+    <span class="moat-pill">Wholesale &amp; retail shelf space</span>
+    <span class="moat-pill">Lochinvar boiler brand</span>
+    <span class="moat-pill">Pass-through pricing</span>
+    <span class="moat-pill">ROIC 23.0%</span>
+    <span class="moat-pill">33 yrs dividend growth</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>distribution plus urgency</strong>. When a water heater fails, the plumber installs whatever the local wholesaler has on the shelf that day, and A. O. Smith's brands hold a large part of that shelf. Replacement demand does not wait for the housing cycle. That is how the company earns returns most manufacturers would envy: ROE of 27.1% and ROIC of 23.0% over the trailing twelve months.</p>
+  <p class="prose" style="margin-top:14px;">The weakness is that the same structure caps growth. A replacement market grows with the installed base and with housing formation, and no faster. To beat that, a company needs price, adjacent products (boilers, water treatment, valves) or new geographies (China, India). In 2026 steel is eating the price gains, water treatment is being restructured, and China is under review.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">China has gone from growth engine to write-down candidate.</strong> China revenue fell from $922.4M in FY2021 to $624.8M over the twelve months to June 2026, a 32% drop. It fell another 28% in local currency in Q2. The CEO says every option is open: a sale, a partnership or restructuring it alone. Any of those could bring a loss on exit or an impairment, and none is in the guidance.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Price and cost are nearly cancelling out.</strong> Management said Q2 price-cost was only "slightly positive". The full-year outlook assumes steel about 15% above 2025 levels, with second-half steel inflation "somewhat higher than the first half". It also expects new tariffs to cost modestly more than the ones they replaced. The 4–7% price increase is smaller than recent ones and arrives mid-Q3.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Q2 borrowed from Q3.</strong> Customers buying ahead of the price increase, plus boiler early-buy orders, pulled demand forward. Management has already said Q3 EPS will be below both Q2 and Q4. A weak quarter that has been guided can still move the stock when it prints.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">The balance sheet is being put to work.</strong> Debt rose to $637.5M at June 30, 2026, after the Leonard Valve term loan (net debt $456M; debt-to-capital 25.7%). At FY2025 year-end total debt was $203.9M, and cash roughly matched it (StockAnalysis). Leverage is still modest at 0.84x debt/EBITDA, but acquisitions and buybacks are now partly funded with debt.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The benchmark index is the <strong>S&amp;P 500</strong>, which AOS joined on July 26, 2017. The stock is NYSE-listed, so it is not eligible for the NASDAQ-100. Price-dependent ratios are <strong>recomputed at the $56.96 close of September 21, 2026</strong>. Other figures are StockAnalysis trailing-twelve-month values to June 30, 2026. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—" rather than estimated.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>AOS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>15.9</td><td>—</td><td>—</td><td>$56.96 ÷ $3.59 TTM diluted EPS = 15.87. TTM EPS includes the Q2 water-treatment restructuring charge.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>15.2</td><td>—</td><td>—</td><td>$56.96 ÷ FY2026 consensus adjusted EPS of $3.74 (13 analysts, StockAnalysis). Consensus FY2027 EPS is $4.09.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to EBITDA: market cap plus debt minus cash, divided by earnings before interest, tax, depreciation and amortisation.">EV / EBITDA</span></td><td>10.5</td><td>—</td><td>—</td><td>Our calculation: $7.74B market cap + $0.68B total debt − $0.18B cash = $8.24B EV, ÷ $783.7M TTM EBITDA.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$3.59</td><td>—</td><td>—</td><td>+0.2% YoY on a TTM basis, even though net income fell 3.5%. The shrinking share count makes up the difference.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+0.4%</td><td>—</td><td>—</td><td>TTM revenue $3.80B. Q2 2026 −1% ($1,004.3M vs $1,011.3M). The 2026 guide is +2% to +3% ($3.90–$3.95B), helped by Leonard Valve.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of making the product, as a percentage of revenue.">Gross Margin</span></td><td>38.6%</td><td>—</td><td>—</td><td>TTM. Q2 2026 gross profit was $387.8M on $1,004.3M of sales. Steel is the input that moves it.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>13.1%</td><td>—</td><td>—</td><td>TTM; operating margin 18.2%. Q2 2026 net earnings of $124.9M were down 18% YoY on a GAAP basis and 7% adjusted.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>2.53%</td><td>—</td><td>—</td><td>$1.44 annualised ($0.36/quarter) on $56.96. Payout ratio is 40.1% of TTM EPS. 33 years of dividend growth per StockAnalysis; the company's October 2025 release says "over 30 years".</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>9.72%</td><td>—</td><td>—</td><td>10.48M shares short (7.71% of shares outstanding), 7.32 days to cover. Latest reported figure on StockAnalysis. That is high for a dividend-growth industrial.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.37</td><td>—</td><td>—</td><td>$677.2M total debt per StockAnalysis (likely including leases; the company reports $637.5M of debt) against $1.84B of equity. Debt/EBITDA 0.84x.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.59</td><td>—</td><td>—</td><td>Quick ratio 0.98. Inventory is a large share of current assets, as you would expect for a manufacturer.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>$639.4M</td><td>—</td><td>—</td><td>TTM: $692.3M operating cash flow − $52.9M capex. That is an 8.3% FCF yield on the $7.74B market cap (our calculation). FY2025 FCF was $546.0M.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>27.1%</td><td>—</td><td>—</td><td>High, and partly flattered by buybacks shrinking equity. Tangible book value is small; StockAnalysis shows price/tangible book above 20x.</td></tr>
+      <tr><td><span class="tip" title="Return on Invested Capital: after-tax operating profit divided by the total debt and equity capital employed in the business.">ROIC</span></td><td>23.0%</td><td>—</td><td>—</td><td>More than twice StockAnalysis's 9.94% WACC estimate.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means historically more volatile than the index.">Beta</span></td><td>1.15</td><td>—</td><td>—</td><td>5-year beta. The stock moves more with the market than "boring water heaters" suggests, because housing and consumer spending sit behind it.</td></tr>
+      <tr><td>52-Week Range</td><td>$54.16 – $81.87</td><td>—</td><td>—</td><td>$56.96 is 5.2% above the low and 30.4% below the high: near the bottom of its year.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the reported figures:</p>
+  <ul class="prose" style="margin-top:8px;padding-left:22px;">
+    <li><strong>The $22.6M pre-tax restructuring and impairment charge</strong> in North America water treatment in Q2 2026. It explains the gap between GAAP EPS of $0.91 and adjusted EPS of $1.03, and between 2026 GAAP guidance ($3.60–$3.75) and adjusted guidance ($3.70–$3.85).</li>
+    <li><strong>Buybacks.</strong> Share count is down 3.71% year over year, which is why TTM EPS rose 0.2% while net income fell 3.5%.</li>
+    <li><strong>Timing.</strong> Q2 benefited from customers buying ahead of price increases, boiler early-buy orders, and a lower tax rate than management expects for the full year.</li>
+  </ul>
+  <p class="prose" style="margin-top:14px;">Looking further back, FY2022 diluted EPS of $1.51 (against $3.02 in FY2021) reflects a Q4 2022 loss of $0.79 per share. The sources fetched did not show what caused it, so we do not attribute it.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">13 analysts polled by S&amp;P Global, via StockAnalysis. Price targets were last updated August 21, 2026.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$69.91</div><div class="card-note"><span style="color:var(--green);">+22.7% upside</span> from $56.96 (our recalculation at the banner close). The median target is $70 (+22.9%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$59 – $84</div><div class="card-note">+3.6% to +47.5% from $56.96. Even the lowest target is above the current price. Either the targets have not caught up with the stock, or the stock has fallen further than analysts think it should.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 6 / 2</div><div class="card-note">4 Strong Buy + 1 Buy, 6 Hold, 1 Sell + 1 Strong Sell (August 2026 column). In March 2026 it was 4 Strong Buy, 0 Buy, 8 Hold, 0 Sell and 1 Strong Sell. Net change since: two fewer Holds, one more Buy and one more Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:38.5;background:#22c55e;"></div>
+    <div style="flex:46.2;background:#f59e0b;"></div>
+    <div style="flex:15.4;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (38.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 6 (46.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (15.4%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">J.P. Morgan — Tomohiko Sano</strong> · Sell (Underweight) · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$60</span> maintained (Aug 21, 2026). Sano had earlier downgraded AOS to Underweight from Neutral and cut his target from $65 to $60 on May 14, 2026, citing lowered guidance, residential exposure and a weaker China outlook (Investing.com, May 15, 2026). The $60 target is only 5.3% above the September 21 close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">Goldman Sachs — Susan Maklari</strong> · Sell · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$59</span> maintained (Jul 31, 2026). This is the lowest target on the board, and the stock has since closed below it.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Stifel — Nathan Jones</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$76 → $70</span> (Jul 31, 2026). The most prominent bull cut his target after the Q2 print. He is still positive, but expects less upside.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">D.A. Davidson — Matt Summerville</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$67</span> reiterated (Aug 3, 2026). <strong>UBS</strong> also kept a Hold with a <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$68</span> target on Jul 31, 2026 (analyst not named in the source).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 27, 2026 (est.)</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings — and the China verdict</div>
+        <div class="tl-desc">The CEO said on the Q2 call: "We expect to share our conclusion on that assessment by our next quarterly earnings call." So this print carries two events. One is a quarter management has already guided below both Q2 and Q4. The other is a decision on a business worth about 16% of revenue. Watch for a sale, joint venture or restructuring, any impairment, and any change to the $300M buyback target. The date is StockAnalysis's estimate, not confirmed by the company.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Mid-Q3 2026 onward</div>
+      <div class="tl-content">
+        <div class="tl-title">4–7% water-heater and boiler price increase takes effect</div>
+        <div class="tl-desc">Management expects the increase "to begin to be realized midway through the third quarter", after a delay of a couple of months. If it holds up against steel inflation, North America margins recover in Q4 and 2027. If competitors do not follow, it becomes a question of market share.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Late 2026 / 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Water-treatment restructuring pays back</div>
+        <div class="tl-desc">The company expects proceeds from selling certain assets in late 2026, then $6–8M a year of savings from 2027. These are small numbers against $3.8B of revenue, but they show management is willing to prune.</div>
+        <div class="tl-impact up">Modest upside</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — $300M 2026 target</div>
+        <div class="tl-desc">The company spent $162.4M in 1H 2026. Hitting the target implies about $138M more in 2H (our arithmetic). At June 30, 2026 it still had authority to buy about 3.2M more shares, worth roughly $182M at $56.96 (our calculation). That covers the implied remainder at current prices.</div>
+        <div class="tl-impact up">Support under the price</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Sales were $1,004.3M (−1%) and adjusted EPS $1.03 (vs $1.07). Adjusted EPS guidance was narrowed to $3.70–$3.85 from $3.70–$4.00, and the buyback target was raised to $300M. The stock closed at $59.81 that day, down 3.59% (StockAnalysis daily history).</div>
+        <div class="tl-impact down">Reaction already happened: −3.6% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">May–Jul 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Leadership turnover at the top</div>
+        <div class="tl-desc">CFO Charles Lauber's retirement and Carrie L. Anderson's appointment were announced May 19. Executive Chairman Kevin Wheeler retired effective July 1, 2026, and CEO Stephen Shafer added the chairman role (June 22 release). The CEO called it "another planned and orderly leadership transition". Even so, the company goes into the China decision with a new CFO and a combined chair and CEO.</div>
+        <div class="tl-impact neutral">Governance watch</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Leonard Valve acquired</div>
+        <div class="tl-desc">A maker of water-management and digital-control valves, financed with a new term loan. It is targeted at about $70M of 2026 sales. Management calls it the start of building out a "water management platform". The purchase price was not sourced this session.</div>
+        <div class="tl-impact up">Portfolio shift</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">AOS — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$61.07</strong> to the September 21, 2026 settled close of <strong>$56.96</strong>, AOS lost <strong>6.7% of its price</strong>. Add back roughly $6 per share of dividends paid over the period (our estimate from StockAnalysis annual dividend-per-share figures) and the total return is roughly flat. Over five years, the dividends were the whole return.</p>
+  <p class="prose" style="margin-top:14px;">The path was a round trip, not a slow bleed. The stock fell to $48.58 in September 2022 and climbed to <strong>$89.83 in September 2024</strong>. It gave most of that back over the next year, bounced to $78.00 in February 2026, and has fallen 27% since.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>33.9</strong> at the banner date: weak, but not yet oversold. It was below 30 for several months in early 2025, with a low of 27.3 in March 2025, and again in May 2026 at 29.1. The 10-month moving average is about $64.18, above the price, so the long-term trend still points down. The chart does not show a bottom yet.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Five-year low — $48.58 month-end close</div><div class="tl-desc">The stock's 2022 low and the lowest month-end close in the window, down 43% from the December 2021 close of $85.85.</div><div class="tl-impact down">−13.9% month · 5-yr low</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">Cycle high — $89.83</div><div class="tl-desc">The highest month-end close of the five years, following a March 2024 close of $89.46. The monthly RSI peaked at 75.0 in March 2024. The stock has not been back since.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2024</div><div class="tl-content"><div class="tl-title">The break — $75.10 (−16.4% in a month)</div><div class="tl-desc">The largest monthly fall in the five-year series. The sources fetched this session did not establish what triggered it. What followed is in the data: six straight monthly declines to $65.36 by March 2025, and FY2024 revenue down 0.90%.</div><div class="tl-impact down">−16.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">Relief rally peaks — $78.00</div><div class="tl-desc">Up from $65.98 in November 2025 over three months. The best month-end close since September 2024.</div><div class="tl-impact up">+18% from Nov 2025</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar–May 2026</div><div class="tl-content"><div class="tl-title">Rally unwinds — $78.00 → $56.72</div><div class="tl-desc">March fell 15.5%. Then the April 30 Q1 report missed expectations: EPS of $0.85 against a $0.95 forecast and revenue of $946M, hurt by China and by weather-related production and shipping constraints (per Investing.com). May closed at $56.72.</div><div class="tl-impact down">−27.3% in three months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">Q2: bigger buyback, narrower guide — $60.13</div><div class="tl-desc">The stock fell 3.59% on results day as guidance was narrowed toward the low end. It closed July at $60.13 and August at $59.13.</div><div class="tl-impact down">−4.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $56.96</div><div class="tl-desc">Down 3.7% from the August close and 14.8% below the December 2025 close of $66.88. The price is within 5.2% of the 52-week low of $54.16.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year returns for the <strong>S&amp;P 500</strong>, this report's benchmark, were not obtained from the sources fetched, so no numeric comparison is given. The sourced data shows AOS <strong>down 6.7% on price over five years</strong>, and down 22.4% since the September 2025 month-end close of $73.41.</p>
+  <p class="prose" style="margin-top:14px;">Against listed peers at the September 21 close (our calculations), A. O. Smith's $7.74B market value compares with $12.57B for Lennox International, $11.70B for Watts Water and $8.90B for Pentair. AOS is the smallest of the four.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You pay 15.9x trailing and 15.2x forward earnings, with an 8.3% free-cash-flow yield and a 2.53% dividend. The business earns a 23% return on invested capital, has raised its dividend for 33 years, and is retiring nearly 4% of its shares a year. People replace the core product when it breaks rather than choosing to buy it: 80–85% of US residential demand is replacement, and emergency replacement is holding up. Boilers are growing at double digits, Leonard Valve adds a new platform, and a 4–7% price increase lands in the second half. The October China decision could remove the business that has dragged on results since 2021, leaving a higher-margin company centred on North America. Every analyst target, including the two Sells, is above the current price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>This is a no-growth company. Revenue has been between $3.75B and $3.85B for four years and TTM EPS is flat. EPS is only holding up because of buybacks, which are now partly funded with debt. The US residential market is guided down, Q2 pulled demand from Q3, steel is up about 20%, and the new price increase is smaller than past ones. China has lost about a third of its revenue since 2021, and an exit could come with an impairment. J.P. Morgan and Goldman rate it a Sell, and 9.7% of the float is sold short. Part of the market clearly thinks the high returns on capital belong to a franchise that has stopped compounding. At 15.9x, a business with flat earnings is not obviously cheap.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The China outcome.</strong> The strategic assessment ends by the Q3 call, and the CEO says "all outcomes are still on the table". Guidance excludes any result. A sale below book value, a write-down or a costly restructuring would hit GAAP earnings. Keeping the business means living with double-digit revenue declines in local currency.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">US residential water-heater volumes.</strong> Management has already moved its industry outlook from "flat to down low single digits" to "down low single digits". Proactive replacement, about 30% of replacement demand, depends on consumer confidence, and new construction is weak. Another cut to the volume outlook would put the bottom of the $3.70–$3.85 EPS guide at risk.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Price-cost squeeze.</strong> The full-year plan assumes steel about 15% above 2025, rising in the second half, and tariffs that cost modestly more than before. The price increase is "on the lower end" of recent ones and started late. If competitors discount to win share in a soft market, the damage shows up in the 24.4% adjusted North America margin.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">China's consumer-appliance slump</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">A. O. Smith sells water heaters and water purifiers into a Chinese appliance market that management calls "challenging, particularly in the premium segment." The company's product-line data (StockAnalysis) shows China revenue of $922.4M in FY2021, then $839.1M, $835.1M, $791.9M and $689.5M in FY2022–FY2025, and $624.8M over the latest twelve months. Revenue has fallen for four years running, and Q2 2026 was down 28% in local currency.</p>
+    <p class="biz-desc">The company has been reviewing its options for almost a year. The CEO said it has had "a lot of great discussions with a lot of different potential parties." For a US investor, this is the clearest either-or in the stock. The outcome decides whether AOS is valued as a North American replacement franchise, or as one still carrying a shrinking Chinese appliance business.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Steel, tariffs and the US replacement cycle</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Water heaters are mostly steel. Management put steel costs up about 20% year over year in Q2 2026 and assumes about 15% above 2025 for the full year, with tariffs a further headwind. This time the price increase is 4–7%, "on the lower end" of recent ones. It arrives while volumes are soft and the CEO describes "a highly competitive environment". Emergency replacement is not optional, so volumes will not collapse. The risk is to margins, not to revenue.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Boilers, valves and the "water management" pivot</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">The fastest-growing parts of A. O. Smith are its commercial and residential boilers (+21% in Q2 2026, +12% in the first half) and the newly acquired Leonard Valve (about $70M of sales targeted for 2026). Management presents these, alongside its investment in tankless and heat-pump water heating, as the start of a wider water-management platform.</p>
+    <p class="biz-desc"><strong>The bull framing:</strong> these faster-growing adjacent businesses, plus a possible exit from China, could turn a flat company into a mid-single-digit grower with better margins and a buyback.</p>
+    <p class="biz-desc"><strong>The bear framing:</strong> the boiler line, including Leonard Valve, is $329M of TTM revenue, under 9% of the company, and part of Q2's boiler growth was pulled forward. It cannot offset a soft water-heater market by itself.</p>
+    <p class="biz-desc">The test is whether full-year boiler growth lands inside the guided 6–8% after a 12% first half, and what the China decision leaves behind.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/aos/history/</strong>. The September 21, 2026 settled close was $56.96 (open 57.63, high 57.63, low 56.55, volume 1,429,899, Adj. Close present), up 0.02% on the prior close of $56.95. The September 22, 2026 session was still in progress at the time of writing, and its print is not used anywhere in this report. StockAnalysis live fields (market cap, P/E, dividend yield, target upside) were captured intraday on September 22, so every price-dependent figure here is recomputed at $56.96.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources:</p>
+  <ul style="max-width:900px;margin:0 auto 10px;text-align:left;padding-left:22px;">
+    <li>stockanalysis.com (quote, statistics, profile, annual and quarterly financials including product-line revenue, forecast and analyst table): fundamentals, consensus, ratings, named analyst actions, and Sector/Industry labels.</li>
+    <li>A. O. Smith's Q2 2026 earnings release (July 30, 2026, via PR Newswire/TradingView): segment results, guidance, cash flow, debt, buybacks.</li>
+    <li>The Q2 2026 earnings-call transcript at fool.com: management quotes on China, pricing, steel, boilers, Leonard Valve and demand.</li>
+    <li>investing.com: Q1 2026 results against forecasts (April 30, 2026) and the J.P. Morgan downgrade (May 15, 2026). A. O. Smith releases of May 19, 2026 (CFO transition), June 22, 2026 (chairman) and October 13, 2025 (dividend) via PR Newswire.</li>
+    <li>Wikipedia (List of S&amp;P 500 companies; A. O. Smith): index membership, the S&amp;P 500 add date, founding history and the Pureit acquisition.</li>
+    <li>digrin.com/stocks/detail/AOS/price (unadjusted "Real price" column): month-end closes.</li>
+  </ul>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. The first 60 are real month-end closes from September 2021 through August 2026, taken from the unadjusted "Real price" column at digrin.com and cross-checked against StockAnalysis daily closes for July 31 ($60.13) and August 31, 2026 ($59.13). The final point is the September 21, 2026 settled close of $56.96; it is not a month-end and is labelled accordingly. <strong>No interior months were reconstructed or estimated.</strong> The last stock split (2-for-1) was on October 6, 2016, before the chart window, so the unadjusted series needs no split adjustment.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Gaps and estimates:</p>
+  <ul style="max-width:900px;margin:0 auto 10px;text-align:left;padding-left:22px;">
+    <li>The Industry Avg and S&amp;P 500 columns in Section 04 show "—" because no sourced values were obtained.</li>
+    <li>Market shares and TAM are shown as "n/v" (not verified).</li>
+    <li>Peer market caps are our calculation at the September 21 close, and the peer set is our selection.</li>
+    <li>Global and US market-cap ranks were not sourced.</li>
+    <li>"Roughly $6 of dividends" over five years is an estimate from annual dividend-per-share figures, not a summed payment record.</li>
+    <li>The employee count (11,500) is StockAnalysis's figure; its as-of date was not shown.</li>
+    <li>The next earnings date is StockAnalysis's estimate.</li>
+  </ul>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real price") + Sep 21, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [61.07,73.07,79.05,85.85,76.42,68.58,63.89,58.43,60.12,54.68,63.27,56.45,48.58,54.78,60.74,57.24,67.70,65.63,69.15,68.29,63.94,72.78,72.63,72.50,66.13,69.76,75.36,82.44,77.61,82.90,89.46,82.84,83.64,81.78,85.04,83.72,89.83,75.10,74.49,68.21,67.30,66.48,65.36,67.86,64.31,65.57,70.79,71.29,73.41,65.99,65.98,66.88,73.49,78.00,65.94,61.84,56.72,62.72,60.13,59.13,56.96];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 12, label: 'Sep 2022 — five-year low close $48.58',                  color: '#ef4444' },
+  { idx: 36, label: 'Sep 2024 — cycle high $89.83',                           color: '#22c55e' },
+  { idx: 37, label: 'Oct 2024 — $75.10 (−16.4% month)',                       color: '#ef4444' },
+  { idx: 53, label: 'Feb 2026 — relief-rally peak $78.00',                    color: '#22c55e' },
+  { idx: 56, label: 'May 2026 — $56.72 after Q1 miss (Apr 30)',               color: '#f59e0b' },
+  { idx: 58, label: 'Jul 2026 — Q2: guide narrowed, buyback target $300M',    color: '#3b82f6' },
+  { idx: 60, label: 'Sep 21, 2026 — settled close $56.96',                    color: '#2EC4B6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,196,182,0.22)');
+grad.addColorStop(1, 'rgba(46,196,182,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EC4B6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EC4B6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
