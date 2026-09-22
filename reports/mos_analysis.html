@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOS — The Mosaic Company | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of September 21, 2026 (Monday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">MOS</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Materials / Agricultural Inputs</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $7.65B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Global: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US: not sourced</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: not sourced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid #22D3EE44;padding:3px 10px;border-radius:4px;">S&amp;P 500: MEMBER since September 26, 2011 · not a NASDAQ-100 constituent (NYSE-listed)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">The Mosaic Company</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$24.07</div>
+      <div class="price-change">−$0.41 (−1.67%)</div>
+      <div class="price-date">Close, Monday September 21, 2026 · last completed settled market close</div>
+      <div class="price-date">After-hours quote for that session not available from sources fetched</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Tampa, Florida</div>
+    <div class="meta-item"><span>Employees:</span> 13,249 (per StockAnalysis profile)</div>
+    <div class="meta-item"><span>Founded:</span> October 2004 (merger of IMC Global and Cargill's crop nutrition business)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 3, 2026 (Q3 2026, per StockAnalysis)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Mosaic digs two things out of the ground that no farm can do without: <span class="tip" title="Potassium chloride (muriate of potash, MOP) — the potassium in the N-P-K of fertiliser. Mined from ancient evaporated seabeds; Mosaic's mines are in Saskatchewan.">potash</span> from Saskatchewan and <span class="tip" title="Phosphate rock, reacted with sulfuric acid (made from sulfur) and ammonia to produce finished fertilisers such as DAP (diammonium phosphate) and MAP.">phosphate</span> from Florida's Bone Valley — and it sells both, plus imported product, through a large distribution business in Brazil. The company was formed in <strong>October 2004</strong> by merging IMC Global (founded 1909) with Cargill's crop nutrition division; Cargill distributed its stake to its own shareholders in May 2011, and Mosaic joined the S&amp;P 500 on <strong>September 26, 2011</strong>. FY2025 revenue was <strong>$12.05B, up 8.4%</strong>, with diluted <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$1.70</strong>. On a trailing-twelve-month basis to June 2026, revenue is $12.25B but the company is <strong>loss-making: −$638.5M net, −$2.01 per share</strong>.</p>
+  <p class="prose" style="margin-top:16px;">Here is the hand Mosaic is playing. A phosphate producer is a spread business: it buys sulfur and ammonia, reacts them with rock, and sells the result. In Q2 2026 the selling price was good — DAP realised <strong>$773/tonne against $668</strong> a year earlier — and the Phosphates segment still lost <strong>$104M</strong> at the operating line, because the inputs ran faster than the output. Sulfur averaged <strong>$522 per long ton</strong> in the quarter and the Q3 contract settled at <strong>$705</strong>. Mosaic's answer has been to stop playing marginal hands: its Louisiana phosphate operations were fully offline, Faustina idled and Bartow at 40% of its targeted rate, per the Q2 call. Meanwhile potash — steady volumes, ~$275/tonne, <strong>$278M</strong> of adjusted EBITDA — paid for everything. Then, on the banner date itself, the potash leg took a hit of its own: the US President said Washington was negotiating a "massive" deal to buy Belarusian potash for "substantially less than we are currently paying to Canada." Mosaic's potash is Canadian. The stock closed the day down 1.67% at <strong>$24.07</strong>, 30.6% below its September 2025 month-end.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Bruce Bodine</div>
+      <div class="card-note">President and CEO, named on the Q2 2026 earnings release (August 4, 2026); in the seat since January 1, 2024 per Wikipedia. His framing in the release: the company has "reduced phosphate production, cut costs, reduced capital expenditures and strengthened our financial flexibility while maintaining the ability to resume full production rates when markets improve."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Luciano Siani Pires</div>
+      <div class="card-note">Executive Vice President and CFO, per the participant list of the August 5, 2026 earnings call transcript (Motley Fool). He owns the cost programme: SG&amp;A was $132M in Q2, which management described on the call as down 20% year over year, with FY2026 SG&amp;A guided to $510–530M.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Board Chair</div>
+      <div class="card-value" style="font-size:20px;">Gregory Ebel</div>
+      <div class="card-note">Chairman, per Wikipedia. Institutional ownership and largest holders were not retrieved from a fetched page this session and are not shown.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Mosaic reports three segments — <strong>Phosphates, Potash and Mosaic Fertilizantes</strong> (Brazil). The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) segment net sales</strong> from the earnings release. The three segments sum to $2,930M; consolidated net sales were $2.8B, the difference being inter-segment eliminations and corporate items. Revenue mix and profit mix are very different animals here — see the EBITDA line under each card.</p>
+  <div class="seg-bar">
+    <div style="flex:42.5;background:#22D3EE;">PHOSPHATES 42.5%</div>
+    <div style="flex:35.3;background:#22c55e;">FERTILIZANTES 35.3%</div>
+    <div style="flex:22.2;background:#f59e0b;">POTASH 22.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Phosphates — $1,246M (Q2'26), +6.2% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Mosaic Fertilizantes — $1,034M, −12.0% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Potash — $650M, −8.6% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Flip to profit and the picture inverts. Of the $466M of segment adjusted EBITDA in Q2 2026, Potash produced <strong>$278M (59.7%)</strong> from the smallest revenue line; Phosphates $128M (27.5%); Fertilizantes $60M (12.9%). Consolidated adjusted EBITDA was $407M after corporate costs. (Shares are our calculation from the release's segment figures.)</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Phosphates</div>
+        <span class="biz-badge dominant">LARGEST BY REVENUE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,246M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+6.2%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−$104M</div><div class="biz-stat-label">Op. Result</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Florida phosphate rock turned into finished fertiliser at plants such as New Wales, Riverview and Bartow, plus Louisiana and Faustina. Q2 2026: sales volumes <strong>1.4Mt vs 1.5Mt</strong>, DAP realised <strong>$773/t vs $668/t</strong>, cash conversion cost <strong>$129/t vs $126/t</strong>, adjusted EBITDA <strong>$128M vs $217M</strong>, and an operating loss of $104M against $8M a year earlier. The segment carried about $60M of idle and turnaround costs, per the call. This is the business where Mosaic has had the most operational trouble: in October 2025 it reported Q3 2025 phosphate production of about 1.7Mt, below its own expectations, citing mechanical problems at the Riverview sulfuric acid plant and utility interruptions at Bartow. Management's Q3 2026 guide is 1.1–1.4Mt of sales at $820–840/t DAP.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and industry growth not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Nutrien</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$35.57B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Other producers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Mosaic Fertilizantes</div>
+        <span class="biz-badge dominant">BRAZIL</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$1,034M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−12.0%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−$41M</div><div class="biz-stat-label">Op. Result</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">35.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Brazilian phosphate mining, chemical plants and a distribution business, largely built on the Vale Fertilizantes acquisition completed in January 2018. Q2 2026: volumes <strong>1.5Mt vs 2.2Mt</strong> (produced-product sales 0.7Mt vs 1.1Mt), finished-product price <strong>$585/t vs $474/t</strong>, adjusted EBITDA <strong>$60M vs $159M</strong>, operating loss $41M against $109M of income a year earlier. Sulfur is the same enemy here: in December 2025 Mosaic curtailed single super phosphate output at Fospar and Araxá after a sharp sulfur price rise and suspended further sulfur purchases. The portfolio is being cut back — the company is exploring strategic alternatives for the Araxá and Patrocínio assets, and on the Q2 call management described the Araxá divestment process as advancing.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> TAM and Brazilian market growth not sourced this session — no estimate is presented.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Nutrien</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$35.57B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Other distributors</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Potash</div>
+        <span class="biz-badge growth">PROFIT ENGINE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$650M</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−8.6%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">$195M</div><div class="biz-stat-label">Op. Earnings</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">22.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Saskatchewan mines (Belle Plaine, Colonsay and the Esterhazy complex). The Carlsbad, New Mexico mine was sold in Q2 2026. Q2 2026: volumes <strong>2.0Mt vs 2.3Mt</strong>, MOP realised <strong>$275/t vs $261/t</strong> (FOB mine), cash production cost <strong>$84/t vs $75/t</strong>, operating earnings <strong>$195M vs $194M</strong>, adjusted EBITDA flat at <strong>$278M</strong>. Management expects about 9.0Mt of potash production in 2026, weighted to the second half, helped by the Esterhazy Hydrofloat project; the Q3 guide is 2.0–2.2Mt at $270–290/t. On the call, management described potash supply and demand as "much more balanced", with product moving freely around the world. That balance is exactly what a Belarus supply deal into the US would test.</p>
+    <div class="biz-tam"><strong>Industry size:</strong> Global potash TAM not sourced. Context from The Northern Miner (Sep 21, 2026): Canada supplied 79% of US potash imports in 2021–2024; Belarus produced 7.1Mt in 2024.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Nutrien</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$35.57B</div><div class="comp-bubble-label">Mkt Cap*</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Belarusian producers</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="font-size:12px;">* Peer market cap is our calculation: Nutrien's September 21, 2026 close of $74.54 × 477.21M shares outstanding (StockAnalysis). For reference, nitrogen producer CF Industries: $123.27 × 151.34M = $18.66B, and Mosaic: $24.07 × 317.90M = $7.65B, on the same basis.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The two operating metrics that actually matter</h3>
+  <p class="prose">A fertiliser producer lives on the <strong>spread</strong> between what it sells and what it burns. Watch the realised price per tonne against the input cost per tonne — and the volume it can push through.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">DAP Realised Price</div>
+      <div class="card-value">$773/t</div>
+      <div class="card-note"><span style="color:var(--green);">vs $668/t</span> in Q2 2025, FOB plant. Q3 2026 guide: $820–840/t. The selling side of the phosphate spread is not the problem.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Sulfur Cost</div>
+      <div class="card-value" style="color:var(--red);">$705/lt</div>
+      <div class="card-note">Q3 2026 contract settlement per long ton, against a Q2 average of <strong>$522</strong> (per the Q2 call). Ammonia averaged $621/t in Q2 with Q3 guided at $610–620/t. This is the input side, and it moved faster than DAP.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">MOP Realised Price</div>
+      <div class="card-value">$275/t</div>
+      <div class="card-note">vs $261/t a year earlier, FOB mine, with cash production cost of $84/t. Potash earns roughly $190/t of cash margin before freight and overheads — the healthiest spread in the house.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Potash Production Guide</div>
+      <div class="card-value">~9.0Mt</div>
+      <div class="card-note">For FY2026, second-half weighted. Potash volumes were 2.0Mt in Q2 against 2.3Mt a year earlier; Q3 guide 2.0–2.2Mt. Hitting the second-half ramp is what the Hydrofloat spend was for.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Long-life Saskatchewan potash reserves</span>
+    <span class="moat-pill">Integrated Florida phosphate rock</span>
+    <span class="moat-pill">Brazil distribution footprint</span>
+    <span class="moat-pill">Mine permits &amp; capital intensity</span>
+    <span class="moat-pill">Low potash cash cost ($84/t)</span>
+    <span class="moat-pill">Non-discretionary end demand</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>geology and permits</strong>. Nobody builds a new potash mine or phosphate complex quickly, and farmers cannot skip potassium and phosphorus indefinitely. That protects Mosaic's <em>existence</em>. It does not protect its <em>margin</em>: fertiliser is a commodity, the price is set globally, and the producer takes it. The Q2 2026 numbers show the distinction plainly — owning the rock did not stop Phosphates losing money when sulfur spiked, because a phosphate plant's rock is not its only input.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Sulfur is the swing input.</strong> Sulfur averaged $522 per long ton in Q2 and the Q3 contract settled at $705. On the Q2 call Bodine attributed the tight sulfur market to the ongoing closure of the Strait of Hormuz and a blockade affecting Kazakhstan (as reported in the Motley Fool transcript). Mosaic cannot hedge its way out of a physical shortage; its lever is to curtail production, which is what it has done — and curtailment raises unit fixed costs.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Canadian potash is now a political asset.</strong> On September 21, 2026 the US President posted that Washington was negotiating a potash deal with Belarus priced "substantially less than we are currently paying to Canada" (quoted by The Northern Miner). Belarusian producers were removed from US Treasury sanctions in March 2026, per the same report. Belarus's own president responded the same day that its output is already fully contracted (Capital Press, Sep 21, 2026). The deal may never happen; the risk premium arrived the same day.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The balance sheet is doing more work.</strong> Total debt rose from $5.05B at December 31, 2025 to $5.86B at June 30, 2026, against $294M of cash. First-half free cash flow was −$405.5M, and trailing-twelve-month free cash flow is −$947M. Mosaic still pays $0.22 a quarter. Management expects $300–500M of working-capital release this year, mostly in Q4, and put a $1B term loan in place to refinance commercial paper.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Operating reliability.</strong> The October 2025 phosphate production miss (Riverview, Bartow) and the 2026 curtailments mean Mosaic's phosphate plants have spent a long stretch running below capacity. Restarting idled assets costs money, and the market has already seen restart promises slip once.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong> (MOS is a member; it is NYSE-listed and not in the NASDAQ-100). Figures are StockAnalysis trailing-twelve-month values to June 2026 unless stated; price-based ratios are recomputed at the September 21, 2026 close of $24.07 where noted. Industry-average and S&amp;P 500 comparison values were not obtained and are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>MOS</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months.">Trailing P/E</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful: trailing EPS is negative (−$2.01), driven by Ma'aden mark-to-market losses, write-offs and weak phosphate margins.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by expected earnings per share over the next twelve months.">Forward P/E</span></td><td>~24.6</td><td>—</td><td>—</td><td>Our rescaling of StockAnalysis's next-twelve-month forward P/E (25.51 at an intraday $24.95) to the $24.07 close. On consensus FY2026 EPS of $0.39 alone the multiple would be ~62x — 2026 earnings are expected to be thin.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>−$2.01</td><td>—</td><td>—</td><td>GAAP diluted. Net loss of $638.5M over the twelve months to June 2026. Q2 2026 alone: −$0.86 GAAP, $0.13 adjusted.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth.">Revenue Growth (YoY)</span></td><td>+8.8%</td><td>—</td><td>—</td><td>TTM revenue $12.25B. But Q2 2026 net sales fell to $2.8B from $3.0B; the first half was up ($5.82B vs $5.63B) on price, not volume.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus cost of goods sold, as a percentage of revenue.">Gross Margin</span></td><td>11.2%</td><td>—</td><td>—</td><td>Down from 15.8% in FY2025 and 30.1% at the FY2022 peak. Q2 2026 gross margin was $214.7M on $2.8B of sales.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating income as a percentage of revenue.">Operating Margin</span></td><td>4.0%</td><td>—</td><td>—</td><td>TTM operating income $485.2M, versus $1.08B in FY2025.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue.">Net Profit Margin</span></td><td>−5.2%</td><td>—</td><td>—</td><td>Q2 2026 carried $351M of pre-tax notable items, including a $162M Ma'aden mark-to-market loss and a $69M asset write-off.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>3.66%</td><td>—</td><td>—</td><td>$0.88 annualised ($0.22/quarter; last ex-date September 10, 2026) on $24.07 — our calculation. Paid while free cash flow is negative.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable float.">Short Interest (% float)</span></td><td>9.70%</td><td>—</td><td>—</td><td>28.88M shares short, per StockAnalysis (latest reported settlement before the banner date).</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity.">Debt-to-Equity</span></td><td>0.52</td><td>—</td><td>—</td><td>StockAnalysis figure (its total debt of $6.08B includes leases). On the release's balance sheet: debt $5.86B vs Mosaic stockholders' equity $11.46B at June 30, 2026 = 0.51 (our calculation). Net of $294M cash, ~$5.56B.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>1.34</td><td>—</td><td>—</td><td>Adequate; short-term debt rose to $1.02B from $0.76B in the half, now being termed out via the $1B term loan.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure.">Free Cash Flow</span></td><td>−$947M</td><td>—</td><td>—</td><td>TTM. FY2025 was −$534.6M. FY2026 capex guided to $1.2B (cut from $1.25B).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>−5.1%</td><td>—</td><td>—</td><td>Negative on the GAAP loss. ROIC (operating basis) is 2.8%.</td></tr>
+      <tr><td><span class="tip" title="Price-to-Book: market value divided by shareholders' equity.">Price / Book</span></td><td>0.67</td><td>—</td><td>—</td><td>Our calculation: $7.65B market cap vs $11.46B equity. The market values the assets at two-thirds of their carrying value.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>0.83</td><td>—</td><td>—</td><td>Low correlation with the index, not low volatility: the stock has had five monthly moves of 20% or more in five years.</td></tr>
+      <tr><td>52-Week Range</td><td>$19.80 – $36.99</td><td>—</td><td>—</td><td>Intraday; high on September 25, 2025, low in June 2026 (Yahoo; StockAnalysis rounds the high to $37.00). $24.07 sits 22% above the low and 35% below the high. One-year price change ≈ −29.2% (vs the $33.98 close of September 19, 2025 — our calculation).</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">GAAP and adjusted earnings are far apart. Q2 2026 GAAP diluted EPS was <strong>−$0.86</strong> against adjusted <strong>$0.13</strong>; the gap is <strong>$351M of pre-tax notable items</strong>: a $162M mark-to-market loss on Mosaic's Ma'aden shares, a $69M asset write-off, $49M of foreign-currency transaction losses, $28M of closed-facility costs, $26M of accelerated depreciation in Brazil and $17M of other items. The Ma'aden line is a non-cash swing on a listed shareholding and can reverse; the write-offs and closure costs are the accounting trail of a company shrinking its footprint. Separately, the Carlsbad potash mine sale closed in Q2 2026 (proceeds not captured from the sources fetched).</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Buy / Hold</div><div class="card-note">20 analysts via StockAnalysis read <strong>Buy</strong>; MarketBeat's 22-analyst panel reads <strong>Hold</strong> (7 Buy, 12 Hold, 3 Sell). Same stock, different vote-counting — the middle of the distribution is Hold either way.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$26.77</div><div class="card-note"><span style="color:var(--green);">+11.2% upside</span> from $24.07 (our calculation). Median $26.50 (+10.1%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$17 – $35</div><div class="card-note">−29.4% to +45.4% from $24.07. A $17 floor and a $35 ceiling on a commodity producer is a bet on sulfur and potash prices as much as on Mosaic.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">9 / 9 / 2</div><div class="card-note">StockAnalysis, September 2026: 5 Strong Buy + 4 Buy, 9 Hold, 1 Sell + 1 Strong Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:45;background:#22c55e;"></div>
+    <div style="flex:45;background:#f59e0b;"></div>
+    <div style="flex:10;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 9 (45%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 9 (45%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (10%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">BMO Capital — Joel Jackson</strong> · Buy (reiterated) · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$30 → $30</span> (Sep 15, 2026). The most recent call on the board; implies +24.6% from $24.07.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">KeyBanc — Salvator Tiano</strong> · Initiated at Sector Weight (Hold) · no price target (Sep 10, 2026). A new name on the coverage list choosing to stand aside.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Goldman Sachs — Duffy Fischer</strong> · Buy (maintained) · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$28 → $28</span> (Aug 5, 2026), the day after Q2 results.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">UBS — Lucas Beaumont</strong> · Hold (maintained) · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$23 → $23</span> (Aug 10, 2026) — below the current price. Morgan Stanley (Vincent Andrews) and Barclays (Benjamin Theurer) both maintained Hold at $26 on Aug 11, 2026. And on the Belarus headline, RBC's Andrew Wong, in a note quoted by The Northern Miner (Sep 21, 2026), called the share-price declines "overdone".</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 3, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings (date per StockAnalysis)</div>
+        <div class="tl-desc">The test of the Q3 guide: phosphate volumes 1.1–1.4Mt at $820–840/t DAP, potash 2.0–2.2Mt at $270–290/t, against a $705 sulfur contract. Watch the phosphate segment's operating line — whether higher DAP prices finally outrun the input bill — and the second-half potash ramp toward ~9.0Mt for the year.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Working-capital release: $300–500M expected</div>
+        <div class="tl-desc">Management guided to $300–500M of working capital released for the full year, mostly in Q4. After first-half free cash flow of −$405.5M, this is what turns the cash-flow line — and it bears directly on whether the $0.22 quarterly dividend is funded from operations or from the balance sheet.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Brazil portfolio: Araxá and Patrocínio</div>
+        <div class="tl-desc">Strategic alternatives are being explored for the two non-core Brazilian assets, with management describing the Araxá divestment process as advancing on the Q2 call. A sale would shrink the segment that swung from $109M of operating income to a $41M loss year over year.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Belarus potash headline</div>
+        <div class="tl-desc">The US President said Washington was negotiating a "massive" deal to buy Belarusian potash for less than it pays Canada. Mosaic closed down 1.67% at $24.07 on heavy volume (12.98M shares, StockAnalysis); Nutrien closed down 3.31% at $74.54. Belarus's president said the same day that its potash was already contracted.</div>
+        <div class="tl-impact down">Reaction already happened: −1.67% on the day</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 4, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — reaction already happened</div>
+        <div class="tl-desc">Net sales $2.8B (vs $3.0B), GAAP EPS −$0.86, adjusted EPS $0.13 (vs $0.51), adjusted EBITDA $407M (vs $566M); capex guide cut to $1.2B; Carlsbad sale completed. The stock closed August 5 up 3.08% at $23.41 and ended August at $24.12 (+9.0% on the month).</div>
+        <div class="tl-impact up">Reaction already happened: +3.1% next session</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 16, 2025</div>
+      <div class="tl-content">
+        <div class="tl-title">Brazil SSP curtailments on sulfur</div>
+        <div class="tl-desc">Mosaic curtailed single super phosphate production at Fospar and Araxá after a sharp rise in sulfur prices and suspended future sulfur purchases, saying it may review the decision after 30 days. The first visible sign of the input squeeze that dominated 2026.</div>
+        <div class="tl-impact down">Input-cost pressure</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">MOS — Monthly Closes, Sep 2021 → Sep 21, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Sep 21, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF SEP 21, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>$35.72</strong> to the September 21, 2026 settled close of <strong>$24.07</strong>, MOS lost <strong>32.6% of its price</strong> (before dividends, which were not summed for this report). The endpoints hide the ride. The stock nearly doubled into a <strong>$66.50 month-end in March 2022</strong>, as FY2022 revenue rose 54.8% to $19.13B and EPS reached $10.06 — and then gave it all back and more over four years, bottoming at a <strong>$21.19 June 2026 close</strong>, the lowest month-end in the window and 68% below the 2022 peak. Commodity producers are priced on the cycle, and the cycle turned.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>44.8</strong> — neutral. Its most oversold print in the five years was <strong>19.7 in December 2024</strong>, not at the June 2026 price low (27.9): the 2026 decline was grinding rather than violent. The 10-month moving average is about <strong>$24.36</strong>, a hair above the price; the 3-month average is about $23.44, below it. The stock has stopped falling on momentum measures; it has not started a trend.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Feb–Mar 2022</div><div class="tl-content"><div class="tl-title">The spike — $66.50 month-end close</div><div class="tl-desc">+31.2% in February and +26.8% in March 2022, the two largest monthly gains in the series. FY2022 was the peak year: revenue $19.13B, gross margin 30.1%, EPS $10.06.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">First crack — $47.23 (−24.6%)</div><div class="tl-desc">The stock lost a quarter of its value in one month and never regained the spring 2022 highs.</div><div class="tl-impact down">−24.6% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2023</div><div class="tl-content"><div class="tl-title">The normalisation — $31.96 (−25.4%)</div><div class="tl-desc">The largest single-month fall in the five-year series. FY2023 revenue fell 28.4% to $13.70B and EPS dropped to $3.50 from $10.06 as crop-nutrient prices came off the peak.</div><div class="tl-impact down">−25.4% month · largest monthly fall</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2024</div><div class="tl-content"><div class="tl-title">Momentum trough — $24.58, RSI 19.7</div><div class="tl-desc">The most oversold monthly reading in the series, after a year in which FY2024 revenue fell a further 18.8% to $11.12B and EPS was $0.55.</div><div class="tl-impact down">Lowest RSI of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2025</div><div class="tl-content"><div class="tl-title">Recovery high — $36.48</div><div class="tl-desc">A 53% rebound from the February 2025 close of $23.92 in four months. The stock stayed above $33 at every month-end through September 2025, and the 52-week intraday high of $36.99 came on September 25, 2025.</div><div class="tl-impact up">Best month-end since 2023</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">Production miss — $27.45 (−20.8%)</div><div class="tl-desc">On October 10, 2025 Mosaic reported Q3 2025 phosphate production of about 1.7Mt, below its own expectations, citing mechanical issues at the Riverview sulfuric acid plant and utility interruptions at Bartow. The rebound was over.</div><div class="tl-impact down">−20.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jun 2026</div><div class="tl-content"><div class="tl-title">Five-year low close — $21.19</div><div class="tl-desc">The sulfur squeeze, phosphate curtailments and a Brazil business in retreat, all in one quarter. The 52-week intraday low of $19.80 was printed this month.</div><div class="tl-impact down">−11.3% month · 5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 21, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $24.07</div><div class="tl-desc">Up 13.6% from the June close, flat against December 2025 ($24.09), and 30.6% below the September 2025 month-end. Closed down 1.67% on the day of the Belarus potash headline.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Five-year and one-year returns for the <strong>S&amp;P 500</strong> (the benchmark for this report) were not obtained from the sources fetched, so no numeric comparison is given. What can be stated from sourced data: MOS is <strong>down 32.6% on price over five years</strong> and about <strong>29% over one year</strong> (our calculation from Yahoo and StockAnalysis closes). Against its closest listed peer, the same September 21 closes put Nutrien at $35.57B of market value and Mosaic at $7.65B (both our calculation from StockAnalysis share counts). Mosaic trades at 0.67x book value — the market is pricing the assets below what they are carried at, which is the market's way of saying it does not trust the returns those assets will earn at today's input costs.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying a potash franchise that earned $278M of adjusted EBITDA in a single quarter at $84/t cash cost, plus a phosphate business priced for permanent impairment, at 0.67x book with a 3.66% dividend. The phosphate problem is an input-cost problem, not a demand problem: DAP realised $773/t and is guided to $820–840/t in Q3. If sulfur normalises, the spread reopens on idled capacity Mosaic has explicitly kept ready to restart. Add $300–500M of working-capital release in Q4, a lower $1.2B capex guide, a 20% cut in SG&amp;A and the sale of non-core Brazilian assets, and the cash-flow line can turn without any help from the cycle. The Belarus headline may prove to be just that — Belarus itself said its output is fully contracted.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>A commodity producer with negative trailing EPS (−$2.01), negative free cash flow (−$947M TTM), debt up $0.8B in six months and a dividend funded by the balance sheet is not cheap at 0.67x book — it is showing you what the book is worth. Phosphates lost money in a quarter when the product price rose 16%; Fertilizantes swung to a loss on volumes down a third. The one healthy segment, potash, is now exposed to a US government actively seeking cheaper non-Canadian supply. Forward earnings are thin — consensus FY2026 EPS is $0.39 — and the analyst range runs down to $17.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Sulfur and ammonia stay expensive.</strong> The Q3 sulfur contract at $705 per long ton is 35% above the Q2 average of $522. If input costs keep outrunning DAP, the phosphate curtailments stay in place and their fixed costs keep landing in the income statement.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Potash pricing politics.</strong> A US–Belarus supply arrangement priced below Canadian product would hit the segment that currently generates about 60% of Mosaic's segment EBITDA. Management guided Q3 MOP at $270–290/t before the September 21 headline.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Leverage and the dividend.</strong> Total debt $5.86B against $294M of cash and negative free cash flow. If the Q4 working-capital release disappoints, the choice between the dividend and the balance sheet becomes explicit.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The sulfur squeeze on phosphate producers</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL CONSTRAINT</span></div>
+    <p class="biz-desc">Phosphate fertiliser needs sulfuric acid, and sulfuric acid needs sulfur — mostly a by-product of oil and gas refining, so its supply follows energy flows rather than farm demand. Mosaic's Q2 2026 call put the quarter's sulfur cost at $522 per long ton, the Q3 settlement at $705, and — per the Motley Fool transcript — attributed the tightness to the ongoing closure of the Strait of Hormuz and a Kazakhstan blockade. Mosaic's response across 2026 has been to curtail: Louisiana offline, Faustina idle, Bartow at 40%, New Wales and Riverview in the low-to-mid 70s percent, and Brazilian SSP curtailed since December 2025. That preserves cash per tonne but shrinks volume and raises unit fixed costs — the $60M of idle and turnaround costs in Q2 is the bill.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Potash: balanced market, political supply</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">Potash is a concentrated industry. The Northern Miner (September 21, 2026) put Canada's share of US potash imports at 79% over 2021–2024, with Russia at 12%; the US imported 0.5–1Mt a year from Belarus before 2021 sanctions, and the US Treasury removed Belaruskali and Belarusian Potash Company from sanctions in March 2026. Belarus produced 7.1Mt in 2024. Mosaic's MOP price was $275/t in Q2, up from $261, and management called the market balanced. A US-Belarus deal would not change world supply much — Belarus says its output is already contracted — but it could redirect flows into Mosaic's home market. RBC's Andrew Wong, in a note quoted by the same outlet: "Unless Belarusian potash were to displace Canadian potash in significant quantities, we think any mix-shift impact to realized prices would be moderate."</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Self-help: a smaller, cheaper Mosaic</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">What Mosaic controls, it is cutting: Carlsbad sold, Araxá and Patrocínio under strategic review, capex trimmed to $1.2B, SG&amp;A down about 20% year over year to $132M in Q2 and guided at $510–530M for the year, and a Biosciences business (Q2 net sales $25M) that management wants to reallocate capital toward. <strong>The bull framing:</strong> the company is sitting out the bad hands and keeping its chips for when sulfur normalises, with idled capacity ready to restart. <strong>The bear framing:</strong> selling assets and idling plants at the bottom of a cycle locks in a smaller business just before the recovery. The deciding data points are reported every quarter: phosphate operating result, sulfur cost per long ton, and free cash flow after the dividend.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Monday, September 21, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/mos/history/</strong> — the September 21, 2026 settled close of $24.07 (open 24.72, high 24.94, low 23.03, volume 12,975,173, Adj. Close present, −1.67% on the prior close of $24.48). The September 22, 2026 session was still in progress at the time of writing and its print is not used anywhere in this report.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: stockanalysis.com (quote, statistics, financials, forecast, ratings, profile) for TTM and annual financials, ratios, consensus, named analyst actions, short interest, employees and next earnings date; Mosaic's Q2 2026 earnings release (Exhibit 99.1 to Form 8-K, August 4, 2026) for segment results, prices, volumes, costs, notable items, guidance, balance sheet and the CEO quote; the Motley Fool transcript of the August 5, 2026 call for the CFO's name, sulfur and ammonia costs, curtailment detail, SG&amp;A and working-capital comments; digrin.com/stocks/detail/MOS/price (unadjusted "Real Price" column) for month-end closes; Yahoo Finance for the 52-week high and low and the September 19, 2025 close; Wikipedia (List of S&amp;P 500 companies; The Mosaic Company) for the S&amp;P 500 add date, formation history, Board chair and mine locations; The Northern Miner (September 21, 2026) for the Belarus headline, US import shares and the RBC comment; investing.com (October 10, 2025) for the Q3 2025 production miss; stocktitan.net for the December 16, 2025 Brazil curtailment; MarketBeat's consensus panel as syndicated on September 18, 2026 (dailypolitical.com); Capital Press (September 21, 2026) for the Belarusian president's response.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 real month-end closes from September 2021 through August 2026 taken from the unadjusted "Real Price" column at digrin.com, plus a final point at the September 21, 2026 settled close of $24.07. The July and August 2026 month-ends ($22.12, $24.12) were cross-checked against StockAnalysis daily rows. <strong>No interior months were reconstructed or estimated.</strong> Mosaic has not split its shares over the window. Market capitalisation ($7.65B), peer market caps, dividend yield, price/book, price-target upside and one-year change are our calculations at the September 21 closes. Industry-average and S&amp;P 500 benchmark columns are shown as "—" because no sourced values were obtained. Market-cap ranks, segment market shares, TAM, institutional holders and the Carlsbad sale proceeds were not sourced and are shown as "not sourced"/"n/v" or omitted. Executive remarks paraphrased from the call transcript are attributed, not quoted.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Sep 2021 → Aug 2026 (digrin.com unadjusted "Real Price") + Sep 21, 2026 settled close (stockanalysis.com) =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 21 26'];
+const prices = [35.72,41.57,34.22,39.29,39.95,52.43,66.50,62.42,62.65,47.23,52.66,53.87,48.33,53.75,51.30,43.87,49.54,53.19,45.88,42.85,31.96,35.00,40.76,38.85,35.60,32.48,35.89,35.73,30.71,31.16,32.46,31.39,30.93,28.90,29.77,28.57,26.78,26.76,26.46,24.58,27.89,23.92,27.01,30.40,36.14,36.48,36.01,33.40,34.68,27.45,24.49,24.09,27.50,27.84,25.50,23.27,23.90,21.19,22.12,24.12,24.07];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 6,  label: 'Mar 2022 — cycle peak $66.50 (FY22 EPS $10.06)',          color: '#22c55e' },
+  { idx: 9,  label: 'Jun 2022 — first crack, $47.23 (−24.6%)',                  color: '#ef4444' },
+  { idx: 20, label: 'May 2023 — $31.96 (−25.4%, largest monthly fall)',         color: '#ef4444' },
+  { idx: 39, label: 'Dec 2024 — $24.58, RSI 19.7 (most oversold)',              color: '#f59e0b' },
+  { idx: 45, label: 'Jun 2025 — recovery high $36.48',                          color: '#22c55e' },
+  { idx: 49, label: 'Oct 2025 — Q3 phosphate production miss; $27.45 (−20.8%)', color: '#ef4444' },
+  { idx: 57, label: 'Jun 2026 — sulfur squeeze; 5-yr low close $21.19',         color: '#ef4444' },
+  { idx: 60, label: 'Sep 21, 2026 — Belarus potash headline; close $24.07',     color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
