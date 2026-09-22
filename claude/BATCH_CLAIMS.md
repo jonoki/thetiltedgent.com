@@ -26,13 +26,6 @@ work, so the claim goes in first and the research goes second.
 ### sess-2026-09-22-r · claimed 2026-09-22 (local Claude Code session)
 DPZ DVA ERIE FDS FRT GDDY GL GNRC HAS HII
 
-### sess-2026-09-22-q · claimed 2026-09-22 (local Claude Code session)
-BAX BF.B BXP CF CLX COO CPT CRL CSGP DECK
-
-### sess-2026-09-22-p · claimed 2026-09-22 (local Claude Code session)
-MGM WYNN AES ALB ALGN ALLE AOS APTV ARE AVY
-- MGM and WYNN are casino operators: included at Oki's explicit instruction (22 Sep 2026), an exception to the no-gambling-operators voice rule for these two reports only.
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -101,6 +94,15 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-22-q · done 2026-09-22 (local Claude Code session)
+BAX BF.B BXP CF CLX COO CPT CRL CSGP DECK
+- All 10 published 22 Sep, each independently checked.
+
+### sess-2026-09-22-p · done 2026-09-22 (local Claude Code session)
+MGM WYNN AES ALB ALGN ALLE AOS APTV ARE AVY
+- MGM and WYNN are casino operators: included at Oki's explicit instruction (22 Sep 2026), an exception to the no-gambling-operators voice rule for these two reports only.
+- All 10 published 22 Sep, each independently checked.
 
 ### sess-2026-09-21-o · done 2026-09-22 (local Claude Code session)
 SOLV PTC DOC EG MAA IVZ AIZ TXT TYL REG
