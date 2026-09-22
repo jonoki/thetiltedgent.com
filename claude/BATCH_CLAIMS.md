@@ -23,10 +23,6 @@ work, so the claim goes in first and the research goes second.
 
 ## OPEN
 
-### sess-2026-09-22-t · claimed 2026-09-22 (local Claude Code session)
-NDSN PNR PNW PODD PPL PSKY SJM SWK SWKS TECH TRMB UDR UHS WY
-- The last 14 S&P 500 companies not covered (GOOG/FOX/NWS are second share classes of covered companies).
-
 ### sess-2026-09-08-a · claimed 2026-09-08T00:50Z, rebased 01:0xZ
 Ranks 300–333 by market cap, 25 names (the covered ones in that span are skipped):
 
@@ -95,6 +91,11 @@ WAT DHI ED SYY EL PEG MLM NTAP UAL KVUE KR EXPE TKO KMB HSY IRM STLD WEC EQT
 HBAN RJF NTRS
 
 ## DONE
+
+### sess-2026-09-22-t · done 2026-09-22 (local Claude Code session)
+NDSN PNR PNW PODD PPL PSKY SJM SWK SWKS TECH TRMB UDR UHS WY
+- All 14 published 22 Sep, each independently checked. With this batch every S&P 500 company has a report (GOOG/FOX/NWS are second share classes covered by GOOGL/FOXA/NWSA).
+- Follow-up: reports/wbd_analysis.html (data as of Sep 4) is stale on the Paramount deal and mislabels $110.9B as equity value (primary release: $81B equity / $110B EV) — needs a refresh.
 
 ### sess-2026-09-22-s · done 2026-09-22 (local Claude Code session)
 HRL HSIC IT JKHY LII LULU MAS MKC MOS NCLH
