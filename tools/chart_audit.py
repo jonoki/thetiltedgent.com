@@ -13,7 +13,7 @@ MON = {m: i+1 for i, m in enumerate('jan feb mar apr may jun jul aug sep oct nov
 YSYM = {'brkb': 'BRK-B', 'bfb': 'BF-B'}
 
 def arr(t, name):
-    m = re.search(r'const\s+' + name + r'\s*=\s*\[(.*?)\]', t, re.S)
+    m = re.search(r'(?:const|let|var)\s+' + name + r'\s*=\s*\[(.*?)\]', t, re.S)
     return m.group(1) if m else None
 
 def parse_label(s):
@@ -27,10 +27,10 @@ def parse_label(s):
     return None
 
 def yahoo(slug, tick):
-    p = os.path.join(C, slug + '.json')
+    p = os.path.join(C, slug + '.ev.json')
     if not os.path.exists(p):
         sym = YSYM.get(slug, tick.replace('.', '-'))
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6y&interval=1mo"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6y&interval=1mo&events=split"
         try:
             r = urllib.request.urlopen(urllib.request.Request(url, headers=H), timeout=30).read()
             open(p, 'wb').write(r); time.sleep(0.3)
@@ -47,7 +47,9 @@ def yahoo(slug, tick):
         if c is None: continue
         d = datetime.datetime.fromtimestamp(t_ + (res['meta'].get('gmtoffset') or 0), datetime.UTC)
         out[(d.year, d.month)] = (c, a)
-    return out, None
+    ev = sorted((datetime.datetime.fromtimestamp(int(k), datetime.UTC).date().isoformat(), v['numerator'] / v['denominator'])
+                for k, v in (res.get('events') or {}).get('splits', {}).items())
+    return out, ev
 
 d = json.load(open(os.path.join(R, 'data', 'reports.json'), encoding='utf-8'))
 only = set(sys.argv[1:])
@@ -57,23 +59,33 @@ for tick, slug, sec, asof, px in d['index']:
     t = open(os.path.join(R, 'reports', slug + '_analysis.html'), encoding='utf-8').read()
     L, P = arr(t, 'labels'), arr(t, 'prices')
     if not L or not P: rows.append({'slug': slug, 'err': 'arrays'}); continue
-    labels = [x for x in re.findall(r'["\'`]([^"\'`]*)["\'`]', L)]
+    labels = [a or b.replace("\\'", "'") or c for a, b, c in re.findall(r"\"([^\"]*)\"|'((?:\\'|[^'])*)'|`([^`]*)`", L)]
     prices = [float(x) for x in re.findall(r'-?\d+(?:\.\d+)?', P)]
-    yh, err = yahoo(slug, tick)
-    if yh is None: rows.append({'slug': slug, 'err': 'yahoo ' + err}); continue
+    yh, ev = yahoo(slug, tick)
+    if yh is None: rows.append({'slug': slug, 'err': 'yahoo ' + ev}); continue
+    # Yahoo's close is adjusted for every split it knows, including ones after the report's as-of
+    # (the report is on its as-of share basis) and spin-offs it books as fractional "splits"
+    # (a report may show the real pre-spin close). Both are a basis step, not a wrong point.
+    A = 1.0
+    for dt, r in ev:
+        if asof and dt > asof: A *= r
     asof_ym = tuple(int(x) for x in asof.split('-')[:2]) if asof else None
-    bad = []; n = 0; adjok = 0
+    bad = []; n = 0; adjok = 0; stepok = 0
     for lab, pr in zip(labels[:-1], prices[:-1]):   # last point is the as-of close, checked by verify.py
         ym = parse_label(lab)
         if not ym or ym not in yh or (asof_ym and ym >= asof_ym): continue
         n += 1
         c, a = yh[ym]
-        dev = (pr - c) / c
+        SPIN = 1.0
+        for dt, r in ev:
+            if dt[:7] > f'{ym[0]}-{ym[1]:02d}' and (not asof or dt <= asof) and 0.9 < r < 1.45 and r != 1: SPIN *= r   # spin-offs and capital returns book as small fractional splits; 3:2 and up are real splits
+        dev = (pr - c * A) / (c * A)
         if abs(dev) > 0.03:
-            if a and abs((pr - a) / a) <= 0.03: adjok += 1
-            else: bad.append((lab, pr, round(c, 2), round(dev * 100, 1)))
+            if a and abs((pr - a * A) / (a * A)) <= 0.03: adjok += 1
+            elif SPIN != 1.0 and (abs(pr / (c * A * SPIN) - 1) <= 0.03 or (a and abs(pr / (a * A * SPIN) - 1) <= 0.03)): stepok += 1
+            else: bad.append((lab, pr, round(c * A, 2), round(dev * 100, 1)))
     lab_adj = bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))
-    rows.append({'slug': slug, 'tick': tick, 'asof': asof, 'checked': n, 'bad': bad, 'adj_pts': adjok, 'adj_labelled': lab_adj})
+    rows.append({'slug': slug, 'tick': tick, 'asof': asof, 'checked': n, 'bad': bad, 'adj_pts': adjok, 'step_pts': stepok, 'splits_after_asof': A, 'adj_labelled': lab_adj})
 json.dump(rows, open(os.path.join(S, 'chart_audit.json'), 'w'), indent=0)
 errs = [r for r in rows if 'err' in r]
 flag = [r for r in rows if r.get('bad')]
@@ -81,6 +93,7 @@ unparsed = [r for r in rows if 'err' not in r and r['checked'] < 30]
 adj_unl = [r for r in rows if r.get('adj_pts', 0) >= 10 and not r.get('adj_labelled')]
 print('reports', len(rows), '| errors', len(errs), '| WRONG points >3% vs both close and adjclose:', len(flag), '| dividend-adjusted but unlabelled:', len(adj_unl), '| <30 comparable', len(unparsed))
 print('ADJ-UNLABELLED', [r['slug'] for r in adj_unl])
+print('BASIS STEPS (pre-spin real closes / split after as-of; not errors)', [(r['slug'], r['step_pts'], r['splits_after_asof']) for r in rows if r.get('step_pts') or r.get('splits_after_asof', 1) != 1])
 for r in sorted(flag, key=lambda r: -len(r['bad']))[:60]:
     worst = max(r['bad'], key=lambda b: abs(b[3]))
     print(f"{r['slug']:6} as-of {r['asof']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")

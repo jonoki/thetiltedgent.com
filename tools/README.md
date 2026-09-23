@@ -50,3 +50,10 @@ lists series that are dividend-adjusted without saying so. Read-only on the
 repo; caches Yahoo responses under `$TEMP/ttg_chart_audit/`. Required at 0
 wrong points on every new build and every refresh (see `claude/briefs/`).
 The 22 Sep 2026 run found reconstructed month-ends on ~60 live reports.
+
+Two basis steps are not errors and are listed separately as BASIS STEPS: a
+split dated after the report's as-of (the report stays on its as-of share
+basis, so Yahoo's close is scaled back up), and a real pre-spin close where
+Yahoo books the spin-off as a small fractional split (IP, T, WDC, MMM …).
+Before 23 Sep 2026 the parser skipped charts declared with `var`/`let` or with
+labels like `'Sep \'21'` / `"Oct '21"`, so 13 reports were never audited.

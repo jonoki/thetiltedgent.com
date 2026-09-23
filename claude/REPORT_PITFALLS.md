@@ -23,6 +23,7 @@ The single most damaging error: it is invisible to `verify.py` (which only check
 - Every point is a real month-end close from a fetched source (digrin "Real price" or Yahoo monthly Close). Never type a value.
 - One basis for the whole series, consistent with the header price. Splits always adjusted; dividends not (or labelled if so); spin-offs either adjusted or explicitly labelled "not spin-adjusted" with the gap shown.
 - Run `py -3 tools/chart_audit.py <slug>` before handing back. Target: 0 points >3% off Yahoo close/adjclose.
+- A point within 3% is not proof: the 23 Sep 2026 fix pass found ~960 points in 54 reports more than 0.6% off both bases (typed values that happened to sit near the truth). Copy values from the source; never round or estimate.
 
 ## B. Information dated after the banner date — seen in ~25 reports
 The next session's live pages are intraday. Examples: PEG, forward P/E, 52-week change, P/B, market cap read on Sep 22 for a Sep 21 banner; peer market caps at Sep 22 prices; analyst calls dated after the banner (TYL Evercore Sep 22, EG RBC Sep 22, CSCO Piper Sep 22, ADI Bernstein Sep 22); the consensus average changed by a next-day action.
@@ -76,6 +77,8 @@ PNW said O&M rose faster than rates (it fell); AVY and TJX said the stock fell a
 ## I. Data-site traps
 - stockanalysis: the current session's row has no Adj. Close until settled — never use it; live fields are intraday; fiscal-year labels can run a year ahead; odd dates (a Saturday month-end row); analyst name glitches.
 - digrin: header price stale (use the table); some tickers live under a different symbol (BF-B not BF.B; old P = Pandora); the "Adjusted" column is dividend-adjusted.
+- digrin "Real price" is **not split-adjusted** (23 Sep 2026: KLAC May-22 shows $364.85 vs split-adjusted $36.49 after the 10:1; NOW 5:1, NFLX 10:1, AMZN/GOOGL 20:1 the same). Divide every pre-split month by the split ratio before charting, or chart Yahoo's close and use digrin only as the cross-check.
+- Yahoo books spin-offs and capital returns as small fractional "splits" (IP 1.056 Sylvamo, T 1.324 WBD, WDC 1.323 SanDisk, MMM 1.196 Solventum) and back-adjusts its close for them — a real pre-spin close will not match Yahoo's close. Yahoo also re-bases the whole history for splits dated after a report's as-of (APH 2:1 on 1 Sep 2026): the report stays on its as-of share basis. `tools/chart_audit.py` knows both since 23 Sep and lists them as BASIS STEPS, not errors.
 - Wikipedia: add dates can be placeholders (1957/1978/1987) or weekends.
 - Yahoo v8 chart API close = split-adjusted, adjclose = + dividends.
 - Nasdaq earnings calendar: past dates show "time-not-supplied" — confirm pre/after-market on the company release.
