@@ -23,6 +23,8 @@ The single most damaging error: it is invisible to `verify.py` (which only check
 - Every point is a real month-end close from a fetched source (digrin "Real price" or Yahoo monthly Close). Never type a value.
 - One basis for the whole series, consistent with the header price. Splits always adjusted; dividends not (or labelled if so); spin-offs either adjusted or explicitly labelled "not spin-adjusted" with the gap shown.
 - Run `py -3 tools/chart_audit.py <slug>` before handing back. Target: 0 points >3% off Yahoo close/adjclose.
+- After changing any chart point, sweep the page's text (prose, timeline, `events` labels, cards) for the OLD value to the cent and fix every month-end use; leave dated daily closes, moving averages and targets that merely share the number. On 23 Sep 2026 diffs alone missed ~110 stale mentions across 40 reports.
+- Compare price return with price return: the S&P/SPY comparator must be its price return over the same window (SPY month-end close → banner-date close), never its total return against the stock's price return (FCX, MET, APD, BAC, MTB were all off by 8–12 points).
 - A point within 3% is not proof: the 23 Sep 2026 fix pass found ~960 points in 54 reports more than 0.6% off both bases (typed values that happened to sit near the truth). Copy values from the source; never round or estimate.
 
 ## B. Information dated after the banner date — seen in ~25 reports
