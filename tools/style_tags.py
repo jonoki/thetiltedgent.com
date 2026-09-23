@@ -161,7 +161,9 @@ def main():
     N = {'pe': len(pe_sp), 'revg': len(g_sp), 'yield': len(y_sp), 'fcf_yield': len(f_sp), 'beta': len(b_sp), 'roic': len(q_sp)}
 
     def asof(d):
-        return f" Figures as of {d['as_of']}."
+        import datetime
+        x = datetime.date.fromisoformat(d['as_of'])
+        return f" Figures as of {x:%b} {x.day}, {x.year}."
 
     for d in live:
         tags = []
