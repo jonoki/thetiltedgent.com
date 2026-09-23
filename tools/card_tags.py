@@ -9,6 +9,8 @@ Per report slug:
   ed   [latest edition date, previous edition date, previous price] when the report has been refreshed
   ln   one-line hook (claude/card_lines.json; empty until written)
   sp   [year, sentence] overriding the S&P 500 badge's year and tooltip (SP_NOTE below)
+  hw   ♥ what you know them for, th ♠ big themes, pp ★ key people: [label, tooltip(, since YYYY-MM)] from claude/hand_tags.json
+  lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
 """
 import glob, html, json, os, re
@@ -65,6 +67,10 @@ def main():
     style = {d['slug']: d for d in json.load(open(os.path.join(R, 'data', 'style_tags.json'), encoding='utf-8'))['reports']}
     lines_p = os.path.join(R, 'claude', 'card_lines.json')
     lines = json.load(open(lines_p, encoding='utf-8')) if os.path.exists(lines_p) else {}
+    hand_p = os.path.join(R, 'claude', 'hand_tags.json')        # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
+    hand = json.load(open(hand_p, encoding='utf-8')) if os.path.exists(hand_p) else {}
+    logos_p = os.path.join(R, 'assets', 'logos', 'index.json')   # logo files + where each came from
+    logos = json.load(open(logos_p, encoding='utf-8')) if os.path.exists(logos_p) else {}
     man = {}
     for f in sorted(glob.glob(os.path.join(R, 'data', 'reports', '*.json'))):
         shard = os.path.basename(f)[:-5]
@@ -93,6 +99,16 @@ def main():
             c['ln'] = lines[slug]
         if slug in SP_NOTE:
             c['sp'] = SP_NOTE[slug]
+        h = hand.get(slug) or {}
+        for k in ('hw', 'th'):
+            if h.get(k):
+                c[k] = h[k]
+        if h.get('pp'):
+            # a New CEO tag carries its start month so the page can drop it after two years
+            c['pp'] = [p + [h['since']] if (p[0] == 'New CEO' and h.get('since')) else p for p in h['pp']]
+        lg = logos.get(slug) or {}
+        if lg.get('ext') and os.path.exists(os.path.join(R, 'assets', 'logos', f"{slug}.{lg['ext']}")):
+            c['lg'] = f"../assets/logos/{slug}.{lg['ext']}"
         out[slug] = c
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
     p = os.path.join(R, 'data', 'card_tags.json')
@@ -101,7 +117,8 @@ def main():
     print(f'{len(out)} cards -> {os.path.relpath(p, R)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
     print('no HQ tag:', no_hq)
-    print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()))
+    print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()),
+          ' hand tags:', sum('hw' in c for c in out.values()), ' logos:', sum('lg' in c for c in out.values()))
 
 
 if __name__ == '__main__':

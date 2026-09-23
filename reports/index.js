@@ -209,6 +209,9 @@
   var ICON={
     list:'<circle cx="12" cy="6.6" r="4.3"/><circle cx="6.6" cy="13.4" r="4.3"/><circle cx="17.4" cy="13.4" r="4.3"/><path d="M11 12h2l1.6 9.2H9.4z"/>',
     cash:'<path d="M12 1.8 20.2 12 12 22.2 3.8 12z"/>',
+    what:'<path d="M12 21.2S2.6 14.9 2.6 8.6A4.9 4.9 0 0 1 12 6.4a4.9 4.9 0 0 1 9.4 2.2c0 6.3-9.4 12.6-9.4 12.6z"/>',
+    theme:'<path d="M12 1.8S2.8 8.6 2.8 13.9a4.6 4.6 0 0 0 8.1 3l-1.5 4.9h5.2l-1.5-4.9a4.6 4.6 0 0 0 8.1-3C21.2 8.6 12 1.8 12 1.8z"/>',
+    who:'<path d="m12 2 2.95 6.3 6.9.8-5.1 4.75 1.35 6.85L12 17.3l-6.1 3.4 1.35-6.85-5.1-4.75 6.9-.8z"/>',
     where:'<path d="M12 2.6 1.8 11.4h2.9V21.4h5.6v-6.2h3.4v6.2h5.6V11.4h2.9L18.9 8.4V4.2h-2.6v1.9z"/>',
     'new':'<circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 7v5.4l3.6 2.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
     style:'<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3.2 2.6"/><circle cx="12" cy="12" r="5.2"/>'
@@ -231,6 +234,15 @@
 
   function decorate(card,c){
     c=c||{};
+    // take the link off the card and lay it over the card instead ("stretched link"), with tags stacked above it:
+    // a tap on a tag or on +N then never reaches the link, whatever else is listening for link clicks
+    var href=card.getAttribute('href');
+    if(href){
+      var tk=(card.querySelector('.tick')||{}).textContent||'';
+      var extra=(card.getAttribute('target')?' target="'+card.getAttribute('target')+'"':'')+(card.getAttribute('rel')?' rel="'+card.getAttribute('rel')+'"':'');
+      card.removeAttribute('href'); card.removeAttribute('target'); card.removeAttribute('rel');
+      card.insertAdjacentHTML('afterbegin','<a class="stretch" href="'+href+'"'+extra+' aria-label="Read the '+esc(tk.trim())+' report"></a>');
+    }
     // index badges become club tags with a tooltip
     [].forEach.call(card.querySelectorAll('.ix'),function(ix){
       var b=ix.querySelector('b'), label=b.textContent, iso=ix.getAttribute('data-iso'), tip;
@@ -247,21 +259,46 @@
       ix.setAttribute('aria-label',ix.textContent.trim()+': '+tip);
       ix.insertAdjacentHTML('afterbegin',icon('list'));
     });
+    if(c.lg){
+      var tk=card.querySelector('.tick');
+      if(tk) tk.insertAdjacentHTML('afterend','<span class="logo" aria-hidden="true"><img alt="" loading="lazy" src="'+c.lg+'"></span>');
+      card.classList.add('has-logo');
+    }
     if(c.ln){
       var sect=card.querySelector('.sect');
-      if(sect) sect.insertAdjacentHTML('afterend','<p class="line">'+esc(c.ln)+'</p>');
+      if(sect) sect.insertAdjacentHTML('afterend','<div class="play"><span class="play-k"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" width="10.5" height="14.5" rx="1.8" transform="rotate(-13 8.5 12.2)"/><rect x="10" y="3.6" width="10.5" height="14.5" rx="1.8" transform="rotate(11 15.2 10.8)" class="f"/></svg>Their hand</span><p class="line">'+esc(c.ln)+'</p></div>');
     }
-    var h='';
+    // collect tags by family, in priority order; index badges (clubs) are separate and always shown
+    var fams={what:[],theme:[],who:[],'new':[],style:[],cash:[],where:[]}, ORDER=['what','theme','who','new','style','cash','where'];
+    (c.hw||[]).forEach(function(x){ fams.what.push(tagHtml('what',x[0],x[1])); });
+    (c.th||[]).forEach(function(x){ fams.theme.push(tagHtml('theme',x[0],x[1])); });
+    (c.pp||[]).forEach(function(x){
+      // "New CEO" expires two years after the start month the tag was built with
+      if(x[0]==='New CEO' && x[2] && (NOW-Date.parse(x[2]+'-01T00:00:00Z'))/864e5>730) return;
+      fams.who.push(tagHtml('who',x[0],x[1]));
+    });
     if(c.ed && (NOW-Date.parse(c.ed[0]+'T00:00:00Z'))/864e5<=60)
-      h+=tagHtml('new','Updated','Refreshed '+when(c.ed[0])+', replacing the edition of '+nice(c.ed[1])+' (then $'+(+c.ed[2]).toFixed(2)+'). The report opens with what changed.');
+      fams['new'].push(tagHtml('new','Updated','Refreshed '+when(c.ed[0])+', replacing the edition of '+nice(c.ed[1])+' (then $'+(+c.ed[2]).toFixed(2)+'). The report opens with what changed.'));
     var income=false;
-    (c.st||[]).forEach(function(s){ if(s[0]==='Income') income=true; h+=tagHtml('style',s[0],s[1]); });
-    if(c.dv===0) h+=tagHtml('cash','No dividend','Pays no dividend, so shareholders gain only if the share price rises.');
-    else if(c.dv>0 && !income) h+=tagHtml('cash','Dividend','Pays a dividend of about $'+c.dv.toFixed(2)+' a year per $100 invested ('+c.dv.toFixed(2)+'% yield).');
-    if(c.hq) h+=tagHtml('where',c.hq[0],'Head office: '+c.hq[1]+'. This tag is about home base only; many companies earn much of their money abroad.');
-    if(h){
+    (c.st||[]).forEach(function(s){ if(s[0]==='Income') income=true; fams.style.push(tagHtml('style',s[0],s[1])); });
+    if(c.dv===0) fams.cash.push(tagHtml('cash','No dividend','Pays no dividend, so shareholders gain only if the share price rises.'));
+    else if(c.dv>0 && !income) fams.cash.push(tagHtml('cash','Dividend','Pays a dividend of about $'+c.dv.toFixed(2)+' a year per $100 invested ('+c.dv.toFixed(2)+'% yield).'));
+    if(c.hq) fams.where.push(tagHtml('where',c.hq[0],'Head office: '+c.hq[1]+'. This tag is about home base only; many companies earn much of their money abroad.'));
+    // pick up to MAX: one from each family in turn, then a second round, so the visible set spans families
+    var MAX=6, picked={}, n=0, round=0, more=true;
+    while(n<MAX && more){
+      more=false;
+      ORDER.forEach(function(f){ if(n<MAX && fams[f].length>round){ picked[f]=(picked[f]||0)+1; n++; } if(fams[f].length>round+1) more=true; });
+      round++;
+    }
+    var shown='', hidden='', extra=0;
+    ORDER.forEach(function(f){ fams[f].forEach(function(html,k){
+      if(k<(picked[f]||0)) shown+=html; else { hidden+=html.replace('class="tg t','class="tg t x'); extra++; }
+    }); });
+    if(shown||hidden){
+      var more_=extra?'<span class="tg-more" role="button" tabindex="0" aria-expanded="false" aria-label="Show '+extra+' more tags">+'+extra+'</span>':'';
       var row=card.querySelector('.ixrow');
-      (row||card.querySelector('.sect')).insertAdjacentHTML('afterend','<span class="tags">'+h+'</span>');
+      (row||card.querySelector('.sect')).insertAdjacentHTML('afterend','<span class="tags">'+shown+hidden+more_+'</span>');
     }
   }
 
@@ -286,12 +323,18 @@
   document.addEventListener('mouseout',function(e){if(tagOf(e)&&!pinned){tip.hidden=true;cur=null;}});
   document.addEventListener('focusin',function(e){var el=tagOf(e); if(el) show(el);});
   document.addEventListener('focusout',function(e){if(tagOf(e)) hide();});
+  function toggleMore(m){ var box=m.parentNode, on=!box.classList.contains('all');
+    box.classList.toggle('all',on); m.setAttribute('aria-expanded',on); m.textContent=on?'less':'+'+box.querySelectorAll('.x').length; }
   document.addEventListener('click',function(e){
+    var m=e.target.closest&&e.target.closest('.tg-more');
+    if(m){e.preventDefault(); e.stopPropagation(); toggleMore(m); return;}
     var el=tagOf(e);
     if(el){e.preventDefault(); e.stopPropagation(); if(pinned===el) hide(); else {pinned=el; show(el);} return;}
     if(pinned) hide();
   },true);
   document.addEventListener('keydown',function(e){
+    var m=e.target.closest&&e.target.closest('.tg-more');
+    if(m&&(e.key==='Enter'||e.key===' ')){e.preventDefault(); toggleMore(m); return;}
     var el=tagOf(e);
     if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault(); if(pinned===el) hide(); else {pinned=el; show(el);}}
     else if(e.key==='Escape') hide();

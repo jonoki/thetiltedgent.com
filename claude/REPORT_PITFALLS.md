@@ -83,6 +83,23 @@ PNW said O&M rose faster than rates (it fell); AVY and TJX said the stock fell a
 ## J. Build hygiene (caught by the gate, but costs a cycle)
 A `<title>` tag copied from another report: on 21 Sep, `cboe_analysis.html` shipped titled "PCG — PG&E" and `mtd_analysis.html` titled "CBOE — Cboe" (the bodies were correct). The manifest reads tickers from titles, so the error spread into data. verify.py now fails any report whose title ticker doesn't match its slug. Orchestrators: judge a report by its body and hero, never by the title alone. On 22 Sep that mistake nearly launched a rebuild over a good MTD report. The manifest can also duplicate records into `unclassified.json` (AWK CINF CPAY FFIV Q WRB). Missing `</head>` (≈10 builders), P/E row not labelled exactly `Trailing P/E` (verify can't check it), `.fin-scroll` wrapper missing, red/red-orange accents on older pages (PANW TJX AVGO ORCL ADBE — do not recolour without Oki), mojibake from pasted characters, a checker recolouring an accent unasked.
 
+## K. Card lines ("Their hand" one-liners) — 23 Sep 2026 run: 339 of 494 drafts needed fixing
+Writers (Sonnet, one per ~38 companies, working only from each report's hero + sections 01–03 extract) marked all their lines OK. Independent checkers fixed 69%.
+
+| Error | Share of fixes (approx.) | Examples |
+|---|---|---|
+| Event or deal hook instead of the business model | ~30% | pending mergers (MKC/UL, PSKY/WBD, SWKS/QRVO), dividend cut (BAX), breakup fees (NSC, WTW), spin-offs (FDXF, SOLV, APTV), one quarter's loss (MOS, SPCX) |
+| Fact not in the extract, or overstated | ~35% | KHC "$22B write-off", MAS "a third via Home Depot", IBM "100% of mainframes", SO "owns" Vogtle (45.7% stake), CAH "most of America's drugs" (one of three), GEHC 30% "of profit" (it was margin), COIN "nearly half" (a fifth to a quarter) |
+| One-quarter figure presented as permanent, or "now"/"just"/"is buying" | ~20% | DIS, TRV, RCL, SHOP, HPQ, J |
+| Trivia rather than the business | ~10% | EL family votes, NDAQ can't join its own index, TYL iron-pipe origins |
+| Jargon, two dashes, over length | ~5% | P&L, net inventory, 123 characters |
+
+**Rules** (in `claude/briefs/CARDLINE.md` and the checker brief)
+- Never trust a writer's OK. Every line gets an independent check against the extract, with length counted by `len()`.
+- The hook must be how the money comes in. Deals, cuts, lawsuits, single quarters and trivia are out.
+- Parallel agents sharing a scratch folder must use unique file and script names. On 23 Sep one checker ran another's `chk_build.py` by name collision.
+- Some errors were in the reports themselves (e.g. GEHC's report mixes up margin and profit share). Log these for the next refresh.
+
 ---
 
 ## Retro protocol (run at the end of every recurring run)
