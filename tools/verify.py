@@ -64,8 +64,16 @@ def check(path):
     date = re.search(r'Static data as of ([A-Za-z]+ \d+, \d{4})', t)
     out['date'] = date.group(1) if date else None
     out['sitenav'] = t.count('tg-sitenav')
+    # the <title> ticker must match the file's slug: on 21 Sep 2026 a builder wrote the Cboe report into
+    # mtd_analysis.html and a PG&E copy into cboe_analysis.html, and every other check passed
+    slug = os.path.basename(path).replace('_analysis.html', '')
+    tt = re.search(r'<title>\s*([A-Z][A-Z0-9.\-]*)\s*[—–-]|<title>[^<]*\(([A-Z][A-Z0-9.\-]*)\)', t)
+    out['title_ticker'] = (tt.group(1) or tt.group(2)) if tt else None
+    norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
+    out['title_ok'] = norm(out['title_ticker']) == norm(slug)
     ok = all(out[k] == 1 for k in ['doctype', 'html', 'head', '/head', 'body', '/body', '/html']) and out['canvas'] == 2 and out['style_open'] == out['style_close'] \
-        and out['price_match'] and out['n_labels'] == out['n_prices'] and out['sitenav'] == 0 and out.get('range_ok', True)
+        and out['price_match'] and out['n_labels'] == out['n_prices'] and out['sitenav'] == 0 and out.get('range_ok', True) \
+        and out['title_ok']
     out['OK'] = ok
     return out
 
@@ -76,4 +84,4 @@ if __name__ == '__main__':
         flag = 'PASS' if o['OK'] else 'FAIL'
         print(f"{flag} {os.path.basename(f):22s} price={o['price']} last={o.get('last_price')} n={o['n_labels']}/{o['n_prices']} "
               f"skel={o['doctype']}{o['html']}{o['head']}{o['body']}{o['/body']}{o['/html']} canvas={o['canvas']} lines={o['lines']} "
-              f"pe={o.get('pe_stated')}/{o.get('pe_calc')} range={o.get('range_ok')} date={o['date']}")
+              f"pe={o.get('pe_stated')}/{o.get('pe_calc')} range={o.get('range_ok')} date={o['date']} title={o['title_ticker']}")

@@ -15,8 +15,9 @@ R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(R, 'tools'))
 from manifest import parse_index_cards  # noqa: E402
 
-# Reports whose file does not hold the company its name says (found 22 Sep 2026); excluded until fixed.
-EXCLUDE = {'cboe': 'file holds a PG&E report', 'mtd': 'file holds the Cboe report; no Mettler-Toledo report exists'}
+# Reports to leave out of tagging, slug -> reason. Empty: CBOE and MTD were excluded on 22 Sep 2026 over
+# swapped <title> tags (bodies were correct); titles fixed the same day.
+EXCLUDE = {}
 # Quality is not meaningful for balance-sheet businesses (Oki, 22 Sep 2026).
 NO_QUALITY = re.compile(r'\bBANK|INSURANCE|REIT\b', re.I)
 # Free cash flow is not meaningful for lenders, insurers and brokers (customer money flows through it).
