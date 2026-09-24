@@ -16,6 +16,9 @@ Read `reports/ctsh_analysis.html` in full and copy its CSS, components (static-d
 - Companies and projects (Oki, 24 Sep 2026): "For analysis purposes, any company is fair game." Holders, key projects and peers are chosen on the stated measure alone — no exclusion for betting, prediction-market, lottery or gambling businesses. Describe each factually by what it does.
 - LF line endings, UTF-8, no "tg-sitenav".
 
+## PRIVACY — read first (hard rule)
+Never put the owner's name, email or any personal data in any request: not in User-Agent or other headers, query strings, or bodies. Do not read `git config user.email` or similar into a request. sec.gov refuses curl without a contact User-Agent — use WebFetch for sec.gov instead; never "fix" a 403 by adding contact details. (A fix agent sent the owner's email in a sec.gov User-Agent on 24 Sep 2026, the second time after 21 Sep.)
+
 ## Rules from the pilot checker rounds (23–24 Sep 2026 — hard rules, all families)
 - **No hedge caveats in user-facing text** (Oki, 22 Sep): never "not confirmed", "unconfirmed", "not checked", "could not be fetched", "no later … found". A figure you cannot confirm on a fetched page is "n/v"; a statement you cannot confirm is removed. Process notes go in your Return, not on the page.
 - **Nothing read after the banner date.** If a figure (e.g. a rich list) can only be read after it, it is n/v.
