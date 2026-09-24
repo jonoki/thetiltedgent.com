@@ -27,6 +27,12 @@ Read `reports/ctsh_analysis.html` in full and copy its CSS, components (static-d
 - **Look-through sums:** say whether cash lines are included.
 - **Primary-source routes that work from this machine:** sec.gov EDGAR filings via WebFetch; api.congress.gov/v3/bill/…/actions?api_key=DEMO_KEY (congress.gov itself returns 403); Treasury CSV/XML and TreasuryDirect TA_WS JSON via curl; mempool.space and blockchain.info APIs; DefiLlama API; issuer pages vary (iShares US holdings JS-only; Grayscale/WisdomTree/Morgan Stanley 403; use 10-Qs). FRED CSV often hangs — optional.
 - **Shell:** never run `py -3 -` without a heredoc (hangs); run scripts from files.
+- **Enumerate, don't remember (ETH round, 24 Sep):** list US spot ETFs and corporate holders from an EDGAR full-text search of 10-Qs/8-Ks, not from memory (ETHB, BTCS, Galaxy were missed); state the set's basis on the page ("companies named here; others also hold …").
+- **Staking wording:** "Does not stake" only when a filing says so; otherwise "No staking disclosed".
+- **Canadian MERs:** ETF Facts carry the prior fiscal-year MER — use the latest MRFP / fund-profile MER with its period.
+- **Price series gaps:** Yahoo can drop the latest settled bar (and ^GSPC rows); use the latest non-null bar, `range=` queries over `period1/period2`, Coinbase as fallback for crypto, and matched month-ends only for cross-asset stats.
+- **Crypto hero/metrics for proof of stake:** "Max supply: none" convention; security measure = amount staked (not hash rate).
+- **Gambling-linked holders:** a company whose current or former business is betting (e.g. SharpLink, formerly SharpLink Gaming) is excluded until Oki rules (open question, 24 Sep).
 
 ## ETF family — `reports/etf/<slug>_analysis.html`
 Identity: confirm on the issuer's page the fund name, ticker, exchange, currency, inception, index.
