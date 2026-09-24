@@ -47,6 +47,21 @@ Hero meta: MER · AUM (net assets) · Holdings · Distribution yield (state whic
 - 08 Summary & Key Risks — case-cards "What helps it" / "What hurts it" (market conditions, not forecasts); Top 3 Risks.
 - Category Commentary — the product category, factual. Disclaimer.
 
+### ETF batch rules (Oki approved the XEQT pilot, 24 Sep)
+- Reference build: `reports/etf/xeqt_analysis.html` — match its structure, components, charts and depth; pick your own accent.
+- Currency = listing currency (US-listed: USD, risk-free = U.S. 3-month Treasury par yield ÷ 12 at the prior month-end; TSX-listed: CAD, risk-free = Bank of Canada V122531 ÷ 12). Say which.
+- Adapt slot content to the fund type, keeping the 8 slots:
+  - **Equity index fund** (e.g. S&P 500, total market, Nasdaq-100, developed/emerging): 02 = sector bars, region/country seg-bar (or market-cap/style mix for single-country funds), top-10 holdings, biz-cards for the top sectors.
+  - **Fund of funds / asset allocation**: as XEQT (underlying-fund seg-bar instead of a trivial asset-class bar).
+  - **Bond fund**: 02 = sector (Treasury / agency MBS / corporate …), credit-quality seg-bar, maturity buckets, top-10 holdings; 04 adds SEC yield (US) or yield to maturity, effective/option-adjusted duration, average maturity, all dated from the issuer; beta vs S&P 500 still computed but also give correlation; 07 relative performance vs its index and vs the S&P 500.
+  - **Commodity (gold/silver) trust**: 02 = what it holds (ounces/tonnes of bullion, custodian, vault location, bar-list note) instead of sectors; 04 = NAV per share in metal, expense ratio, tracking vs the metal price; relative performance vs the metal price and the S&P 500.
+  - **Dividend / factor fund**: 02 adds the index's selection rules (from the index provider's methodology page).
+- Fees: US "expense ratio" (and any fee waiver with end date) vs Canadian "MER" (latest MRFP/fund profile with period). Every fee with its source document and date; peers too.
+- Peers (05): 3–4 funds tracking the same or a close index/category; state the basis for choosing them; overlap only when computable from published holdings; no verdict.
+- Wording: "U.S. companies" (by the issuer's location field), not "U.S.-listed"; say whether look-through or sector sums include cash lines.
+- Returns: issuer-published NAV returns with their as-of date; your 5-yr stats from monthly total returns (issuer NAV total-return series if published, else Yahoo `adjclose`, labelled). Funds younger than 5 years: say so in the heading and use the available window.
+- Useful data routes: iShares CA pages embed `priceData`/`navData`/`performanceData` and a `tab=lookthrus` JSON; US issuer holdings pages are often JavaScript-only — use their downloadable holdings CSV/XLSX if reachable, else the fund's latest N-PORT on EDGAR, else the fact sheet top-10.
+
 ## Crypto family — `reports/crypto/<slug>_analysis.html`
 Price = USD close of the banner date (UTC day). Monthly chart = UTC month-end closes.
 Hero meta: Market cap · Circulating supply · Max supply · Launch year.
@@ -59,6 +74,13 @@ Hero meta: Market cap · Circulating supply · Max supply · Launch year.
 - 07 5-Year Price Analysis — Chart 1 `priceChart`: monthly closes + MAs, with a button toggling a log y-axis. Chart 2 `drawdownChart`. Inflection points; Relative performance vs S&P 500.
 - 08 Summary & Key Risks — Bull / Bear case-cards; Top 3 Risks.
 - Sector Commentary. Disclaimer.
+
+### Crypto batch rules (Oki, 24 Sep: "thin on why it matters", "too dense / too long")
+- Reference builds: `reports/crypto/btc_analysis.html`, `eth_analysis.html` — same slots and components, plus:
+- **"In brief — why it matters"** box at the top of 01, before the history: 5 bullets — (1) what it is used for today, with sourced numbers; (2) the adoption story in 2–3 dated facts; (3) what moves its price: supply schedule, flows (ETFs, treasuries, the issuer/exchange behind it), link to broad risk appetite (your computed beta/correlation); (4) competition — the alternatives it competes with; (5) the main open question, one line. Descriptive, never a buy/sell view; every bullet sourced or computed.
+- 08 Summary becomes a synthesis ("what would change the picture"), not a repeat of figures.
+- **Visible length ≈ 2,500 words.** Keep every verified fact, but put sourcing notes, method detail and long lists in `<details class="more"><summary>…</summary>…</details>` blocks, closed by default: holdings beyond the top 5, the full ETF table, regulatory history beyond current-status rows, method notes. Inflection points: 4. Card notes: one line. Style `details.more` to match the page (summary in the mono kicker style, accent-coloured marker); it must work without JS and print open.
+- For a token tied to a company or exchange (e.g. BNB — Binance; XRP — Ripple): state the relationship from primary sources (the issuer's own pages, filings, court records); enforcement actions and settlements go in the regulatory table with docket/release links.
 
 ## Bond & cash family — `reports/fixed/<slug>_analysis.html`
 Source hierarchy: U.S. Treasury (home.treasury.gov daily par yield curve, TreasuryDirect auction results), FRED, Federal Reserve; Bank of Canada Valet for Canadian series.
@@ -73,6 +95,14 @@ Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name t
 - 07 5-Year Yield Analysis — Chart 1 `priceChart`: month-end yields + MAs. Chart 2 `sensChart`: % price change for yield shifts −3% to +3% in 0.25% steps, ΔP/P ≈ −D·Δy + ½·C·Δy² (computed in the script from the fin-table values). Inflection points.
 - 08 Summary & Key Risks — case-cards "When it does well" / "When it does poorly" (mechanical: yields falling/rising, inflation surprises); Top 3 Risks.
 - Rates Commentary. Disclaimer.
+
+### Fixed-income batch rules (24 Sep)
+- Reference build: `reports/fixed/ust10y_analysis.html` — same slots, components and charts, but a **quick report: at most ~1,800 words of visible text** (half the pilot). Each section a short paragraph plus its table/cards; keep both 07 charts and the 02 curve.
+- **T-bill**: no coupon — show the auction's discount rate and investment rate (bond-equivalent) from TreasuryDirect, and the par yield from the daily curve (header); duration ≈ time to maturity, convexity negligible — say so; sensChart still drawn.
+- **TIPS**: header = the par REAL yield (Treasury daily par real yield curve); also nominal and breakeven for the banner date; CPI indexation and the deflation floor from TreasuryDirect's own pages; on-the-run TIPS from TreasuryDirect.
+- **Government of Canada**: Bank of Canada Valet benchmark bond yields (name the series id), GoC auction results from the Bank of Canada, currency CAD; policy expectations = the latest Monetary Policy Report (no dot plot); ratings n/v unless the agency's own page is readable; Canadian tax facts only if sourced (CRA).
+- Ratings: n/v unless the agency's own page is readable (Moody's usually is). No press-report ratings.
+- verify.py accepts 3 canvases for files under `reports/fixed/`.
 
 ## Verify
 - Extract the `<script>` bodies to `$TEMP/ttg_<slug>/` and `node --check` each.

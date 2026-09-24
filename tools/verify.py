@@ -71,7 +71,9 @@ def check(path):
     out['title_ticker'] = (tt.group(1) or tt.group(2)) if tt else None
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
     out['title_ok'] = norm(out['title_ticker']) == norm(slug)
-    ok = all(out[k] == 1 for k in ['doctype', 'html', 'head', '/head', 'body', '/body', '/html']) and out['canvas'] == 2 and out['style_open'] == out['style_close'] \
+    # bond/cash reports (reports/fixed/) carry a third canvas: the yield curve in section 02
+    want_canvas = 3 if re.search(r'[\\/]fixed[\\/]', os.path.abspath(path)) else 2
+    ok = all(out[k] == 1 for k in ['doctype', 'html', 'head', '/head', 'body', '/body', '/html']) and out['canvas'] == want_canvas and out['style_open'] == out['style_close'] \
         and out['price_match'] and out['n_labels'] == out['n_prices'] and out['sitenav'] == 0 and out.get('range_ok', True) \
         and out['title_ok']
     out['OK'] = ok
