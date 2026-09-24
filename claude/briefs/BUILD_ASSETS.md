@@ -32,7 +32,7 @@ Read `reports/ctsh_analysis.html` in full and copy its CSS, components (static-d
 - **Canadian MERs:** ETF Facts carry the prior fiscal-year MER — use the latest MRFP / fund-profile MER with its period.
 - **Price series gaps:** Yahoo can drop the latest settled bar (and ^GSPC rows); use the latest non-null bar, `range=` queries over `period1/period2`, Coinbase as fallback for crypto, and matched month-ends only for cross-asset stats.
 - **Crypto hero/metrics for proof of stake:** "Max supply: none" convention; security measure = amount staked (not hash rate).
-- **Gambling-linked holders:** a company whose current or former business is betting (e.g. SharpLink, formerly SharpLink Gaming) is excluded until Oki rules (open question, 24 Sep).
+- **Gambling-linked holders:** SharpLink is included (Oki, 24 Sep), described only by its current treasury business from its own filing, former name and betting links not mentioned. Any other holder with a betting business or history: ask Oki before naming it.
 
 ## ETF family — `reports/etf/<slug>_analysis.html`
 Identity: confirm on the issuer's page the fund name, ticker, exchange, currency, inception, index.
