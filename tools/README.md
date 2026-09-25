@@ -30,13 +30,19 @@ shape — a consumer that wants one sector fetches ~18 KB instead of the lot.
 
     python3 tools/verify.py reports/*_analysis.html
 
-Checks document skeleton, exactly two canvases, equal `labels`/`prices` array
+Checks document skeleton, exactly two canvases (three for bond/cash reports
+under `reports/fixed/`, which add a yield-curve chart), equal `labels`/`prices` array
 lengths, final chart value == header price, P/E ≈ price ÷ EPS, and that the
 52-week range contains the price.
 
 Run it on new reports **before** pushing. Two reports (AEP, DLR) reached the
 live site with no doctype, html, head or body tags at all, because they were
 built five days before this check existed; they were repaired on 15 Sep 2026.
+
+`chart_audit.py` does not scan `reports/etf/`, `reports/crypto/` or `reports/fixed/`
+(24 Sep 2026): the ETF, crypto and bond reports were checked point by point with
+the checkers' own scripts against Yahoo (ETF/crypto) or Treasury / Bank of Canada
+daily files (bonds). Brief: `claude/briefs/BUILD_ASSETS.md`.
 
 ## `chart_audit.py` — every chart point vs Yahoo month-end closes
 

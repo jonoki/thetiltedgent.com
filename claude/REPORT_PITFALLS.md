@@ -105,6 +105,22 @@ Writers (Sonnet, one per ~38 companies, working only from each report's hero + s
 - Parallel agents sharing a scratch folder must use unique file and script names. On 23 Sep one checker ran another's `chk_build.py` by name collision.
 - Some errors were in the reports themselves (e.g. GEHC's report mixes up margin and profit share). Log these for the next refresh.
 
+## L. ETF, crypto and bond/cash reports — 23–24 Sep 2026 (16 reports, every one corrected by its checker)
+Brief: `claude/briefs/BUILD_ASSETS.md` (its "Rules from the pilot checker rounds" and PRIVACY sections carry every rule below).
+
+| Error | Examples |
+|---|---|
+| Hedge / process caveats on the page | "not confirmed", "was not sourced", "not established from the sources fetched", "our reading" — found in all 3 pilots and in reference pages later copied |
+| Figure read or dated after the banner date | BTC rich list read Sep 24; live issuer AUM fields dated Sep 23; SOL epoch data ending Sep 23; undated validator lists |
+| Stale holdings (10-Q copied, later 8-K missed) | Strive 12.8k→26.4k BTC, Strategy one filing behind, Trump Media 9.5k→14.1k, Upexi "2.25M" was fair value ÷ price |
+| Enumeration misses (from memory, not EDGAR) | ETHB, OBTC, Galaxy, BTCS, Solmate, BitGo; PHYS larger than two of GLD's "next four" |
+| "Highest since" on a partial history | BND "since 2021" (was Jul 2007); UST30Y missed Sep 10–16 2026 readings |
+| Selection basis on mismatched dates | VFV Aug 31 vs XIC Sep 23 — re-ranked on a common month-end |
+| Non-verbatim quotes / WebFetch summaries as quotes | Shapella, Pectra, Frankendancer, Moody's headline, SEC releases |
+| Counts and superlatives | "seven Fed increases" (five in window), "twelve US ETFs" (thirteen), longest outage 17 h (19.7 h) |
+| Layout | unbroken URLs overflowed 390 px (TIPS10Y 10 px, GOC10Y 113 px) — every report now has `overflow-wrap: break-word` |
+| Privacy | a fix agent sent the owner's email in a sec.gov User-Agent (24 Sep; second time) |
+
 ---
 
 ## Retro protocol (run at the end of every recurring run)
