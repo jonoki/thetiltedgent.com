@@ -121,6 +121,20 @@ Brief: `claude/briefs/BUILD_ASSETS.md` (its "Rules from the pilot checker rounds
 | Layout | unbroken URLs overflowed 390 px (TIPS10Y 10 px, GOC10Y 113 px) — every report now has `overflow-wrap: break-word` |
 | Privacy | a fix agent sent the owner's email in a sec.gov User-Agent (24 Sep; second time) |
 
+## M. ETF group pages (top-30 run, 25 Sep 2026: 17 new + 5 retrofits; every page corrected by its checker)
+| Error | Examples |
+|---|---|
+| Overlap by name-prefix matching (misses renamed companies, ADR/local pairs) | IVV/SPY 99.8→99.97%, VONG 92.5→97.0%, FTEC 98.6→99.35% (became an equivalent), IEFA/VEA 75.8→78.1% — use ISIN/SEDOL, else exchange ticker + name/country check, share classes combined |
+| Overlap matcher merging different companies | Banorte/Inbursa, Bank of Communications/T&S Communications, First Bancorp ×2 |
+| Wrong premise in the orchestrator's prompt | QQQ "unit investment trust" (reclassified open-end Dec 19, 2025); CRSP→Morningstar was a rename (Jul 29, 2026), not an index switch |
+| Stale company names from issuer holdings files | "General Electric" for GE Aerospace, "Facebook Inc.", "Square Inc." |
+| Split funds | issuer 12-month yields not split-adjusted (IWF 1.14% vs 0.34%); Vanguard 52-week fields not split-adjusted (VGT) |
+| Mixed-date or wrong-basis figures | ranking on Aug 31 vs Sep 23 net assets (VFV/XIC); Yahoo monthly FX bars vs last daily close (XEF beta); weights shown twice on different bases (XIC BMO 3.30/3.31) |
+| Fund-history marketing claims | XIU "first ETF in 1990" vs 1999 inception — resolved from TMX/BCSC records (TIPs merged Mar 6, 2000) |
+| Manager rosters from a superseded prospectus | VUG/VTV listed a manager removed by a June supplement — check every 497 up to the banner date; list current managers only |
+| Derived future dates stated as scheduled | rebalance and dividend dates computed from calendar rules — quote the rule, keep only published dates |
+| Accent collisions between parallel builds | QQQ/VTI #FDBA74, VGT/XLK near-identical — orchestrator assigns accents up front |
+
 ---
 
 ## Retro protocol (run at the end of every recurring run)
