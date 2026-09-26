@@ -129,7 +129,7 @@ extra_css = r'''
   .slotnote{border:1px solid rgba(224,56,79,.45);background:rgba(224,56,79,.06);border-radius:12px;padding:20px 22px;margin-top:14px;color:var(--dim);font-size:15px;line-height:1.7;}
   .slotnote b{color:var(--cream);font-weight:500;}
 '''
-open(os.path.join(ROOT, 'tables.css'), 'w', encoding='utf-8').write(css.strip('\n') + '\n' + extra_css)
+open(os.path.join(ROOT, 'tables.css'), 'w', encoding='utf-8', newline='\n').write(css.strip('\n') + '\n' + extra_css)
 
 # ---------- shared head ----------
 def head(title, desc, url, extra=''):
@@ -234,7 +234,7 @@ for i, (gid, slug, title, desc) in enumerate(GAMES):
     crumbs = f'<div class="wrap crumbs"><a href="../">Home</a><span>/</span><a href="casino-games.html">The Tables</a><span>/</span>{html.escape(title, quote=False)}</div>'
     body = nav_for(gid) + '\n\n' + crumbs + (('\n' + family_tabs(slug)) if family_tabs(slug) else '') + '\n\n' + sec + '\n\n' + page_nav(i) + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
     out = head(title + ', graded', desc, slug + '.html') + body
-    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8').write(out)
+    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8', newline='\n').write(out)
 
 # ---------- extra (family) pages ----------
 for gid, slug, title, desc, simgame, prev, nxt in EXTRA:
@@ -256,7 +256,7 @@ for gid, slug, title, desc, simgame, prev, nxt in EXTRA:
 <script src="sim/ttg-sim.js"></script>
 <script>TTGSim.mount('#simmount', {{game: '{simgame}', n: 500}});</script>'''
     body = nav_for(gid) + '\n\n' + crumbs + '\n' + family_tabs(slug) + '\n\n' + sec + '\n\n' + pnav + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
-    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8').write(head(title + ', graded', desc, slug + '.html') + body)
+    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8', newline='\n').write(head(title + ', graded', desc, slug + '.html') + body)
 
 # ---------- index ----------
 board_i = board
@@ -282,5 +282,5 @@ games_section = f'''<!-- ================= GAME PAGES ================= -->
 '''
 index_body = nav + '\n\n' + hero_i + '\n' + board_i + '\n\n' + games_section + '\n' + method + '\n\n' + outro + '\n\n' + footer + '\n\n' + navscript + '\n</body>\n</html>\n'
 index_head = head('Casino Games, Graded', 'Eight casino games, graded honestly: how each one plays, the house edge on every bet, the best and worst bets, the quirks, advantage play — and a variance simulator on every game page.', 'casino-games.html').replace('<title>Casino Games, Graded — The Tilted Gent</title>', '<title>Casino Games, Graded — The Tilted Gent</title>').replace('property="og:type" content="article"', 'property="og:type" content="website"')
-open(os.path.join(ROOT, 'casino-games.html'), 'w', encoding='utf-8').write(index_head + index_body)
+open(os.path.join(ROOT, 'casino-games.html'), 'w', encoding='utf-8', newline='\n').write(index_head + index_body)
 print('built', len(GAMES), 'game pages +', len(EXTRA), 'family pages + index + tables.css')
