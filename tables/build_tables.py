@@ -174,11 +174,10 @@ def family_tabs(slug: str) -> str:
     return ''
 
 
-def crumbs(*trail: str | tuple[str, str]) -> str:
-    """Home / The Tables / … / the current page (its title, escaped); trail items before it are (href, text)."""
-    *links, here = trail
+def crumbs(here: str, parents: tuple[tuple[str, str], ...] = ()) -> str:
+    """Home / The Tables / the parents, as (href, text) / the current page (its title, escaped)."""
     parts = ['<a href="../">Home</a>', '<a href="casino-games.html">The Tables</a>']
-    parts += [f'<a href="{h}">{t}</a>' for h, t in links] + [html.escape(here, quote=False)]
+    parts += [f'<a href="{h}">{t}</a>' for h, t in parents] + [html.escape(here, quote=False)]
     return '<div class="wrap crumbs">' + '<span>/</span>'.join(parts) + '</div>'
 
 
@@ -273,7 +272,7 @@ def family_page(site: Site, p: FamilyPage) -> None:
     by_slug = {g.slug: g for g in GAMES}
     prev, nxt = by_slug[p.prev], by_slug[p.next]
     sec = with_sim(site.sections[p.id], p.id, variant_sim())
-    body = site.game_body(crumbs((f'{prev.slug}.html', prev.title), p.title), family_tabs(p.slug), sec,
+    body = site.game_body(crumbs(p.title, ((f'{prev.slug}.html', prev.title),)), family_tabs(p.slug), sec,
                           page_links(prev, nxt), sim_scripts(p.sim_game, DEFAULT_SESSIONS))
     write(p.slug + '.html', site.head(p.title + ', graded', p.desc, p.slug + '.html') + body)
 

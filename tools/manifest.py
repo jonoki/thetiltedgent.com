@@ -16,6 +16,7 @@ import re
 import sys
 from collections import Counter
 from datetime import datetime, timezone
+from typing import Mapping, cast
 
 import reportlib as rl
 
@@ -41,14 +42,14 @@ def blob_sha(path: str) -> tuple[str, int]:
     return hashlib.sha1(b'blob %d\0' % len(b) + b, usedforsecurity=False).hexdigest(), len(b)
 
 
-def extract_metrics(t: str) -> dict[str, dict[str, str | float | None]]:
+def extract_metrics(t: str) -> dict[str, rl.Metric]:
     """The metrics table as a label -> {text, number} map.
 
     Deliberately generic: REIT reports carry P/FFO where others carry P/E, banks carry NIM and CET1.
     Capturing the table as-is keeps those without the manifest needing to know every sector's
     substitutions in advance. The first row with a label wins; labels over 60 characters are prose, not metrics.
     """
-    metrics = {}
+    metrics: dict[str, rl.Metric] = {}
     for label, value in rl.table_rows(t):
         if label and value and len(label) <= 60 and label not in metrics:
             metrics[label] = {'text': value, 'number': rl.to_number(value)}
@@ -102,6 +103,7 @@ def as_of_date(t: str, warn: list[str]) -> str | None:
           or re.search(r'Data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
           or re.search(r'as of ' + day + r'([A-Za-z]+ \d+, \d{4})\s*(?:close|market close|\(market close\))', t)
           or re.search(r'Static data as of ([A-Za-z]+ \d+)[–\-—]\d+, (\d{4})', t))
+    text: str | None
     if dm and dm.lastindex and dm.lastindex > 1:      # 'August 19-20, 2026': the later day's year, first day
         text = f'{dm.group(1)}, {dm.group(2)}'
         warn.append('as_of_was_a_date_range')
@@ -116,7 +118,7 @@ def as_of_date(t: str, warn: list[str]) -> str | None:
 def chart_fields(t: str, price: float | None, warn: list[str]) -> tuple[int | None, bool]:
     """(points, chart_ok) for the main price chart."""
     labels, prices = rl.chart_series(t)
-    if labels is None:
+    if labels is None or prices is None:
         warn.append('chart_arrays_missing')
         return None, False
     ends_at_price = bool(price is not None and prices
@@ -168,17 +170,21 @@ def card_checks(card: rl.IndexCard | None, ticker: str | None, warn: list[str]) 
         warn.append(f"card_ticker_mismatch:{card['ticker']}")
 
 
-def key_metrics(metrics: dict[str, dict[str, str | float | None]]) -> dict[str, float | str]:
+def key_metrics(metrics: dict[str, rl.Metric]) -> dict[str, float | str]:
     """The KEY_METRICS the page has: the number when the cell is one, else its text."""
-    return {key: (metrics[label]['number'] if metrics[label]['number'] is not None else metrics[label]['text'])
-            for label, key in KEY_METRICS.items() if label in metrics}
+    out: dict[str, float | str] = {}
+    for label, key in KEY_METRICS.items():
+        if label in metrics:
+            number = metrics[label]['number']
+            out[key] = number if number is not None else metrics[label]['text']
+    return out
 
 
 def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = False) -> rl.ReportRecord:
     """One report page -> its manifest record."""
     t = rl.read_text(path)
     slug = os.path.basename(path).replace('_analysis.html', '')
-    warn = []
+    warn: list[str] = []
     ticker, name = title_fields(t, warn)
     _sector, industry = industry_fields(t, warn)   # the card's industry label is canonical; the page's is kept raw
     price = rl.header_price(t)
@@ -199,7 +205,7 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
     card_checks(card, ticker, warn)
     cf = card_fields(card)
 
-    rec = {
+    rec: dict[str, object] = {
         'ticker': ticker, 'slug': slug, 'name': name,
         'sector_key': cf['sector_key'], 'industry': cf['industry'], 'industry_raw': industry,
         'exchange': meta_field(t, 'Exchange'),
@@ -213,13 +219,13 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
     rec.update(key_metrics(metrics))
     if full_metrics:
         rec['metrics'] = metrics
-    # drop nulls: a missing key means "not extracted", which the warnings explain
-    return {k: v for k, v in rec.items() if v is not None and v != []}
+    # drop nulls: a missing key means "not extracted", which the warnings explain; the keys are ReportRecord's
+    return cast(rl.ReportRecord, {k: v for k, v in rec.items() if v is not None and v != []})
 
 
 # ---------- the files ----------
 
-def write_json(path: str, obj: dict[str, object]) -> int:
+def write_json(path: str, obj: Mapping[str, object]) -> int:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(obj, fh, ensure_ascii=False, separators=(',', ':'))

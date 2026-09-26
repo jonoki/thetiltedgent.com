@@ -38,7 +38,7 @@ def plain_value(cell: str) -> float | None:
     """A value cell that is a plain number ('24.1x', '−$1.20'); None for n/m, n/a, ~257x and the like, so an
     unreadable cell yields no P/E check rather than a wrong one."""
     m = re.match(r'^\s*([−-])?\s*\$?([\d,]+(?:\.\d+)?)\s*[x×]?\s*(?:$|\(|—|–|-|\s)', cell)
-    return (-1 if m.group(1) else 1) * rl.to_number(m.group(2)) if m else None
+    return (-1 if m.group(1) else 1) * float(m.group(2).replace(',', '')) if m else None
 
 
 def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:

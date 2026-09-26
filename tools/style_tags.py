@@ -16,7 +16,7 @@ import re
 import statistics
 import sys
 from collections import Counter
-from typing import NotRequired, TypedDict
+from typing import NotRequired, Sequence, TypedDict
 
 import reportlib as rl
 
@@ -69,7 +69,7 @@ def table_rows(path: str) -> dict[str, str]:
     return {key: value for key, value in found.items() if value is not None}
 
 
-def quantile(vals: list[float], p: float) -> float:
+def quantile(vals: Sequence[float], p: float) -> float:
     v = sorted(vals)
     k = (len(v) - 1) * p
     f = int(k)
@@ -77,7 +77,7 @@ def quantile(vals: list[float], p: float) -> float:
     return v[f] + (v[c] - v[f]) * (k - f)
 
 
-def pct_rank(v: float, vals: list[float]) -> int:
+def pct_rank(v: float, vals: Sequence[float]) -> int:
     """Share of values strictly below v, in %."""
     return round(100 * sum(x < v for x in vals) / len(vals))
 
@@ -100,15 +100,15 @@ def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> fl
 def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None, tbl: dict[str, str]) -> TagInputs:
     """One report's tag inputs: who it is about (the index card wins over the manifest), every parsed number,
     and under 'raw' the page text each number came from."""
-    card = card or {}
-    industry = card.get('card_industry') or r.get('industry')
+    industry = (card['card_industry'] if card else None) or r.get('industry')
+    w52 = r.get('w52')
     pe, mcap, fcf = rl.first_number(r.get('pe_trailing')), money(r.get('market_cap')), usd_fcf(r.get('fcf'))
     d: TagInputs = {
-        'slug': slug, 'ticker': card.get('ticker') or r.get('ticker'), 'as_of': r.get('as_of'),
-        'industry': industry, 'sp500': bool((card.get('indices') or {}).get('sp500_added')),
+        'slug': slug, 'ticker': (card['ticker'] if card else None) or r.get('ticker'), 'as_of': r.get('as_of'),
+        'industry': industry, 'sp500': bool(card and card['indices']['sp500_added']),
         'raw': {'pe_trailing': r.get('pe_trailing'), 'eps_ttm': r.get('eps_ttm'), 'yield': r.get('yield_pct'),
                 'market_cap': r.get('market_cap'), 'fcf': r.get('fcf'), **tbl},
-        'price': rl.first_number(r.get('price')), 'w52_high': rl.first_number((r.get('w52') or [None, None])[1]),
+        'price': rl.first_number(r.get('price')), 'w52_high': w52[1] if w52 else None,
         'mcap': mcap, 'fcf': fcf, 'eps': rl.first_number(r.get('eps_ttm')),
         'pe': pe if pe is not None else rl.first_number(tbl.get('pe_tbl')),   # the table row when the manifest missed it
         'yield': rl.first_number(r.get('yield_pct')),
@@ -186,8 +186,7 @@ def tags_for(d: TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> l
         tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies." + when])
     if d['price'] and d['w52_high'] and d['price'] <= th['beaten_down_ratio'] * d['w52_high']:
         tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}." + when])
-    if is_quality(d, th):
-        tags.append(['Quality', f"Earns {d['roic']:.1f}% a year on the money invested in the business, better than {pct_rank(d['roic'], u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {d['de']:.2f})." + when])
+    tags += quality_tags(d, th, u, when)
     return tags
 
 
@@ -202,10 +201,13 @@ def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     return []
 
 
-def is_quality(d: TagInputs, th: dict[str, float]) -> bool:
-    """Top-20% ROIC outside banks, insurers and REITs, with debt-to-equity from 0 up to the cut-off."""
-    return (d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '') and d['roic'] >= th['quality_roic_min']
-            and d['de'] is not None and 0 <= d['de'] < th['quality_de_max'])
+def quality_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+    """Quality: top-20% ROIC outside banks, insurers and REITs, with debt-to-equity from 0 up to the cut-off."""
+    roic, de = d['roic'], d['de']
+    if (roic is None or de is None or NO_QUALITY.search(d['industry'] or '') or roic < th['quality_roic_min']
+            or not 0 <= de < th['quality_de_max']):
+        return []
+    return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f})." + when]]
 
 
 def main(repo: str = rl.ROOT) -> int:

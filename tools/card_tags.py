@@ -19,6 +19,7 @@ import os
 import re
 import sys
 from collections import Counter
+from typing import TypedDict
 
 import reportlib as rl
 from style_tags import TagInputs
@@ -45,12 +46,26 @@ COUNTRY = {'united kingdom': 'UK', 'england': 'UK', 'uk': 'UK', 'the netherlands
            'manitoba': 'Canada', 'saskatchewan': 'Canada', 'new brunswick': 'Canada',
            'prince edward island': 'Canada', 'newfoundland and labrador': 'Canada'}
 # S&P 500 badge overrides where the join year shown differs from the card's data-sp date (Oki's decisions)
-SP_NOTE = {
+SP_NOTE: dict[str, list[int | str]] = {
     'lmt': [1984, 'Lockheed Corporation joined in 1984 and merged with Martin Marietta to form Lockheed Martin in 1995.'],
 }
 HQ_FALLBACK = {  # reports with no "HQ:" line (from Wikipedia's constituent list or the report text)
     'hd': 'Atlanta, Georgia', 'unh': 'Minnetonka, Minnesota',
 }
+
+
+class CardTags(TypedDict, total=False):
+    """One report's entry in data/card_tags.json; the keys are listed in the module docstring."""
+    st: list[list[str]]
+    dv: float
+    hq: list[str]
+    ed: list[str | float]
+    ln: str
+    sp: list[int | str]
+    hw: list
+    th: list
+    pp: list
+    lg: str
 
 
 def hq_of(slug: str, text: str) -> list[str] | None:
@@ -83,9 +98,13 @@ def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
         return json.load(fh)
 
 
-def hand_tags(h: dict[str, list]) -> dict[str, list]:
+def hand_tags(h: dict[str, list]) -> 'CardTags':
     """The ♥ what-you-know-them-for, ♠ theme and ★ key-people tags the report has."""
-    c = {k: h[k] for k in ('hw', 'th') if h.get(k)}
+    c: CardTags = {}
+    if h.get('hw'):
+        c['hw'] = h['hw']
+    if h.get('th'):
+        c['th'] = h['th']
     if h.get('pp'):
         # a New CEO tag carries its start month so the page can drop it after two years
         c['pp'] = [p + [h['since']] if (p[0] == 'New CEO' and h.get('since')) else p for p in h['pp']]
@@ -101,13 +120,14 @@ def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
 
 
 def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: str, line: str | None,
-             hand: dict[str, list], logo: str | None) -> dict[str, object]:
+             hand: dict[str, list], logo: str | None) -> CardTags:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
-    c: dict[str, object] = {}
+    c: CardTags = {}
     if style.get('tags'):
         c['st'] = [[t['tag'], t['tip']] for t in style['tags']]
-    if style.get('yield') is not None:
-        c['dv'] = style['yield']
+    dividend = style['yield']
+    if dividend is not None:
+        c['dv'] = dividend
     hq = hq_of(slug, text)
     if hq:
         c['hq'] = hq

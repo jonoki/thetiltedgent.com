@@ -9,7 +9,7 @@ import html as htmllib
 import json
 import os
 import re
-from typing import TypedDict
+from typing import Final, TypedDict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo root, from this file's place in tools/
 
@@ -127,7 +127,8 @@ def table_rows(t: str) -> list[tuple[str, str]]:
     for row in _ROW.findall(t):
         cells = _CELL.findall(row)
         if len(cells) >= 2 and cells[1][0] == 'td':
-            rows.append(tuple(re.sub(r'\s+', ' ', strip_tags(body)) for _, body in cells[:2]))
+            label, value = (re.sub(r'\s+', ' ', strip_tags(body)) for _, body in cells[:2])
+            rows.append((label, value))
     return rows
 
 
@@ -212,7 +213,7 @@ def structure_counts(t: str) -> StructureCounts:
     }
 
 
-SKELETON = ('doctype', 'html', 'head', 'head_close', 'body', 'body_close', 'html_close')
+SKELETON: Final = ('doctype', 'html', 'head', 'head_close', 'body', 'body_close', 'html_close')
 
 
 def expected_canvases(path: str) -> int:
@@ -243,6 +244,12 @@ class IndexMembership(TypedDict):
     nasdaq100: bool
     dow30_added: str | None
     global_exchange: str | None  # home exchange of a non-US-index name
+
+
+class Metric(TypedDict):
+    """One metrics-table row: the cell's text and, when the whole cell is one number, that number."""
+    text: str
+    number: float | None
 
 
 class ReportRecord(TypedDict, total=False):
@@ -281,7 +288,7 @@ class ReportRecord(TypedDict, total=False):
     beta: float | str
     shares_out: float | str
     fcf: float | str
-    metrics: dict[str, dict]        # only with --full-metrics
+    metrics: dict[str, 'Metric']    # only with --full-metrics
 
 
 class Manifest(TypedDict):
@@ -318,7 +325,7 @@ def parse_index_cards(repo: str = ROOT) -> dict[str, 'IndexCard']:
         r'<h3>(?P<name>.*?)</h3>'
         r'<span class="sect">(?P<ind>[^<]*)</span>'
         r'<span class="ixrow">(?P<ix>.*?)</span></a>')
-    out = {}
+    out: dict[str, IndexCard] = {}
     for m in card_re.finditer(t):
         a = m.group('attrs')
         sp = re.search(r'data-sp="([\d-]+)"', a)

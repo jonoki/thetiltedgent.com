@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 import urllib.request
-from typing import TypedDict
+from typing import Mapping, TypedDict
 
 import reportlib as rl
 
@@ -171,7 +171,8 @@ def audit(slug: str, ticker: str, as_of: str | None, repo: str = rl.ROOT) -> Aud
     return row
 
 
-def check_points(labels: list[str], prices: list[float], yh: Monthly, splits: Splits, as_of: str | None) -> AuditRow:
+def check_points(labels: list[str], prices: list[float], yh: Mapping[tuple[int, int], tuple[float, float | None]],
+                 splits: Splits, as_of: str | None) -> AuditRow:
     """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
     verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones.
 

@@ -240,13 +240,14 @@ def insert_box(path: str, e: DeltaBox) -> bool:
     t = rl.read_text(path)
     if 'class="tg-d ' in t:
         return False
-    if not ANCHOR_RE.search(t):
-        raise ValueError('section-01 anchor comment not found')
-    if '</style>' not in t:
+    i = t.rfind('</style>')                      # CSS once, before the last </style>
+    if i < 0:
         raise ValueError('no </style> to add the box CSS before')
-    i = t.rindex('</style>')                     # CSS once, before the last </style>
     t = t[:i] + CSS + t[i:]
-    j = ANCHOR_RE.search(t).start()              # the box immediately above section 01
+    anchor = ANCHOR_RE.search(t)                 # the box goes immediately above section 01
+    if not anchor:
+        raise ValueError('section-01 anchor comment not found')
+    j = anchor.start()
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(t[:j] + box(e) + t[j:])
     return True

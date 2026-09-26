@@ -24,7 +24,7 @@ class TablesBuilder(unittest.TestCase):
         self.assertNotIn('class="next"', build_tables.page_links(self.DICE, None))
 
     def test_crumbs_escape_the_current_title(self):
-        c = build_tables.crumbs(('blackjack.html', 'Blackjack'), 'Hold & Draw')
+        c = build_tables.crumbs('Hold & Draw', (('blackjack.html', 'Blackjack'),))
         self.assertTrue(c.endswith('<a href="blackjack.html">Blackjack</a><span>/</span>Hold &amp; Draw</div>'))
 
     def test_family_tabs(self):

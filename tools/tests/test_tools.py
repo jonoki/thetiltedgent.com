@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 import unittest.mock
+from typing import Any, cast
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tools/
 
@@ -88,9 +89,11 @@ class StyleTagInputs(unittest.TestCase):
         self.assertEqual(rows, {'pe_tbl': '24.1x', 'revg': '12.5%', 'beta': '1.10'})
 
     def test_tag_inputs_prefer_the_card_and_fall_back_to_the_table_pe(self):
-        r = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
+        r: rl.ReportRecord = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
              'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1}
-        card = {'ticker': 'ACME', 'card_industry': 'SOFTWARE', 'indices': {'sp500_added': '2001-01-01'}}
+        card: rl.IndexCard = {'ticker': 'ACME', 'card_name': 'Acme', 'card_industry': 'SOFTWARE', 'card_sector_key': None,
+                              'indices': {'sp500_added': '2001-01-01', 'nasdaq100': False, 'dow30_added': None,
+                                          'global_exchange': None}}
         d = style_tags.tag_inputs('acme', r, card, {'pe_tbl': '25.0x', 'beta': '0.8'})
         self.assertEqual((d['ticker'], d['industry'], d['sp500'], d['pe'], d['beta']), ('ACME', 'SOFTWARE', True, 25.0, 0.8))
         self.assertEqual((d['mcap'], d['fcf_yield'], d['w52_high']), (250e9, 8.0, 100.0))
@@ -106,15 +109,15 @@ class StyleTagRules(unittest.TestCase):
     U = {k: [1.0, 5.0, 10.0, 20.0, 30.0] for k in ('pe', 'revg', 'yield', 'fcf_yield', 'beta', 'roic')}
 
     @staticmethod
-    def inputs(**kw) -> dict:
-        d = {'slug': 'acme', 'ticker': 'ACME', 'as_of': '2026-09-21', 'industry': 'SOFTWARE', 'sp500': True,
+    def inputs(**kw: Any) -> style_tags.TagInputs:
+        d: dict[str, Any] = {'slug': 'acme', 'ticker': 'ACME', 'as_of': '2026-09-21', 'industry': 'SOFTWARE', 'sp500': True,
              'raw': {'eps_ttm': '$2.00', 'market_cap': '$250.0B'}, 'price': 90.0, 'w52_high': 100.0, 'mcap': 50e9,
              'fcf': None, 'eps': 2.0, 'pe': 20.0, 'yield': None, 'revg': 5.0, 'roic': None, 'de': None, 'beta': 1.0,
              'fcf_yield': None}
         d.update(kw)
-        return d
+        return cast(style_tags.TagInputs, d)
 
-    def tags(self, **kw) -> list[str]:
+    def tags(self, **kw: Any) -> list[str]:
         return [t for t, _ in style_tags.tags_for(self.inputs(**kw), self.TH, self.U)]
 
     def test_each_tag_at_its_cutoff(self):
@@ -146,7 +149,7 @@ class StyleTagRules(unittest.TestCase):
 
 class ManifestFields(unittest.TestCase):
     def test_as_of_date_range_takes_the_first_day(self):
-        warn = []
+        warn: list[str] = []
         self.assertEqual(manifest.as_of_date('Static data as of August 19–20, 2026', warn), '2026-08-19')
         self.assertEqual(warn, ['as_of_was_a_date_range'])
 
@@ -347,11 +350,11 @@ class DeltaBox(unittest.TestCase):
 
     def test_the_box_round_trips_through_the_manifest_to_the_card(self):
         """deltabox writes the prior edition into the page; manifest reads it back; card_tags shows it."""
-        warn = []
+        warn: list[str] = []
         eds, state = manifest.editions(deltabox.box(self.BOX), '2026-09-01', 816.64, warn)
         self.assertEqual((eds, state, warn), ([['2026-08-17', 994.79, 'previous edition'],
                                                ['2026-09-01', 816.64, 'refreshed']], 'fix', []))
-        card = card_tags.card_for('acme', {}, {'editions': eds}, '', None, {}, None)
+        card = card_tags.card_for('acme', StyleTagRules.inputs(), {'editions': eds}, '', None, {}, None)
         self.assertEqual(card['ed'], ['2026-09-01', '2026-08-17', 994.79])
 
     def test_insert_box_adds_css_once_and_never_a_second_box(self):

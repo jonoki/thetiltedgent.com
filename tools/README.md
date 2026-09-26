@@ -24,6 +24,7 @@ The Tables pages have their own builder, `tables/build_tables.py`, and their own
 
 Tests: `py -3 -m unittest discover -s tools/tests -v`. Standard library only, like the scripts
 (`build_chips.py` alone needs fontTools). Every script's `main()` returns its exit status.
+Type check: `py -3 -m mypy` from the repo root (config in `mypy.ini`; mypy is not needed to run the scripts).
 
 After a batch of report builds or refreshes: `manifest.py`, then `style_tags.py`, then `card_tags.py`.
 
