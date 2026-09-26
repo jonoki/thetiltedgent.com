@@ -37,7 +37,7 @@ class YahooError(Exception):
     """No usable monthly series for a symbol."""
 
 
-def parse_label(s):
+def parse_label(s: str) -> tuple[int, int] | None:
     """A chart label ('Sep \\'21', 'Sep 2021', '2021-09') -> (year, month), or None."""
     s = s.strip().strip('\'"`').strip()
     m = re.match(r'([A-Za-z]{3})[a-z]*[\s\'’\-]*(\d{2,4})', s)
@@ -48,7 +48,7 @@ def parse_label(s):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def fetch(slug, tick, path):
+def fetch(slug: str, tick: str, path: str) -> None:
     url = YAHOO_CHART.format(sym=YAHOO_SYMBOL.get(slug, tick.replace('.', '-')))
     if not url.startswith('https://'):
         raise YahooError(f'refusing non-https url {url}')
@@ -61,7 +61,7 @@ def fetch(slug, tick, path):
     time.sleep(FETCH_PAUSE_S)
 
 
-def read_series(path):
+def read_series(path: str) -> tuple[dict[tuple[int, int], tuple[float, float | None]], list[tuple[str, float]]]:
     """Cached Yahoo JSON -> ({(year, month): (close, adjclose)}, [(split date, ratio), ...])."""
     with open(path, encoding='utf-8') as fh:
         j = json.load(fh)
@@ -82,7 +82,7 @@ def read_series(path):
     return monthly, splits
 
 
-def yahoo(slug, tick, asof_ym):
+def yahoo(slug: str, tick: str, asof_ym: tuple[int, int] | None) -> tuple[dict, list[tuple[str, float]]]:
     """The monthly series for a report, from the cache when it reaches the report's as-of month."""
     path = os.path.join(CACHE, slug + '.ev.json')
     if not os.path.exists(path):
@@ -94,7 +94,29 @@ def yahoo(slug, tick, asof_ym):
     return monthly, splits
 
 
-def audit(slug, tick, asof):
+def spin_factor(splits: list[tuple[str, float]], ym: tuple[int, int], asof: str | None) -> float:
+    """Product of the small fractional "splits" (spin-offs, capital returns) dated after month ym and by the
+    as-of; a real pre-spin close sits this factor above Yahoo's back-adjusted one."""
+    f = 1.0
+    for dt, r in splits:
+        if dt[:7] > f'{ym[0]}-{ym[1]:02d}' and (not asof or dt <= asof) and SPIN_RATIO_LO < r < SPIN_RATIO_HI and r != 1:
+            f *= r
+    return f
+
+
+def classify(point: float, close: float, adjclose: float | None, spin: float) -> str:
+    """'ok' within 3% of the close; else 'adjusted' when it matches the dividend-adjusted close, 'basis step'
+    when it matches a real pre-spin close, otherwise 'wrong'."""
+    if abs((point - close) / close) <= TOLERANCE:
+        return 'ok'
+    if adjclose and abs((point - adjclose) / adjclose) <= TOLERANCE:
+        return 'adjusted'
+    if spin != 1.0 and (abs(point / (close * spin) - 1) <= TOLERANCE or (adjclose and abs(point / (adjclose * spin) - 1) <= TOLERANCE)):
+        return 'basis step'
+    return 'wrong'
+
+
+def audit(slug: str, tick: str, asof: str | None) -> dict:
     t = rl.read_text(os.path.join(rl.ROOT, 'reports', slug + '_analysis.html'))
     labels, prices = rl.chart_series(t)
     if not labels or not prices:
@@ -118,24 +140,16 @@ def audit(slug, tick, asof):
             continue
         n += 1
         c, a = yh[ym]
-        spin = 1.0
-        for dt, r in splits:
-            if dt[:7] > f'{ym[0]}-{ym[1]:02d}' and (not asof or dt <= asof) and SPIN_RATIO_LO < r < SPIN_RATIO_HI and r != 1:
-                spin *= r
-        dev = (pr - c * after) / (c * after)
-        if abs(dev) <= TOLERANCE:
-            continue
-        if a and abs((pr - a * after) / (a * after)) <= TOLERANCE:
-            adj_ok += 1
-        elif spin != 1.0 and (abs(pr / (c * after * spin) - 1) <= TOLERANCE or (a and abs(pr / (a * after * spin) - 1) <= TOLERANCE)):
-            step_ok += 1
-        else:
-            bad.append((lab, pr, round(c * after, 2), round(dev * 100, 1)))
+        verdict = classify(pr, c * after, a * after if a else None, spin_factor(splits, ym, asof))
+        adj_ok += verdict == 'adjusted'
+        step_ok += verdict == 'basis step'
+        if verdict == 'wrong':
+            bad.append((lab, pr, round(c * after, 2), round((pr - c * after) / (c * after) * 100, 1)))
     return {'slug': slug, 'tick': tick, 'asof': asof, 'checked': n, 'bad': bad, 'adj_pts': adj_ok, 'step_pts': step_ok,
             'splits_after_asof': after, 'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))}
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     only = set(sys.argv[1:] if argv is None else argv)
     os.makedirs(CACHE, exist_ok=True)
     rows = [audit(slug, tick, asof) for tick, slug, _sec, asof, _px in rl.load_manifest()['index']

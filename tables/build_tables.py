@@ -148,14 +148,14 @@ EXTRA_CSS = r'''
 '''
 
 
-def between(s, a, b, start=0):
+def between(s: str, a: str, b: str, start: int = 0) -> tuple[str, int, int]:
     """(s from the first a to the end of the following b, its start, its end); ValueError when absent."""
     i = s.index(a, start)
     j = s.index(b, i) + len(b)
     return s[i:j], i, j
 
 
-def head(title, desc, url, extra=''):
+def head(title: str, desc: str, url: str, extra: str = '') -> str:
     t = html.escape(title, quote=False)
     d = html.escape(desc, quote=True)
     return f'''<!DOCTYPE html>
@@ -203,7 +203,7 @@ SLOTS_NOTE = '''
     </div>'''
 
 
-def sim_section(em, sub, nojs):
+def sim_section(em: str, sub: str, nojs: str) -> str:
     return f'''
     <div class="simsec" id="sim">
       <div class="kicker">Feel the edge</div>
@@ -213,7 +213,7 @@ def sim_section(em, sub, nojs):
     </div>'''
 
 
-def game_sim(gid):
+def game_sim(gid: str) -> str:
     if gid == 'slots':
         return SLOTS_NOTE
     return sim_section('before you sit down',
@@ -221,13 +221,13 @@ def game_sim(gid):
                        'The simulator needs JavaScript. The house edge on every bet is in the table above; the simulator only shows what it feels like.')
 
 
-def variant_sim():
+def variant_sim() -> str:
     return sim_section('at each variant',
                        "Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart.",
                        'The simulator needs JavaScript. The house edge on every variant is in the table above.')
 
 
-def sim_scripts(game):
+def sim_scripts(game: str) -> str:
     return f'''
 <script src="sim/games.js"></script>
 <script src="sim/ttg-sim.js"></script>
@@ -236,7 +236,7 @@ def sim_scripts(game):
 
 # ---------- page parts ----------
 
-def page_links(prev, nxt):
+def page_links(prev: Game | None, nxt: Game | None) -> str:
     """Previous / next page cards, then the link back to the board. prev and nxt are Games or None."""
     a = (f'<a class="prev" href="{prev.slug}.html"><div class="k">&larr; Previous</div><div class="t">{prev.title}</div></a>'
          if prev else '<span></span>')
@@ -246,7 +246,7 @@ def page_links(prev, nxt):
             '<a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>')
 
 
-def family_tabs(slug):
+def family_tabs(slug: str) -> str:
     for tabs in FAMILY.values():
         if any(h == slug + '.html' for h, _ in tabs):
             links = ''.join('<a href="%s"%s>%s</a>' % (h, ' class="on"' if h == slug + '.html' else '', t) for h, t in tabs)
@@ -254,7 +254,7 @@ def family_tabs(slug):
     return ''
 
 
-def crumbs(*trail):
+def crumbs(*trail: str | tuple[str, str]) -> str:
     """Home / The Tables / … / the current page (its title, escaped); trail items before it are (href, text)."""
     *links, here = trail
     parts = ['<a href="../">Home</a>', '<a href="casino-games.html">The Tables</a>']
@@ -262,7 +262,7 @@ def crumbs(*trail):
     return '<div class="wrap crumbs">' + '<span>/</span>'.join(parts) + '</div>'
 
 
-def with_sim(section, gid, sim):
+def with_sim(section: str, gid: str, sim: str) -> str:
     """The game's source section, opened as the page's first section, with the simulator above the
     advantage-play box."""
     sec = section.replace('<section class="game" id="%s">' % gid, '<section class="game first" id="%s">' % gid, 1)
@@ -274,7 +274,7 @@ def with_sim(section, gid, sim):
 class Site:
     """The pieces of the source every page is assembled from."""
 
-    def __init__(self, src):
+    def __init__(self, src: str) -> None:
         css, _, _ = between(src, '<style>', '</style>')
         self.css = css[len('<style>'):-len('</style>')]
         self.nav = between(src, '<!-- ================= NAV ================= -->', '</nav>')[0]
@@ -286,17 +286,17 @@ class Site:
         self.sections = {g.id: between(src, '<section class="game" id="%s">' % g.id, '</section>')[0]
                          for g in GAMES + FAMILY_PAGES}
 
-    def body(self, crumb, tabs, sec, links, scripts):
+    def body(self, crumb: str, tabs: str, sec: str, links: str, scripts: str) -> str:
         return (self.nav + '\n\n' + crumb + ('\n' + tabs if tabs else '') + '\n\n' + sec + '\n\n' + links + '\n\n'
                 + self.footer + '\n\n' + NAVSCRIPT + scripts + '\n</body>\n</html>\n')
 
 
-def write(name, text):
+def write(name: str, text: str) -> None:
     with open(os.path.join(ROOT, name), 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
 
 
-def game_page(site, i, g):
+def game_page(site: Site, i: int, g: Game) -> None:
     sec = with_sim(site.sections[g.id], g.id, game_sim(g.id))
     if g.id == 'blackjack':
         sec = sec.replace(AP_MARKER, '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>
@@ -307,7 +307,7 @@ def game_page(site, i, g):
     write(g.slug + '.html', head(g.title + ', graded', g.desc, g.slug + '.html') + body)
 
 
-def family_page(site, p):
+def family_page(site: Site, p: FamilyPage) -> None:
     by_slug = {g.slug: g for g in GAMES}
     prev, nxt = by_slug[p.prev], by_slug[p.next]
     sec = with_sim(site.sections[p.id], p.id, variant_sim())
@@ -316,7 +316,7 @@ def family_page(site, p):
     write(p.slug + '.html', head(p.title + ', graded', p.desc, p.slug + '.html') + body)
 
 
-def index_page(site):
+def index_page(site: Site) -> None:
     board = site.board
     for g in GAMES:
         board = board.replace(f'href="#{g.id}"', f'href="{g.slug}.html"')
@@ -346,7 +346,7 @@ def index_page(site):
     write('casino-games.html', index_head + body)
 
 
-def main():
+def main() -> None:
     with open(SRC, encoding='utf-8') as fh:
         site = Site(fh.read())
     write('tables.css', site.css.strip('\n') + '\n' + EXTRA_CSS)

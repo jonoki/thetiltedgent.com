@@ -34,7 +34,7 @@ METRIC_ROW = re.compile(r'<tr>\s*<t[dh][^>]*>(?P<label>.*?)</t[dh]>\s*<td[^>]*>(
 MIN_METRICS = 5
 
 
-def blob_sha(path):
+def blob_sha(path: str) -> tuple[str, int]:
     """Git's blob id for the file (what `git hash-object` prints) and its size. SHA-1 here is git's object
     naming, not a security control."""
     with open(path, 'rb') as fh:
@@ -42,7 +42,7 @@ def blob_sha(path):
     return hashlib.sha1(b'blob %d\0' % len(b) + b, usedforsecurity=False).hexdigest(), len(b)
 
 
-def extract_metrics(t):
+def extract_metrics(t: str) -> dict[str, dict[str, str | float | None]]:
     """The metrics table as a label -> {text, number} map.
 
     Deliberately generic: REIT reports carry P/FFO where others carry P/E, banks carry NIM and CET1.
@@ -62,7 +62,7 @@ def extract_metrics(t):
 
 # ---------- one field group at a time; each returns its values and adds to warn ----------
 
-def title_fields(t, warn):
+def title_fields(t: str, warn: list[str]) -> tuple[str | None, str | None]:
     ticker, name = rl.parse_title(t)
     if not ticker:
         warn.append('title_unparsed')
@@ -73,7 +73,7 @@ def title_fields(t, warn):
     return ticker or badge_ticker, name
 
 
-def meta_field(t, label):
+def meta_field(t: str, label: str) -> str | None:
     """The value after '<label>:' in the header meta line. Variant A: <span>LABEL:</span> VALUE</span>;
     variant B: <span>LABEL:</span> VALUE &nbsp;.&nbsp; <span>NEXT:</span>."""
     m = re.search(label + r':</span>\s*(.*?)(?:</span>|&nbsp;|<span)', t, re.S)
@@ -82,7 +82,7 @@ def meta_field(t, label):
     return rl.strip_tags(m.group(1)).strip(' ··-') or None
 
 
-def industry_fields(t, warn):
+def industry_fields(t: str, warn: list[str]) -> tuple[str | None, str | None]:
     """(sector, industry) from the meta line: variant A carries 'Sector / Industry', variant B the industry alone."""
     v = meta_field(t, 'Industry')
     if not v:
@@ -92,7 +92,7 @@ def industry_fields(t, warn):
     return (parts[0], parts[1]) if len(parts) > 1 else (None, parts[0])
 
 
-def change_pct(t):
+def change_pct(t: str) -> float | None:
     ch = (re.search(r'class="price-change"[^>]*>\s*([^<]+)', t)
           or re.search(r'class="chg[ "][^>]*>\s*([^<]+)', t))
     if not ch:
@@ -101,7 +101,7 @@ def change_pct(t):
     return rl.to_number(cm.group(2).replace(' ', '')) if cm else None
 
 
-def as_of_date(t, warn):
+def as_of_date(t: str, warn: list[str]) -> str | None:
     day = r'(?:the\s+)?(?:[A-Za-z]+day,?\s+)?'
     dm = (re.search(r'Static data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
           or re.search(r'Data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
@@ -118,7 +118,7 @@ def as_of_date(t, warn):
     return as_of
 
 
-def chart_fields(t, price, warn):
+def chart_fields(t: str, price: float | None, warn: list[str]) -> tuple[int | None, bool]:
     """(points, chart_ok) for the main price chart."""
     labels, prices = rl.chart_series(t)
     if labels is None:
@@ -133,7 +133,7 @@ def chart_fields(t, price, warn):
     return len(prices), ends_at_price and len(prices) == len(labels)
 
 
-def editions(t, as_of, price, warn):
+def editions(t: str, as_of: str | None, price: float | None, warn: list[str]) -> tuple[list[list], str | None]:
     """([as_of, price, note] per published edition, newest last; the delta box's state or None). The prior
     edition is read back out of the report's own "what changed" box, so the box and the manifest cannot
     disagree — there is no separate state file."""
@@ -148,7 +148,7 @@ def editions(t, as_of, price, warn):
             box.group('state'))
 
 
-def structure_ok(t, warn):
+def structure_ok(t: str, warn: list[str]) -> bool:
     s = rl.structure_counts(t)
     if not all(s[k] == 1 for k in rl.SKELETON):
         warn.append('document_skeleton_incomplete')
@@ -159,13 +159,26 @@ def structure_ok(t, warn):
     return not any(w.startswith(('document_skeleton', 'canvas_count')) for w in warn)
 
 
-def extract(path, cards, full_metrics=False):
+def card_checks(card: dict, ticker: str | None, warn: list[str]) -> None:
+    if not card:
+        warn.append('not_carded_on_index')
+    elif ticker and card.get('ticker') != ticker:
+        warn.append(f"card_ticker_mismatch:{card.get('ticker')}")
+
+
+def key_metrics(metrics: dict) -> dict[str, float | str]:
+    """The KEY_METRICS the page has: the number when the cell is one, else its text."""
+    return {key: (metrics[label]['number'] if metrics[label]['number'] is not None else metrics[label]['text'])
+            for label, key in KEY_METRICS.items() if label in metrics}
+
+
+def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = False) -> dict:
     """One report page -> its manifest record."""
     t = rl.read_text(path)
     slug = os.path.basename(path).replace('_analysis.html', '')
     warn = []
     ticker, name = title_fields(t, warn)
-    sector, industry = industry_fields(t, warn)
+    _sector, industry = industry_fields(t, warn)   # the card's industry label is canonical; the page's is kept raw
     price = rl.header_price(t)
     if price is None:
         warn.append('price_missing')
@@ -181,10 +194,7 @@ def extract(path, cards, full_metrics=False):
     struct_ok = structure_ok(t, warn)
     sha, size = blob_sha(path)
     card = cards.get(slug, {})
-    if not card:
-        warn.append('not_carded_on_index')
-    elif ticker and card.get('ticker') != ticker:
-        warn.append(f"card_ticker_mismatch:{card.get('ticker')}")
+    card_checks(card, ticker, warn)
     ix = card.get('indices', {})
 
     rec = {
@@ -198,10 +208,7 @@ def extract(path, cards, full_metrics=False):
         'metrics_count': len(metrics), 'bytes': size, 'blob_sha': sha, 'structure_ok': struct_ok,
         'editions': eds, 'delta_state': delta_state, 'warnings': warn or None,
     }
-    for label, key in KEY_METRICS.items():
-        if label in metrics:
-            v = metrics[label]
-            rec[key] = v['number'] if v['number'] is not None else v['text']
+    rec.update(key_metrics(metrics))
     if full_metrics:
         rec['metrics'] = metrics
     # drop nulls: a missing key means "not extracted", which the warnings explain
@@ -210,7 +217,7 @@ def extract(path, cards, full_metrics=False):
 
 # ---------- the files ----------
 
-def write_json(path, obj):
+def write_json(path: str, obj: dict) -> int:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(obj, fh, ensure_ascii=False, sort_keys=False, separators=(',', ':'), indent=None)
@@ -218,7 +225,7 @@ def write_json(path, obj):
     return os.path.getsize(path)
 
 
-def reconciliation(reports, cards):
+def reconciliation(reports: list[dict], cards: dict[str, rl.IndexCard]) -> dict:
     carded, filed = set(cards), {r['slug'] for r in reports}
     return {
         'report_files': len(filed),
@@ -231,7 +238,7 @@ def reconciliation(reports, cards):
     }
 
 
-def print_coverage(reports, full_metrics):
+def print_coverage(reports: list[dict], full_metrics: bool) -> None:
     fields = ['ticker', 'name', 'exchange', 'sector_key', 'industry', 'industry_raw', 'as_of', 'price',
               'change_pct', 'market_cap', 'w52', 'chart_points', 'eps_ttm', 'pe_forward', 'yield_pct']
     for f in fields:
@@ -246,7 +253,7 @@ def print_coverage(reports, full_metrics):
         print(f'     {w:34s} {c}', file=sys.stderr)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description='Build the report manifest from the published report pages.')
     ap.add_argument('repo', nargs='?', default='.', help='repo root (default: current directory)')
     ap.add_argument('-o', dest='out', help='top-level output file (default: <repo>/data/reports.json)')

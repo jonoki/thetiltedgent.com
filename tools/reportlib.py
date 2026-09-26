@@ -9,6 +9,7 @@ import html as htmllib
 import json
 import os
 import re
+from typing import TypedDict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo root, from this file's place in tools/
 
@@ -32,17 +33,17 @@ _DASHES = str.maketrans({'\u2212': '-', '\u2013': '-', '\u2014': '-'})   # minus
 
 # ---------- text and numbers ----------
 
-def read_text(path):
+def read_text(path: str) -> str:
     with open(path, encoding='utf-8') as fh:
         return fh.read()
 
 
-def strip_tags(s):
+def strip_tags(s: str) -> str:
     """Markup removed and entities decoded: the text a reader sees in a cell or span."""
     return htmllib.unescape(re.sub(r'<[^>]+>', '', s)).strip()
 
 
-def to_number(s):
+def to_number(s: str | None) -> float | None:
     """A whole string read as one number: '1,234.5', '$12.30', '4.1%', '−3.2' -> float; anything else -> None."""
     if s is None:
         return None
@@ -53,7 +54,7 @@ def to_number(s):
         return None
 
 
-def first_number(s):
+def first_number(s: str | int | float | None) -> float | None:
     """The first number in a text cell: '12.4x (vs 18x)' -> 12.4. None for n/m, n/a or no number.
     Brackets or a leading minus make it negative: '($1.2B)' -> -1.2. Numbers pass through as floats."""
     if s is None:
@@ -70,7 +71,7 @@ def first_number(s):
     return -v if (m.group(1) or m.group(2)) else v
 
 
-def iso_date(text):
+def iso_date(text: str | None) -> str | None:
     """'September 10, 2026' -> '2026-09-10'; None when it is not a date in that form."""
     if not text:
         return None
@@ -82,7 +83,7 @@ def iso_date(text):
 
 # ---------- what a report page says ----------
 
-def parse_title(t):
+def parse_title(t: str) -> tuple[str | None, str | None]:
     """(ticker, name) from the <title>: 'AAPL — Apple Inc. | Stock Analysis' or 'Apple Inc. (AAPL) — …'.
     Either part is None when the title is in neither form."""
     m = re.search(r'<title>\s*([A-Z][A-Z0-9.\-]*)\s*[\u2014\u2013\-]\s*(.*?)\s*(?:\|[^<]*)?</title>', t, re.S)
@@ -94,7 +95,7 @@ def parse_title(t):
     return None, None
 
 
-def header_price(t):
+def header_price(t: str) -> float | None:
     """The price in the report header ($ and commas removed), or None."""
     m = (re.search(r'class="price-current"[^>]*>\s*\$?([\d,]+\.\d+)', t)
          or re.search(r'class="price[ "][^>]*>\s*\$?([\d,]+\.\d+)', t)
@@ -102,12 +103,12 @@ def header_price(t):
     return to_number(m.group(1)) if m else None
 
 
-def _js_arrays(t, name):
+def _js_arrays(t: str, name: str) -> list[str]:
     """The body of every `const|let|var <name> = [...]` in the page's scripts."""
     return [m.group(1) for m in re.finditer(r'(?:const|let|var)\s+' + name + r'\s*=\s*\[(.*?)\]\s*;', t, re.S)]
 
 
-def _labels(body):
+def _labels(body: str) -> list[str]:
     """Quoted strings in an array body, unescaped; allows 'Sep \\'21', "Oct '21" and `Nov 21`."""
     out = []
     for dq, sq, bq in re.findall(r'"((?:\\.|[^"\\])*)"|\'((?:\\.|[^\'\\])*)\'|`([^`]*)`', body):
@@ -115,14 +116,14 @@ def _labels(body):
     return out
 
 
-def _numbers(body):
+def _numbers(body: str) -> list[float]:
     """Numbers in an array body, split on commas (a character class containing ',' would swallow a
     whole array written without spaces as one token). Entries that are not numbers are dropped."""
     vals = (to_number(part.strip()) for part in body.split(',') if part.strip())
     return [v for v in vals if v is not None]
 
 
-def chart_series(t):
+def chart_series(t: str) -> tuple[list[str], list[float]] | tuple[None, None]:
     """(labels, prices) of the main price chart, or (None, None) when the page defines no arrays.
     A page may define more than one series; the main one is the first labels/prices pair of equal length,
     else the first of each."""
@@ -137,14 +138,14 @@ def chart_series(t):
 _DASH = r'(?:&ndash;|&mdash;|&#8211;|&#x2013;|[\u2013\-\u2014])'
 
 
-def range_52w(t):
+def range_52w(t: str) -> list[float | None] | None:
     """[low, high] from the metrics-table 52-week row (else the first '52-week range $x – $y' in the page)."""
     m = (re.search(r'52-Week Range[^<]*</t[dh]>\s*<td[^>]*>\s*\$?([\d,]+\.\d+)\s*' + _DASH + r'\s*\$?([\d,]+\.\d+)', t, re.S)
          or re.search(r'52[- ]Week Range.{0,120}?\$([\d,]+\.\d+)\s*' + _DASH + r'\s*\$([\d,]+\.\d+)', t, re.S))
     return [to_number(m.group(1)), to_number(m.group(2))] if m else None
 
 
-def structure_counts(t):
+def structure_counts(t: str) -> dict[str, int]:
     """How many of each skeleton element the page has; a sound page has exactly one of each tag pair."""
     return {
         'doctype': t.count('<!DOCTYPE'),
@@ -167,7 +168,22 @@ SKELETON = ('doctype', 'html', 'head', 'body', 'body_close', 'html_close')
 
 # ---------- the index page and the manifest's data files ----------
 
-def parse_index_cards(repo=ROOT):
+class IndexMembership(TypedDict):
+    sp500_added: str | None      # 'YYYY-MM-DD' the name joined the S&P 500, when it is a member
+    nasdaq100: bool
+    dow30_added: str | None
+    global_exchange: str | None  # home exchange of a non-US-index name
+
+
+class IndexCard(TypedDict):
+    ticker: str
+    card_name: str
+    card_industry: str
+    card_sector_key: str | None  # the sector group the card sits in
+    indices: IndexMembership
+
+
+def parse_index_cards(repo: str = ROOT) -> dict[str, 'IndexCard']:
     """Per report slug on reports/index.html: ticker, name, industry, sector group and index membership."""
     p = os.path.join(repo, 'reports', 'index.html')
     if not os.path.exists(p):
@@ -204,13 +220,13 @@ def parse_index_cards(repo=ROOT):
     return out
 
 
-def load_manifest(repo=ROOT):
+def load_manifest(repo: str = ROOT) -> dict:
     """data/reports.json, the manifest's top-level file."""
     with open(os.path.join(repo, 'data', 'reports.json'), encoding='utf-8') as fh:
         return json.load(fh)
 
 
-def load_report_records(repo=ROOT):
+def load_report_records(repo: str = ROOT) -> dict[str, dict]:
     """Every manifest record, slug -> record, from the shards the manifest lists (not every file in the
     folder, so a shard left over from an older build cannot add stale or duplicate records)."""
     recs = {}
@@ -221,7 +237,7 @@ def load_report_records(repo=ROOT):
     return recs
 
 
-def report_paths(repo=ROOT, assets=False):
+def report_paths(repo: str = ROOT, assets: bool = False) -> list[str]:
     """Sorted paths of the stock reports (and the ETF, crypto and bond reports when assets=True)."""
     pats = [STOCK_REPORTS] + (ASSET_REPORTS if assets else [])
     return sorted(p for pat in pats for p in glob.glob(os.path.join(repo, pat)))

@@ -12,8 +12,14 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tools/
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'tables'))
+
 import asset_cards  # noqa: E402
+import build_chips  # noqa: E402
+import build_tables  # noqa: E402
 import card_tags    # noqa: E402
+import chart_audit  # noqa: E402
+import chrome       # noqa: E402
 import deltabox     # noqa: E402
 import manifest     # noqa: E402
 import reportlib as rl   # noqa: E402
@@ -217,6 +223,96 @@ class DeltaBox(unittest.TestCase):
         self.assertIn('data-prior-as-of="2026-08-17"', b)
         self.assertIn('tg-d-pct dn', b)
         self.assertIn('17 Aug 2026 &rarr; 1 Sep 2026 &middot; 15 days', b)
+
+
+class Chrome(unittest.TestCase):
+    def test_nav_marks_only_the_active_section(self):
+        n = chrome.nav('tables')
+        self.assertEqual(n.count('aria-current="page"'), 1)
+        self.assertIn('<a href="/tables/casino-games.html" aria-current="page">The Tables</a>', n)
+        self.assertNotIn('aria-current', chrome.nav(None))
+
+    def test_a_page_keeps_its_own_fine_print(self):
+        own = '<footer><p><b>The fine print, craps edition.</b> A practice table.</p></footer>'
+        self.assertEqual(chrome.old_fine(own), '<b>The fine print, craps edition.</b> A practice table.')
+        self.assertEqual(chrome.old_fine('<footer><p>Nothing here.</p></footer>'), chrome.SITE_FINE)
+
+    def test_write_chrome_replaces_the_nav_once(self):
+        page = ('<html><head><meta charset="UTF-8"><style></style></head><body><nav>old</nav>'
+                '<footer><p><b>The fine print:</b> ours.</p></footer></body></html>')
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'page.html')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write(page)
+            self.assertTrue(chrome.write_chrome(p, 'reports', True))
+            self.assertFalse(chrome.write_chrome(p, 'reports', True))   # a second run changes nothing
+            out = rl.read_text(p)
+        self.assertIn('aria-current="page">Reports</a>', out)
+        self.assertIn('<b>The fine print:</b> ours.', out)
+        self.assertIn('/assets/site.css', out)
+        self.assertIn('/assets/site.js', out)
+
+    def test_a_page_without_a_nav_is_an_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'page.html')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write('<html><body></body></html>')
+            with self.assertRaises(ValueError):
+                chrome.write_chrome(p, None, False)
+
+
+class TablesBuilder(unittest.TestCase):
+    def test_page_links(self):
+        first, second = build_tables.GAMES[0], build_tables.GAMES[1]
+        self.assertIn('<span></span>', build_tables.page_links(None, second))
+        self.assertIn(f'href="{first.slug}.html"', build_tables.page_links(first, None))
+        self.assertNotIn('class="next"', build_tables.page_links(first, None))
+
+    def test_crumbs_escape_the_current_title(self):
+        c = build_tables.crumbs(('blackjack.html', 'Blackjack'), 'Hold & Draw')
+        self.assertTrue(c.endswith('<a href="blackjack.html">Blackjack</a><span>/</span>Hold &amp; Draw</div>'))
+
+    def test_family_tabs(self):
+        self.assertIn('<a href="blackjack-variants.html" class="on">Variants</a>', build_tables.family_tabs('blackjack-variants'))
+        self.assertEqual(build_tables.family_tabs('roulette'), '')
+
+    def test_simulator_needs_one_advantage_play_box(self):
+        with self.assertRaises(ValueError):
+            build_tables.with_sim('<section class="game" id="x"></section>', 'x', 'SIM')
+        sec = build_tables.with_sim('<section class="game" id="x">\n' + build_tables.AP_MARKER + '</div></section>', 'x', 'SIM')
+        self.assertIn('class="game first"', sec)
+        self.assertIn('SIM\n' + build_tables.AP_MARKER, sec)
+        self.assertIn('n: 700', build_tables.sim_scripts('baccarat'))
+        self.assertIn('n: 500', build_tables.sim_scripts('craps'))
+
+
+class ChartAudit(unittest.TestCase):
+    def test_labels(self):
+        self.assertEqual(chart_audit.parse_label("Sep '21"), (2021, 9))
+        self.assertEqual(chart_audit.parse_label('September 2021'), (2021, 9))
+        self.assertEqual(chart_audit.parse_label('2021-09'), (2021, 9))
+        self.assertIsNone(chart_audit.parse_label('Q3'))
+
+    def test_classify(self):
+        self.assertEqual(chart_audit.classify(102, 100, None, 1.0), 'ok')             # within 3%
+        self.assertEqual(chart_audit.classify(90, 100, 91, 1.0), 'adjusted')         # matches the dividend-adjusted close
+        self.assertEqual(chart_audit.classify(120, 100, None, 1.2), 'basis step')    # a real pre-spin close
+        self.assertEqual(chart_audit.classify(120, 100, 101, 1.0), 'wrong')
+
+    def test_spin_factor_counts_only_small_splits_between_the_month_and_the_as_of(self):
+        splits = [('2024-06-03', 1.1), ('2025-01-10', 2.0), ('2026-12-01', 1.05)]
+        self.assertAlmostEqual(chart_audit.spin_factor(splits, (2024, 5), '2026-09-21'), 1.1)   # 2:1 is a real split
+        self.assertEqual(chart_audit.spin_factor(splits, (2024, 7), '2026-09-21'), 1.0)
+
+
+class Chips(unittest.TestCase):
+    def test_eight_alternating_edge_spots(self):
+        s = build_chips.spots('#aaa', '#bbb')
+        self.assertEqual(s.count('<path '), 8)
+        self.assertEqual((s.count('#aaa'), s.count('#bbb')), (4, 4))
+
+    def test_imports_without_fonttools(self):
+        self.assertIsNone(build_chips.GS)   # the font is only loaded by main()
 
 
 if __name__ == '__main__':

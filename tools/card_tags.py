@@ -21,8 +21,6 @@ from collections import Counter
 
 import reportlib as rl
 
-ROOT = rl.ROOT
-
 # Full names only, so a street or city word ("West Wen Yi Road", "New Delhi", "Prince Edward Island") never
 # reads as a state; multi-word names are matched whole, longest first.
 US_STATES = [
@@ -53,7 +51,8 @@ HQ_FALLBACK = {  # reports with no "HQ:" line (from Wikipedia's constituent list
 }
 
 
-def hq_of(slug, text):
+def hq_of(slug: str, text: str) -> list[str] | None:
+    """[short label, full head-office text] from the page's "HQ:" line, or None when it cannot be reduced to one."""
     m = re.search(r'HQ:?\s*</span>\s*([^<]{3,160})|HQ:\s*([^<]{3,160})', text)
     full = html.unescape((m.group(1) or m.group(2)).strip()) if m else HQ_FALLBACK.get(slug)
     if not full:
@@ -73,60 +72,64 @@ def hq_of(slug, text):
     return [f'{country}-based', full]
 
 
-def load_json(*parts, default=None):
+def load_json(*parts: str, default: dict | None = None) -> dict:
     """A JSON file under the repo; `default` when it does not exist (None: it must exist)."""
-    p = os.path.join(ROOT, *parts)
+    p = os.path.join(rl.ROOT, *parts)
     if default is not None and not os.path.exists(p):
         return default
     with open(p, encoding='utf-8') as fh:
         return json.load(fh)
 
 
-def main():
+def hand_tags(h: dict) -> dict[str, list]:
+    """The ♥ what-you-know-them-for, ♠ theme and ★ key-people tags the report has."""
+    c = {k: h[k] for k in ('hw', 'th') if h.get(k)}
+    if h.get('pp'):
+        # a New CEO tag carries its start month so the page can drop it after two years
+        c['pp'] = [p + [h['since']] if (p[0] == 'New CEO' and h.get('since')) else p for p in h['pp']]
+    return c
+
+
+def card_for(slug: str, style: dict, record: dict, text: str, line: str | None, hand: dict, logo: dict) -> dict:
+    """Everything on one report card besides its index badges (keys listed in the module docstring)."""
+    c = {}
+    if style.get('tags'):
+        c['st'] = [[t['tag'], t['tip']] for t in style['tags']]
+    if style.get('yield') is not None:
+        c['dv'] = style['yield']
+    hq = hq_of(slug, text)
+    if hq:
+        c['hq'] = hq
+    eds = record.get('editions') or []
+    if len(eds) > 1:
+        c['ed'] = [eds[-1][0], eds[-2][0], eds[-2][1]]
+    if line:
+        c['ln'] = line
+    if slug in SP_NOTE:
+        c['sp'] = SP_NOTE[slug]
+    c.update(hand_tags(hand))
+    if logo.get('ext') and os.path.exists(os.path.join(rl.ROOT, 'assets', 'logos', f"{slug}.{logo['ext']}")):
+        c['lg'] = f"../assets/logos/{slug}.{logo['ext']}"
+    return c
+
+
+def main() -> None:
     style = {d['slug']: d for d in load_json('data', 'style_tags.json')['reports']}
     lines = load_json('claude', 'card_lines.json', default={})
     hand = load_json('claude', 'hand_tags.json', default={})           # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
     logos = load_json('assets', 'logos', 'index.json', default={})     # logo files + where each came from
-    man = rl.load_report_records(ROOT)
-    out, no_hq = {}, []
+    man = rl.load_report_records()
+    out = {}
     for slug in sorted(style):
-        s, r = style[slug], man.get(slug, {})
-        text = rl.read_text(os.path.join(ROOT, 'reports', f'{slug}_analysis.html'))[:80000]
-        c = {}
-        if s.get('tags'):
-            c['st'] = [[t['tag'], t['tip']] for t in s['tags']]
-        if s.get('yield') is not None:
-            c['dv'] = s['yield']
-        h = hq_of(slug, text)
-        if h:
-            c['hq'] = h
-        else:
-            no_hq.append(slug)
-        eds = r.get('editions') or []
-        if len(eds) > 1:
-            c['ed'] = [eds[-1][0], eds[-2][0], eds[-2][1]]
-        if lines.get(slug):
-            c['ln'] = lines[slug]
-        if slug in SP_NOTE:
-            c['sp'] = SP_NOTE[slug]
-        h = hand.get(slug) or {}
-        for k in ('hw', 'th'):
-            if h.get(k):
-                c[k] = h[k]
-        if h.get('pp'):
-            # a New CEO tag carries its start month so the page can drop it after two years
-            c['pp'] = [p + [h['since']] if (p[0] == 'New CEO' and h.get('since')) else p for p in h['pp']]
-        lg = logos.get(slug) or {}
-        if lg.get('ext') and os.path.exists(os.path.join(ROOT, 'assets', 'logos', f"{slug}.{lg['ext']}")):
-            c['lg'] = f"../assets/logos/{slug}.{lg['ext']}"
-        out[slug] = c
+        text = rl.read_text(os.path.join(rl.ROOT, 'reports', f'{slug}_analysis.html'))[:80000]
+        out[slug] = card_for(slug, style[slug], man.get(slug, {}), text, lines.get(slug), hand.get(slug) or {}, logos.get(slug) or {})
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
-    p = os.path.join(ROOT, 'data', 'card_tags.json')
+    p = os.path.join(rl.ROOT, 'data', 'card_tags.json')
     with open(p, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(doc, fh, ensure_ascii=False, separators=(',', ':'))
-    print(f'{len(out)} cards -> {os.path.relpath(p, ROOT)} ({os.path.getsize(p) // 1024} KB)')
+    print(f'{len(out)} cards -> {os.path.relpath(p, rl.ROOT)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
-    print('no HQ tag:', no_hq)
+    print('no HQ tag:', [slug for slug, c in out.items() if 'hq' not in c])
     print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()),
           ' hand tags:', sum('hw' in c for c in out.values()), ' logos:', sum('lg' in c for c in out.values()))
 

@@ -25,19 +25,17 @@ LATTICE_STEP = 34                # card-back diagonal lattice spacing
 GS = CMAP = UPM = None           # the loaded font's glyph set, character map and units per em (see load_font)
 
 
-def load_font(path):
+def load_font(path: str) -> None:
+    """Load the Cinzel font the text is drawn in. Raises ImportError when fontTools is not installed."""
     global GS, CMAP, UPM
-    try:
-        from fontTools.ttLib import TTFont
-    except ImportError:
-        sys.exit('build_chips.py needs fontTools: py -3 -m pip install fonttools')
+    from fontTools.ttLib import TTFont   # imported here: only this script needs fontTools
     font = TTFont(path)
     GS, CMAP, UPM = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
 
 
-def text_path(s, size, x, y, anchor='middle', spacing=0):
+def text_path(s: str, size: float, x: float, y: float, anchor: str = 'middle', spacing: float = 0) -> str:
     """Return SVG <path>s for string s in Cinzel 700, baseline at y, sized in px."""
-    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.svgPathPen import SVGPathPen   # see load_font
     scale = size / UPM; parts = []; adv = 0
     glyphs = [CMAP.get(ord(c)) for c in s]
     widths = [GS[g].width if g else 0 for g in glyphs]
@@ -51,7 +49,7 @@ def text_path(s, size, x, y, anchor='middle', spacing=0):
     return ''.join(parts)
 
 
-def read_mark(path):
+def read_mark(path: str) -> tuple[str, str]:
     """(the <defs> block, the monogram's paths) from the source chip mark."""
     with open(path, encoding='utf-8') as fh:
         src = fh.read()
@@ -61,7 +59,7 @@ def read_mark(path):
     return defs, mono[mono.index('>') + 1:-4]   # the paths only
 
 
-def spots(a, b):
+def spots(a: str, b: str) -> str:
     """The eight edge spots: arcs at r=470, alternating colours a and b."""
     out = ''
     for i in range(8):
@@ -80,7 +78,8 @@ CHIPS = [  # value, inlay gradient (centre, mid, edge), rim/body field (chip col
 ]
 
 
-def chip_svg(defs, monogram, v, disc, body, spot, txtc):
+def chip_svg(defs: str, monogram: str, v: int, disc: tuple[str, str, str], body: tuple[str, str, str],
+             spot: tuple[str, str], txtc: str) -> str:
     d = re.sub(r'<radialGradient id="body".*?</radialGradient>', '<radialGradient id="body" cx="38%%" cy="30%%" r="78%%"><stop offset="0" stop-color="%s"/><stop offset="0.55" stop-color="%s"/><stop offset="1" stop-color="%s"/></radialGradient>' % body, defs, flags=re.S)
     d = re.sub(r'<radialGradient id="disc".*?</radialGradient>', '<radialGradient id="disc" cx="42%%" cy="34%%" r="72%%"><stop offset="0" stop-color="%s"/><stop offset="0.62" stop-color="%s"/><stop offset="1" stop-color="%s"/></radialGradient>' % disc, d, flags=re.S)
     label = '$' + ('{:,}'.format(v))
@@ -109,7 +108,7 @@ def chip_svg(defs, monogram, v, disc, body, spot, txtc):
 '''
 
 
-def card_back_svg(defs, monogram):
+def card_back_svg(defs: str, monogram: str) -> str:
     lattice = ''.join('<line x1="%d" y1="0" x2="%d" y2="%d" stroke="#D9A85C" stroke-opacity="0.22" stroke-width="2"/>' % (x, x + CARD_H, CARD_H)
                       for x in range(-CARD_H, CARD_W, LATTICE_STEP))
     lattice += ''.join('<line x1="%d" y1="0" x2="%d" y2="%d" stroke="#D9A85C" stroke-opacity="0.22" stroke-width="2"/>' % (x, x - CARD_H, CARD_H)
@@ -144,26 +143,30 @@ def card_back_svg(defs, monogram):
 '''
 
 
-def write(path, text):
+def write(path: str, text: str) -> None:
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int | str:
     ap = argparse.ArgumentParser(description='Build the TTG chip and card-back SVG masters.')
     ap.add_argument('--font', required=True, help='Cinzel 700 font file (cinzel-latin-700-normal.woff)')
     ap.add_argument('--mark', required=True, help='the source chip mark, ttg-chip.svg')
     args = ap.parse_args(argv)
-    for p in (args.font, args.mark):
-        if not os.path.exists(p):
-            sys.exit(f'not found: {p}')
-    load_font(args.font)
+    missing = [p for p in (args.font, args.mark) if not os.path.exists(p)]
+    if missing:
+        return f'not found: {", ".join(missing)}'
+    try:
+        load_font(args.font)
+    except ImportError:
+        return 'build_chips.py needs fontTools: py -3 -m pip install fonttools'
     defs, monogram = read_mark(args.mark)
     for v, disc, body, spot, txtc in CHIPS:
         write(os.path.join(OUT_CHIPS, 'ttg-chip-%d.svg' % v), chip_svg(defs, monogram, v, disc, body, spot, txtc))
     write(os.path.join(OUT_CARDS, 'ttg-card-back.svg'), card_back_svg(defs, monogram))
     print('chips + card back written')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

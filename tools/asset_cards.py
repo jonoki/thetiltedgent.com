@@ -15,8 +15,7 @@ import sys
 
 import reportlib as rl
 
-ROOT = rl.ROOT
-INDEX = os.path.join(ROOT, 'reports', 'index.html')
+INDEX = os.path.join(rl.ROOT, 'reports', 'index.html')
 
 FAMILIES = {  # folder: (heading, one-line note, sort)
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
@@ -40,7 +39,7 @@ CARD_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" wi
 QUOTED_DEFINITION = {'ust30y'}   # its section 01 opens with the definition quoted from TreasuryDirect
 
 
-def section_01(page):
+def section_01(page: str) -> str:
     page = page[page.find('<body'):]        # the class name also appears in the page's CSS
     m = re.search(r'class="section-title[^>]*>.*?</(?:div|h2)>(.*?)(?:<div class="section"|</section>)', page, re.S)
     if not m:
@@ -48,7 +47,7 @@ def section_01(page):
     return m.group(1)
 
 
-def quoted_definition(page):
+def quoted_definition(page: str) -> str:
     p = re.search(r'<p[^>]*>(.*?)</p>', section_01(page), re.S)
     txt = html.unescape(re.sub(r'<[^>]+>', '', p.group(1))).strip()
     m = re.match(r'^[A-Za-z]+:\s*"[^"]+"', txt)
@@ -57,7 +56,7 @@ def quoted_definition(page):
     return m.group(0)
 
 
-def first_sentence(page):
+def first_sentence(page: str) -> str:
     body = section_01(page)
     for p in re.findall(r'<p[^>]*>(.*?)</p>', body, re.S):
         txt = html.unescape(re.sub(r'<[^>]+>', '', p)).strip()
@@ -72,7 +71,7 @@ def first_sentence(page):
     raise ValueError('no sentence of 30+ characters in section 01')
 
 
-def card(folder, path):
+def card(folder: str, path: str) -> tuple[str, str]:
     """(slug, card markup) for one report. Raises ValueError, saying what is missing, when the page cannot
     be made into a card; main() adds the file name."""
     page = rl.read_text(path)
@@ -91,16 +90,17 @@ def card(folder, path):
                   f'<div class="play"><span class="play-k">{CARD_ICON}What it is</span><p class="line">{e(line)}</p></div></a>')
 
 
-def main():
+def main() -> int | str:
+    """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing marker)."""
     with open(INDEX, encoding='utf-8', newline='') as fh:
         t = fh.read()
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
-        for p in glob.glob(os.path.join(ROOT, 'reports', folder, '*_analysis.html')):
+        for p in glob.glob(os.path.join(rl.ROOT, 'reports', folder, '*_analysis.html')):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:
-                sys.exit(f'{os.path.relpath(p, ROOT)}: {e}')
+                return f'{os.path.relpath(p, rl.ROOT)}: {e}'
         cards.sort(key=(lambda c: TERM.get(c[0], 99)) if order == 'term' else (lambda c: c[0]))
         block = (f'<!-- asset-cards:{folder} (written by tools/asset_cards.py) -->\n<div class="wrap">\n'
                  f'  <h2 class="shead">{head} <span class="scount">{len(cards)}</span></h2>\n'
@@ -108,7 +108,7 @@ def main():
                  f'\n  </div>\n</div>\n<!-- /asset-cards:{folder} -->')
         t, n = re.subn(r'<!-- asset-cards:%s .*?<!-- /asset-cards:%s -->' % (folder, folder), lambda _: block, t, flags=re.S)
         if n != 1:
-            sys.exit(f'marker for {folder} not found in reports/index.html')
+            return f'marker for {folder} not found in reports/index.html'
         t = re.sub(r'(data-fam="%s"[^>]*>.*?<b class="fam-n">)\d+(</b>)' % folder, r'\g<1>%d\g<2>' % len(cards), t, count=1)
         print(f'{folder}: {len(cards)} cards')
     stocks = len(re.findall(r'<a class="rep"(?! asset)', t))
@@ -116,7 +116,8 @@ def main():
     with open(INDEX, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(t)
     print(f'stocks: {stocks}')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

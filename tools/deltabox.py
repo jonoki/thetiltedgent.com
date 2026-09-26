@@ -33,7 +33,7 @@ class Edition(NamedTuple):
     price: float
     state: str           # 'price' | 'print' | 'fix'
     claim: str
-    paras: list          # body paragraphs (HTML)
+    paras: list[str]     # body paragraphs (HTML)
     check: str           # the closing "re-verified / not re-verified" line (HTML)
 
 
@@ -210,12 +210,12 @@ _RECORDS = {
 EDITIONS = {slug: Edition(*fields) for slug, fields in _RECORDS.items()}
 
 
-def day(d):
+def day(d: datetime.date) -> str:
     """'1 Sep 2026' (no leading zero, on every platform: Windows strftime has no %-d)."""
     return f'{d.day} {d:%b %Y}'
 
 
-def box(e):
+def box(e: Edition) -> str:
     d0, d1 = datetime.date.fromisoformat(e.prior_date), datetime.date.fromisoformat(e.as_of)
     pct = (e.price / e.prior_price - 1) * 100
     body = '\n  '.join(f'<p>{p}</p>' for p in e.paras)
@@ -239,7 +239,7 @@ def box(e):
 """
 
 
-def insert_box(path, e):
+def insert_box(path: str, e: Edition) -> bool:
     """Add the box (and, once, its CSS) to one report. Returns False when it already has one."""
     t = rl.read_text(path)
     if 'class="tg-d ' in t:
@@ -256,7 +256,7 @@ def insert_box(path, e):
     return True
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int | str:
     args = sys.argv[1:] if argv is None else argv
     root = args[0] if args else rl.ROOT
     for slug, e in EDITIONS.items():
@@ -264,9 +264,10 @@ def main(argv=None):
         try:
             inserted = insert_box(p, e)
         except (OSError, ValueError) as err:
-            sys.exit(f'{slug}: {err}')
+            return f'{slug}: {err}'
         print(f'  {slug}: box inserted ({e.state})' if inserted else f'  {slug}: already has a box, skipping')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

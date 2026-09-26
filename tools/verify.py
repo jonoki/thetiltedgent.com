@@ -16,7 +16,7 @@ import sys
 import reportlib as rl
 
 
-def table_cells(t):
+def table_cells(t: str) -> dict[str, str]:
     """First two <td> texts of every table row, keyed by the first: metrics labels are often split into
     tooltip spans ("<span>EPS</span> (<span>TTM</span>)"), so rows are read with tags stripped rather than
     by a loose pattern over the page, which picks up numbers from prose or the next row."""
@@ -28,14 +28,14 @@ def table_cells(t):
     return rows
 
 
-def plain_value(cell):
+def plain_value(cell: str) -> float | None:
     """A value cell that is a plain number ('24.1x', '−$1.20'); None for n/m, n/a, ~257x and the like, so an
     unreadable cell yields no P/E check rather than a wrong one."""
     m = re.match(r'^\s*([−-])?\s*\$?([\d,]+(?:\.\d+)?)\s*[x×]?\s*(?:$|\(|—|–|-|\s)', cell)
     return (-1 if m.group(1) else 1) * rl.to_number(m.group(2)) if m else None
 
 
-def pe_pair(t, price):
+def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:
     """(stated trailing P/E, price ÷ EPS) when both are readable and EPS is positive, else (None, None)."""
     rows = table_cells(t)
     pe_cell = next((v for k, v in rows.items() if re.match(r'^Trailing P/?E\b', k)), None)
@@ -46,7 +46,18 @@ def pe_pair(t, price):
     return None, None
 
 
-def check(path):
+def passes(o: dict, path: str) -> bool:
+    """The gate: a sound skeleton, the right canvas count, matched <style> tags, the chart ending on the header
+    price, equal label and price counts, no site nav, the price inside its 52-week range and the title ticker
+    matching the file name. Bond/cash reports (reports/fixed/) carry a third canvas, the yield curve."""
+    want_canvas = 3 if re.search(r'[\\/]fixed[\\/]', os.path.abspath(path)) else 2
+    return bool(all(o[k] == 1 for k in rl.SKELETON + ('head_close',))
+                and o['canvas'] == want_canvas and o['style_open'] == o['style_close']
+                and o['price_match'] and o['n_labels'] == o['n_prices'] and o['sitenav'] == 0
+                and o.get('range_ok', True) and o['title_ok'])
+
+
+def check(path: str) -> dict:
     t = rl.read_text(path)
     out = rl.structure_counts(t)   # a missing </head> (EXPD) or </style> (CAT, blank for five weeks) fails here
     price = rl.header_price(t)
@@ -69,23 +80,18 @@ def check(path):
     out['title_ticker'] = rl.parse_title(t)[0]
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
     out['title_ok'] = norm(out['title_ticker']) == norm(slug)
-    # bond/cash reports (reports/fixed/) carry a third canvas: the yield curve in section 02
-    want_canvas = 3 if re.search(r'[\\/]fixed[\\/]', os.path.abspath(path)) else 2
-    out['OK'] = (all(out[k] == 1 for k in rl.SKELETON + ('head_close',))
-                 and out['canvas'] == want_canvas and out['style_open'] == out['style_close']
-                 and out['price_match'] and out['n_labels'] == out['n_prices'] and out['sitenav'] == 0
-                 and out.get('range_ok', True) and out['title_ok'])
+    out['OK'] = passes(out, path)
     return out
 
 
-def line(path, o):
+def line(path: str, o: dict) -> str:
     skel = ''.join(str(o[k]) for k in ('doctype', 'html', 'head', 'body', 'body_close', 'html_close'))
     return (f"{'PASS' if o['OK'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
             f"n={o['n_labels']}/{o['n_prices']} skel={skel} canvas={o['canvas']} lines={o['lines']} "
             f"pe={o['pe_stated']}/{o['pe_calc']} range={o.get('range_ok')} date={o['date']} title={o['title_ticker']}")
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     files = (sys.argv[1:] if argv is None else argv) or rl.report_paths(assets=True)
     failed = 0
     for f in files:

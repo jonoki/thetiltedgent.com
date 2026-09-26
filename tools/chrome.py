@@ -14,8 +14,6 @@ import sys
 
 import reportlib as rl
 
-ROOT = rl.ROOT
-
 LINKS = [  # (key, label, href) — root-relative so the same markup works at any depth
     ('learn', 'Learn', '/#learn'),
     ('tables', 'The Tables', '/tables/casino-games.html'),
@@ -42,7 +40,7 @@ SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on t
              "something — help exists and taking it is the +EV play.")
 
 
-def nav(active):
+def nav(active: str | None) -> str:
     links = '\n'.join(
         '      <a href="%s"%s>%s</a>' % (href, ' aria-current="page"' if key == active else '', label)
         for key, label, href in LINKS)
@@ -61,7 +59,7 @@ def nav(active):
 </nav>'''
 
 
-def footer(fine):
+def footer(fine: str) -> str:
     links = ' '.join('<a href="%s">%s</a>' % (href, label) for _, label, href in LINKS)
     return f'''<footer class="site">
   <div class="wrap foot">
@@ -81,17 +79,18 @@ def footer(fine):
 </footer>'''
 
 
-def old_fine(block):
+def old_fine(block: str) -> str:
+    """The page's own fine-print paragraph from its old footer, else the site's."""
     for p in re.findall(r'<p[^>]*>(.*?)</p>', block, re.S):
         if re.match(r'\s*<b[^>]*>[^<]*fine print', p, re.I):
             return re.sub(r'<b style="[^"]*">', '<b>', p.strip())
     return SITE_FINE
 
 
-def write_chrome(path, active, has_footer):
+def write_chrome(path: str, active: str | None, has_footer: bool) -> bool:
     """Put the current nav (and footer) into one page and make sure it loads site.css and site.js.
     Returns True when the page changed; raises ValueError when there is no nav or footer to replace."""
-    full = os.path.join(ROOT, path)
+    full = os.path.join(rl.ROOT, path)
     with open(full, encoding='utf-8', newline='') as fh:
         t = fh.read()
     before = t
@@ -120,13 +119,15 @@ def write_chrome(path, active, has_footer):
     return True
 
 
-def main():
+def main() -> int | str:
+    """0 when every page is written, else the problem (the page had no nav or footer to replace)."""
     for path, active, has_footer in PAGES:
         try:
             print('updated' if write_chrome(path, active, has_footer) else 'unchanged', path)
         except ValueError as e:
-            sys.exit(str(e))
+            return str(e)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
