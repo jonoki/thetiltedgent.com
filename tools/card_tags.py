@@ -22,7 +22,6 @@ from typing import TypedDict
 import reportlib as rl
 import repodata as rd
 from headoffice import hq_of
-from style_tags import TagInputs
 
 # S&P 500 badge overrides where the join year shown differs from the card's data-sp date (Oki's decisions)
 SP_NOTE: dict[str, list[int | str]] = {
@@ -35,7 +34,7 @@ class CardTags(TypedDict, total=False):
     st: list[list[str]]
     dv: float
     hq: list[str]
-    ed: list[str | float]
+    ed: list[str | float | None]
     ln: str
     sp: list[int | str]
     hw: list[list[str]]
@@ -82,7 +81,7 @@ def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
     return None
 
 
-def card_for(slug: str, style: TagInputs, record: rd.ReportRecord | None, text: str, line: str | None,
+def card_for(slug: str, style: rd.TagInputs, record: rd.ReportRecord | None, text: str, line: str | None,
              hand: HandTags, logo: str | None) -> CardTags:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
     c: CardTags = {}
@@ -108,7 +107,7 @@ def card_for(slug: str, style: TagInputs, record: rd.ReportRecord | None, text: 
 
 
 def main(repo: str = rd.ROOT) -> int:
-    style: dict[str, TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
+    style: dict[str, rd.TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
     lines = load_json(repo, 'claude', 'card_lines.json', default={})
     hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json', default={})         # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
     logos = load_json(repo, 'assets', 'logos', 'index.json', default={})     # logo files + where each came from
@@ -120,8 +119,7 @@ def main(repo: str = rd.ROOT) -> int:
                              logo_path(repo, slug, logos.get(slug) or {}))
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
     p = os.path.join(repo, 'data', 'card_tags.json')
-    with open(p, 'w', encoding='utf-8', newline='\n') as fh:
-        json.dump(doc, fh, ensure_ascii=False, separators=(',', ':'))
+    rd.write_json(p, doc)
     print(f'{len(out)} cards -> {os.path.relpath(p, repo)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
     print('no HQ tag:', [slug for slug, c in out.items() if 'hq' not in c])

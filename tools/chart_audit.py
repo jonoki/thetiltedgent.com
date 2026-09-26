@@ -239,7 +239,7 @@ def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[i
 
 def main(argv: list[str] | None = None) -> int:
     """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
-    slugs = (sys.argv[1:] if argv is None else argv) or [os.path.basename(p).replace('_analysis.html', '')
+    slugs = (sys.argv[1:] if argv is None else argv) or [rd.slug_of(p)
                                                           for p in rd.report_paths()]
     rows = sorted((audit(slug) for slug in slugs), key=lambda r: r.get('ticker') or r['slug'])   # the manifest's order
     with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:

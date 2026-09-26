@@ -74,7 +74,7 @@ def title_matches(ticker: str | None, path: str) -> bool:
     """The <title> ticker names the file: on 21 Sep 2026 a builder wrote the Cboe report into mtd_analysis.html
     and a PG&E copy into cboe_analysis.html, and every other check passed."""
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
-    return norm(ticker) == norm(os.path.basename(path).replace('_analysis.html', ''))
+    return norm(ticker) == norm(rd.slug_of(path))
 
 
 def check(path: str) -> CheckResult:

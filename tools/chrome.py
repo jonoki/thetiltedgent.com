@@ -12,6 +12,7 @@ import os
 import re
 import sys
 
+import reportlib as rl
 import repodata as rd
 
 LINKS = [  # (key, label, href) — root-relative so the same markup works at any depth
@@ -127,8 +128,7 @@ def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rd
         t = insert_once(t, '</body>', SITE_JS + '\n', path)
     if t == before:
         return False
-    with open(full, 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(t)
+    rl.write_text(full, t)
     return True
 
 

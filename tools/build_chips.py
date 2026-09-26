@@ -15,6 +15,7 @@ import re
 import sys
 from typing import NamedTuple
 
+import reportlib as rl
 import repodata as rd
 
 OUT_CHIPS = os.path.join(rd.ROOT, 'assets', 'chips')
@@ -180,11 +181,6 @@ def card_back_svg(font: Font, defs: str, monogram: str) -> str:
 '''
 
 
-def write(path: str, text: str) -> None:
-    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(text)
-
-
 def main(argv: list[str] | None = None) -> int | str:
     """0 when every master is written, else what stopped it (a missing input, fontTools, a malformed mark)."""
     ap = argparse.ArgumentParser(description='Build the TTG chip and card-back SVG masters.')
@@ -204,8 +200,8 @@ def main(argv: list[str] | None = None) -> int | str:
     except ValueError as e:
         return f'{args.mark}: {e}'
     for chip in CHIPS:
-        write(os.path.join(OUT_CHIPS, f'ttg-chip-{chip.value}.svg'), chip_svg(font, defs, monogram, chip))
-    write(os.path.join(OUT_CARDS, 'ttg-card-back.svg'), back)
+        rl.write_text(os.path.join(OUT_CHIPS, f'ttg-chip-{chip.value}.svg'), chip_svg(font, defs, monogram, chip))
+    rl.write_text(os.path.join(OUT_CARDS, 'ttg-card-back.svg'), back)
     print('chips + card back written')
     return 0
 

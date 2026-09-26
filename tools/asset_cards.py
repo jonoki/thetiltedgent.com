@@ -74,7 +74,7 @@ def card(folder: str, path: str) -> tuple[str, str]:
     """(slug, card markup) for one report. Raises ValueError, saying what is missing, when the page cannot
     be made into a card; main() adds the file name."""
     page = rl.read_text(path)
-    slug = os.path.basename(path).split('_')[0]
+    slug = rd.slug_of(path)
     if slug not in LABEL:
         raise ValueError(f'add a LABEL for {slug} in tools/asset_cards.py')
     tick, name = rl.parse_title(page)
@@ -116,8 +116,7 @@ def main(repo: str = rd.ROOT) -> int | str:
         print(f'{folder}: {len(cards)} cards')
     stocks = len(re.findall(r'<a class="rep"(?! asset)', t))
     t = family_count(t, 'stocks', stocks)
-    with open(index, 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(t)
+    rl.write_text(index, t)
     print(f'stocks: {stocks}')
     return 0
 

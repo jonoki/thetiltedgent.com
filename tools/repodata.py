@@ -6,7 +6,7 @@ import html as htmllib
 import json
 import os
 import re
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import reportlib as rl
 
@@ -17,6 +17,19 @@ STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
 ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ASSET_FAMILIES]
 
 
+def slug_of(path: str) -> str:
+    """reports/aapl_analysis.html -> 'aapl'."""
+    return os.path.basename(path).removesuffix('_analysis.html')
+
+
+def write_json(path: str, obj: object, indent: int | None = None) -> int:
+    """Write a data file the way every generator does: UTF-8, LF, non-ASCII kept, compact unless indent is
+    given, ending in a newline. Returns its size in bytes."""
+    text = json.dumps(obj, ensure_ascii=False, indent=indent, separators=None if indent else (',', ':'))
+    rl.write_text(path, text + '\n')
+    return os.path.getsize(path)
+
+
 def report_path(slug: str, family: str | None = None, repo: str = ROOT) -> str:
     """reports/<slug>_analysis.html, or reports/<family>/<slug>_analysis.html for an ETF, crypto or bond report."""
     return os.path.join(repo, 'reports', *([family] if family else []), f'{slug}_analysis.html')
@@ -24,7 +37,7 @@ def report_path(slug: str, family: str | None = None, repo: str = ROOT) -> str:
 
 class IndexMembership(TypedDict):
     sp500_added: str | None      # 'YYYY-MM-DD' the name joined the S&P 500, when it is a member
-    nasdaq100: bool
+    ndx: bool                    # a Nasdaq-100 member (the card's data-ndx)
     dow30_added: str | None
     global_exchange: str | None  # home exchange of a non-US-index name
 
@@ -54,7 +67,7 @@ class ReportRecord(TypedDict, total=False):
     bytes: int
     blob_sha: str
     structure_ok: bool
-    editions: list[list]            # [as_of, price, note] per published edition, newest last
+    editions: list[list[str | float | None]]   # [as_of, price, note] per published edition, newest last
     delta_state: str
     warnings: list[str]
     pe_trailing: float | str
@@ -77,7 +90,7 @@ class Manifest(TypedDict):
     count: int
     reconciliation: dict[str, object]
     index_fields: list[str]
-    index: list[list]               # [ticker, slug, sector_key, as_of, price]
+    index: list[list[str | float | None]]      # [ticker, slug, sector_key, as_of, price]; any but slug may be None
     shards: dict[str, str]          # sector key -> path of its shard
     shard_counts: dict[str, int]
 
@@ -116,11 +129,13 @@ def parse_index_cards(repo: str = ROOT) -> dict[str, IndexCard]:
             'card_sector_key': sector_of.get(m.group('slug')),
             'indices': {
                 'sp500_added': sp.group(1) if sp else None,
-                'nasdaq100': 'data-ndx' in a,
+                'ndx': 'data-ndx' in a,
                 'dow30_added': dow.group(1) if dow else None,
                 'global_exchange': gl.group(1) if gl else None,
             },
         }
+    if not out:
+        raise ValueError('no report cards found in reports/index.html (has the card markup changed?)')
     return out
 
 
@@ -139,6 +154,18 @@ def load_report_records(repo: str = ROOT) -> dict[str, ReportRecord]:
             for r in json.load(fh)['reports']:
                 recs[r['slug']] = r
     return recs
+
+
+# One report's style-tag inputs, as data/style_tags.json stores them (written by style_tags.py, read by
+# card_tags.py) (keys include 'yield', a keyword, hence the functional form). Each number sits next
+# to the page text it was read from, under 'raw'; 'tags' is added once the thresholds are known.
+TagInputs = TypedDict('TagInputs', {
+    'slug': str, 'ticker': str | None, 'as_of': str | None, 'industry': str | None, 'sp500': bool,
+    'raw': dict[str, str | float | None], 'price': float | None, 'w52_high': float | None, 'mcap': float | None,
+    'fcf': float | None, 'eps': float | None, 'pe': float | None, 'yield': float | None, 'revg': float | None,
+    'roic': float | None, 'de': float | None, 'beta': float | None, 'fcf_yield': float | None,
+    'excluded': NotRequired[str], 'tags': NotRequired[list[dict[str, str]]],
+})
 
 
 def report_paths(repo: str = ROOT, assets: bool = False) -> list[str]:

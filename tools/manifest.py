@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
-"""Build data/reports.json and data/reports/<sector>.json — the machine-readable manifest of every live report.
+"""Build data/reports.json and data/reports/<sector>.json — the machine-readable manifest of every stock report
+(reports/*_analysis.html; the ETF, crypto and bond reports are not in it).
 
 Extracts from the report HTML itself rather than re-researching, so the manifest can never disagree with
 what is actually published. A field that cannot be parsed is left out of the record (a missing key means
-"not extracted") and the record's warnings say why; nothing is guessed.
+"not extracted"); nothing is guessed. The fields the pipeline depends on (ticker, name, industry, price, as-of,
+chart, metrics table, structure, index card) add a warning when missing; the rest (exchange, market cap, change,
+key metrics) are simply absent.
 
 usage:  py -3 tools/manifest.py [repo-root] [-o data/reports.json] [--full-metrics]
 """
 import argparse
 import glob
 import hashlib
-import json
 import os
 import re
 import sys
 from collections import Counter
 from datetime import datetime, timezone
-from typing import Mapping, cast
+from typing import cast
 
 import reportlib as rl
 import repodata as rd
@@ -79,14 +81,14 @@ def meta_field(t: str, label: str) -> str | None:
     return rl.strip_tags(m.group(1)).strip(' ··-') or None
 
 
-def industry_fields(t: str, warn: list[str]) -> tuple[str | None, str | None]:
-    """(sector, industry) from the meta line: variant A carries 'Sector / Industry', variant B the industry alone."""
+def page_industry(t: str, warn: list[str]) -> str | None:
+    """The industry on the page's meta line: variant A carries 'Sector / Industry', variant B the industry alone.
+    The index card's industry label is canonical; this one is kept raw."""
     v = meta_field(t, 'Industry')
     if not v:
         warn.append('industry_missing')
-        return None, None
-    parts = [p.strip() for p in v.split('/', 1)]
-    return (parts[0], parts[1]) if len(parts) > 1 else (None, parts[0])
+        return None
+    return v.split('/', 1)[-1].strip()
 
 
 def change_pct(t: str) -> float | None:
@@ -140,21 +142,22 @@ def editions(t: str, as_of: str | None, price: float | None, warn: list[str]) ->
 
 
 def structure_ok(t: str, path: str, warn: list[str]) -> bool:
-    """reportlib's structure problems go into warn; a legacy site nav is recorded but does not make the page unsound."""
+    """No reportlib structure problem (the same gate verify.py applies); each problem goes into warn."""
     problems = rl.structure_problems(rl.structure_counts(t), path)
     warn.extend(problems)
-    return not any(p != 'has_legacy_sitenav' for p in problems)
+    return not problems
 
 
-def card_fields(card: rd.IndexCard | None) -> dict[str, str | bool | None]:
-    """The record fields the index card supplies (the card's industry label is canonical); None, and ndx False,
-    for a report with no card."""
+def card_sector(card: rd.IndexCard | None) -> dict[str, str | None]:
+    """sector_key and industry from the index card (its industry label is canonical); None without a card."""
+    return {'sector_key': card['card_sector_key'] if card else None, 'industry': card['card_industry'] if card else None}
+
+
+def card_indices(card: rd.IndexCard | None) -> rd.IndexMembership:
+    """The card's index membership; not a member of anything without a card."""
     if card is None:
-        return {'sector_key': None, 'industry': None, 'sp500_added': None, 'ndx': False, 'dow30_added': None,
-                'global_exchange': None}
-    ix = card['indices']
-    return {'sector_key': card['card_sector_key'], 'industry': card['card_industry'], 'sp500_added': ix['sp500_added'],
-            'ndx': bool(ix['nasdaq100']), 'dow30_added': ix['dow30_added'], 'global_exchange': ix['global_exchange']}
+        return {'sp500_added': None, 'ndx': False, 'dow30_added': None, 'global_exchange': None}
+    return card['indices']
 
 
 def card_checks(card: rd.IndexCard | None, ticker: str | None, warn: list[str]) -> None:
@@ -177,10 +180,10 @@ def key_metrics(metrics: dict[str, rl.Metric]) -> dict[str, float | str]:
 def extract(path: str, cards: dict[str, rd.IndexCard], full_metrics: bool = False) -> rd.ReportRecord:
     """One report page -> its manifest record."""
     t = rl.read_text(path)
-    slug = os.path.basename(path).replace('_analysis.html', '')
+    slug = rd.slug_of(path)
     warn: list[str] = []
     ticker, name = title_fields(t, warn)
-    _sector, industry = industry_fields(t, warn)   # the card's industry label is canonical; the page's is kept raw
+    industry = page_industry(t, warn)
     price = rl.header_price(t)
     if price is None:
         warn.append('price_missing')
@@ -197,14 +200,10 @@ def extract(path: str, cards: dict[str, rd.IndexCard], full_metrics: bool = Fals
     sha, size = blob_sha(path)
     card = cards.get(slug)
     card_checks(card, ticker, warn)
-    cf = card_fields(card)
 
     rec: dict[str, object] = {
         'ticker': ticker, 'slug': slug, 'name': name,
-        'sector_key': cf['sector_key'], 'industry': cf['industry'], 'industry_raw': industry,
-        'exchange': meta_field(t, 'Exchange'),
-        'sp500_added': cf['sp500_added'], 'ndx': cf['ndx'],
-        'dow30_added': cf['dow30_added'], 'global_exchange': cf['global_exchange'],
+        **card_sector(card), 'industry_raw': industry, 'exchange': meta_field(t, 'Exchange'), **card_indices(card),
         'as_of': as_of, 'price': price, 'change_pct': change_pct(t), 'market_cap': meta_field(t, r'Mkt Cap'),
         'w52': w52, 'chart_points': points, 'chart_ok': chart_ok,
         'metrics_count': len(metrics), 'bytes': size, 'blob_sha': sha, 'structure_ok': struct_ok,
@@ -218,14 +217,6 @@ def extract(path: str, cards: dict[str, rd.IndexCard], full_metrics: bool = Fals
 
 
 # ---------- the files ----------
-
-def write_json(path: str, obj: Mapping[str, object]) -> int:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
-        json.dump(obj, fh, ensure_ascii=False, separators=(',', ':'))
-        fh.write('\n')
-    return os.path.getsize(path)
-
 
 def reconciliation(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard]) -> dict[str, object]:
     carded, filed = set(cards), {r['slug'] for r in reports}
@@ -268,8 +259,9 @@ def by_sector(reports: list[rd.ReportRecord]) -> dict[str, list[rd.ReportRecord]
 
 
 def manifest_doc(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard],
-                 sectors: dict[str, list[rd.ReportRecord]]) -> rd.Manifest:
-    """The top-level file: answers "what is stale?" and "does the site reconcile?" in one fetch."""
+                 sectors: dict[str, list[rd.ReportRecord]], shard_paths: dict[str, str]) -> rd.Manifest:
+    """The top-level file: answers "what is stale?" and "does the site reconcile?" in one fetch. shard_paths maps
+    each sector to its shard's path relative to the repo, as written."""
     return {
         'schema_version': SCHEMA_VERSION,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -278,7 +270,7 @@ def manifest_doc(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard],
         'reconciliation': reconciliation(reports, cards),
         'index_fields': ['ticker', 'slug', 'sector_key', 'as_of', 'price'],
         'index': [[r.get('ticker'), r['slug'], r.get('sector_key'), r.get('as_of'), r.get('price')] for r in reports],
-        'shards': {k: f'data/reports/{k}.json' for k in sorted(sectors)},
+        'shards': {k: shard_paths[k] for k in sorted(sectors)},
         'shard_counts': {k: len(v) for k, v in sorted(sectors.items())},
     }
 
@@ -288,9 +280,9 @@ def write_shards(shard_dir: str, sectors: dict[str, list[rd.ReportRecord]], repo
     and, left in place, duplicates records."""
     for key, rs in sorted(sectors.items()):
         # deliberately no generated_at: a shard should change only when its content changes
-        sn = write_json(os.path.join(shard_dir, key + '.json'),
+        sn = rd.write_json(os.path.join(shard_dir, key + '.json'),
                         {'schema_version': SCHEMA_VERSION, 'sector_key': key, 'count': len(rs), 'reports': rs})
-        print(f'  data/reports/{key}.json  {len(rs):3d} reports  {sn:7,} bytes', file=sys.stderr)
+        print(f'  {os.path.relpath(os.path.join(shard_dir, key + ".json"), repo)}  {len(rs):3d} reports  {sn:7,} bytes', file=sys.stderr)
     for stale in sorted(set(glob.glob(os.path.join(shard_dir, '*.json'))) -
                         {os.path.join(shard_dir, k + '.json') for k in sectors}):
         os.remove(stale)
@@ -306,14 +298,16 @@ def main(argv: list[str] | None = None) -> int:
     out_path = args.out or os.path.join(args.repo, 'data', 'reports.json')
 
     cards = rd.parse_index_cards(args.repo)
-    files = sorted(glob.glob(os.path.join(args.repo, rd.STOCK_REPORTS)))
+    files = rd.report_paths(args.repo)
     reports = [extract(f, cards, args.full_metrics) for f in files]
     reports.sort(key=lambda r: r.get('ticker') or r['slug'])
     sectors = by_sector(reports)
 
-    n = write_json(out_path, manifest_doc(reports, cards, sectors))
+    shard_dir = os.path.join(os.path.dirname(out_path), 'reports')   # beside the top-level file, wherever -o puts it
+    shard_paths = {k: os.path.relpath(os.path.join(shard_dir, k + '.json'), args.repo).replace(os.sep, '/') for k in sectors}
+    n = rd.write_json(out_path, manifest_doc(reports, cards, sectors, shard_paths))
     print(f'wrote {out_path}  ({len(reports)} reports indexed, {n:,} bytes)', file=sys.stderr)
-    write_shards(os.path.join(os.path.dirname(out_path), 'reports'), sectors, args.repo)
+    write_shards(shard_dir, sectors, args.repo)
     print_coverage(reports, args.full_metrics)
     return 0
 

@@ -31,7 +31,7 @@ class StyleTagInputs(unittest.TestCase):
              'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1,
              'fin_table': {'pe_trailing': '25.0x', 'beta': '0.8'}}
         card: rd.IndexCard = {'ticker': 'ACME', 'card_name': 'Acme', 'card_industry': 'SOFTWARE', 'card_sector_key': None,
-                              'indices': {'sp500_added': '2001-01-01', 'nasdaq100': False, 'dow30_added': None,
+                              'indices': {'sp500_added': '2001-01-01', 'ndx': False, 'dow30_added': None,
                                           'global_exchange': None}}
         d = style_tags.tag_inputs('acme', r, card)
         self.assertEqual((d['ticker'], d['industry'], d['sp500'], d['pe'], d['beta']), ('ACME', 'SOFTWARE', True, 25.0, 0.8))
@@ -50,13 +50,13 @@ class StyleTagRules(unittest.TestCase):
     U = {k: [1.0, 5.0, 10.0, 20.0, 30.0] for k in ('pe', 'revg', 'yield', 'fcf_yield', 'beta', 'roic')}
 
     @staticmethod
-    def inputs(**kw: Any) -> style_tags.TagInputs:
+    def inputs(**kw: Any) -> rd.TagInputs:
         d: dict[str, Any] = {'slug': 'acme', 'ticker': 'ACME', 'as_of': '2026-09-21', 'industry': 'SOFTWARE', 'sp500': True,
              'raw': {'eps_ttm': '$2.00', 'market_cap': '$250.0B'}, 'price': 90.0, 'w52_high': 100.0, 'mcap': 50e9,
              'fcf': None, 'eps': 2.0, 'pe': 20.0, 'yield': None, 'revg': 5.0, 'roic': None, 'de': None, 'beta': 1.0,
              'fcf_yield': None}
         d.update(kw)
-        return cast(style_tags.TagInputs, d)
+        return cast(rd.TagInputs, d)
 
     def tags(self, **kw: Any) -> list[str]:
         return [t for t, _ in style_tags.tags_for(self.inputs(**kw), self.TH, self.U)]

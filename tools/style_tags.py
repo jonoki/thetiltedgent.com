@@ -10,13 +10,12 @@ Inputs per report:
 Every raw text value is kept next to the parsed number so any tag can be traced back to the page.
 """
 import datetime
-import json
 import os
 import re
 import statistics
 import sys
 from collections import Counter
-from typing import NotRequired, Sequence, TypedDict
+from typing import Sequence
 
 import reportlib as rl
 import repodata as rd
@@ -37,15 +36,6 @@ BEATEN_DOWN = 0.60          # price <= 60% of the 52-week high
 QUALITY_MAX_DE = 1.0
 PCT = 0.20                  # top / bottom 20% of S&P 500 members for every rank-based tag
 
-# One report's tag inputs (keys include 'yield', a keyword, hence the functional form). Each number sits next
-# to the page text it was read from, under 'raw'; 'tags' is added once the thresholds are known.
-TagInputs = TypedDict('TagInputs', {
-    'slug': str, 'ticker': str | None, 'as_of': str | None, 'industry': str | None, 'sp500': bool,
-    'raw': dict[str, str | float | None], 'price': float | None, 'w52_high': float | None, 'mcap': float | None,
-    'fcf': float | None, 'eps': float | None, 'pe': float | None, 'yield': float | None, 'revg': float | None,
-    'roic': float | None, 'de': float | None, 'beta': float | None, 'fcf_yield': float | None,
-    'excluded': NotRequired[str], 'tags': NotRequired[list[dict[str, str]]],
-})
 
 
 def money(s: str | None) -> float | None:
@@ -91,7 +81,7 @@ def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> fl
     return round(100 * fcf / mcap, 2)
 
 
-def tag_inputs(slug: str, r: rd.ReportRecord, card: rd.IndexCard | None) -> TagInputs:
+def tag_inputs(slug: str, r: rd.ReportRecord, card: rd.IndexCard | None) -> rd.TagInputs:
     """One report's tag inputs: who it is about (the index card wins over the manifest), every parsed number,
     and under 'raw' the page text each number came from."""
     cells = r.get('fin_table', {})
@@ -99,7 +89,7 @@ def tag_inputs(slug: str, r: rd.ReportRecord, card: rd.IndexCard | None) -> TagI
     industry = (card['card_industry'] if card else None) or r.get('industry')
     w52 = r.get('w52')
     pe, mcap, fcf = rl.first_number(r.get('pe_trailing')), money(r.get('market_cap')), usd_fcf(r.get('fcf'))
-    d: TagInputs = {
+    d: rd.TagInputs = {
         'slug': slug, 'ticker': (card['ticker'] if card else None) or r.get('ticker'), 'as_of': r.get('as_of'),
         'industry': industry, 'sp500': bool(card and card['indices']['sp500_added']),
         'raw': {'pe_trailing': r.get('pe_trailing'), 'eps_ttm': r.get('eps_ttm'), 'yield': r.get('yield_pct'),
@@ -117,16 +107,16 @@ def tag_inputs(slug: str, r: rd.ReportRecord, card: rd.IndexCard | None) -> TagI
     return d
 
 
-def load_tag_inputs(repo: str = rd.ROOT) -> list[TagInputs]:
+def load_tag_inputs(repo: str = rd.ROOT) -> list[rd.TagInputs]:
     """Tag inputs for every report in the manifest, by slug. ValueError when the manifest predates fin_table."""
-    cards = rd.parse_index_cards(repo)
     records = rd.load_report_records(repo)
     if records and not any('fin_table' in r for r in records.values()):
         raise ValueError('the manifest has no fin_table fields: run py -3 tools/manifest.py first')
+    cards = rd.parse_index_cards(repo)
     return [tag_inputs(slug, r, cards.get(slug)) for slug, r in sorted(records.items())]
 
 
-def universe(sp: list[TagInputs]) -> dict[str, list[float]]:
+def universe(sp: list[rd.TagInputs]) -> dict[str, list[float]]:
     """The S&P 500 members' values each rank-based tag is measured against."""
     return {
         'pe': [d['pe'] for d in sp if d['pe'] and d['pe'] > 0 and (d['eps'] is None or d['eps'] > 0)],
@@ -153,7 +143,7 @@ def thresholds_for(u: dict[str, list[float]]) -> dict[str, float]:
     return {k: round(v, 3) for k, v in th.items()}
 
 
-def as_of_note(d: TagInputs) -> str:
+def as_of_note(d: rd.TagInputs) -> str:
     """' Figures as of Sep 21, 2026.' for the tooltips; empty when the report's date was not extracted."""
     if not d['as_of']:
         return ''
@@ -161,14 +151,14 @@ def as_of_note(d: TagInputs) -> str:
     return f" Figures as of {x:%b} {x.day}, {x.year}."
 
 
-def tags_for(d: TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
+def tags_for(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
     """[tag, tooltip] pairs for one report, in display order. Formulas and rationale: claude/TAG_FORMULAS.md."""
     when = as_of_note(d)
     return (earnings_tags(d, th, u, when) + rank_tags(d, th, u, when) + beta_tags(d, th, when)
             + size_and_price_tags(d, th, when) + quality_tags(d, th, u, when))
 
 
-def earnings_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def earnings_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
     """Not yet profitable (a loss over 12 months), else Value (the cheapest 20% by trailing P/E)."""
     tags = []
     profitable = d['eps'] is None or d['eps'] > 0
@@ -179,7 +169,7 @@ def earnings_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]],
     return tags
 
 
-def rank_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def rank_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
     """Growth, Income and Cash machine: the top 20% of S&P 500 members by revenue growth, yield and FCF yield."""
     tags = []
     if d['revg'] is not None and d['revg'] >= th['growth_revg_min']:
@@ -191,7 +181,7 @@ def rank_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], whe
     return tags
 
 
-def size_and_price_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+def size_and_price_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     """Giant (market cap over the cut-off) and Beaten down (price at or under the ratio of its 52-week high)."""
     tags = []
     if d['mcap'] and d['mcap'] >= th['giant_mcap_min']:
@@ -201,7 +191,7 @@ def size_and_price_tags(d: TagInputs, th: dict[str, float], when: str) -> list[l
     return tags
 
 
-def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+def beta_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     """Steady (calmest 20%) or Rollercoaster (most volatile 20%), from the report's 5-year beta."""
     if d['beta'] is None:
         return []
@@ -212,7 +202,7 @@ def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     return []
 
 
-def quality_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def quality_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
     """Quality: top-20% ROIC outside banks, insurers and REITs, with debt-to-equity from 0 up to the cut-off."""
     roic, de = d['roic'], d['de']
     if (roic is None or de is None or NO_QUALITY.search(d['industry'] or '') or roic < th['quality_roic_min']
@@ -235,8 +225,7 @@ def main(repo: str = rd.ROOT) -> int | str:
     out = {'generated_by': 'tools/style_tags.py', 'formulas': 'claude/TAG_FORMULAS.md',
            'universe': 'thresholds from S&P 500 members on reports/index.html (data-sp); applied to every report',
            'thresholds': th, 'sample_sizes': {k: len(v) for k, v in u.items()}, 'excluded': EXCLUDE, 'reports': rows}
-    with open(os.path.join(repo, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n') as fh:
-        json.dump(out, fh, indent=1, ensure_ascii=False)
+    rd.write_json(os.path.join(repo, 'data', 'style_tags.json'), out, indent=1)
 
     print(f"{len(rows)} reports ({len(live)} tagged, {len(rows) - len(live)} excluded); S&P members used for thresholds: {len(sp)}")
     for k, v in th.items():

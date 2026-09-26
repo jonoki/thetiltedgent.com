@@ -34,6 +34,13 @@ def read_text(path: str) -> str:
         return fh.read()
 
 
+def write_text(path: str, text: str) -> None:
+    """Write text as UTF-8 with LF line endings (the repo's rule), creating the folder if needed."""
+    os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(text)
+
+
 def normalize_dashes(s: str) -> str:
     """Minus sign, en dash and em dash -> '-', so a number typed with any of them reads as negative."""
     return s.translate(_DASHES)
