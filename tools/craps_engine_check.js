@@ -23,9 +23,9 @@ var g = CE.create();
 
 /* ---------- 1. edges ---------- */
 console.log('\n1. House edge of every bet (default rules: 3-4-5x, field 3x on 12, buy vig on win, lay vig up front)');
-console.log('   ' + pad('bet', 20) + pad('pays', 26) + pad('edge (exact)', 16) + lpad('edge', 9) + lpad('rolls', 8) + lpad('per roll', 10) + '  band');
+console.log('   ' + pad('bet', 20) + pad('pays', 31) + pad('edge (exact)', 16) + lpad('edge', 9) + lpad('rolls', 8) + lpad('per roll', 10) + '  band');
 g.catalogue.forEach(function (c) {
-  console.log('   ' + pad(c.name, 20) + pad(c.pays, 26) + pad(fq(c.edge), 16) + lpad(c.edgePct.toFixed(3) + '%', 9) +
+  console.log('   ' + pad(c.name, 20) + pad(c.pays, 31) + pad(fq(c.edge), 16) + lpad(c.edgePct.toFixed(3) + '%', 9) +
               lpad(num(c.rolls).toFixed(3), 8) + lpad(c.perRollPct.toFixed(3) + '%', 10) + '  ' + c.band);
 });
 
@@ -51,7 +51,16 @@ var html = fs.readFileSync(path.join(ROOT, 'tables/craps.html'), 'utf8');
 var rows = [], re = /<tr><td>(.*?)<\/td><td class="num (\w+)">([\d.]+)%<\/td><\/tr>/g, m;
 while ((m = re.exec(html))) rows.push({ name: m[1].replace(/&middot;/g, '·').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, "'"), cls: m[2], pct: +m[3] });
 function comboAt(limit) { return CE.create({ odds: limit }).combo('pass').edge; }
-var horn = Q(0); ['two', 'three', 'eleven', 'twelve'].forEach(function (k) { horn = CE.add(horn, CE.mul(Q(1, 4), g.byKey[k].edge)); });
+var horn = g.byKey.horn.edge;
+/* A split bet's edge must equal the unit-weighted average of its parts' edges (computed independently). */
+var SPLITS = { horn: { two: 1, three: 1, eleven: 1, twelve: 1 }, world: { two: 1, three: 1, eleven: 1, twelve: 1, any7: 1 }, ce: { anycraps: 1, eleven: 1 }, hilo: { two: 1, twelve: 1 } };
+console.log('\n   split bets vs the unit-weighted average of their parts');
+Object.keys(SPLITS).forEach(function (k) {
+  var sum = Q(0), u = 0; Object.keys(SPLITS[k]).forEach(function (p) { sum = CE.add(sum, CE.mul(Q(SPLITS[k][p]), g.byKey[p].edge)); u += SPLITS[k][p]; });
+  var avg = CE.div(sum, Q(u));
+  if (ok(CE.eq(avg, g.byKey[k].edge), k + ': engine ' + fq(g.byKey[k].edge) + ' vs parts ' + fq(avg))) console.log('   ok   ' + pad(g.byKey[k].name, 16) + pad(fq(g.byKey[k].edge), 8) + lpad(g.byKey[k].edgePct.toFixed(3) + '%', 9));
+});
+ok(Math.abs(100 * num(g.byKey.ce.edge) - 11.11) < 0.005, 'C&E vs craps.html 11.11%');
 var MAP = [
   [/^Free odds/, g.byKey.odds4.edge], [/^Pass line \+ 3-4-5x/, comboAt('345')], [/^Pass line \+ 2x/, comboAt('2')],
   [/^Pass line \+ 1x/, comboAt('1')], [/^Don't pass/, g.byKey.dontpass.edge], [/^Pass line \/ come/, g.byKey.pass.edge],
@@ -99,7 +108,7 @@ function allBets() {
   });
   [4, 6, 8, 10].forEach(function (n) { out.push({ type: 'hard', num: n }); });
   [6, 8].forEach(function (n) { out.push({ type: 'big', num: n }); });
-  ['field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve'].forEach(function (t) { out.push({ type: t, num: null }); });
+  ['field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'].forEach(function (t) { out.push({ type: t, num: null }); });
   return out;
 }
 var checks = 0, variants = 0;

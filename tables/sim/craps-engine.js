@@ -37,6 +37,16 @@
   var HARD = { 4: Q(7), 6: Q(9), 8: Q(9), 10: Q(7) };
   var PROPS = { any7: { wins: [7], pay: 4 }, anycraps: { wins: [2, 3, 12], pay: 7 },
                 two: { wins: [2], pay: 30 }, three: { wins: [3], pay: 15 }, eleven: { wins: [11], pay: 15 }, twelve: { wins: [12], pay: 30 } };
+  /* One-roll combination bets: the chips are split evenly across one-roll bets (units per part), each part
+     is paid or lost on its own, and the bet settles for the sum. Net per $1 is derived from PROPS. */
+  var MULTI = { horn: { two: 1, three: 1, eleven: 1, twelve: 1 }, world: { two: 1, three: 1, eleven: 1, twelve: 1, any7: 1 },
+                ce: { anycraps: 1, eleven: 1 }, hilo: { two: 1, twelve: 1 } };
+  function multiNet(parts, t) {
+    var net = 0, units = 0;
+    for (var p in parts) { units += parts[p]; net += PROPS[p].wins.indexOf(t) >= 0 ? PROPS[p].pay * parts[p] : -parts[p]; }
+    return Q(net, units);
+  }
+  function multiUnits(parts) { var u = 0; for (var p in parts) u += parts[p]; return u; }
   var VIG = Q(1, 20);                                // 5% commission on buy and lay bets
 
   var DEFAULT_RULES = {
@@ -102,6 +112,7 @@
         default:
           var pr = PROPS[b.type];
           if (pr) return pr.wins.indexOf(t) >= 0 ? W(Q(pr.pay)) : LOSE;
+          if (MULTI[b.type]) { var x = multiNet(MULTI[b.type], t); return x.n > 0 ? W(x) : x.n === 0 ? PUSH : { r: 'lose', x: x }; }
       }
       throw new Error('unknown bet ' + b.type);
     }
@@ -153,6 +164,7 @@
         case 'odds': return ODDS_UNIT[n];
         case 'layodds': return LAY_UNIT[n];
         case 'buy': return 20;                                      // 5% of $20 = $1
+        case 'horn': case 'world': case 'ce': case 'hilo': return multiUnits(MULTI[type]);   // whole dollars on every part
         case 'lay': return 20 * TRUE[n].n / TRUE[n].d;              // lay to win $20: 40 / 30 / 24
       }
       return 1;
@@ -186,7 +198,8 @@
     var NAMES = { pass: 'Pass line', dontpass: 'Don’t pass', come: 'Come', dontcome: 'Don’t come',
                   odds: 'Odds on', layodds: 'Lay odds on', place: 'Place', buy: 'Buy', lay: 'Lay', hard: 'Hard',
                   big: 'Big', field: 'Field', any7: 'Any seven', anycraps: 'Any craps', two: 'Two (aces)',
-                  three: 'Three (ace-deuce)', eleven: 'Eleven (yo)', twelve: 'Twelve (boxcars)' };
+                  three: 'Three (ace-deuce)', eleven: 'Eleven (yo)', twelve: 'Twelve (boxcars)',
+                  horn: 'Horn', world: 'World (whirl)', ce: 'C & E', hilo: 'Hi-Lo' };
     function name(type, n) { return NAMES[type] + (n != null ? ' ' + n : ''); }
     function paysLabel(type, n) {
       switch (type) {
@@ -198,12 +211,16 @@
         case 'lay': return ratio(TRUE[n].d, TRUE[n].n) + ' less 5%';
         case 'hard': return HARD[n].n + ':1';
         case 'field': return '1:1; 2:1 on 2; ' + R.field12 + ':1 on 12';
+        case 'horn': return 'split 4 ways: 2, 3, 11, 12';
+        case 'world': return 'split 5 ways: horn + any 7';
+        case 'ce': return 'split 2 ways: any craps + 11';
+        case 'hilo': return 'split 2 ways: 2 + 12';
       }
       return PROPS[type].pay + ':1';
     }
     /* Odds against winning, among the rolls that settle the bet (single-roll-to-settle bets only). */
     function trueOdds(type, n) {
-      if (type === 'pass' || type === 'dontpass' || type === 'come' || type === 'dontcome' || type === 'field') return null;
+      if (type === 'pass' || type === 'dontpass' || type === 'come' || type === 'dontcome' || type === 'field' || MULTI[type]) return null;
       var w = 0, l = 0;
       COMBOS.forEach(function (c) { var r = step({ type: type, num: n }, c, false); if (r && r.r === 'win') w++; else if (r && r.r === 'lose') l++; });
       return ratio(l, w);
@@ -222,7 +239,7 @@
     ['place', 'buy', 'lay'].forEach(function (t) { POINTS.forEach(function (n) { entry(t, n); }); });
     [4, 6, 8, 10].forEach(function (n) { entry('hard', n); });
     [6, 8].forEach(function (n) { entry('big', n); });
-    ['field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve'].forEach(function (t) { entry(t); });
+    ['field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'].forEach(function (t) { entry(t); });
     var byKey = {}; catalogue.forEach(function (c) { byKey[c.key] = c; });
 
     return { rules: R, step: step, value: value, rolls: rolls, edge: edge, vigRate: vigRate, unit: unit, minBet: minBet,

@@ -60,6 +60,10 @@ window.CrapsTable = (function () {
       case 'three': return 'One roll: wins only on a 3.';
       case 'eleven': return 'One roll: wins only on an 11.';
       case 'twelve': return 'One roll: wins only on a 12 (6+6).';
+      case 'horn': return 'Four one-roll bets in one: your chips are split evenly across 2, 3, 11 and 12. The quarter on the number that rolls is paid at its own odds (30 to 1 or 15 to 1) and the other three quarters lose; any other roll loses the lot. Goes down in multiples of $4.';
+      case 'world': return 'The horn plus any seven, split five ways. A 7 pays the any-seven fifth at 4 to 1, which exactly covers the four horn fifths that lose, so a 7 is a push; a 2, 3, 11 or 12 pays its fifth at 30 or 15 to 1 while the other four fifths lose. Goes down in multiples of $5.';
+      case 'ce': return 'Any craps and eleven, split in half. 2, 3 or 12 pays the craps half at 7 to 1; 11 pays the eleven half at 15 to 1; the other half loses either way. The two circles marked C and E on a real layout. Goes down in multiples of $2.';
+      case 'hilo': return 'The 2 and the 12, split in half. Whichever rolls pays its half at 30 to 1 and the other half loses. Goes down in multiples of $2.';
     }
     return '';
   }
@@ -74,16 +78,19 @@ window.CrapsTable = (function () {
     var h = '<div class="cpt-feltwrap"><div class="cpt-felt" role="group" aria-label="Craps layout">';
     h += '<div class="pass-ext" data-proxy="pass" aria-hidden="true"><span>PASS LINE</span></div>';
     h += '<div class="a-dc">' + z('dontcome', '<b>DON’T COME BAR</b>' + md(6, 6)) + '</div>';
-    /* A number box: the LAY spot above the number (lay bets, and don't come bets that travel here with their
-       lay odds), the number itself for place bets (come bets that travel here sit in it with their odds
-       heeled on top), and the BUY spot below. Clicking your come or don't come stack adds odds to it. */
+    /* A number column: a LAY box above the number, the number itself (where come and don't come bets that
+       travel here sit, with their odds heeled on top; clicking it places the number), then PLACE and BUY boxes.
+       Clicking your come or don't come stack adds odds to it. */
     CE.POINTS.forEach(function (n) {
       h += '<div class="cpt-num a-n' + n + '" data-num="' + n + '">' +
-        z('lay', '<small>LAY</small>', 'strip', ' data-n="' + n + '"') +
-        z('place', '<b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b>', 'big', ' data-n="' + n + '"') +
-        z('buy', '<small>BUY</small>', 'strip', ' data-n="' + n + '"') +
-        '<button type="button" class="z z-cstk cs-come" data-t="odds" data-of="come" data-n="' + n + '" hidden></button>' +
-        '<button type="button" class="z z-cstk cs-dc" data-t="layodds" data-of="dontcome" data-n="' + n + '" hidden></button>' +
+        z('lay', '<small>LAY</small>', 'spot', ' data-n="' + n + '"') +
+        '<div class="nbody" data-proxy="place" data-n="' + n + '">' +
+          '<button type="button" class="z z-cstk cs-dc" data-t="layodds" data-of="dontcome" data-n="' + n + '" hidden></button>' +
+          '<b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b>' +
+          '<button type="button" class="z z-cstk cs-come" data-t="odds" data-of="come" data-n="' + n + '" hidden></button>' +
+        '</div>' +
+        z('place', '<small>PLACE</small>', 'spot', ' data-n="' + n + '"') +
+        z('buy', '<small>BUY</small>', 'spot', ' data-n="' + n + '"') +
         '<span class="puck on" hidden aria-hidden="true">ON</span></div>';
     });
     h += '<div class="a-come">' + z('come', '<b>COME</b>') + '</div>';
@@ -102,7 +109,10 @@ window.CrapsTable = (function () {
       '<div class="pk">ONE ROLL</div>' +
       z('three', md(1, 2) + '<small>15 TO 1</small>') + z('two', md(1, 1) + '<small>30 TO 1</small>') +
       z('twelve', md(6, 6) + '<small>30 TO 1</small>') + z('eleven', md(5, 6) + '<small>15 TO 1</small>') +
-      z('anycraps', '<b>ANY CRAPS</b><small>7 TO 1</small>', 'wide') + '</div>';
+      z('anycraps', '<b>ANY CRAPS</b><small>7 TO 1</small>', 'wide') +
+      '<div class="pk">SPLIT BETS</div>' +
+      z('horn', '<b>HORN</b><small>2·3·11·12</small>') + z('world', '<b>WORLD</b><small>horn + 7</small>') +
+      z('ce', '<b>C &amp; E</b><small>craps + 11</small>') + z('hilo', '<b>HI-LO</b><small>2 + 12</small>') + '</div>';
     h += '<div class="cpt-throw" hidden aria-hidden="true"><div class="cpt-result"></div><span class="die"></span><span class="die"></span></div>';
     return h + '</div></div>';
   }
@@ -228,7 +238,7 @@ window.CrapsTable = (function () {
         spec = { type: t, parent: p.id };
       } else spec = { type: t, num: el.dataset.n ? +el.dataset.n : null };
       var n = p ? p.num : spec.num, u = G.unit(t, n), mn = G.minBet(t, n), cur = T.find(spec), have = cur ? cur.amount : 0;
-      var a = Math.ceil(S.chip / u) * u, note = '';
+      var a = Math.max(1, Math.round(S.chip / u)) * u, note = '';
       if (a !== S.chip) note = G.name(t, n) + ' goes down in $' + u + ' units so it pays in whole dollars.';
       if (have + a < mn) { a = mn - have; note = 'The minimum on ' + G.name(t, n) + ' is ' + usd(mn) + '.'; }
       if (p) {
@@ -554,7 +564,10 @@ window.CrapsTable = (function () {
 
     /* ---------- events ---------- */
     /* The upright arm of the pass line is drawing, not a second button: it hands clicks to the pass line. */
-    function zoneOf(t) { var px = t.closest('[data-proxy]'); return px ? felt.querySelector('.z-' + px.dataset.proxy) : t.closest('.z'); }
+    function zoneOf(t) {
+      var z0 = t.closest('.z'); if (z0) return z0;
+      var px = t.closest('[data-proxy]'); return px ? felt.querySelector('.z-' + px.dataset.proxy + (px.dataset.n ? '[data-n="' + px.dataset.n + '"]' : '')) : null;
+    }
     felt.addEventListener('click', function (e) {
       if (e.target.closest('.cpt-throw')) { if (skipThrow) skipThrow(); return; }
       var el = zoneOf(e.target); if (el) act(el);
