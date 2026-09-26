@@ -59,7 +59,7 @@ def passes(o: CheckResult, path: str) -> bool:
     the title ticker matching the file name."""
     return bool(not rl.structure_problems(o, path)
                 and o['price_match'] and o['n_labels'] == o['n_prices']
-                and o.get('range_ok', True) and o['title_ok'])
+                and o.get('range_ok', False) and o['title_ok'])   # no readable range (or price) fails
 
 
 def check(path: str) -> CheckResult:
@@ -75,7 +75,7 @@ def check(path: str) -> CheckResult:
     out['pe_stated'], out['pe_calc'] = pe_pair(t, price)
     w52 = rl.range_52w(t)
     if w52 and price:
-        out['range'] = tuple(w52)
+        out['range'] = (w52[0], w52[1])
         out['range_ok'] = w52[0] <= price <= w52[1]
     date = re.search(r'Static data as of ([A-Za-z]+ \d+, \d{4})', t)
     out['date'] = date.group(1) if date else None
@@ -89,7 +89,8 @@ def check(path: str) -> CheckResult:
     return out
 
 
-def line(path: str, o: CheckResult) -> str:
+def result_line(path: str, o: CheckResult) -> str:
+    """The one PASS/FAIL line printed for a report."""
     skel = ''.join(str(o[k]) for k in ('doctype', 'html', 'head', 'body', 'body_close', 'html_close'))
     return (f"{'PASS' if o['ok'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
             f"n={o['n_labels']}/{o['n_prices']} skel={skel} canvas={o['canvas']} lines={o['lines']} "
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     for f in files:
         o = check(f)
         failed += not o['ok']
-        print(line(f, o))
+        print(result_line(f, o))
     return 1 if failed else 0
 
 

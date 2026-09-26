@@ -150,11 +150,22 @@ def structure_ok(t: str, path: str, warn: list[str]) -> bool:
     return not any(p != 'has_legacy_sitenav' for p in problems)
 
 
-def card_checks(card: rl.IndexCard | dict, ticker: str | None, warn: list[str]) -> None:
-    if not card:
+def card_fields(card: rl.IndexCard | None) -> dict[str, str | bool | None]:
+    """The record fields the index card supplies (the card's industry label is canonical); None, and ndx False,
+    for a report with no card."""
+    if card is None:
+        return {'sector_key': None, 'industry': None, 'sp500_added': None, 'ndx': False, 'dow30_added': None,
+                'global_exchange': None}
+    ix = card['indices']
+    return {'sector_key': card['card_sector_key'], 'industry': card['card_industry'], 'sp500_added': ix['sp500_added'],
+            'ndx': bool(ix['nasdaq100']), 'dow30_added': ix['dow30_added'], 'global_exchange': ix['global_exchange']}
+
+
+def card_checks(card: rl.IndexCard | None, ticker: str | None, warn: list[str]) -> None:
+    if card is None:
         warn.append('not_carded_on_index')
-    elif ticker and card.get('ticker') != ticker:
-        warn.append(f"card_ticker_mismatch:{card.get('ticker')}")
+    elif ticker and card['ticker'] != ticker:
+        warn.append(f"card_ticker_mismatch:{card['ticker']}")
 
 
 def key_metrics(metrics: dict[str, dict[str, str | float | None]]) -> dict[str, float | str]:
@@ -184,16 +195,16 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
     eds, delta_state = editions(t, as_of, price, warn)
     struct_ok = structure_ok(t, path, warn)
     sha, size = blob_sha(path)
-    card = cards.get(slug, {})
+    card = cards.get(slug)
     card_checks(card, ticker, warn)
-    ix = card.get('indices', {})
+    cf = card_fields(card)
 
     rec = {
         'ticker': ticker, 'slug': slug, 'name': name,
-        'sector_key': card.get('card_sector_key'), 'industry': card.get('card_industry'), 'industry_raw': industry,
+        'sector_key': cf['sector_key'], 'industry': cf['industry'], 'industry_raw': industry,
         'exchange': meta_field(t, 'Exchange'),
-        'sp500_added': ix.get('sp500_added'), 'ndx': bool(ix.get('nasdaq100')),
-        'dow30_added': ix.get('dow30_added'), 'global_exchange': ix.get('global_exchange'),
+        'sp500_added': cf['sp500_added'], 'ndx': cf['ndx'],
+        'dow30_added': cf['dow30_added'], 'global_exchange': cf['global_exchange'],
         'as_of': as_of, 'price': price, 'change_pct': change_pct(t), 'market_cap': meta_field(t, r'Mkt Cap'),
         'w52': w52, 'chart_points': points, 'chart_ok': chart_ok,
         'metrics_count': len(metrics), 'bytes': size, 'blob_sha': sha, 'structure_ok': struct_ok,
@@ -211,7 +222,7 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
 def write_json(path: str, obj: dict[str, object]) -> int:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
-        json.dump(obj, fh, ensure_ascii=False, sort_keys=False, separators=(',', ':'), indent=None)
+        json.dump(obj, fh, ensure_ascii=False, separators=(',', ':'))
         fh.write('\n')
     return os.path.getsize(path)
 

@@ -15,8 +15,6 @@ import sys
 
 import reportlib as rl
 
-INDEX = os.path.join(rl.ROOT, 'reports', 'index.html')
-
 FAMILIES = {  # folder: (heading, one-line note, sort)
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
     'crypto': ('Crypto', 'Cryptoassets, priced at the UTC daily close.', 'az'),
@@ -88,30 +86,36 @@ def card(folder: str, path: str) -> tuple[str, str]:
                   f'<div class="play"><span class="play-k">{CARD_ICON}What it is</span><p class="line">{e(line)}</p></div></a>')
 
 
-def main() -> int | str:
+def family_count(t: str, family: str, n: int) -> str:
+    """t with the count on the family's tab set to n."""
+    return re.sub(rf'(data-fam="{family}"[^>]*>.*?<b class="fam-n">)\d+(</b>)', rf'\g<1>{n}\g<2>', t, count=1)
+
+
+def main(repo: str = rl.ROOT) -> int | str:
     """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing marker)."""
-    with open(INDEX, encoding='utf-8', newline='') as fh:
+    index = os.path.join(repo, 'reports', 'index.html')
+    with open(index, encoding='utf-8', newline='') as fh:
         t = fh.read()
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
-        for p in glob.glob(rl.report_path('*', folder)):
+        for p in glob.glob(rl.report_path('*', folder, repo=repo)):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:
-                return f'{os.path.relpath(p, rl.ROOT)}: {e}'
+                return f'{os.path.relpath(p, repo)}: {e}'
         cards.sort(key=(lambda c: TERM.get(c[0], 99)) if order == 'term' else (lambda c: c[0]))
         block = (f'<!-- asset-cards:{folder} (written by tools/asset_cards.py) -->\n<div class="wrap">\n'
                  f'  <h2 class="shead">{head} <span class="scount">{len(cards)}</span></h2>\n'
                  f'  <p class="famnote">{note}</p>\n  <div class="grid">\n' + '\n'.join(c for _, c in cards) +
                  f'\n  </div>\n</div>\n<!-- /asset-cards:{folder} -->')
-        t, n = re.subn(r'<!-- asset-cards:%s .*?<!-- /asset-cards:%s -->' % (folder, folder), lambda _: block, t, flags=re.S)
+        t, n = re.subn(rf'<!-- asset-cards:{folder} .*?<!-- /asset-cards:{folder} -->', lambda _: block, t, flags=re.S)
         if n != 1:
             return f'marker for {folder} not found in reports/index.html'
-        t = re.sub(r'(data-fam="%s"[^>]*>.*?<b class="fam-n">)\d+(</b>)' % folder, r'\g<1>%d\g<2>' % len(cards), t, count=1)
+        t = family_count(t, folder, len(cards))
         print(f'{folder}: {len(cards)} cards')
     stocks = len(re.findall(r'<a class="rep"(?! asset)', t))
-    t = re.sub(r'(data-fam="stocks"[^>]*>.*?<b class="fam-n">)\d+(</b>)', r'\g<1>%d\g<2>' % stocks, t, count=1)
-    with open(INDEX, 'w', encoding='utf-8', newline='\n') as fh:
+    t = family_count(t, 'stocks', stocks)
+    with open(index, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(t)
     print(f'stocks: {stocks}')
     return 0

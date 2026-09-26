@@ -62,7 +62,8 @@ shape — a consumer that wants one sector fetches ~18 KB instead of the lot.
 Checks document skeleton (including `</head>` and matched `<style>` tags),
 exactly two canvases (three for bond/cash reports under `reports/fixed/`, which
 add a yield-curve chart), equal `labels`/`prices` array lengths, final chart
-value == header price to the cent, that the 52-week range contains the price,
+value == header price to the cent, that the 52-week range contains the price
+(a page with no readable 52-week range fails; every report had one on 26 Sep 2026),
 that the `<title>` ticker matches the file name, and no embedded site nav.
 Prints one PASS/FAIL line per report and **exits 1 if any report fails**.
 P/E is printed as stated/calculated (price ÷ EPS) and is deliberately not part

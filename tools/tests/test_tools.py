@@ -3,7 +3,9 @@
 Each test feeds a small, made-up page or record to one parser, so a change to the report markup rules shows up
 here before it shows up as a wrong tag or a failed gate on the live library.
 """
+import contextlib
 import datetime
+import io
 import json
 import os
 import re
@@ -227,6 +229,39 @@ class ManifestRecords(unittest.TestCase):
             dump('data/reports/unclassified.json', {'reports': [{'slug': 'apa', 'price': 1.0}]})   # stale
             self.assertEqual(rl.load_report_records(repo), {'apa': {'slug': 'apa', 'price': 43.81}})
 
+    INDEX = ('<section class="sgroup" data-s="industrials">'
+             '<a class="rep" data-sp="1999-01-01" data-ndx href="view.html?r=acme"><span class="tick">ACME</span>'
+             '<h3>Acme Widgets</h3><span class="sect">WIDGETS &amp; GEARS</span><span class="ixrow"></span></a>'
+             '<a class="rep" href="view.html?r=gone"><span class="tick">GONE</span>'
+             '<h3>Gone Co</h3><span class="sect">NOTHING</span><span class="ixrow"></span></a></section>')
+
+    def test_manifest_main_builds_shards_reconciles_and_prunes(self):
+        with tempfile.TemporaryDirectory() as repo:
+            for d in ('reports', 'data/reports'):
+                os.makedirs(os.path.join(repo, d))
+            files = {'reports/index.html': self.INDEX, 'reports/acme_analysis.html': PAGE,
+                     'reports/solo_analysis.html': PAGE.replace('ACME', 'SOLO'),
+                     'data/reports/old-sector.json': '{}'}                      # left by an older build
+            for rel, text in files.items():
+                with open(os.path.join(repo, rel), 'w', encoding='utf-8') as fh:
+                    fh.write(text)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(manifest.main([repo]), 0)
+            doc = rl.load_manifest(repo)
+            self.assertEqual(sorted(os.listdir(os.path.join(repo, 'data', 'reports'))), ['industrials.json', 'unclassified.json'])
+            self.assertEqual(doc['index'], [['ACME', 'acme', 'industrials', '2026-09-10', 1234.5],
+                                            ['SOLO', 'solo', None, '2026-09-10', 1234.5]])
+            rec = doc['reconciliation']
+            self.assertEqual((rec['uncarded'], rec['orphan_cards'], rec['structure_failures']), (['solo'], ['gone'], []))
+            acme = rl.load_report_records(repo)['acme']
+            self.assertEqual((acme['industry'], acme['sp500_added'], acme['ndx'], acme['w52']),
+                             ('WIDGETS & GEARS', '1999-01-01', True, [1001.0, 1300.0]))
+            self.assertIn('not_carded_on_index', rl.load_report_records(repo)['solo']['warnings'])
+
+    def test_a_missing_index_page_is_an_error(self):
+        with tempfile.TemporaryDirectory() as repo, self.assertRaises(FileNotFoundError):
+            rl.parse_index_cards(repo)
+
 
 class HeadOffice(unittest.TestCase):
     def label(self, hq):
@@ -270,6 +305,7 @@ class Verify(unittest.TestCase):
         self.assertFalse(self.check(PAGE.replace('</head>', ''))['ok'])                     # skeleton
         self.assertFalse(self.check(PAGE.replace('<canvas></canvas>', '', 1))['ok'])         # canvas count
         self.assertFalse(self.check(PAGE.replace('$1,300.00', '$1,200.00'))['ok'])           # price outside 52w
+        self.assertFalse(self.check(PAGE.replace('52-Week Range', 'Range'))['ok'])            # no 52w range to check
         self.assertFalse(self.check(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>'))['ok'])
 
     def test_pe_is_reported_but_not_a_gate(self):

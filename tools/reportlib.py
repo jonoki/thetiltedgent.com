@@ -171,11 +171,11 @@ def chart_series(t: str) -> tuple[list[str], list[float]] | tuple[None, None]:
 _DASH = r'(?:&ndash;|&mdash;|&#8211;|&#x2013;|[\u2013\-\u2014])'
 
 
-def range_52w(t: str) -> list[float | None] | None:
+def range_52w(t: str) -> list[float] | None:
     """[low, high] from the metrics-table 52-week row (else the first '52-week range $x – $y' in the page)."""
     m = (re.search(r'52-Week Range[^<]*</t[dh]>\s*<td[^>]*>\s*\$?([\d,]+\.\d+)\s*' + _DASH + r'\s*\$?([\d,]+\.\d+)', t, re.S)
          or re.search(r'52[- ]Week Range.{0,120}?\$([\d,]+\.\d+)\s*' + _DASH + r'\s*\$([\d,]+\.\d+)', t, re.S))
-    return [to_number(m.group(1)), to_number(m.group(2))] if m else None
+    return [float(g.replace(',', '')) for g in m.groups()] if m else None   # both groups are plain numbers
 
 
 class StructureCounts(TypedDict):
@@ -263,7 +263,7 @@ class ReportRecord(TypedDict, total=False):
     price: float
     change_pct: float
     market_cap: str
-    w52: list[float | None]         # [low, high]
+    w52: list[float]                # [low, high]
     chart_points: int
     chart_ok: bool
     metrics_count: int
@@ -307,10 +307,7 @@ class IndexCard(TypedDict):
 
 def parse_index_cards(repo: str = ROOT) -> dict[str, 'IndexCard']:
     """Per report slug on reports/index.html: ticker, name, industry, sector group and index membership."""
-    p = os.path.join(repo, 'reports', 'index.html')
-    if not os.path.exists(p):
-        return {}
-    t = read_text(p)
+    t = read_text(os.path.join(repo, 'reports', 'index.html'))   # FileNotFoundError, like the other loaders
     sector_of = {}
     for g in re.finditer(r'<section class="sgroup" data-s="([a-z]+)">(.*?)</section>', t, re.S):
         for sl in re.findall(r'href="view\.html\?r=([a-z0-9.\-]+)"', g.group(2)):
