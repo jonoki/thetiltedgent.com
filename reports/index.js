@@ -296,9 +296,9 @@
     var href=card.getAttribute('href');
     if(href){
       var tk=(card.querySelector('.tick')||{}).textContent||'';
-      var extra=(card.getAttribute('target')?' target="'+card.getAttribute('target')+'"':'')+(card.getAttribute('rel')?' rel="'+card.getAttribute('rel')+'"':'');
+      var extra=(card.getAttribute('target')?' target="'+esc(card.getAttribute('target'))+'"':'')+(card.getAttribute('rel')?' rel="'+esc(card.getAttribute('rel'))+'"':'');
       card.removeAttribute('href'); card.removeAttribute('target'); card.removeAttribute('rel');
-      card.insertAdjacentHTML('afterbegin','<a class="stretch" href="'+href+'"'+extra+' aria-label="Read the '+esc(tk.trim())+' report"></a>');
+      card.insertAdjacentHTML('afterbegin','<a class="stretch" href="'+esc(href)+'"'+extra+' aria-label="Read the '+esc(tk.trim())+' report"></a>');
     }
     // index badges become club tags with a tooltip
     [].forEach.call(card.querySelectorAll('.ix'),function(ix){
@@ -318,7 +318,7 @@
     });
     if(c.lg){
       var tk=card.querySelector('.tick');
-      if(tk) tk.insertAdjacentHTML('afterend','<span class="logo" aria-hidden="true"><img alt="" loading="lazy" src="'+c.lg+'"></span>');
+      if(tk) tk.insertAdjacentHTML('afterend','<span class="logo" aria-hidden="true"><img alt="" loading="lazy" src="'+esc(c.lg)+'"></span>');
       card.classList.add('has-logo');
     }
     if(c.ln){
