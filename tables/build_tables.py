@@ -2,7 +2,8 @@
 """Build the Tables pages from their one source: tables/_source/casino-games-source.html.
 
 Run from the repo root:   py -3 tables/build_tables.py        (after py -3 tools/chrome.py when the nav changed)
-Writes tables/tables.css, one page per game (GAMES), the family pages (FAMILY_PAGES) and the index,
+Writes tables/tables.css (the source page's CSS + tables/_source/split-pages.css), one page per game (GAMES),
+the family pages (FAMILY_PAGES) and the index,
 tables/casino-games.html. The prose lives only in the source; never edit the built pages by hand.
 tools/chrome.py writes the nav and footer into the source, and every page copies them from there.
 """
@@ -72,80 +73,7 @@ SIM_SESSIONS = {'baccarat': 700}   # default bets per simulated session is 500
 AP_MARKER = '    <div class="ap">'    # the advantage-play box; the simulator goes just above it
 NAVSCRIPT = '<script src="/assets/site.js" defer></script>'   # shared menu script; tools/chrome.py writes the nav
 
-EXTRA_CSS = r'''
-  /* ===== SPLIT PAGES: game cards on the index, page nav, simulator ===== */
-  .gamegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px;}
-  @media(max-width:980px){.gamegrid{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:520px){.gamegrid{grid-template-columns:1fr;}}
-  a.gcard{display:flex;flex-direction:column;gap:10px;background:var(--card);border:1px solid var(--gold-line-soft);border-radius:14px;padding:22px;transition:border-color .15s, box-shadow .2s;}
-  a.gcard:hover{border-color:var(--gold-line);box-shadow:0 0 30px rgba(255,201,94,.08);}
-  a.gcard .top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-  a.gcard h3{font-family:'Cinzel',Georgia,serif;font-size:18px;font-weight:600;letter-spacing:.5px;}
-  a.gcard p{color:var(--dim);font-size:14px;line-height:1.6;flex:1;}
-  a.gcard .more{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2.5px;color:var(--cyan);}
-  a.gcard:hover .more{color:var(--cyan-neon);}
-  .famtabs{display:flex;flex-wrap:wrap;gap:8px;padding:18px 0 0;}
-  .famtabs a{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:8px 14px;transition:color .15s,border-color .15s;}
-  .famtabs a:hover{color:var(--cyan-neon);border-color:var(--cyan);}
-  .famtabs a.on{color:var(--gold);border-color:var(--gold);}
-  .crumbs{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);padding:22px 0 0;}
-  .crumbs a{color:var(--gold);} .crumbs a:hover{color:var(--gold-hi);}
-  .crumbs span{margin:0 8px;color:var(--dim2);}
-  .game.first{border-top:0;padding-top:34px;}
-  .pagenav{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 0 60px;}
-  @media(max-width:600px){.pagenav{grid-template-columns:1fr;}}
-  .pagenav a{display:block;background:var(--card);border:1px solid var(--gold-line-soft);border-radius:12px;padding:18px 20px;transition:border-color .15s;}
-  .pagenav a:hover{border-color:var(--gold-line);}
-  .pagenav a.next{text-align:right;}
-  .pagenav .k{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2.5px;color:var(--cyan);text-transform:uppercase;margin-bottom:6px;}
-  .pagenav .t{font-family:'Cinzel',Georgia,serif;font-size:17px;font-weight:600;}
-  .allgames{text-align:center;padding:0 0 56px;}
-  /* simulator */
-  .simsec{margin-top:34px;border:1px solid var(--gold-line);border-radius:14px;padding:26px 26px 22px;background:linear-gradient(180deg,rgba(217,168,92,.05),rgba(6,5,11,0));}
-  @media(max-width:600px){.simsec{padding:20px 16px 16px;}}
-  .simsec .kicker{font-size:12px;letter-spacing:4px;}
-  .simsec h3.simhead{font-family:'Cinzel',Georgia,serif;font-size:clamp(20px,2.4vw,27px);font-weight:600;margin:10px 0 8px;}
-  .simsec h3.simhead em{font-style:normal;color:var(--pink-neon);text-shadow:var(--glow-pink);}
-  .simsec p.simsub{color:var(--dim);font-size:15px;max-width:760px;margin-bottom:18px;}
-  .simsec p.simsub b{color:var(--cream);font-weight:500;}
-  .simform{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:flex-end;}
-  .simfield{display:flex;flex-direction:column;gap:6px;min-width:0;}
-  .simfield .k{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);}
-  .simfield select,.simfield input{background:var(--bg2);color:var(--cream);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:500 14px 'DM Sans',Arial,sans-serif;min-width:0;}
-  .simfield select{max-width:100%;width:min(100%,420px);}
-  .simfield input{width:120px;font-family:'JetBrains Mono',monospace;}
-  .simfield select:focus,.simfield input:focus{outline:2px solid var(--cyan);outline-offset:2px;border-color:var(--cyan);}
-  .simhours{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dim);letter-spacing:.5px;}
-  .simbtns{display:flex;gap:10px;flex-wrap:wrap;}
-  .simrun{background:var(--gold);color:#140B0C;border:0;border-radius:7px;padding:12px 20px;font:700 14px 'DM Sans',Arial,sans-serif;letter-spacing:.4px;cursor:pointer;box-shadow:var(--glow-gold);}
-  .simrun:hover{background:var(--gold-hi);}
-  .simroll{background:transparent;color:var(--cyan-neon);border:1px solid var(--cyan);border-radius:7px;padding:12px 16px;font:700 14px 'DM Sans',Arial,sans-serif;cursor:pointer;box-shadow:var(--glow-cyan);}
-  .simroll:hover{background:rgba(31,203,227,.10);}
-  .simmeta{margin:16px 0 14px;font-size:13.5px;color:var(--dim);line-height:1.7;}
-  .simmeta b{color:var(--cream);font-weight:500;} .simmeta .dim{color:var(--dim2);}
-  .simstats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-  @media(max-width:980px){.simstats{grid-template-columns:repeat(2,1fr);}}
-  @media(max-width:460px){.simstats{grid-template-columns:1fr;}}
-  .st{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0;}
-  .st .k{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:6px;}
-  .st .v{font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:500;color:var(--cream);line-height:1.25;overflow-wrap:anywhere;}
-  .st.up .v{color:var(--green);} .st.dn .v{color:var(--red-neon);}
-  .st .s{font-size:12px;color:var(--dim2);margin-top:6px;line-height:1.5;}
-  .simchart{margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
-  .simchart canvas{display:block;width:100%;height:340px;}
-  @media(max-width:600px){.simchart canvas{height:260px;}}
-  .simlegend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.5px;color:var(--dim);}
-  .simlegend span{display:inline-flex;align-items:center;gap:7px;}
-  .simlegend i{display:inline-block;width:18px;height:3px;border-radius:2px;}
-  .l-med{background:var(--gold);} .l-ev{background:repeating-linear-gradient(90deg,var(--gold-hi) 0 5px,transparent 5px 8px);height:2px !important;}
-  .l-70{background:rgba(31,203,227,.42);height:10px !important;} .l-95{background:rgba(31,203,227,.20);height:10px !important;} .l-smp{background:rgba(163,153,166,.5);height:1px !important;} .l-best{background:var(--green);} .l-worst{background:var(--red-neon);}
-  .simfoot{margin-top:14px;font-size:12.5px;color:var(--dim2);line-height:1.65;}
-  .simstory{margin:0 0 10px;font-size:14.5px;color:var(--dim);line-height:1.7;} .simstory b{color:var(--cream);font-weight:500;} .simstory b.up{color:var(--green);} .simstory b.dn{color:var(--red-neon);}
-  .simnojs{padding:16px;border:1px dashed var(--line);border-radius:10px;color:var(--dim);font-size:14px;}
-  html.js .simnojs{display:none;}
-  .slotnote{border:1px solid rgba(224,56,79,.45);background:rgba(224,56,79,.06);border-radius:12px;padding:20px 22px;margin-top:14px;color:var(--dim);font-size:15px;line-height:1.7;}
-  .slotnote b{color:var(--cream);font-weight:500;}
-'''
+SPLIT_CSS = os.path.join(ROOT, '_source', 'split-pages.css')   # game cards, page nav and simulator styles
 
 
 def between(s: str, a: str, b: str, start: int = 0) -> tuple[str, int, int]:
@@ -349,7 +277,8 @@ def index_page(site: Site) -> None:
 def main() -> None:
     with open(SRC, encoding='utf-8') as fh:
         site = Site(fh.read())
-    write('tables.css', site.css.strip('\n') + '\n' + EXTRA_CSS)
+    with open(SPLIT_CSS, encoding='utf-8') as fh:
+        write('tables.css', site.css.strip('\n') + '\n' + fh.read())
     for i, g in enumerate(GAMES):
         game_page(site, i, g)
     for p in FAMILY_PAGES:
