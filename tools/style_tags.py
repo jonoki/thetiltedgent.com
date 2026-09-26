@@ -14,19 +14,20 @@ import json
 import os
 import re
 import statistics
+import sys
 from collections import Counter
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import reportlib as rl
-from reportlib import first_number as num
 
 # Reports to leave out of tagging, slug -> reason. Empty: CBOE and MTD were excluded on 22 Sep 2026 over
 # swapped <title> tags (bodies were correct); titles fixed the same day.
-EXCLUDE = {}
+EXCLUDE: dict[str, str] = {}
+# Industry labels are matched at the start of a word, so 'BANKS - REGIONAL' and 'REIT - OFFICE' match.
 # Quality is not meaningful for balance-sheet businesses (Oki, 22 Sep 2026).
-NO_QUALITY = re.compile(r'\bBANK|INSURANCE|REIT\b', re.I)
+NO_QUALITY = re.compile(r'\b(?:BANK|INSURANCE|REIT)', re.I)
 # Free cash flow is not meaningful for lenders, insurers and brokers (customer money flows through it).
-NO_CASH = re.compile(r'\bBANK|INSURANCE|CAPITAL MARKETS\b', re.I)
+NO_CASH = re.compile(r'\b(?:BANK|INSURANCE|CAPITAL MARKETS)', re.I)
 # FCF quoted in another currency cannot be divided by a US-dollar market cap.
 FOREIGN_CCY = re.compile(r'[¥€£₩]|(?:NT|HK|C|A|R|S)\$')
 
@@ -42,16 +43,15 @@ TagInputs = TypedDict('TagInputs', {
     'raw': dict[str, str | float | None], 'price': float | None, 'w52_high': float | None, 'mcap': float | None,
     'fcf': float | None, 'eps': float | None, 'pe': float | None, 'yield': float | None, 'revg': float | None,
     'roic': float | None, 'de': float | None, 'beta': float | None, 'fcf_yield': float | None,
-    'excluded': str, 'tags': list[dict[str, str]],
-}, total=False)
+    'excluded': NotRequired[str], 'tags': NotRequired[list[dict[str, str]]],
+})
 
 
 def money(s: str | None) -> float | None:
     """'$99.92B' -> 9.992e10; '-$1.2B' / '($1.2B)' negative."""
     if s is None:
         return None
-    s = str(s).replace('−', '-')
-    m = re.search(r'(\(?)(-?)\s*\$?\s*(\d[\d,]*\.?\d*)\s*([TBMK])?', s)
+    m = re.search(r'(\(?)(-?)\s*\$?\s*(\d[\d,]*\.?\d*)\s*([TBMK])?', rl.normalize_dashes(s))
     if not m:
         return None
     v = float(m.group(3).replace(',', '')) * {'T': 1e12, 'B': 1e9, 'M': 1e6, 'K': 1e3, None: 1}[m.group(4)]
@@ -90,17 +90,6 @@ def usd_fcf(raw: object) -> float | None:
     return None
 
 
-def identity(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
-    """Who the report is about (the index card wins over the manifest) and the page text every number comes from."""
-    return {
-        'slug': slug, 'ticker': card.get('ticker') or r.get('ticker'), 'as_of': r.get('as_of'),
-        'industry': card.get('card_industry') or r.get('industry'),
-        'sp500': bool((card.get('indices') or {}).get('sp500_added')),
-        'raw': {'pe_trailing': r.get('pe_trailing'), 'eps_ttm': r.get('eps_ttm'), 'yield': r.get('yield_pct'),
-                'market_cap': r.get('market_cap'), 'fcf': r.get('fcf'), **tbl},
-    }
-
-
 def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> float | None:
     """Free cash flow as % of market cap; None where FCF is not meaningful (lenders, insurers, brokers)."""
     if fcf is None or not mcap or NO_CASH.search(industry or ''):
@@ -108,30 +97,38 @@ def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> fl
     return round(100 * fcf / mcap, 2)
 
 
-def inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
-    """One report's tag inputs: every parsed number, with the raw text it came from under 'raw'."""
-    d = identity(slug, r, card, tbl)
-    pe = num(r.get('pe_trailing'))
-    d.update({
-        'price': num(r.get('price')), 'w52_high': num((r.get('w52') or [None, None])[1]),
-        'mcap': money(r.get('market_cap')), 'fcf': usd_fcf(r.get('fcf')), 'eps': num(r.get('eps_ttm')),
-        'pe': pe if pe is not None else num(tbl.get('pe_tbl')),   # the table row when the manifest missed it
-        'yield': num(r.get('yield_pct')),
-    })
-    d.update({k: num(tbl.get(k)) for k in TABLE_ROWS if k != 'pe_tbl'})
-    d['fcf_yield'] = fcf_yield(d['fcf'], d['mcap'], d['industry'])
+def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None, tbl: dict[str, str]) -> TagInputs:
+    """One report's tag inputs: who it is about (the index card wins over the manifest), every parsed number,
+    and under 'raw' the page text each number came from."""
+    card = card or {}
+    industry = card.get('card_industry') or r.get('industry')
+    pe, mcap, fcf = rl.first_number(r.get('pe_trailing')), money(r.get('market_cap')), usd_fcf(r.get('fcf'))
+    d: TagInputs = {
+        'slug': slug, 'ticker': card.get('ticker') or r.get('ticker'), 'as_of': r.get('as_of'),
+        'industry': industry, 'sp500': bool((card.get('indices') or {}).get('sp500_added')),
+        'raw': {'pe_trailing': r.get('pe_trailing'), 'eps_ttm': r.get('eps_ttm'), 'yield': r.get('yield_pct'),
+                'market_cap': r.get('market_cap'), 'fcf': r.get('fcf'), **tbl},
+        'price': rl.first_number(r.get('price')), 'w52_high': rl.first_number((r.get('w52') or [None, None])[1]),
+        'mcap': mcap, 'fcf': fcf, 'eps': rl.first_number(r.get('eps_ttm')),
+        'pe': pe if pe is not None else rl.first_number(tbl.get('pe_tbl')),   # the table row when the manifest missed it
+        'yield': rl.first_number(r.get('yield_pct')),
+        'revg': rl.first_number(tbl.get('revg')), 'roic': rl.first_number(tbl.get('roic')),
+        'de': rl.first_number(tbl.get('de')), 'beta': rl.first_number(tbl.get('beta')),
+        'fcf_yield': fcf_yield(fcf, mcap, industry),
+    }
     if slug in EXCLUDE:
         d['excluded'] = EXCLUDE[slug]
     return d
 
 
-def load() -> list[TagInputs]:
-    cards = rl.parse_index_cards()
+def load_tag_inputs(repo: str = rl.ROOT) -> list[TagInputs]:
+    """Tag inputs for every report in the manifest whose page exists, by slug."""
+    cards = rl.parse_index_cards(repo)
     rows = []
-    for slug, r in sorted(rl.load_report_records().items()):
-        path = os.path.join(rl.ROOT, 'reports', f'{slug}_analysis.html')
+    for slug, r in sorted(rl.load_report_records(repo).items()):
+        path = rl.report_path(slug, repo=repo)
         if os.path.exists(path):
-            rows.append(inputs(slug, r, cards.get(slug, {}), table_rows(path)))
+            rows.append(tag_inputs(slug, r, cards.get(slug), table_rows(path)))
     return rows
 
 
@@ -148,6 +145,8 @@ def universe(sp: list[TagInputs]) -> dict[str, list[float]]:
 
 
 def thresholds_for(u: dict[str, list[float]]) -> dict[str, float]:
+    """Every cut-off the tags use, rank-based ones from the universe and fixed ones from the constants above.
+    Published in data/style_tags.json, and the only source tags_for reads them from."""
     th = {
         'value_pe_max': quantile(u['pe'], PCT), 'pe_median': statistics.median(u['pe']),
         'growth_revg_min': quantile(u['revg'], 1 - PCT), 'revg_median': statistics.median(u['revg']),
@@ -161,6 +160,9 @@ def thresholds_for(u: dict[str, list[float]]) -> dict[str, float]:
 
 
 def as_of_note(d: TagInputs) -> str:
+    """' Figures as of Sep 21, 2026.' for the tooltips; empty when the report's date was not extracted."""
+    if not d['as_of']:
+        return ''
     x = datetime.date.fromisoformat(d['as_of'])
     return f" Figures as of {x:%b} {x.day}, {x.year}."
 
@@ -180,16 +182,17 @@ def tags_for(d: TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> l
     if d['fcf_yield'] is not None and d['fcf_yield'] >= th['cash_fcfy_min']:
         tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], u['fcf_yield'])}% of S&P 500 companies (median {th['fcfy_median']:.1f}%)." + when])
     tags += beta_tags(d, th, when)
-    if d['mcap'] and d['mcap'] >= GIANT_MCAP:
+    if d['mcap'] and d['mcap'] >= th['giant_mcap_min']:
         tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies." + when])
-    if d['price'] and d['w52_high'] and d['price'] <= BEATEN_DOWN * d['w52_high']:
+    if d['price'] and d['w52_high'] and d['price'] <= th['beaten_down_ratio'] * d['w52_high']:
         tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}." + when])
-    if quality(d, th):
+    if is_quality(d, th):
         tags.append(['Quality', f"Earns {d['roic']:.1f}% a year on the money invested in the business, better than {pct_rank(d['roic'], u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {d['de']:.2f})." + when])
     return tags
 
 
 def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+    """Steady (calmest 20%) or Rollercoaster (most volatile 20%), from the report's 5-year beta."""
     if d['beta'] is None:
         return []
     if d['beta'] <= th['steady_beta_max']:
@@ -199,13 +202,14 @@ def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     return []
 
 
-def quality(d: TagInputs, th: dict[str, float]) -> bool:
+def is_quality(d: TagInputs, th: dict[str, float]) -> bool:
+    """Top-20% ROIC outside banks, insurers and REITs, with debt-to-equity from 0 up to the cut-off."""
     return (d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '') and d['roic'] >= th['quality_roic_min']
-            and d['de'] is not None and 0 <= d['de'] < QUALITY_MAX_DE)
+            and d['de'] is not None and 0 <= d['de'] < th['quality_de_max'])
 
 
-def main() -> None:
-    rows = load()
+def main(repo: str = rl.ROOT) -> int:
+    rows = load_tag_inputs(repo)
     live = [d for d in rows if 'excluded' not in d]
     sp = [d for d in live if d['sp500']]
     u = universe(sp)
@@ -215,7 +219,7 @@ def main() -> None:
     out = {'generated_by': 'tools/style_tags.py', 'formulas': 'claude/TAG_FORMULAS.md',
            'universe': 'thresholds from S&P 500 members on reports/index.html (data-sp); applied to every report',
            'thresholds': th, 'sample_sizes': {k: len(v) for k, v in u.items()}, 'excluded': EXCLUDE, 'reports': rows}
-    with open(os.path.join(rl.ROOT, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n') as fh:
+    with open(os.path.join(repo, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(out, fh, indent=1, ensure_ascii=False)
 
     print(f"{len(rows)} reports ({len(live)} tagged, {len(rows) - len(live)} excluded); S&P members used for thresholds: {len(sp)}")
@@ -224,7 +228,8 @@ def main() -> None:
     for k, v in Counter(t['tag'] for d in live for t in d['tags']).most_common():
         print(f'  {k:20} {v}')
     print('  untagged:', sum(1 for d in live if not d['tags']))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

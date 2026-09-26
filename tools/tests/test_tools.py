@@ -88,6 +88,62 @@ class StyleTagInputs(unittest.TestCase):
             rows = style_tags.table_rows(p)
         self.assertEqual(rows, {'pe_tbl': '24.1x', 'revg': '12.5%', 'beta': '1.10'})
 
+    def test_tag_inputs_prefer_the_card_and_fall_back_to_the_table_pe(self):
+        r = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
+             'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1}
+        card = {'ticker': 'ACME', 'card_industry': 'SOFTWARE', 'indices': {'sp500_added': '2001-01-01'}}
+        d = style_tags.tag_inputs('acme', r, card, {'pe_tbl': '25.0x', 'beta': '0.8'})
+        self.assertEqual((d['ticker'], d['industry'], d['sp500'], d['pe'], d['beta']), ('ACME', 'SOFTWARE', True, 25.0, 0.8))
+        self.assertEqual((d['mcap'], d['fcf_yield'], d['w52_high']), (250e9, 8.0, 100.0))
+        d = style_tags.tag_inputs('acme', r, None, {})
+        self.assertEqual((d['ticker'], d['sp500'], d['fcf_yield'], d['pe']), ('ACM', False, None, None))   # banks: no FCF yield
+
+
+class StyleTagRules(unittest.TestCase):
+    TH = {'value_pe_max': 15.0, 'pe_median': 22.0, 'growth_revg_min': 12.0, 'revg_median': 5.0,
+          'income_yield_min': 3.0, 'yield_median': 1.5, 'cash_fcfy_min': 6.0, 'fcfy_median': 3.5,
+          'steady_beta_max': 0.7, 'rollercoaster_beta_min': 1.4, 'quality_roic_min': 20.0, 'roic_median': 10.0,
+          'quality_de_max': 1.0, 'giant_mcap_min': 200e9, 'beaten_down_ratio': 0.6}
+    U = {k: [1.0, 5.0, 10.0, 20.0, 30.0] for k in ('pe', 'revg', 'yield', 'fcf_yield', 'beta', 'roic')}
+
+    @staticmethod
+    def inputs(**kw) -> dict:
+        d = {'slug': 'acme', 'ticker': 'ACME', 'as_of': '2026-09-21', 'industry': 'SOFTWARE', 'sp500': True,
+             'raw': {'eps_ttm': '$2.00', 'market_cap': '$250.0B'}, 'price': 90.0, 'w52_high': 100.0, 'mcap': 50e9,
+             'fcf': None, 'eps': 2.0, 'pe': 20.0, 'yield': None, 'revg': 5.0, 'roic': None, 'de': None, 'beta': 1.0,
+             'fcf_yield': None}
+        d.update(kw)
+        return d
+
+    def tags(self, **kw) -> list[str]:
+        return [t for t, _ in style_tags.tags_for(self.inputs(**kw), self.TH, self.U)]
+
+    def test_each_tag_at_its_cutoff(self):
+        self.assertEqual(self.tags(), [])
+        self.assertEqual(self.tags(pe=15.0), ['Value'])
+        self.assertEqual(self.tags(pe=15.0, eps=-1.0), ['Not yet profitable'])   # no Value tag for a loss-maker
+        self.assertEqual(self.tags(revg=12.0), ['Growth'])
+        self.assertEqual(self.tags(**{'yield': 3.0}), ['Income'])
+        self.assertEqual(self.tags(fcf_yield=6.0), ['Cash machine'])
+        self.assertEqual(self.tags(mcap=200e9), ['Giant'])
+        self.assertEqual(self.tags(price=60.0), ['Beaten down'])
+        self.assertEqual(self.tags(beta=0.7), ['Steady'])
+        self.assertEqual(self.tags(beta=1.4), ['Rollercoaster'])
+        self.assertEqual(self.tags(beta=None), [])
+
+    def test_quality_needs_high_roic_low_debt_and_no_balance_sheet_business(self):
+        self.assertEqual(self.tags(roic=20.0, de=0.5), ['Quality'])
+        self.assertEqual(self.tags(roic=20.0, de=1.0), [])      # debt-to-equity must be under the cut-off
+        self.assertEqual(self.tags(roic=20.0, de=-0.1), [])     # negative equity is not low debt
+        self.assertEqual(self.tags(roic=20.0, de=0.5, industry='REIT - OFFICE'), [])
+        self.assertEqual(self.tags(roic=20.0, de=0.5, industry='BANKS - REGIONAL'), [])
+
+    def test_tooltips_carry_the_date_unless_there_is_none(self):
+        (_, tip), = style_tags.tags_for(self.inputs(pe=15.0), self.TH, self.U)
+        self.assertTrue(tip.endswith(' Figures as of Sep 21, 2026.'), tip)
+        (_, tip), = style_tags.tags_for(self.inputs(pe=15.0, as_of=None), self.TH, self.U)
+        self.assertTrue(tip.endswith('the cheapest 20%.'), tip)
+
 
 class ManifestFields(unittest.TestCase):
     def test_as_of_date_range_takes_the_first_day(self):
