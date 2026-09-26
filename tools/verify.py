@@ -15,6 +15,7 @@ import sys
 from typing import TypedDict
 
 import reportlib as rl
+import repodata as rd
 
 
 class CheckResult(rl.StructureCounts, total=False):
@@ -98,7 +99,7 @@ def result_line(path: str, o: CheckResult) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    files = (sys.argv[1:] if argv is None else argv) or rl.report_paths(assets=True)
+    files = (sys.argv[1:] if argv is None else argv) or rd.report_paths(assets=True)
     failed = 0
     for f in files:
         o = check(f)

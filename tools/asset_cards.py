@@ -14,6 +14,7 @@ import re
 import sys
 
 import reportlib as rl
+import repodata as rd
 
 FAMILIES = {  # folder: (heading, one-line note, sort)
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
@@ -91,14 +92,14 @@ def family_count(t: str, family: str, n: int) -> str:
     return re.sub(rf'(data-fam="{family}"[^>]*>.*?<b class="fam-n">)\d+(</b>)', rf'\g<1>{n}\g<2>', t, count=1)
 
 
-def main(repo: str = rl.ROOT) -> int | str:
+def main(repo: str = rd.ROOT) -> int | str:
     """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing marker)."""
     index = os.path.join(repo, 'reports', 'index.html')
     with open(index, encoding='utf-8', newline='') as fh:
         t = fh.read()
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
-        for p in glob.glob(rl.report_path('*', folder, repo=repo)):
+        for p in glob.glob(rd.report_path('*', folder, repo=repo)):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:

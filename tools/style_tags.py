@@ -19,6 +19,7 @@ from collections import Counter
 from typing import NotRequired, Sequence, TypedDict
 
 import reportlib as rl
+import repodata as rd
 
 # Reports to leave out of tagging, slug -> reason. Empty: CBOE and MTD were excluded on 22 Sep 2026 over
 # swapped <title> tags (bodies were correct); titles fixed the same day.
@@ -90,7 +91,7 @@ def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> fl
     return round(100 * fcf / mcap, 2)
 
 
-def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None) -> TagInputs:
+def tag_inputs(slug: str, r: rd.ReportRecord, card: rd.IndexCard | None) -> TagInputs:
     """One report's tag inputs: who it is about (the index card wins over the manifest), every parsed number,
     and under 'raw' the page text each number came from."""
     cells = r.get('fin_table', {})
@@ -116,10 +117,10 @@ def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None) -> TagI
     return d
 
 
-def load_tag_inputs(repo: str = rl.ROOT) -> list[TagInputs]:
+def load_tag_inputs(repo: str = rd.ROOT) -> list[TagInputs]:
     """Tag inputs for every report in the manifest, by slug. ValueError when the manifest predates fin_table."""
-    cards = rl.parse_index_cards(repo)
-    records = rl.load_report_records(repo)
+    cards = rd.parse_index_cards(repo)
+    records = rd.load_report_records(repo)
     if records and not any('fin_table' in r for r in records.values()):
         raise ValueError('the manifest has no fin_table fields: run py -3 tools/manifest.py first')
     return [tag_inputs(slug, r, cards.get(slug)) for slug, r in sorted(records.items())]
@@ -220,7 +221,7 @@ def quality_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], 
     return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f})." + when]]
 
 
-def main(repo: str = rl.ROOT) -> int | str:
+def main(repo: str = rd.ROOT) -> int | str:
     try:
         rows = load_tag_inputs(repo)
     except ValueError as e:

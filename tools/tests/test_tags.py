@@ -11,6 +11,7 @@ import headoffice  # noqa: E402
 import manifest  # noqa: E402
 import style_tags  # noqa: E402
 import reportlib as rl  # noqa: E402
+import repodata as rd  # noqa: E402
 
 
 class StyleTagInputs(unittest.TestCase):
@@ -26,10 +27,10 @@ class StyleTagInputs(unittest.TestCase):
         self.assertEqual(rl.fin_table('<table><tr><td>Beta</td><td>1.1</td></tr></table>'), {})   # only the fin-table
 
     def test_tag_inputs_prefer_the_card_and_fall_back_to_the_table_pe(self):
-        r: rl.ReportRecord = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
+        r: rd.ReportRecord = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
              'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1,
              'fin_table': {'pe_trailing': '25.0x', 'beta': '0.8'}}
-        card: rl.IndexCard = {'ticker': 'ACME', 'card_name': 'Acme', 'card_industry': 'SOFTWARE', 'card_sector_key': None,
+        card: rd.IndexCard = {'ticker': 'ACME', 'card_name': 'Acme', 'card_industry': 'SOFTWARE', 'card_sector_key': None,
                               'indices': {'sp500_added': '2001-01-01', 'nasdaq100': False, 'dow30_added': None,
                                           'global_exchange': None}}
         d = style_tags.tag_inputs('acme', r, card)

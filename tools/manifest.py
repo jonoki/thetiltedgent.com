@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Mapping, cast
 
 import reportlib as rl
+import repodata as rd
 
 SCHEMA_VERSION = 2   # 2 (26 Sep 2026): fin_table, the style-tag inputs from the page's metrics table
 GENERATOR = 'tools/manifest.py'
@@ -145,7 +146,7 @@ def structure_ok(t: str, path: str, warn: list[str]) -> bool:
     return not any(p != 'has_legacy_sitenav' for p in problems)
 
 
-def card_fields(card: rl.IndexCard | None) -> dict[str, str | bool | None]:
+def card_fields(card: rd.IndexCard | None) -> dict[str, str | bool | None]:
     """The record fields the index card supplies (the card's industry label is canonical); None, and ndx False,
     for a report with no card."""
     if card is None:
@@ -156,7 +157,7 @@ def card_fields(card: rl.IndexCard | None) -> dict[str, str | bool | None]:
             'ndx': bool(ix['nasdaq100']), 'dow30_added': ix['dow30_added'], 'global_exchange': ix['global_exchange']}
 
 
-def card_checks(card: rl.IndexCard | None, ticker: str | None, warn: list[str]) -> None:
+def card_checks(card: rd.IndexCard | None, ticker: str | None, warn: list[str]) -> None:
     if card is None:
         warn.append('not_carded_on_index')
     elif ticker and card['ticker'] != ticker:
@@ -173,7 +174,7 @@ def key_metrics(metrics: dict[str, rl.Metric]) -> dict[str, float | str]:
     return out
 
 
-def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = False) -> rl.ReportRecord:
+def extract(path: str, cards: dict[str, rd.IndexCard], full_metrics: bool = False) -> rd.ReportRecord:
     """One report page -> its manifest record."""
     t = rl.read_text(path)
     slug = os.path.basename(path).replace('_analysis.html', '')
@@ -213,7 +214,7 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
     if full_metrics:
         rec['metrics'] = metrics
     # drop nulls: a missing key means "not extracted", which the warnings explain; the keys are ReportRecord's
-    return cast(rl.ReportRecord, {k: v for k, v in rec.items() if v is not None and v != [] and v != {}})
+    return cast(rd.ReportRecord, {k: v for k, v in rec.items() if v is not None and v != [] and v != {}})
 
 
 # ---------- the files ----------
@@ -226,7 +227,7 @@ def write_json(path: str, obj: Mapping[str, object]) -> int:
     return os.path.getsize(path)
 
 
-def reconciliation(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard]) -> dict[str, object]:
+def reconciliation(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard]) -> dict[str, object]:
     carded, filed = set(cards), {r['slug'] for r in reports}
     return {
         'report_files': len(filed),
@@ -239,7 +240,7 @@ def reconciliation(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard
     }
 
 
-def print_coverage(reports: list[rl.ReportRecord], full_metrics: bool) -> None:
+def print_coverage(reports: list[rd.ReportRecord], full_metrics: bool) -> None:
     fields = ['ticker', 'name', 'exchange', 'sector_key', 'industry', 'industry_raw', 'as_of', 'price',
               'change_pct', 'market_cap', 'w52', 'chart_points', 'eps_ttm', 'pe_forward', 'yield_pct']
     for f in fields:
@@ -254,20 +255,20 @@ def print_coverage(reports: list[rl.ReportRecord], full_metrics: bool) -> None:
         print(f'     {w:34s} {c}', file=sys.stderr)
 
 
-def by_sector(reports: list[rl.ReportRecord]) -> dict[str, list[rl.ReportRecord]]:
+def by_sector(reports: list[rd.ReportRecord]) -> dict[str, list[rd.ReportRecord]]:
     """Records grouped by sector key, reports without one under 'unclassified'.
 
     Sharded by sector. A single 208 KB file cannot be published through the GitHub connector (one
     push_files call must carry the whole file, ~113k tokens of minified JSON), and sharding is the better
     shape anyway: a consumer that wants one sector fetches ~18 KB, not the lot."""
-    groups: dict[str, list[rl.ReportRecord]] = {}
+    groups: dict[str, list[rd.ReportRecord]] = {}
     for r in reports:
         groups.setdefault(r.get('sector_key') or 'unclassified', []).append(r)
     return groups
 
 
-def manifest_doc(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard],
-                 sectors: dict[str, list[rl.ReportRecord]]) -> rl.Manifest:
+def manifest_doc(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard],
+                 sectors: dict[str, list[rd.ReportRecord]]) -> rd.Manifest:
     """The top-level file: answers "what is stale?" and "does the site reconcile?" in one fetch."""
     return {
         'schema_version': SCHEMA_VERSION,
@@ -282,7 +283,7 @@ def manifest_doc(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard],
     }
 
 
-def write_shards(shard_dir: str, sectors: dict[str, list[rl.ReportRecord]], repo: str) -> None:
+def write_shards(shard_dir: str, sectors: dict[str, list[rd.ReportRecord]], repo: str) -> None:
     """One file per sector, then remove any shard this build did not write: it belongs to an older build
     and, left in place, duplicates records."""
     for key, rs in sorted(sectors.items()):
@@ -298,14 +299,14 @@ def write_shards(shard_dir: str, sectors: dict[str, list[rl.ReportRecord]], repo
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description='Build the report manifest from the published report pages.')
-    ap.add_argument('repo', nargs='?', default=rl.ROOT, help='repo root (default: the repo this script is in)')
+    ap.add_argument('repo', nargs='?', default=rd.ROOT, help='repo root (default: the repo this script is in)')
     ap.add_argument('-o', dest='out', help='top-level output file (default: <repo>/data/reports.json)')
     ap.add_argument('--full-metrics', action='store_true', help='include every report\'s full metrics table')
     args = ap.parse_args(argv)
     out_path = args.out or os.path.join(args.repo, 'data', 'reports.json')
 
-    cards = rl.parse_index_cards(args.repo)
-    files = sorted(glob.glob(os.path.join(args.repo, rl.STOCK_REPORTS)))
+    cards = rd.parse_index_cards(args.repo)
+    files = sorted(glob.glob(os.path.join(args.repo, rd.STOCK_REPORTS)))
     reports = [extract(f, cards, args.full_metrics) for f in files]
     reports.sort(key=lambda r: r.get('ticker') or r['slug'])
     sectors = by_sector(reports)

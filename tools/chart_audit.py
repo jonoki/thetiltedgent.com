@@ -17,6 +17,7 @@ import urllib.request
 from typing import Mapping, TypedDict
 
 import reportlib as rl
+import repodata as rd
 
 WORK = os.path.join(tempfile.gettempdir(), 'ttg_chart_audit')
 CACHE = os.path.join(WORK, 'yh')
@@ -175,11 +176,11 @@ def classify(point: float, close: float, adjclose: float | None, spin: float) ->
     return 'wrong'
 
 
-def audit(slug: str, repo: str = rl.ROOT) -> AuditRow:
+def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
     """One report's chart against Yahoo, with its ticker and as-of date read from the page itself (so a new or
     just-refreshed report is checked before the manifest is rebuilt); {'slug', 'err'} when it cannot be audited
     (no such page, no ticker in the title, no chart arrays, no Yahoo series)."""
-    path = rl.report_path(slug, repo=repo)
+    path = rd.report_path(slug, repo=repo)
     if not os.path.exists(path):
         return {'slug': slug, 'err': f'no page {os.path.relpath(path, repo)}'}
     t = rl.read_text(path)
@@ -227,7 +228,7 @@ def check_points(labels: list[str], prices: list[float], yh: Mapping[tuple[int, 
 def main(argv: list[str] | None = None) -> int:
     """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
     slugs = (sys.argv[1:] if argv is None else argv) or [os.path.basename(p).replace('_analysis.html', '')
-                                                          for p in rl.report_paths()]
+                                                          for p in rd.report_paths()]
     os.makedirs(CACHE, exist_ok=True)
     rows = sorted((audit(slug) for slug in slugs), key=lambda r: r.get('ticker') or r['slug'])   # the manifest's order
     with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:

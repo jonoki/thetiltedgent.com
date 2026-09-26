@@ -12,7 +12,7 @@ import os
 import re
 import sys
 
-import reportlib as rl
+import repodata as rd
 
 LINKS = [  # (key, label, href) — root-relative so the same markup works at any depth
     ('learn', 'Learn', '/#learn'),
@@ -101,7 +101,7 @@ def insert_once(t: str, anchor: str, text: str, path: str, after: bool = False) 
     return t[:at] + text + t[at:]
 
 
-def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rl.ROOT) -> bool:
+def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rd.ROOT) -> bool:
     """Put the current nav (and footer) into one page and make sure it loads site.css and site.js.
     Returns True when the page changed; raises ValueError, naming the page and what is missing, when there is
     no nav or footer to replace or nowhere to put the shared wiring."""

@@ -10,7 +10,7 @@ import unittest
 from fixtures import PAGE
 import manifest  # noqa: E402
 import verify  # noqa: E402
-import reportlib as rl  # noqa: E402
+import repodata as rd  # noqa: E402
 
 
 class ManifestFields(unittest.TestCase):
@@ -40,7 +40,7 @@ class ManifestRecords(unittest.TestCase):
             dump('data/reports.json', {'shards': {'energy': 'data/reports/energy.json'}})
             dump('data/reports/energy.json', {'reports': [{'slug': 'apa', 'price': 43.81}]})
             dump('data/reports/unclassified.json', {'reports': [{'slug': 'apa', 'price': 1.0}]})   # stale
-            self.assertEqual(rl.load_report_records(repo), {'apa': {'slug': 'apa', 'price': 43.81}})
+            self.assertEqual(rd.load_report_records(repo), {'apa': {'slug': 'apa', 'price': 43.81}})
 
     INDEX = ('<section class="sgroup" data-s="industrials">'
              '<a class="rep" data-sp="1999-01-01" data-ndx href="view.html?r=acme"><span class="tick">ACME</span>'
@@ -60,20 +60,20 @@ class ManifestRecords(unittest.TestCase):
                     fh.write(text)
             with contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(manifest.main([repo]), 0)
-            doc = rl.load_manifest(repo)
+            doc = rd.load_manifest(repo)
             self.assertEqual(sorted(os.listdir(os.path.join(repo, 'data', 'reports'))), ['industrials.json', 'unclassified.json'])
             self.assertEqual(doc['index'], [['ACME', 'acme', 'industrials', '2026-09-10', 1234.5],
                                             ['SOLO', 'solo', None, '2026-09-10', 1234.5]])
             rec = doc['reconciliation']
             self.assertEqual((rec['uncarded'], rec['orphan_cards'], rec['structure_failures']), (['solo'], ['gone'], []))
-            acme = rl.load_report_records(repo)['acme']
+            acme = rd.load_report_records(repo)['acme']
             self.assertEqual((acme['industry'], acme['sp500_added'], acme['ndx'], acme['w52']),
                              ('WIDGETS & GEARS', '1999-01-01', True, [1001.0, 1300.0]))
-            self.assertIn('not_carded_on_index', rl.load_report_records(repo)['solo']['warnings'])
+            self.assertIn('not_carded_on_index', rd.load_report_records(repo)['solo']['warnings'])
 
     def test_a_missing_index_page_is_an_error(self):
         with tempfile.TemporaryDirectory() as repo, self.assertRaises(FileNotFoundError):
-            rl.parse_index_cards(repo)
+            rd.parse_index_cards(repo)
 
 
 class Verify(unittest.TestCase):

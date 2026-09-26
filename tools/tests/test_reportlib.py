@@ -7,6 +7,7 @@ from fixtures import PAGE
 import asset_cards  # noqa: E402
 import style_tags  # noqa: E402
 import reportlib as rl  # noqa: E402
+import repodata as rd  # noqa: E402
 
 
 class Numbers(unittest.TestCase):
@@ -79,11 +80,11 @@ class ReportPage(unittest.TestCase):
         self.assertIsNone(rl.row_value(rows, r'ROTCE'))
 
     def test_every_asset_family_has_a_tab(self):
-        self.assertEqual(tuple(asset_cards.FAMILIES), rl.ASSET_FAMILIES)
+        self.assertEqual(tuple(asset_cards.FAMILIES), rd.ASSET_FAMILIES)
 
     def test_report_path(self):
-        self.assertEqual(rl.report_path('aapl', repo='r'), os.path.join('r', 'reports', 'aapl_analysis.html'))
-        self.assertEqual(rl.report_path('voo', 'etf', repo='r'), os.path.join('r', 'reports', 'etf', 'voo_analysis.html'))
+        self.assertEqual(rd.report_path('aapl', repo='r'), os.path.join('r', 'reports', 'aapl_analysis.html'))
+        self.assertEqual(rd.report_path('voo', 'etf', repo='r'), os.path.join('r', 'reports', 'etf', 'voo_analysis.html'))
 
 
 if __name__ == '__main__':

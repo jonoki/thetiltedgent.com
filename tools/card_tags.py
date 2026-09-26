@@ -20,6 +20,7 @@ from collections import Counter
 from typing import TypedDict
 
 import reportlib as rl
+import repodata as rd
 from headoffice import hq_of
 from style_tags import TagInputs
 
@@ -81,7 +82,7 @@ def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
     return None
 
 
-def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: str, line: str | None,
+def card_for(slug: str, style: TagInputs, record: rd.ReportRecord | None, text: str, line: str | None,
              hand: HandTags, logo: str | None) -> CardTags:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
     c: CardTags = {}
@@ -106,15 +107,15 @@ def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: 
     return c
 
 
-def main(repo: str = rl.ROOT) -> int:
+def main(repo: str = rd.ROOT) -> int:
     style: dict[str, TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
     lines = load_json(repo, 'claude', 'card_lines.json', default={})
     hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json', default={})         # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
     logos = load_json(repo, 'assets', 'logos', 'index.json', default={})     # logo files + where each came from
-    records = rl.load_report_records(repo)
+    records = rd.load_report_records(repo)
     out = {}
     for slug in sorted(style):
-        text = rl.read_text(rl.report_path(slug, repo=repo))[:80000]
+        text = rl.read_text(rd.report_path(slug, repo=repo))[:80000]
         out[slug] = card_for(slug, style[slug], records.get(slug), text, lines.get(slug), hand.get(slug, {}),
                              logo_path(repo, slug, logos.get(slug) or {}))
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}

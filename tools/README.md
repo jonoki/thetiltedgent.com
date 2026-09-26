@@ -14,8 +14,9 @@ Each finds the repo from its own location, so the working directory only matters
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
-`reportlib.py` is not run on its own: it is what every script above knows about the repo and a report page
-(the title, header price, chart series, 52-week range, page skeleton, index cards and the manifest's files).
+Two shared modules are not run on their own. `reportlib.py` is how a report page is read (the title, as-of
+date, header price, chart series, 52-week range, metrics table, page skeleton); `repodata.py` is where the
+files are (the repo root, report paths, the index page's cards, the manifest's data files and their record types).
 A change to the report markup is made there once, including the metrics-table reader (`table_rows`) and what
 makes a page structurally sound (`structure_problems`), which `verify.py` gates on and `manifest.py` records.
 The Tables pages have their own builder, `tables/build_tables.py`, and their own checks in `tables/tests/`

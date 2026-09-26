@@ -15,10 +15,10 @@ import re
 import sys
 from typing import NamedTuple
 
-import reportlib as rl
+import repodata as rd
 
-OUT_CHIPS = os.path.join(rl.ROOT, 'assets', 'chips')
-OUT_CARDS = os.path.join(rl.ROOT, 'assets', 'cards')
+OUT_CHIPS = os.path.join(rd.ROOT, 'assets', 'chips')
+OUT_CARDS = os.path.join(rd.ROOT, 'assets', 'cards')
 CHIP_SIZE = 1080                 # chip SVG viewBox, square
 CARD_W, CARD_H = 750, 1050       # poker card, 2.5 x 3.5 in
 LATTICE_STEP = 34                # card-back diagonal lattice spacing
