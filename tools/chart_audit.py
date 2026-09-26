@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 from http.client import HTTPException
-from typing import Mapping, TypedDict
+from typing import Literal, Mapping, TypedDict, TypeGuard
 
 import reportlib as rl
 import repodata as rd
@@ -37,18 +37,41 @@ MAX_LISTED = 60
 CENTURY = 2000          # two-digit chart years ('Sep '21') are 20xx
 
 
-class AuditRow(TypedDict, total=False):
-    """One report's audit result; 'err' alone when it could not be audited."""
-    slug: str
-    err: str
-    ticker: str
-    as_of: str | None
+Verdict = Literal['ok', 'adjusted', 'basis step', 'wrong']
+
+
+class PointCheck(TypedDict):
+    """check_points(): how many chart points were compared, and the adjusted, basis-step and wrong ones."""
     checked: int
     bad: list[tuple[str, float, float, float]]   # (label, chart value, Yahoo close, % off)
     adj_pts: int
     step_pts: int
     splits_after_as_of: float
+
+
+class AuditResult(PointCheck):
+    """One audited report."""
+    slug: str
+    ticker: str
+    as_of: str | None
     adj_labelled: bool
+
+
+class AuditFailure(TypedDict):
+    """A report that could not be audited, and why."""
+    slug: str
+    err: str
+
+
+AuditRow = AuditResult | AuditFailure
+
+
+def failed(row: AuditRow) -> TypeGuard[AuditFailure]:
+    return 'err' in row
+
+
+def succeeded(row: AuditRow) -> TypeGuard[AuditResult]:
+    return 'err' not in row
 
 
 class YahooError(Exception):
@@ -173,7 +196,7 @@ def spin_factor(splits: Splits, ym: tuple[int, int], as_of: str | None) -> float
     return f
 
 
-def classify(point: float, close: float, adjclose: float | None, spin: float) -> str:
+def classify(point: float, close: float, adjclose: float | None, spin: float) -> Verdict:
     """'ok' within 3% of the close; else 'adjusted' when it matches the dividend-adjusted close, 'basis step'
     when it matches a real pre-spin close, otherwise 'wrong'."""
     if abs((point - close) / close) <= TOLERANCE:
@@ -205,14 +228,12 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
         series, splits = monthly_series(slug, ticker, as_of)
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
-    row = check_points(labels, prices, series, splits, as_of)
-    row.update({'slug': slug, 'ticker': ticker, 'as_of': as_of,
-                'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))})
-    return row
+    return {**check_points(labels, prices, series, splits, as_of), 'slug': slug, 'ticker': ticker, 'as_of': as_of,
+            'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))}
 
 
 def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[int, int], tuple[float, float | None]],
-                 splits: Splits, as_of: str | None) -> AuditRow:
+                 splits: Splits, as_of: str | None) -> PointCheck:
     """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
     verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones. labels and prices
     pair by position (audit() rejects a page whose arrays differ in length).
@@ -222,7 +243,7 @@ def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[i
     pre-spin close). Both are a basis step, not a wrong point."""
     as_of_ym = year_month(as_of)
     after = splits_after(splits, as_of)
-    row: AuditRow = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after}
+    row: PointCheck = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after}
     for lab, pr in zip(labels[:-1], prices[:-1]):
         ym = parse_label(lab)
         if not ym or ym not in series or (as_of_ym and ym >= as_of_ym):
@@ -241,22 +262,22 @@ def main(argv: list[str] | None = None) -> int:
     """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
     slugs = (sys.argv[1:] if argv is None else argv) or [rd.slug_of(p)
                                                           for p in rd.report_paths()]
-    rows = sorted((audit(slug) for slug in slugs), key=lambda r: r.get('ticker') or r['slug'])   # the manifest's order
-    with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:
-        json.dump(rows, fh, indent=0)
-    errs = [r for r in rows if 'err' in r]
-    flag = [r for r in rows if r.get('bad')]
-    unparsed = [r for r in rows if 'err' not in r and r['checked'] < MIN_COMPARABLE]
-    adj_unl = [r for r in rows if r.get('adj_pts', 0) >= ADJ_UNLABELLED_MIN and not r.get('adj_labelled')]
+    rows = [audit(slug) for slug in slugs]
+    rd.write_json(os.path.join(WORK, 'chart_audit.json'), rows, indent=0)
+    errs = [r for r in rows if failed(r)]
+    done = sorted((r for r in rows if succeeded(r)), key=lambda r: r['ticker'])   # the manifest's order
+    flag = [r for r in done if r['bad']]
+    unparsed = [r for r in done if r['checked'] < MIN_COMPARABLE]
+    adj_unl = [r for r in done if r['adj_pts'] >= ADJ_UNLABELLED_MIN and not r['adj_labelled']]
     print('reports', len(rows), '| errors', len(errs), '| WRONG points >3% vs both close and adjclose:', len(flag),
           '| dividend-adjusted but unlabelled:', len(adj_unl), '| <30 comparable', len(unparsed))
     print('ADJ-UNLABELLED', [r['slug'] for r in adj_unl])
     print('BASIS STEPS (pre-spin real closes / split after as-of; not errors)',
-          [(r['slug'], r['step_pts'], r['splits_after_as_of']) for r in rows if r.get('step_pts') or r.get('splits_after_as_of', 1) != 1])
+          [(r['slug'], r['step_pts'], r['splits_after_as_of']) for r in done if r['step_pts'] or r['splits_after_as_of'] != 1])
     for r in sorted(flag, key=lambda r: -len(r['bad']))[:MAX_LISTED]:
         worst = max(r['bad'], key=lambda b: abs(b[3]))
         print(f"{r['slug']:6} as-of {r['as_of']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
-    print('ERR', [(r['slug'], r['err']) for r in errs][:20])
+    print('ERR', [(r['slug'], r['err']) for r in sorted(errs, key=lambda r: r['slug'])][:20])
     print('LOWCOUNT', [(r['slug'], r['checked']) for r in unparsed][:40])
     return 1 if (flag or errs) else 0
 

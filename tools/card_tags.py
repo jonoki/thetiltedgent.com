@@ -17,15 +17,15 @@ import json
 import os
 import sys
 from collections import Counter
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import reportlib as rl
 import repodata as rd
 from headoffice import hq_of
 
 # S&P 500 badge overrides where the join year shown differs from the card's data-sp date (Oki's decisions)
-SP_NOTE: dict[str, list[int | str]] = {
-    'lmt': [1984, 'Lockheed Corporation joined in 1984 and merged with Martin Marietta to form Lockheed Martin in 1995.'],
+SP_NOTE: dict[str, tuple[int, str]] = {
+    'lmt': (1984, 'Lockheed Corporation joined in 1984 and merged with Martin Marietta to form Lockheed Martin in 1995.'),
 }
 
 
@@ -33,10 +33,10 @@ class CardTags(TypedDict, total=False):
     """One report's entry in data/card_tags.json; the keys are listed in the module docstring."""
     st: list[list[str]]
     dv: float
-    hq: list[str]
-    ed: list[str | float | None]
+    hq: tuple[str, str]                      # (label, full head-office text)
+    ed: tuple[str | float | None, str | float | None, str | float | None]   # (latest as-of, previous as-of, previous price)
     ln: str
-    sp: list[int | str]
+    sp: tuple[int, str]                      # (year, sentence)
     hw: list[list[str]]
     th: list[list[str]]
     pp: list[list[str]]
@@ -51,12 +51,10 @@ class HandTags(TypedDict, total=False):
     since: str
 
 
-def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
-    """A JSON file under the repo; `default` when it does not exist (None: it must exist)."""
-    p = os.path.join(repo, *parts)
-    if default is not None and not os.path.exists(p):
-        return default
-    with open(p, encoding='utf-8') as fh:
+def load_json(repo: str, *parts: str) -> Any:
+    """A JSON file under the repo, as parsed; the caller states its shape. FileNotFoundError when it is missing:
+    every input is required, so a missing file cannot silently strip every card."""
+    with open(os.path.join(repo, *parts), encoding='utf-8') as fh:
         return json.load(fh)
 
 
@@ -81,7 +79,7 @@ def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
     return None
 
 
-def card_for(slug: str, style: rd.TagInputs, record: rd.ReportRecord | None, text: str, line: str | None,
+def card_for(slug: str, *, style: rd.TagInputs, record: rd.ReportRecord | None, text: str, line: str | None,
              hand: HandTags, logo: str | None) -> CardTags:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
     c: CardTags = {}
@@ -95,7 +93,7 @@ def card_for(slug: str, style: rd.TagInputs, record: rd.ReportRecord | None, tex
         c['hq'] = hq
     eds = (record.get('editions') if record else None) or []
     if len(eds) > 1:
-        c['ed'] = [eds[-1][0], eds[-2][0], eds[-2][1]]
+        c['ed'] = (eds[-1][0], eds[-2][0], eds[-2][1])
     if line:
         c['ln'] = line
     if slug in SP_NOTE:
@@ -106,17 +104,21 @@ def card_for(slug: str, style: rd.TagInputs, record: rd.ReportRecord | None, tex
     return c
 
 
-def main(repo: str = rd.ROOT) -> int:
-    style: dict[str, rd.TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
-    lines = load_json(repo, 'claude', 'card_lines.json', default={})
-    hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json', default={})         # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
-    logos = load_json(repo, 'assets', 'logos', 'index.json', default={})     # logo files + where each came from
-    records = rd.load_report_records(repo)
+def main(repo: str = rd.ROOT) -> int | str:
+    """0 when data/card_tags.json is written, else which input is missing (run style_tags.py first)."""
+    try:
+        style: dict[str, rd.TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
+        lines: dict[str, str] = load_json(repo, 'claude', 'card_lines.json')
+        hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json')   # ♥ ♠ ★ tags (claude/briefs/HANDTAGS.md)
+        logos: dict[str, dict[str, str]] = load_json(repo, 'assets', 'logos', 'index.json')   # logo files and sources
+        records = rd.load_report_records(repo)
+    except FileNotFoundError as e:
+        return f'missing input {os.path.relpath(e.filename, repo)} (card_tags runs after manifest.py and style_tags.py)'
     out = {}
     for slug in sorted(style):
         text = rl.read_text(rd.report_path(slug, repo=repo))[:80000]
-        out[slug] = card_for(slug, style[slug], records.get(slug), text, lines.get(slug), hand.get(slug, {}),
-                             logo_path(repo, slug, logos.get(slug) or {}))
+        out[slug] = card_for(slug, style=style[slug], record=records.get(slug), text=text, line=lines.get(slug),
+                             hand=hand.get(slug, {}), logo=logo_path(repo, slug, logos.get(slug) or {}))
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
     p = os.path.join(repo, 'data', 'card_tags.json')
     rd.write_json(p, doc)

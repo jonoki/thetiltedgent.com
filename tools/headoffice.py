@@ -32,8 +32,8 @@ HQ_FALLBACK = {  # reports with no "HQ:" line (from Wikipedia's constituent list
 }
 
 
-def hq_of(slug: str, text: str) -> list[str] | None:
-    """[short label, full head-office text] from the page's "HQ:" line, or None when it cannot be reduced to one."""
+def hq_of(slug: str, text: str) -> tuple[str, str] | None:
+    """(short label, full head-office text) from the page's "HQ:" line, or None when it cannot be reduced to one."""
     m = re.search(r'HQ:?\s*</span>\s*([^<]{3,160})|HQ:\s*([^<]{3,160})', text)
     full = html.unescape((m.group(1) or m.group(2)).strip()) if m else HQ_FALLBACK.get(slug)
     if not full:
@@ -44,10 +44,10 @@ def hq_of(slug: str, text: str) -> list[str] | None:
     if ',' not in main:             # "Mayfield Village (300 N. Commons Blvd., Mayfield, OH 44143)": the place is in the brackets
         main = full
     if STATE_RE.search(main) or US_ABBR.search(main) or re.search(r'\b[A-Z]{2} \d{5}\b', main):
-        return ['US-based', full]
+        return 'US-based', full
     parts = [p.strip() for p in main.split(',') if p.strip()]
     country = parts[-1] if parts else main
     country = COUNTRY.get(country.lower(), country)
     if len(country) > 18:           # free text we can't reduce to a country: show no tag rather than a wrong one
         return None
-    return [f'{country}-based', full]
+    return f'{country}-based', full

@@ -17,7 +17,6 @@ class Numbers(unittest.TestCase):
         self.assertEqual(rl.to_number('4.1%'), 4.1)
         self.assertEqual(rl.to_number('−3.2'), -3.2)
         self.assertIsNone(rl.to_number('n/m'))
-        self.assertIsNone(rl.to_number(None))
 
     def test_first_number_reads_the_first_value_in_a_cell(self):
         self.assertEqual(rl.first_number('12.4x (vs 18x)'), 12.4)

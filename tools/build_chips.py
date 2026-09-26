@@ -13,7 +13,7 @@ import math
 import os
 import re
 import sys
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import reportlib as rl
 import repodata as rd
@@ -26,6 +26,9 @@ LATTICE_STEP = 34                # card-back diagonal lattice spacing
 MONOGRAM_GROUP = '<g transform="translate(540 540) scale(0.8772) translate(-685.5 -688.0)">'   # in the source mark
 
 
+Anchor = Literal['start', 'middle', 'end']   # where x sits on the text, as in SVG text-anchor
+
+
 class Font:
     """The Cinzel font the text is drawn in: its glyph set, character map and units per em."""
 
@@ -35,7 +38,7 @@ class Font:
         font = TTFont(path)
         self.glyphs, self.cmap, self.upm = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
 
-    def text_path(self, s: str, size: float, x: float, y: float, anchor: str = 'middle', spacing: float = 0) -> str:
+    def text_path(self, s: str, size: float, x: float, y: float, anchor: Anchor = 'middle', spacing: float = 0) -> str:
         """SVG <path>s for string s, baseline at y, sized in px; anchor is 'start', 'middle' or 'end'."""
         from fontTools.pens.svgPathPen import SVGPathPen   # see __init__
         scale = size / self.upm

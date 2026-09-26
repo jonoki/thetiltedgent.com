@@ -15,7 +15,7 @@ import re
 import statistics
 import sys
 from collections import Counter
-from typing import Sequence
+from typing import Sequence, TypedDict
 
 import reportlib as rl
 import repodata as rd
@@ -116,7 +116,31 @@ def load_tag_inputs(repo: str = rd.ROOT) -> list[rd.TagInputs]:
     return [tag_inputs(slug, r, cards.get(slug)) for slug, r in sorted(records.items())]
 
 
-def universe(sp: list[rd.TagInputs]) -> dict[str, list[float]]:
+# The S&P 500 members' values per rank-based tag ('yield' is a keyword, hence the functional form)
+Universe = TypedDict('Universe', {'pe': list[float], 'revg': list[float], 'yield': list[float],
+                                 'fcf_yield': list[float], 'beta': list[float], 'roic': list[float]})
+
+
+class Thresholds(TypedDict):
+    """Every cut-off and median the tags quote, as published in data/style_tags.json."""
+    value_pe_max: float
+    pe_median: float
+    growth_revg_min: float
+    revg_median: float
+    income_yield_min: float
+    yield_median: float
+    cash_fcfy_min: float
+    fcfy_median: float
+    steady_beta_max: float
+    rollercoaster_beta_min: float
+    quality_roic_min: float
+    roic_median: float
+    quality_de_max: float
+    giant_mcap_min: float
+    beaten_down_ratio: float
+
+
+def universe(sp: list[rd.TagInputs]) -> Universe:
     """The S&P 500 members' values each rank-based tag is measured against."""
     return {
         'pe': [d['pe'] for d in sp if d['pe'] and d['pe'] > 0 and (d['eps'] is None or d['eps'] > 0)],
@@ -128,19 +152,23 @@ def universe(sp: list[rd.TagInputs]) -> dict[str, list[float]]:
     }
 
 
-def thresholds_for(u: dict[str, list[float]]) -> dict[str, float]:
-    """Every cut-off the tags use, rank-based ones from the universe and fixed ones from the constants above.
-    Published in data/style_tags.json, and the only source tags_for reads them from."""
-    th = {
-        'value_pe_max': quantile(u['pe'], PCT), 'pe_median': statistics.median(u['pe']),
-        'growth_revg_min': quantile(u['revg'], 1 - PCT), 'revg_median': statistics.median(u['revg']),
-        'income_yield_min': quantile(u['yield'], 1 - PCT), 'yield_median': statistics.median(u['yield']),
-        'cash_fcfy_min': quantile(u['fcf_yield'], 1 - PCT), 'fcfy_median': statistics.median(u['fcf_yield']),
-        'steady_beta_max': quantile(u['beta'], PCT), 'rollercoaster_beta_min': quantile(u['beta'], 1 - PCT),
-        'quality_roic_min': quantile(u['roic'], 1 - PCT), 'roic_median': statistics.median(u['roic']),
-        'quality_de_max': QUALITY_MAX_DE, 'giant_mcap_min': GIANT_MCAP, 'beaten_down_ratio': BEATEN_DOWN,
+def thresholds_for(u: Universe) -> Thresholds:
+    """Every cut-off the tags use, rank-based ones from the universe and fixed ones from the constants above,
+    rounded to 3 places. Published in data/style_tags.json, and the only source tags_for reads them from.
+    ValueError naming the measure when the universe has no values for one (no S&P 500 members found)."""
+    empty = [k for k, v in u.items() if not v]
+    if empty:
+        raise ValueError(f'no S&P 500 values for {", ".join(empty)}: check the data-sp attributes on reports/index.html')
+    r = lambda v: round(v, 3)
+    return {
+        'value_pe_max': r(quantile(u['pe'], PCT)), 'pe_median': r(statistics.median(u['pe'])),
+        'growth_revg_min': r(quantile(u['revg'], 1 - PCT)), 'revg_median': r(statistics.median(u['revg'])),
+        'income_yield_min': r(quantile(u['yield'], 1 - PCT)), 'yield_median': r(statistics.median(u['yield'])),
+        'cash_fcfy_min': r(quantile(u['fcf_yield'], 1 - PCT)), 'fcfy_median': r(statistics.median(u['fcf_yield'])),
+        'steady_beta_max': r(quantile(u['beta'], PCT)), 'rollercoaster_beta_min': r(quantile(u['beta'], 1 - PCT)),
+        'quality_roic_min': r(quantile(u['roic'], 1 - PCT)), 'roic_median': r(statistics.median(u['roic'])),
+        'quality_de_max': r(QUALITY_MAX_DE), 'giant_mcap_min': r(GIANT_MCAP), 'beaten_down_ratio': r(BEATEN_DOWN),
     }
-    return {k: round(v, 3) for k, v in th.items()}
 
 
 def as_of_note(d: rd.TagInputs) -> str:
@@ -151,14 +179,14 @@ def as_of_note(d: rd.TagInputs) -> str:
     return f" Figures as of {x:%b} {x.day}, {x.year}."
 
 
-def tags_for(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
+def tags_for(d: rd.TagInputs, th: Thresholds, u: Universe) -> list[list[str]]:
     """[tag, tooltip] pairs for one report, in display order. Formulas and rationale: claude/TAG_FORMULAS.md."""
     when = as_of_note(d)
     return (earnings_tags(d, th, u, when) + rank_tags(d, th, u, when) + beta_tags(d, th, when)
             + size_and_price_tags(d, th, when) + quality_tags(d, th, u, when))
 
 
-def earnings_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def earnings_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> list[list[str]]:
     """Not yet profitable (a loss over 12 months), else Value (the cheapest 20% by trailing P/E)."""
     tags = []
     profitable = d['eps'] is None or d['eps'] > 0
@@ -169,7 +197,7 @@ def earnings_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float
     return tags
 
 
-def rank_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def rank_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> list[list[str]]:
     """Growth, Income and Cash machine: the top 20% of S&P 500 members by revenue growth, yield and FCF yield."""
     tags = []
     if d['revg'] is not None and d['revg'] >= th['growth_revg_min']:
@@ -181,7 +209,7 @@ def rank_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], 
     return tags
 
 
-def size_and_price_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+def size_and_price_tags(d: rd.TagInputs, th: Thresholds, when: str) -> list[list[str]]:
     """Giant (market cap over the cut-off) and Beaten down (price at or under the ratio of its 52-week high)."""
     tags = []
     if d['mcap'] and d['mcap'] >= th['giant_mcap_min']:
@@ -191,7 +219,7 @@ def size_and_price_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> lis
     return tags
 
 
-def beta_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+def beta_tags(d: rd.TagInputs, th: Thresholds, when: str) -> list[list[str]]:
     """Steady (calmest 20%) or Rollercoaster (most volatile 20%), from the report's 5-year beta."""
     if d['beta'] is None:
         return []
@@ -202,7 +230,7 @@ def beta_tags(d: rd.TagInputs, th: dict[str, float], when: str) -> list[list[str
     return []
 
 
-def quality_tags(d: rd.TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+def quality_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> list[list[str]]:
     """Quality: top-20% ROIC outside banks, insurers and REITs, with debt-to-equity from 0 up to the cut-off."""
     roic, de = d['roic'], d['de']
     if (roic is None or de is None or NO_QUALITY.search(d['industry'] or '') or roic < th['quality_roic_min']
@@ -219,12 +247,15 @@ def main(repo: str = rd.ROOT) -> int | str:
     live = [d for d in rows if 'excluded' not in d]
     sp = [d for d in live if d['sp500']]
     u = universe(sp)
-    th = thresholds_for(u)
+    try:
+        th = thresholds_for(u)
+    except ValueError as e:
+        return str(e)
     for d in live:
         d['tags'] = [{'tag': t, 'tip': tip} for t, tip in tags_for(d, th, u)]
     out = {'generated_by': 'tools/style_tags.py', 'formulas': 'claude/TAG_FORMULAS.md',
            'universe': 'thresholds from S&P 500 members on reports/index.html (data-sp); applied to every report',
-           'thresholds': th, 'sample_sizes': {k: len(v) for k, v in u.items()}, 'excluded': EXCLUDE, 'reports': rows}
+           'thresholds': th, 'sample_sizes': {k: len(v) for k, v in u.items() if isinstance(v, list)}, 'excluded': EXCLUDE, 'reports': rows}
     rd.write_json(os.path.join(repo, 'data', 'style_tags.json'), out, indent=1)
 
     print(f"{len(rows)} reports ({len(live)} tagged, {len(rows) - len(live)} excluded); S&P members used for thresholds: {len(sp)}")

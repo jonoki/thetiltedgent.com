@@ -101,6 +101,7 @@ class ChartAudit(unittest.TestCase):
                 row = chart_audit.audit('acme', repo=repo)
             missing = chart_audit.audit('gone', repo=repo)
         self.assertEqual(seen, [('acme', 'ACME', '2026-09-10')])
+        assert chart_audit.succeeded(row) and chart_audit.failed(missing)
         self.assertEqual((row['checked'], row['bad']), (2, []))
         self.assertTrue(missing['err'].startswith('no page'))
 
@@ -110,6 +111,7 @@ class ChartAudit(unittest.TestCase):
             with open(os.path.join(repo, 'reports', 'acme_analysis.html'), 'w', encoding='utf-8') as fh:
                 fh.write(PAGE.replace('[1100.5,1200,1234.5]', '[1200,1234.5]'))
             row = chart_audit.audit('acme', repo=repo)
+        assert chart_audit.failed(row)
         self.assertEqual(row['err'], '3 labels for 2 prices')
 
     def test_an_unknown_slug_fails_the_run(self):

@@ -51,10 +51,8 @@ def strip_tags(s: str) -> str:
     return htmllib.unescape(re.sub(r'<[^>]+>', '', s)).strip()
 
 
-def to_number(s: str | None) -> float | None:
+def to_number(s: str) -> float | None:
     """A whole string read as one number: '1,234.5', '$12.30', '4.1%', '−3.2' -> float; anything else -> None."""
-    if s is None:
-        return None
     s = normalize_dashes(s.replace(',', '').replace('$', '').replace('%', '').strip())
     try:
         return float(s)
@@ -150,9 +148,10 @@ FIN_TABLE_ROWS = {'pe_trailing': r'^(Trailing P/E|P/E\b)', 'revenue_growth': r'^
 
 
 def fin_table(t: str) -> dict[str, str]:
-    """The FIN_TABLE_ROWS cells of the page's metrics table (class fin-table) as text, the first match for each."""
-    m = re.search(r'<table class="fin-table".*?</table>', t, re.S)
-    rows = table_rows(m.group(0)) if m else []
+    """The FIN_TABLE_ROWS cells as text, the first match for each, from every table of class fin-table (a page may
+    carry a segment table before the metrics table), or from the whole page when it has none (HD, UNH)."""
+    tables = re.findall(r'<table class="fin-table"[^>]*>.*?</table>', t, re.S)
+    rows = table_rows(''.join(tables) if tables else t)
     found = {key: row_value(rows, label, re.I) for key, label in FIN_TABLE_ROWS.items()}
     return {key: value for key, value in found.items() if value is not None}
 

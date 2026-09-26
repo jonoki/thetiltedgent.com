@@ -1,4 +1,6 @@
 """Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, manifest).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+import contextlib
+import io
 import json
 import os
 import tempfile
@@ -24,7 +26,12 @@ class StyleTagInputs(unittest.TestCase):
     def test_fin_table_reads_the_metrics_table_cells(self):
         page = PAGE.replace('<tr><td>EPS (TTM)</td>', '<tr><td>Revenue Growth</td><td>12.5%</td></tr><tr><td>Beta</td><td>1.10</td></tr><tr><td>EPS (TTM)</td>')
         self.assertEqual(rl.fin_table(page), {'pe_trailing': '24.1x', 'revenue_growth': '12.5%', 'beta': '1.10'})
-        self.assertEqual(rl.fin_table('<table><tr><td>Beta</td><td>1.1</td></tr></table>'), {})   # only the fin-table
+        # a segment table can come first: every fin-table is read, and a page with none falls back to all its tables
+        two = ('<table class="fin-table"><tr><td>Pharma</td><td>+12%</td></tr></table>'
+               '<table class="fin-table"><tr><td>Beta (5Y)</td><td>1.1</td></tr></table>'
+               '<table><tr><td>Beta</td><td>9.9</td></tr></table>')
+        self.assertEqual(rl.fin_table(two), {'beta': '1.1'})
+        self.assertEqual(rl.fin_table('<table><tr><td>Beta</td><td>1.1</td></tr></table>'), {'beta': '1.1'})
 
     def test_tag_inputs_prefer_the_card_and_fall_back_to_the_table_pe(self):
         r: rd.ReportRecord = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
@@ -43,11 +50,12 @@ class StyleTagInputs(unittest.TestCase):
 
 
 class StyleTagRules(unittest.TestCase):
-    TH = {'value_pe_max': 15.0, 'pe_median': 22.0, 'growth_revg_min': 12.0, 'revg_median': 5.0,
+    TH: style_tags.Thresholds = {'value_pe_max': 15.0, 'pe_median': 22.0, 'growth_revg_min': 12.0, 'revg_median': 5.0,
           'income_yield_min': 3.0, 'yield_median': 1.5, 'cash_fcfy_min': 6.0, 'fcfy_median': 3.5,
           'steady_beta_max': 0.7, 'rollercoaster_beta_min': 1.4, 'quality_roic_min': 20.0, 'roic_median': 10.0,
           'quality_de_max': 1.0, 'giant_mcap_min': 200e9, 'beaten_down_ratio': 0.6}
-    U = {k: [1.0, 5.0, 10.0, 20.0, 30.0] for k in ('pe', 'revg', 'yield', 'fcf_yield', 'beta', 'roic')}
+    RANKS = [1.0, 5.0, 10.0, 20.0, 30.0]
+    U: style_tags.Universe = {'pe': RANKS, 'revg': RANKS, 'yield': RANKS, 'fcf_yield': RANKS, 'beta': RANKS, 'roic': RANKS}
 
     @staticmethod
     def inputs(**kw: Any) -> rd.TagInputs:
@@ -122,13 +130,64 @@ class DeltaBox(unittest.TestCase):
         eds, state = manifest.editions(self.BOX, '2026-09-01', 816.64, warn)
         self.assertEqual((eds, state, warn), ([['2026-08-17', 994.79, 'previous edition'],
                                                ['2026-09-01', 816.64, 'refreshed']], 'fix', []))
-        card = card_tags.card_for('acme', StyleTagRules.inputs(), {'editions': eds}, '', None, {}, None)
-        self.assertEqual(card['ed'], ['2026-09-01', '2026-08-17', 994.79])
+        card = card_tags.card_for('acme', style=StyleTagRules.inputs(), record={'editions': eds}, text='', line=None,
+                                  hand={}, logo=None)
+        self.assertEqual(card['ed'], ('2026-09-01', '2026-08-17', 994.79))
 
     def test_a_prior_edition_that_is_not_earlier_is_flagged(self):
         warn: list[str] = []
         manifest.editions(self.BOX, '2026-08-17', 816.64, warn)
         self.assertEqual(warn, ['delta_box_prior_edition_not_earlier'])
+
+
+class Thresholds(unittest.TestCase):
+    def test_cutoffs_sit_at_the_20th_and_80th_percentiles(self):
+        vals = [float(v) for v in range(1, 102)]                  # 1..101: 20th pct 21, 80th pct 81, median 51
+        u: style_tags.Universe = {'pe': vals, 'revg': vals, 'yield': vals, 'fcf_yield': vals, 'beta': vals, 'roic': vals}
+        th = style_tags.thresholds_for(u)
+        self.assertEqual((th['value_pe_max'], th['pe_median'], th['growth_revg_min']), (21.0, 51.0, 81.0))   # cheap = bottom
+        self.assertEqual((th['steady_beta_max'], th['rollercoaster_beta_min']), (21.0, 81.0))
+        self.assertEqual((th['income_yield_min'], th['cash_fcfy_min'], th['quality_roic_min']), (81.0, 81.0, 81.0))
+        self.assertEqual((th['giant_mcap_min'], th['quality_de_max']), (200e9, 1.0))
+
+    def test_an_empty_universe_names_the_measure(self):
+        vals = [1.0, 2.0]
+        u: style_tags.Universe = {'pe': vals, 'revg': [], 'yield': vals, 'fcf_yield': vals, 'beta': vals, 'roic': vals}
+        with self.assertRaisesRegex(ValueError, 'revg'):
+            style_tags.thresholds_for(u)
+
+
+class TagPipeline(unittest.TestCase):
+    """manifest.py -> style_tags.py -> card_tags.py on a one-report fixture repo."""
+    PAGE = PAGE.replace('<tr><td>EPS (TTM)</td>',
+                        '<tr><td>Revenue Growth</td><td>+40%</td></tr><tr><td>ROIC</td><td>30%</td></tr>'
+                        '<tr><td>Debt-to-Equity</td><td>0.4</td></tr><tr><td>Beta</td><td>2.0</td></tr>'
+                        '<tr><td>Dividend Yield</td><td>3.0%</td></tr><tr><td>Free Cash Flow</td><td>$9.0B</td></tr>'
+                        '<tr><td>EPS (TTM)</td>').replace(
+                            '<div class="price-current">', '<div><span>Mkt Cap:</span> $100.0B</span></div><div class="price-current">')
+    INDEX = ('<section class="sgroup" data-s="industrials"><a class="rep" data-sp="1999-01-01" href="view.html?r=acme">'
+             '<span class="tick">ACME</span><h3>Acme</h3><span class="sect">WIDGETS</span><span class="ixrow"></span></a></section>')
+
+    def test_the_three_writers_run_in_order(self):
+        with tempfile.TemporaryDirectory() as repo:
+            files = {'reports/index.html': self.INDEX, 'reports/acme_analysis.html': self.PAGE,
+                     'claude/card_lines.json': '{"acme": "Sells widgets."}', 'claude/hand_tags.json': '{}',
+                     'assets/logos/index.json': '{}'}
+            for rel, text in files.items():
+                os.makedirs(os.path.dirname(os.path.join(repo, rel)), exist_ok=True)
+                with open(os.path.join(repo, rel), 'w', encoding='utf-8') as fh:
+                    fh.write(text)
+            self.assertIn('style_tags.py', str(card_tags.main(repo)))           # before style_tags.py has run
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(manifest.main([repo]), 0)
+                self.assertEqual(style_tags.main(repo), 0)
+                self.assertEqual(card_tags.main(repo), 0)
+            with open(os.path.join(repo, 'data', 'card_tags.json'), encoding='utf-8') as fh:
+                card = json.load(fh)['cards']['acme']
+        # the only S&P member is its own 20th and 80th percentile, so it meets both ends of every rank: Value and
+        # Steady (checked before Rollercoaster) as well as Growth, Income, Cash machine and Quality
+        self.assertEqual([t for t, _ in card['st']], ['Value', 'Growth', 'Income', 'Cash machine', 'Steady', 'Quality'])
+        self.assertEqual((card['dv'], card['ln'], card['hq']), (3.0, 'Sells widgets.', ['US-based', 'Springfield, Illinois']))
 
 
 class StyleTagsNeedTheNewManifest(unittest.TestCase):

@@ -6,7 +6,7 @@ import html as htmllib
 import json
 import os
 import re
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 import reportlib as rl
 
@@ -68,7 +68,7 @@ class ReportRecord(TypedDict, total=False):
     blob_sha: str
     structure_ok: bool
     editions: list[list[str | float | None]]   # [as_of, price, note] per published edition, newest last
-    delta_state: str
+    delta_state: Literal['price', 'print', 'fix']   # the "what changed" box's class (claude/briefs/REFRESH.md)
     warnings: list[str]
     pe_trailing: float | str
     pe_forward: float | str
