@@ -19,6 +19,7 @@ PAGE = """<!DOCTYPE html>
 <tr><td>52-Week Range</td><td>$1,001.00 &ndash; $1,300.00</td></tr>
 </tbody></table>
 <canvas></canvas><canvas></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>const labels = ['Sep \\'21', "Oct '21", `Nov 21`]; const prices = [1100.5,1200,1234.5];</script>
 </body></html>
 """

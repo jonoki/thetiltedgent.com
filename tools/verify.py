@@ -12,14 +12,20 @@ PASS: the EPS row's wording varies too much between reports for a pattern match 
 import os
 import re
 import sys
-from typing import TypedDict
+from typing import NotRequired
 
 import reportlib as rl
 import repodata as rd
 
 
-class CheckResult(rl.StructureCounts, total=False):
-    """verify.check() for one page: its structure counts plus these."""
+# every report loads this Chart.js build (from cdnjs, or jsdelivr on two older pages); a page on any other version fails
+CHART_JS = re.compile(r'<script src="https://(?:cdnjs\.cloudflare\.com/ajax/libs/Chart\.js/4\.4\.1/'
+                      r'|cdn\.jsdelivr\.net/npm/chart\.js@4\.4\.1/dist/)chart\.umd\.min\.js"')
+
+
+class CheckResult(rl.StructureCounts):
+    """verify.check() for one page: its structure counts plus these. range and range_ok are absent when the page
+    has no readable 52-week range or price."""
     price: float | None
     n_labels: int | None
     n_prices: int | None
@@ -27,9 +33,10 @@ class CheckResult(rl.StructureCounts, total=False):
     price_match: bool
     pe_stated: float | None
     pe_calc: float | None
-    range: tuple[float, float]
-    range_ok: bool
-    date: str | None
+    range: NotRequired[tuple[float, float]]
+    range_ok: NotRequired[bool]
+    date: str | None               # the as-of date, YYYY-MM-DD (reportlib.as_of)
+    chart_js: bool
     title_ticker: str | None
     title_ok: bool
     ok: bool
@@ -56,36 +63,37 @@ def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:
 
 def passes(o: CheckResult, path: str) -> bool:
     """The gate: no structure problem (skeleton, canvas count, <style> tags, site nav; reportlib.structure_problems),
-    the chart ending on the header price, equal label and price counts, the price inside its 52-week range and
-    the title ticker matching the file name."""
+    the chart ending on the header price, equal label and price counts, the pinned Chart.js build, the price inside
+    its 52-week range (a page with no readable range fails) and the title ticker matching the file name."""
     return bool(not rl.structure_problems(o, path)
-                and o['price_match'] and o['n_labels'] == o['n_prices']
-                and o.get('range_ok', False) and o['title_ok'])   # no readable range (or price) fails
+                and o['price_match'] and o['n_labels'] == o['n_prices'] and o['chart_js']
+                and o.get('range_ok', False) and o['title_ok'])
+
+
+def title_matches(ticker: str | None, path: str) -> bool:
+    """The <title> ticker names the file: on 21 Sep 2026 a builder wrote the Cboe report into mtd_analysis.html
+    and a PG&E copy into cboe_analysis.html, and every other check passed."""
+    norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
+    return norm(ticker) == norm(os.path.basename(path).replace('_analysis.html', ''))
 
 
 def check(path: str) -> CheckResult:
     t = rl.read_text(path)
-    out = CheckResult(**rl.structure_counts(t))
     price = rl.header_price(t)
-    out['price'] = price
     labels, prices = rl.chart_series(t)
-    out['n_labels'] = len(labels) if labels is not None else None
-    out['n_prices'] = len(prices) if prices is not None else None
-    out['last_price'] = prices[-1] if prices else None
-    out['price_match'] = bool(price is not None and prices and abs(prices[-1] - price) < rl.PRICE_EXACT)
-    out['pe_stated'], out['pe_calc'] = pe_pair(t, price)
+    pe_stated, pe_calc = pe_pair(t, price)
+    ticker = rl.parse_title(t)[0]
+    out = CheckResult(
+        **rl.structure_counts(t), price=price,
+        n_labels=len(labels) if labels is not None else None, n_prices=len(prices) if prices is not None else None,
+        last_price=prices[-1] if prices else None,
+        price_match=bool(price is not None and prices and abs(prices[-1] - price) < rl.PRICE_EXACT),
+        pe_stated=pe_stated, pe_calc=pe_calc, date=rl.as_of(t)[0], chart_js=bool(CHART_JS.search(t)),
+        title_ticker=ticker, title_ok=title_matches(ticker, path), ok=False)
     w52 = rl.range_52w(t)
     if w52 and price:
         out['range'] = (w52[0], w52[1])
         out['range_ok'] = w52[0] <= price <= w52[1]
-    date = re.search(r'Static data as of ([A-Za-z]+ \d+, \d{4})', t)
-    out['date'] = date.group(1) if date else None
-    # the <title> ticker must match the file name: on 21 Sep 2026 a builder wrote the Cboe report into
-    # mtd_analysis.html and a PG&E copy into cboe_analysis.html, and every other check passed
-    slug = os.path.basename(path).replace('_analysis.html', '')
-    out['title_ticker'] = rl.parse_title(t)[0]
-    norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
-    out['title_ok'] = norm(out['title_ticker']) == norm(slug)
     out['ok'] = passes(out, path)
     return out
 
@@ -95,13 +103,18 @@ def result_line(path: str, o: CheckResult) -> str:
     skel = ''.join(str(o[k]) for k in ('doctype', 'html', 'head', 'body', 'body_close', 'html_close'))
     return (f"{'PASS' if o['ok'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
             f"n={o['n_labels']}/{o['n_prices']} skel={skel} canvas={o['canvas']} lines={o['lines']} "
-            f"pe={o['pe_stated']}/{o['pe_calc']} range={o.get('range_ok')} date={o['date']} title={o['title_ticker']}")
+            f"pe={o['pe_stated']}/{o['pe_calc']} range={o.get('range_ok')} chartjs={o['chart_js']} date={o['date']} "
+            f"title={o['title_ticker']}")
 
 
 def main(argv: list[str] | None = None) -> int:
     files = (sys.argv[1:] if argv is None else argv) or rd.report_paths(assets=True)
     failed = 0
     for f in files:
+        if not os.path.isfile(f):
+            failed += 1
+            print(f'FAIL {f}: no such file')
+            continue
         o = check(f)
         failed += not o['ok']
         print(result_line(f, o))

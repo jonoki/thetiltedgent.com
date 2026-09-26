@@ -96,6 +96,7 @@ class Verify(unittest.TestCase):
         self.assertFalse(self.check(PAGE.replace('<canvas></canvas>', '', 1))['ok'])         # canvas count
         self.assertFalse(self.check(PAGE.replace('$1,300.00', '$1,200.00'))['ok'])           # price outside 52w
         self.assertFalse(self.check(PAGE.replace('52-Week Range', 'Range'))['ok'])            # no 52w range to check
+        self.assertFalse(self.check(PAGE.replace('Chart.js/4.4.1', 'Chart.js/3.9.1'))['ok'])   # unpinned Chart.js
         self.assertFalse(self.check(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>'))['ok'])
 
     def test_pe_is_reported_but_not_a_gate(self):

@@ -13,14 +13,15 @@ import re
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
+from http.client import HTTPException
 from typing import Mapping, TypedDict
 
 import reportlib as rl
 import repodata as rd
 
-WORK = os.path.join(tempfile.gettempdir(), 'ttg_chart_audit')
-CACHE = os.path.join(WORK, 'yh')
+WORK = os.path.join(tempfile.gettempdir(), 'ttg_chart_audit')   # the Yahoo cache is WORK/yh (cache_dir) and the run's rows go here
 YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6y&interval=1mo&events=split'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 FETCH_TIMEOUT_S, FETCH_PAUSE_S = 30, 0.3
@@ -75,7 +76,7 @@ def fetch(slug: str, ticker: str, path: str) -> None:
     url = YAHOO_CHART.format(sym=YAHOO_SYMBOL.get(slug, ticker.replace('.', '-')))
     try:
         body = urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=FETCH_TIMEOUT_S).read()  # nosec B310 - fixed https host
-    except Exception as e:                        # network, HTTP or timeout: reported per report, not fatal
+    except (urllib.error.URLError, HTTPException, TimeoutError, OSError) as e:   # reported per report, not fatal
         raise YahooError(str(e)) from e
     with open(path, 'wb') as fh:
         fh.write(body)
@@ -119,9 +120,16 @@ def read_series(path: str) -> tuple[Monthly, Splits]:
         raise YahooError(f'unreadable series ({type(e).__name__})') from e
 
 
+def cache_dir() -> str:
+    """Where fetched Yahoo series are kept: WORK/yh, created on first use."""
+    path = os.path.join(WORK, 'yh')
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
 def cached_series(path: str, as_of: str | None) -> tuple[Monthly, Splits] | None:
-    """The cached series when it reads and reaches the report's as-of month; None (saying why when the file
-    is unreadable) when it has to be fetched again."""
+    """The cached series when it reads and is current: it has data and, when the report has an as-of date, reaches
+    that month. None (saying why when the file is unreadable) when it has to be fetched again."""
     if not os.path.exists(path):
         return None
     try:
@@ -129,15 +137,16 @@ def cached_series(path: str, as_of: str | None) -> tuple[Monthly, Splits] | None
     except YahooError as e:
         print(f'  {os.path.basename(path)}: cached series {e}; fetching it again', file=sys.stderr)
         return None
-    if monthly and max(monthly) >= (year_month(as_of) or min(monthly)):
-        return monthly, splits
-    return None
+    if not monthly:
+        return None
+    as_of_ym = year_month(as_of)
+    return (monthly, splits) if as_of_ym is None or max(monthly) >= as_of_ym else None
 
 
-def yahoo(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, Splits]:
+def monthly_series(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, Splits]:
     """The monthly series for a report: from the cache when it is readable and current, else fetched again (a
     refreshed report's newest points are never skipped silently)."""
-    path = os.path.join(CACHE, slug + '.ev.json')
+    path = os.path.join(cache_dir(), slug + '.ev.json')
     cached = cached_series(path, as_of)
     if cached:
         return cached
@@ -190,20 +199,23 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
     labels, prices = rl.chart_series(t)
     if not labels or not prices:
         return {'slug': slug, 'err': 'arrays'}
+    if len(labels) != len(prices):
+        return {'slug': slug, 'err': f'{len(labels)} labels for {len(prices)} prices'}
     try:
-        yh, splits = yahoo(slug, ticker, as_of)
+        series, splits = monthly_series(slug, ticker, as_of)
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
-    row = check_points(labels, prices, yh, splits, as_of)
+    row = check_points(labels, prices, series, splits, as_of)
     row.update({'slug': slug, 'ticker': ticker, 'as_of': as_of,
                 'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))})
     return row
 
 
-def check_points(labels: list[str], prices: list[float], yh: Mapping[tuple[int, int], tuple[float, float | None]],
+def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[int, int], tuple[float, float | None]],
                  splits: Splits, as_of: str | None) -> AuditRow:
     """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
-    verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones.
+    verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones. labels and prices
+    pair by position (audit() rejects a page whose arrays differ in length).
 
     Yahoo's close is adjusted for every split it knows, including ones after the report's as-of (the report
     is on its as-of share basis) and spin-offs booked as fractional "splits" (a report may show the real
@@ -213,10 +225,10 @@ def check_points(labels: list[str], prices: list[float], yh: Mapping[tuple[int, 
     row: AuditRow = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after}
     for lab, pr in zip(labels[:-1], prices[:-1]):
         ym = parse_label(lab)
-        if not ym or ym not in yh or (as_of_ym and ym >= as_of_ym):
+        if not ym or ym not in series or (as_of_ym and ym >= as_of_ym):
             continue
         row['checked'] += 1
-        c, a = yh[ym]
+        c, a = series[ym]
         verdict = classify(pr, c * after, a * after if a else None, spin_factor(splits, ym, as_of))
         row['adj_pts'] += verdict == 'adjusted'
         row['step_pts'] += verdict == 'basis step'
@@ -229,7 +241,6 @@ def main(argv: list[str] | None = None) -> int:
     """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
     slugs = (sys.argv[1:] if argv is None else argv) or [os.path.basename(p).replace('_analysis.html', '')
                                                           for p in rd.report_paths()]
-    os.makedirs(CACHE, exist_ok=True)
     rows = sorted((audit(slug) for slug in slugs), key=lambda r: r.get('ticker') or r['slug'])   # the manifest's order
     with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:
         json.dump(rows, fh, indent=0)

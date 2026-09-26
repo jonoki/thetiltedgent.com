@@ -67,7 +67,9 @@ exactly two canvases (three for bond/cash reports under `reports/fixed/`, which
 add a yield-curve chart), equal `labels`/`prices` array lengths, final chart
 value == header price to the cent, that the 52-week range contains the price
 (a page with no readable 52-week range fails; every report had one on 26 Sep 2026),
-that the `<title>` ticker matches the file name, and no embedded site nav.
+that the `<title>` ticker matches the file name, no embedded site nav, and that the page loads the
+pinned Chart.js 4.4.1 build. A path that is not a file is a FAIL. The date column is the as-of date read by
+`reportlib.as_of`, the same reader the manifest uses.
 Prints one PASS/FAIL line per report and **exits 1 if any report fails**.
 P/E is printed as stated/calculated (price ÷ EPS) and is deliberately not part
 of PASS: fix the pattern, not the report's prose, when they disagree.

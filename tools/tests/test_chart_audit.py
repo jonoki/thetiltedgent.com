@@ -61,28 +61,28 @@ class ChartAudit(unittest.TestCase):
             with open(path, 'w', encoding='utf-8') as fh:
                 fh.write(fresh)
         with tempfile.TemporaryDirectory() as d, \
-                unittest.mock.patch.object(chart_audit, 'CACHE', d), \
+                unittest.mock.patch.object(chart_audit, 'WORK', d), \
                 unittest.mock.patch.object(chart_audit, 'fetch', fake_fetch):
-            path = os.path.join(d, 'acme.ev.json')
+            path = os.path.join(chart_audit.cache_dir(), 'acme.ev.json')
             for cached in ('not json', self.yahoo_json([]), self.yahoo_json([(2026, 7)])):
                 with open(path, 'w', encoding='utf-8') as fh:
                     fh.write(cached)
                 with contextlib.redirect_stderr(io.StringIO()) as err:
-                    monthly, _ = chart_audit.yahoo('acme', 'ACME', '2026-09-21')
+                    monthly, _ = chart_audit.monthly_series('acme', 'ACME', '2026-09-21')
                 self.assertIn((2026, 9), monthly)
                 self.assertEqual('unreadable' in err.getvalue(), cached == 'not json')   # a corrupt cache is reported
             self.assertEqual(len(fetched), 3)
-            chart_audit.yahoo('acme', 'ACME', '2026-09-21')    # now current: read from the cache
+            chart_audit.monthly_series('acme', 'ACME', '2026-09-21')    # now current: read from the cache
             self.assertEqual(len(fetched), 3)
 
     def test_check_points(self):
-        yh = {(2026, 6): (100.0, 95.0), (2026, 7): (100.0, 95.0), (2026, 8): (100.0, 95.0)}
+        series = {(2026, 6): (100.0, 95.0), (2026, 7): (100.0, 95.0), (2026, 8): (100.0, 95.0)}
         labels, prices = ["Jun '26", "Jul '26", "Aug '26", "Sep '26"], [101.0, 95.5, 150.0, 999.0]
-        row = chart_audit.check_points(labels, prices, yh, [], '2026-09-21')
+        row = chart_audit.check_points(labels, prices, series, [], '2026-09-21')
         self.assertEqual((row['checked'], row['adj_pts'], row['step_pts']), (3, 1, 0))   # the last point is verify.py's
         self.assertEqual(row['bad'], [("Aug '26", 150.0, 100.0, 50.0)])
         # a 2-for-1 split after the as-of: Yahoo's closes are halved, the report's are not
-        row = chart_audit.check_points(labels, [100.0, 100.0, 100.0, 0], {k: (50.0, None) for k in yh},
+        row = chart_audit.check_points(labels, [100.0, 100.0, 100.0, 0], {k: (50.0, None) for k in series},
                                        [('2026-10-01', 2.0)], '2026-09-21')
         self.assertEqual((row['checked'], row['bad'], row['splits_after_as_of']), (3, [], 2.0))
 
@@ -97,12 +97,20 @@ class ChartAudit(unittest.TestCase):
             os.makedirs(os.path.join(repo, 'reports'))
             with open(os.path.join(repo, 'reports', 'acme_analysis.html'), 'w', encoding='utf-8') as fh:
                 fh.write(PAGE)
-            with unittest.mock.patch.object(chart_audit, 'yahoo', fake_yahoo):
+            with unittest.mock.patch.object(chart_audit, 'monthly_series', fake_yahoo):
                 row = chart_audit.audit('acme', repo=repo)
             missing = chart_audit.audit('gone', repo=repo)
         self.assertEqual(seen, [('acme', 'ACME', '2026-09-10')])
         self.assertEqual((row['checked'], row['bad']), (2, []))
         self.assertTrue(missing['err'].startswith('no page'))
+
+    def test_labels_and_prices_of_different_lengths_are_an_error(self):
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'reports'))
+            with open(os.path.join(repo, 'reports', 'acme_analysis.html'), 'w', encoding='utf-8') as fh:
+                fh.write(PAGE.replace('[1100.5,1200,1234.5]', '[1200,1234.5]'))
+            row = chart_audit.audit('acme', repo=repo)
+        self.assertEqual(row['err'], '3 labels for 2 prices')
 
     def test_an_unknown_slug_fails_the_run(self):
         with contextlib.redirect_stdout(io.StringIO()), \
