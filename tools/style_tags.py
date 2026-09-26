@@ -98,30 +98,36 @@ def usd_fcf(raw: object) -> float | None:
     return None
 
 
-def inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
-    """One report's tag inputs: every parsed number, with the raw text it came from under 'raw'."""
-    w52 = r.get('w52') or [None, None]
-    d: TagInputs = {
+def identity(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
+    """Who the report is about (the index card wins over the manifest) and the page text every number comes from."""
+    return {
         'slug': slug, 'ticker': card.get('ticker') or r.get('ticker'), 'as_of': r.get('as_of'),
         'industry': card.get('card_industry') or r.get('industry'),
         'sp500': bool((card.get('indices') or {}).get('sp500_added')),
         'raw': {'pe_trailing': r.get('pe_trailing'), 'eps_ttm': r.get('eps_ttm'), 'yield': r.get('yield_pct'),
                 'market_cap': r.get('market_cap'), 'fcf': r.get('fcf'), **tbl},
     }
-    d['price'] = num(r.get('price'))
-    d['w52_high'] = num(w52[1])
-    d['mcap'] = money(r.get('market_cap'))
-    d['fcf'] = usd_fcf(r.get('fcf'))
-    d['eps'] = num(r.get('eps_ttm'))
-    d['pe'] = num(r.get('pe_trailing'))
-    if d['pe'] is None:
-        d['pe'] = num(tbl.get('pe_tbl'))   # manifest missed it; fall back to the table row
-    d['yield'] = num(r.get('yield_pct'))
-    for k in TABLE_ROWS:
-        if k != 'pe_tbl':
-            d[k] = num(tbl.get(k))
-    cash_ok = d['fcf'] is not None and d['mcap'] and not NO_CASH.search(d['industry'] or '')
-    d['fcf_yield'] = round(100 * d['fcf'] / d['mcap'], 2) if cash_ok else None
+
+
+def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> float | None:
+    """Free cash flow as % of market cap; None where FCF is not meaningful (lenders, insurers, brokers)."""
+    if fcf is None or not mcap or NO_CASH.search(industry or ''):
+        return None
+    return round(100 * fcf / mcap, 2)
+
+
+def inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
+    """One report's tag inputs: every parsed number, with the raw text it came from under 'raw'."""
+    d = identity(slug, r, card, tbl)
+    pe = num(r.get('pe_trailing'))
+    d.update({
+        'price': num(r.get('price')), 'w52_high': num((r.get('w52') or [None, None])[1]),
+        'mcap': money(r.get('market_cap')), 'fcf': usd_fcf(r.get('fcf')), 'eps': num(r.get('eps_ttm')),
+        'pe': pe if pe is not None else num(tbl.get('pe_tbl')),   # the table row when the manifest missed it
+        'yield': num(r.get('yield_pct')),
+    })
+    d.update({k: num(tbl.get(k)) for k in TABLE_ROWS if k != 'pe_tbl'})
+    d['fcf_yield'] = fcf_yield(d['fcf'], d['mcap'], d['industry'])
     if slug in EXCLUDE:
         d['excluded'] = EXCLUDE[slug]
     return d
