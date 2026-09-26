@@ -177,11 +177,11 @@ class TagPipeline(unittest.TestCase):
                 os.makedirs(os.path.dirname(os.path.join(repo, rel)), exist_ok=True)
                 with open(os.path.join(repo, rel), 'w', encoding='utf-8') as fh:
                     fh.write(text)
-            self.assertIn('style_tags.py', str(card_tags.main(repo)))           # before style_tags.py has run
+            self.assertIn('style_tags.py', str(card_tags.main(['--repo', repo])))           # before style_tags.py has run
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(manifest.main([repo]), 0)
-                self.assertEqual(style_tags.main(repo), 0)
-                self.assertEqual(card_tags.main(repo), 0)
+                self.assertEqual(manifest.main(['--repo', repo]), 0)
+                self.assertEqual(style_tags.main(['--repo', repo]), 0)
+                self.assertEqual(card_tags.main(['--repo', repo]), 0)
             with open(os.path.join(repo, 'data', 'card_tags.json'), encoding='utf-8') as fh:
                 card = json.load(fh)['cards']['acme']
         # the only S&P member is its own 20th and 80th percentile, so it meets both ends of every rank: Value and
@@ -201,7 +201,7 @@ class StyleTagsNeedTheNewManifest(unittest.TestCase):
                 json.dump({'shards': {'x': 'data/reports/x.json'}}, fh)
             with open(os.path.join(repo, 'data', 'reports', 'x.json'), 'w', encoding='utf-8') as fh:
                 json.dump({'reports': [{'slug': 'acme', 'price': 1.0}]}, fh)
-            self.assertIn('manifest.py', str(style_tags.main(repo)))
+            self.assertIn('manifest.py', str(style_tags.main(['--repo', repo])))
 
 
 if __name__ == '__main__':

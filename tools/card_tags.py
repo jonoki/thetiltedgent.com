@@ -104,8 +104,9 @@ def card_for(slug: str, *, style: rd.TagInputs, record: rd.ReportRecord | None, 
     return c
 
 
-def main(repo: str = rd.ROOT) -> int | str:
+def main(argv: list[str] | None = None) -> int | str:
     """0 when data/card_tags.json is written, else which input is missing (run style_tags.py first)."""
+    repo = rd.parser('Write data/card_tags.json, the tags on every report card.').parse_args(argv).repo
     try:
         style: dict[str, rd.TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
         lines: dict[str, str] = load_json(repo, 'claude', 'card_lines.json')

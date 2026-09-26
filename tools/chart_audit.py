@@ -258,11 +258,13 @@ def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[i
     return row
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int | str:
     """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
-    slugs = (sys.argv[1:] if argv is None else argv) or [rd.slug_of(p)
-                                                          for p in rd.report_paths()]
-    rows = [audit(slug) for slug in slugs]
+    ap = rd.parser('Audit report charts against Yahoo month-end closes.')
+    ap.add_argument('slugs', nargs='*', help='report slugs (default: every stock report)')
+    args = ap.parse_args(argv)
+    slugs = args.slugs or [rd.slug_of(p) for p in rd.report_paths(args.repo)]
+    rows = [audit(slug, repo=args.repo) for slug in slugs]
     rd.write_json(os.path.join(WORK, 'chart_audit.json'), rows, indent=0)
     errs = [r for r in rows if failed(r)]
     done = sorted((r for r in rows if succeeded(r)), key=lambda r: r['ticker'])   # the manifest's order

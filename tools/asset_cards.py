@@ -16,14 +16,14 @@ import sys
 import reportlib as rl
 import repodata as rd
 
-FAMILIES = {  # folder: (heading, one-line note, sort)
+FAMILIES = {  # folder: (heading, one-line note, sort), plain text
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
     'crypto': ('Crypto', 'Cryptoassets, priced at the UTC daily close.', 'az'),
-    'fixed': ('Bonds &amp; cash', 'Government bonds and bills, priced by their yield. Shortest term first.', 'term'),
+    'fixed': ('Bonds & cash', 'Government bonds and bills, priced by their yield. Shortest term first.', 'term'),
 }   # one per reportlib.ASSET_FAMILIES folder (a unit test checks)
-LABEL = {  # slug: category line on the card
-    'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&amp;P 500 in Canadian dollars',
-    'voo': 'S&amp;P 500', 'xeqt': 'Global stocks, all in one',
+LABEL = {  # slug: category line on the card, plain text
+    'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&P 500 in Canadian dollars',
+    'voo': 'S&P 500', 'xeqt': 'Global stocks, all in one',
     'btc': 'Cryptoasset', 'eth': 'Cryptoasset', 'bnb': 'Cryptoasset', 'xrp': 'Cryptoasset', 'sol': 'Cryptoasset',
     'ust3m': 'US Treasury bill, 3-month', 'ust10y': 'US Treasury note, 10-year', 'tips10y': 'US inflation-protected, 10-year',
     'ust30y': 'US Treasury bond, 30-year', 'goc10y': 'Government of Canada, 10-year',
@@ -83,42 +83,55 @@ def card(folder: str, path: str) -> tuple[str, str]:
     line = quoted_definition(page) if slug in QUOTED_DEFINITION else first_sentence(page)
     e = lambda s: html.escape(s, quote=False)
     return slug, (f'      <a class="rep asset" href="view.html?r={folder}/{slug}"><span class="tick">{e(tick)}</span>'
-                  f'<h3>{e(name)}</h3><span class="sect">{e(html.unescape(LABEL[slug]).upper())}</span>'
+                  f'<h3>{e(name)}</h3><span class="sect">{e(LABEL[slug].upper())}</span>'
                   f'<div class="play"><span class="play-k">{CARD_ICON}What it is</span><p class="line">{e(line)}</p></div></a>')
 
 
-def family_count(t: str, family: str, n: int) -> str:
-    """t with the count on the family's tab set to n."""
-    return re.sub(rf'(data-fam="{family}"[^>]*>.*?<b class="fam-n">)\d+(</b>)', rf'\g<1>{n}\g<2>', t, count=1)
+def set_family_count(t: str, family: str, n: int) -> str:
+    """t with the count on the family's tab set to n; ValueError when the tab has no count to set."""
+    t, found = re.subn(rf'(data-fam="{family}"[^>]*>.*?<b class="fam-n">)\d+(</b>)', rf'\g<1>{n}\g<2>', t, count=1)
+    if not found:
+        raise ValueError(f'no count on the {family} tab in reports/index.html')
+    return t
 
 
-def main(repo: str = rd.ROOT) -> int | str:
-    """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing marker)."""
+def main(argv: list[str] | None = None) -> int | str:
+    """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing
+    marker or tab count, a file that cannot be read or written)."""
+    repo = rd.parser('Write the ETF, crypto and bond cards on reports/index.html.').parse_args(argv).repo
     index = os.path.join(repo, 'reports', 'index.html')
-    with open(index, encoding='utf-8', newline='') as fh:
-        t = fh.read()
+    try:
+        with open(index, encoding='utf-8', newline='') as fh:
+            t = write_cards(fh.read(), repo)
+        rl.write_text(index, t)
+    except (ValueError, OSError) as e:
+        return str(e)
+    return 0
+
+
+def write_cards(t: str, repo: str) -> str:
+    """The index page t with every family's card block and tab count rewritten from the reports under repo."""
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
         for p in glob.glob(rd.report_path('*', folder, repo=repo)):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:
-                return f'{os.path.relpath(p, repo)}: {e}'
+                raise ValueError(f'{os.path.relpath(p, repo)}: {e}') from e
         cards.sort(key=(lambda c: TERM.get(c[0], 99)) if order == 'term' else (lambda c: c[0]))
         block = (f'<!-- asset-cards:{folder} (written by tools/asset_cards.py) -->\n<div class="wrap">\n'
-                 f'  <h2 class="shead">{head} <span class="scount">{len(cards)}</span></h2>\n'
-                 f'  <p class="famnote">{note}</p>\n  <div class="grid">\n' + '\n'.join(c for _, c in cards) +
+                 f'  <h2 class="shead">{html.escape(head)} <span class="scount">{len(cards)}</span></h2>\n'
+                 f'  <p class="famnote">{html.escape(note)}</p>\n  <div class="grid">\n' + '\n'.join(c for _, c in cards) +
                  f'\n  </div>\n</div>\n<!-- /asset-cards:{folder} -->')
         t, n = re.subn(rf'<!-- asset-cards:{folder} .*?<!-- /asset-cards:{folder} -->', lambda _: block, t, flags=re.S)
         if n != 1:
-            return f'marker for {folder} not found in reports/index.html'
-        t = family_count(t, folder, len(cards))
+            raise ValueError(f'marker for {folder} not found in reports/index.html')
+        t = set_family_count(t, folder, len(cards))
         print(f'{folder}: {len(cards)} cards')
     stocks = len(re.findall(r'<a class="rep"(?! asset)', t))
-    t = family_count(t, 'stocks', stocks)
-    rl.write_text(index, t)
+    t = set_family_count(t, 'stocks', stocks)
     print(f'stocks: {stocks}')
-    return 0
+    return t
 
 
 if __name__ == '__main__':

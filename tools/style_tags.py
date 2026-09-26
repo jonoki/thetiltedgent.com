@@ -239,7 +239,8 @@ def quality_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> lis
     return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f})." + when]]
 
 
-def main(repo: str = rd.ROOT) -> int | str:
+def main(argv: list[str] | None = None) -> int | str:
+    repo = rd.parser('Write data/style_tags.json: the style tags for every report.').parse_args(argv).repo
     try:
         rows = load_tag_inputs(repo)
     except ValueError as e:

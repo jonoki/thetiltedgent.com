@@ -14,9 +14,10 @@ import build_tables  # noqa: E402
 
 
 class TablesBuilder(unittest.TestCase):
-    DICE = build_tables.Game('dice', 'dice', 'Dice & Co', 'Dice.', ('b', 'B'), 'Roll them.', 'Try it.', sessions=300,
+    DICE = build_tables.Game('dice', 'dice', 'Dice & Co', 'Dice.', ('b', 'B'), 'Roll them.', 'Try it.', bets_per_session=300,
                              callout='    <div class="callout">Practice</div>')
-    CARDS = build_tables.Game('cards', 'cards', 'Cards', 'Cards.', ('d', 'D'), 'Deal them.', None, more='READ')
+    CARDS = build_tables.Game('cards', 'cards', 'Cards', 'Cards.', ('d', 'D'), 'Deal them.', None, more='READ',
+                              no_sim_note='<div>No simulator.</div>')
 
     def test_page_links(self):
         self.assertIn('<span></span>', build_tables.page_links(None, self.CARDS))
@@ -29,7 +30,7 @@ class TablesBuilder(unittest.TestCase):
 
     def test_family_tabs(self):
         fam = {'dice': [('dice.html', 'Dice'), ('dice-trainer.html', 'Trainer')]}
-        with unittest.mock.patch.object(build_tables, 'FAMILY', fam):
+        with unittest.mock.patch.object(build_tables, 'FAMILY_TABS', fam):
             self.assertEqual(build_tables.family_tabs('dice-trainer'),
                              '<div class="wrap famtabs"><a href="dice.html">Dice</a><a href="dice-trainer.html" class="on">Trainer</a></div>')
             self.assertEqual(build_tables.family_tabs('cards'), '')
@@ -45,15 +46,15 @@ class TablesBuilder(unittest.TestCase):
         sim = build_tables.game_sim(self.DICE)
         self.assertIn('Try it.', sim)
         self.assertTrue(sim.endswith('\n    <div class="callout">Practice</div>'))   # the callout sits after the simulator
-        self.assertEqual(build_tables.game_sim(self.CARDS), build_tables.NO_SIM_NOTE)
-        self.assertIn('n: 300', build_tables.sim_scripts('dice', self.DICE.sessions))
+        self.assertEqual(build_tables.game_sim(self.CARDS), '<div>No simulator.</div>')
+        self.assertIn('n: 300', build_tables.sim_scripts('dice', self.DICE.bets_per_session))
 
     def test_replace_once_and_between_name_what_is_missing(self):
         self.assertEqual(build_tables.replace_once('a b c', 'b', 'x'), 'a x c')
         for s in ('a c', 'b b'):
             with self.assertRaisesRegex(ValueError, "'b'"):
                 build_tables.replace_once(s, 'b', 'x')
-        self.assertEqual(build_tables.between('x<a>1</a>y', '<a>', '</a>'), ('<a>1</a>', 1, 9))
+        self.assertEqual(build_tables.between('x<a>1</a>y', '<a>', '</a>'), '<a>1</a>')
         with self.assertRaisesRegex(ValueError, "'<b>'"):
             build_tables.between('x<a>1</a>y', '<b>', '</a>')
 
@@ -91,6 +92,14 @@ class TablesBuilder(unittest.TestCase):
         page = site.page('MAIN', '<script>x</script>')
         self.assertTrue(page.startswith('<!-- ================= NAV'))
         self.assertTrue(page.endswith('<footer>F</footer>\n\n<script src="/assets/site.js" defer></script><script>x</script>\n</body>\n</html>\n'))
+
+class CommittedPages(unittest.TestCase):
+    def test_the_committed_pages_are_what_the_builder_writes(self):
+        """A hand edit to a generated page, or a source edit without a rebuild, fails here."""
+        tables = build_tables.TABLES
+        for name, text in build_tables.build():
+            with open(os.path.join(tables, name), encoding='utf-8', newline='') as fh:
+                self.assertEqual(fh.read(), text, f'tables/{name} differs from the build: run py -3 tables/build_tables.py')
 
 
 if __name__ == '__main__':

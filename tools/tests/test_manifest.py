@@ -59,7 +59,7 @@ class ManifestRecords(unittest.TestCase):
                 with open(os.path.join(repo, rel), 'w', encoding='utf-8') as fh:
                     fh.write(text)
             with contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(manifest.main([repo]), 0)
+                self.assertEqual(manifest.main(['--repo', repo]), 0)
             doc = rd.load_manifest(repo)
             self.assertEqual(sorted(os.listdir(os.path.join(repo, 'data', 'reports'))), ['industrials.json', 'unclassified.json'])
             self.assertEqual(doc['index'], [['ACME', 'acme', 'industrials', '2026-09-10', 1234.5],

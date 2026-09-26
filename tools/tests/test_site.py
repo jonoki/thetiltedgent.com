@@ -1,5 +1,8 @@
 """Unit tests for the site writers: asset cards, chrome, chip masters.   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+import contextlib
+import io
 import os
+import re
 import tempfile
 import unittest
 import unittest.mock
@@ -16,6 +19,39 @@ class AssetCards(unittest.TestCase):
         page = ('<body><div class="section-title">01 What it is</div><p>What it is. The U.S. government borrows for ten '
                 'years through this note. It pays interest twice a year.</p><div class="section">')
         self.assertEqual(asset_cards.first_sentence(page), 'The U.S. government borrows for ten years through this note.')
+
+    INDEX = ('<a data-fam="stocks"><b class="fam-n">0</b></a><a data-fam="etf"><b class="fam-n">0</b></a>'
+             '<a data-fam="crypto"><b class="fam-n">9</b></a><a data-fam="fixed"><b class="fam-n">9</b></a>\n'
+             '<a class="rep" href="view.html?r=aapl">AAPL</a>\n'
+             + ''.join(f'<!-- asset-cards:{f} old -->x<!-- /asset-cards:{f} -->\n' for f in ('etf', 'crypto', 'fixed')))
+    VOO = ('<html><head><title>VOO — Vanguard S&amp;P 500 ETF | ETF Analysis</title></head><body><section class="section">'
+           '<div class="section-title">01 What it is</div><p>What it is. VOO holds the five hundred largest US companies '
+           'in one fund. Cheap.</p></section></body></html>')
+
+    def repo_with(self, repo: str, index: str) -> None:
+        os.makedirs(os.path.join(repo, 'reports', 'etf'))
+        with open(os.path.join(repo, 'reports', 'index.html'), 'w', encoding='utf-8') as fh:
+            fh.write(index)
+        with open(os.path.join(repo, 'reports', 'etf', 'voo_analysis.html'), 'w', encoding='utf-8') as fh:
+            fh.write(self.VOO)
+
+    def test_main_writes_the_cards_and_tab_counts(self):
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            self.repo_with(repo, self.INDEX)
+            self.assertEqual(asset_cards.main(['--repo', repo]), 0)
+            t = rl.read_text(os.path.join(repo, 'reports', 'index.html'))
+        self.assertIn('<span class="tick">VOO</span><h3>Vanguard S&amp;P 500 ETF</h3><span class="sect">S&amp;P 500</span>', t)
+        self.assertIn('VOO holds the five hundred largest US companies in one fund.', t)
+        self.assertIn('<h2 class="shead">Bonds &amp; cash <span class="scount">0</span></h2>', t)
+        counts = dict(re.findall(r'data-fam="(\w+)"><b class="fam-n">(\d+)</b>', t))
+        self.assertEqual(counts, {'stocks': '1', 'etf': '1', 'crypto': '0', 'fixed': '0'})
+
+    def test_a_missing_tab_count_is_an_error_and_nothing_is_written(self):
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            index = self.INDEX.replace('<a data-fam="fixed"><b class="fam-n">9</b></a>', '')
+            self.repo_with(repo, index)
+            self.assertIn('fixed tab', str(asset_cards.main(['--repo', repo])))
+            self.assertEqual(rl.read_text(os.path.join(repo, 'reports', 'index.html')), index)
 
 
 class Chrome(unittest.TestCase):

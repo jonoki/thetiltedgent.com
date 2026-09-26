@@ -58,21 +58,21 @@ class Font:
         return ''.join(parts)
 
 
-def cut(src: str, start: str, end: str, what: str, from_: int = 0) -> tuple[str, int]:
-    """(src from start through end, where it begins); ValueError naming the part of the mark when either is missing."""
-    i = src.find(start, from_)
+def cut(src: str, start: str, end: str, what: str) -> str:
+    """src from start through end; ValueError naming the part of the mark when either is missing."""
+    i = src.find(start)
     j = src.find(end, i) if i >= 0 else -1
     if j < 0:
         raise ValueError(f'the chip mark has no {what} ({start!r} ... {end!r})')
-    return src[i:j + len(end)], i
+    return src[i:j + len(end)]
 
 
 def read_mark(path: str) -> tuple[str, str]:
     """(the <defs> block, the monogram's paths) from the source chip mark."""
     with open(path, encoding='utf-8') as fh:
         src = fh.read()
-    defs, _ = cut(src, '<defs>', '</defs>', '<defs> block')
-    mono, _ = cut(src, MONOGRAM_GROUP, '</g>', 'monogram group')
+    defs = cut(src, '<defs>', '</defs>', '<defs> block')
+    mono = cut(src, MONOGRAM_GROUP, '</g>', 'monogram group')
     return defs, mono[len(MONOGRAM_GROUP):-len('</g>')]   # the paths only
 
 
@@ -91,12 +91,12 @@ def spots(a: str, b: str) -> str:
 
 class Chip(NamedTuple):
     """One chip: its value, inlay gradient and rim/body field (centre, mid, edge; darker toward the edge),
-    edge-spot colours and value text colour."""
+    edge-spot colours and the colour of the value text."""
     value: int
     disc: tuple[str, str, str]
     body: tuple[str, str, str]
     spots: tuple[str, str]
-    text: str
+    text_colour: str
 
 
 CHIPS = [
@@ -139,7 +139,7 @@ def chip_svg(font: Font, defs: str, monogram: str, chip: Chip) -> str:
 {monogram}
   </g>
   <line x1="420" y1="676" x2="660" y2="676" stroke="#D9A85C" stroke-width="3" opacity="0.6"/>
-  <g fill="{chip.text}">{val}</g>
+  <g fill="{chip.text_colour}">{val}</g>
   <circle cx="540" cy="540" r="540" fill="url(#vig)"/>
 </g>
 </svg>
@@ -154,7 +154,7 @@ def lattice() -> str:
 
 
 def card_back_svg(font: Font, defs: str, monogram: str) -> str:
-    gold_defs, _ = cut(defs, '<linearGradient id="gold"', '</linearGradient>', 'gold gradient')
+    gold_defs = cut(defs, '<linearGradient id="gold"', '</linearGradient>', 'gold gradient')
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {CARD_W} {CARD_H}" width="{CARD_W}" height="{CARD_H}" role="img" aria-label="The Tilted Gent card back">
 <title>The Tilted Gent — card back</title>
 <defs>{gold_defs}

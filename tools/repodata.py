@@ -1,6 +1,7 @@
 """Where the report library's files are: the repo root, report paths, the index page's cards and the manifest's
 data files, with the record types they hold. Imported by the scripts in tools/; not run on its own.
 How a report page itself is read is tools/reportlib.py."""
+import argparse
 import glob
 import html as htmllib
 import json
@@ -15,6 +16,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo 
 ASSET_FAMILIES = ('etf', 'crypto', 'fixed')   # reports/<family>/: ETFs, crypto, bonds and cash
 STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
 ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ASSET_FAMILIES]
+
+
+def parser(description: str) -> argparse.ArgumentParser:
+    """The command line every tools/ script shares: its description and --repo (default: this repo)."""
+    ap = argparse.ArgumentParser(description=description)
+    ap.add_argument('--repo', default=ROOT, help='repo root (default: the repo these scripts are in)')
+    return ap
 
 
 def slug_of(path: str) -> str:

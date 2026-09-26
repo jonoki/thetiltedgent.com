@@ -107,8 +107,11 @@ def result_line(path: str, o: CheckResult) -> str:
             f"title={o['title_ticker']}")
 
 
-def main(argv: list[str] | None = None) -> int:
-    files = (sys.argv[1:] if argv is None else argv) or rd.report_paths(assets=True)
+def main(argv: list[str] | None = None) -> int | str:
+    ap = rd.parser('Pre-publish gate for report pages.')
+    ap.add_argument('reports', nargs='*', help='report files (default: every report in the library)')
+    args = ap.parse_args(argv)
+    files = args.reports or rd.report_paths(args.repo, assets=True)
     failed = 0
     for f in files:
         if not os.path.isfile(f):

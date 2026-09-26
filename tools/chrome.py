@@ -2,14 +2,15 @@
 """Write the one site nav and footer into every site page, and make sure each page loads the shared
 assets/site.css and assets/site.js. Report documents (reports/**/*_analysis.html) are never touched.
 
-Run from the repo root:   py -3 tools/chrome.py            (then: py -3 tables/build_tables.py)
+Run from the repo root:   py -3 tools/chrome.py
 The Tables game pages are generated: this script updates their source (tables/_source/casino-games-source.html)
-and the builder copies the nav and footer from there.
+and then runs tables/build_tables.py, which copies the nav and footer from there, so the two cannot drift.
 
 Each page keeps its own fine print: the <p> inside its old footer that starts with a <b>…fine print…</b>
 label is carried into the new footer unchanged."""
 import os
 import re
+import subprocess
 import sys
 
 import reportlib as rl
@@ -89,7 +90,7 @@ def old_fine(block: str) -> str:
     """The page's own fine-print paragraph from its old footer, else the site's."""
     for p in re.findall(r'<p[^>]*>(.*?)</p>', block, re.S):
         if re.match(r'\s*<b[^>]*>[^<]*fine print', p, re.I):
-            return re.sub(r'<b style="[^"]*">', '<b>', p.strip())
+            return p.strip()
     return SITE_FINE
 
 
@@ -132,14 +133,19 @@ def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rd
     return True
 
 
-def main() -> int | str:
-    """0 when every page is written, else the problem (the page had no nav or footer to replace)."""
+def main(argv: list[str] | None = None) -> int | str:
+    """0 when every page is written and the Tables pages rebuilt, else the problem (a page with no nav or footer
+    to replace, a file that cannot be read or written, or the builder's own message)."""
+    repo = rd.parser('Write the site nav and footer into every chrome page.').parse_args(argv).repo
     for path, active, has_footer in PAGES:
         try:
-            print('updated' if write_chrome(path, active, has_footer) else 'unchanged', path)
-        except ValueError as e:
+            print('updated' if write_chrome(path, active, has_footer, repo) else 'unchanged', path)
+        except (ValueError, OSError) as e:
             return str(e)
-    return 0
+    built = subprocess.run([sys.executable, os.path.join(repo, 'tables', 'build_tables.py')],
+                           capture_output=True, text=True, encoding='utf-8')
+    print(built.stdout.strip())
+    return built.returncode and (built.stderr.strip() or f'tables/build_tables.py exited {built.returncode}')
 
 
 if __name__ == '__main__':

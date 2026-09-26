@@ -1,16 +1,24 @@
 """The Tables pages' game list: one Game record per game on the grade board, the family pages that are not on
-the board, and the family tab strips. Per-game prose that is not in the source page (the board one-liner, the
-simulator intro, the card link label, a callout) lives here; tables/build_tables.py builds from it."""
+the board, and the family tab strips. Per-page prose that is not in the source page (the board one-liner, the
+simulator intro or the note saying why there is none, the card link label, a callout) lives here;
+tables/build_tables.py builds from it."""
 from typing import NamedTuple
 
-DEFAULT_SESSIONS = 500   # bets per simulated session unless a game sets its own
+DEFAULT_BETS_PER_SESSION = 500   # bets in each simulated session unless a game sets its own
+SLOTS_NO_SIM_NOTE = '''
+    <div class="simsec" id="sim">
+      <div class="kicker">Feel the edge</div>
+      <h3 class="simhead">No simulator for slots &mdash; <em>and that's the point</em>.</h3>
+      <div class="slotnote"><b>Slot outcome distributions are not published.</b> Every other game on this site has a simulator because its odds are knowable: the deck, the dice and the wheel are public, and the paytable is printed on the felt or the glass. A slot machine's return and hit frequency are set by the casino from a menu the manufacturer provides, are not displayed anywhere, and vary wildly from one machine to the next &mdash; two identical cabinets can be set years apart in expected cost. Any simulation would be a guess dressed up as a chart, which is exactly the trick the machine itself is playing. <b>What we do know is enough:</b> reported holds run from roughly 2&ndash;4% in high-limit rooms to 10&ndash;15% on penny games and bar tops, at 500&ndash;900 spins an hour. At those numbers a slot is the worst bet in the building by a wide margin, and no amount of simulating changes that. If you want to see what a fast, high-edge game does to a bankroll, run the <a href="craps.html#bet=any-seven&amp;unit=2&amp;n=1200" style="color:var(--cyan-neon)">any-seven bet on the craps page</a> at $2 for 1,200 bets &mdash; that's a penny slot on a good day.</div>
+    </div>'''
+
 BLACKJACK_TRAINER_CALLOUT = '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>'''
 
 
 class Game(NamedTuple):
     """A game on the grade board and its page: the <section id> in the source, page slug, title, meta description,
-    grade (CSS class, label), the board card's one-liner and link label, and its simulator: the intro sentence
-    (None: no simulator, the page explains why) and bets per session. callout goes above the advantage-play box."""
+    grade (CSS class, label), the board card's one-liner and link label, and its simulator: the intro sentence and
+    bets per session, or (sim_intro None) the no_sim_note shown instead. callout goes above the advantage-play box."""
     id: str
     slug: str
     title: str
@@ -18,13 +26,14 @@ class Game(NamedTuple):
     grade: tuple[str, str]
     oneline: str
     sim_intro: str | None
-    sessions: int = DEFAULT_SESSIONS
+    bets_per_session: int = DEFAULT_BETS_PER_SESSION
     more: str = 'ANALYSIS + SIMULATOR'
     callout: str = ''
+    no_sim_note: str = ''
 
 
 class FamilyPage(NamedTuple):
-    """A page in a game's family that is not on the grade board, with its simulator game and page neighbours."""
+    """A page in a game's family that is not on the grade board: its simulator game and intro, and page neighbours."""
     id: str
     slug: str
     title: str
@@ -32,6 +41,7 @@ class FamilyPage(NamedTuple):
     sim_game: str
     prev: str
     next: str
+    sim_intro: str
 
 
 GAMES = [
@@ -52,7 +62,7 @@ GAMES = [
          'Baccarat: coin-flipping in a tuxedo — Banker vs Player vs Tie, side bets, edge sorting, and a variance simulator.',
          ('b', 'B'), "Zero decisions, low edge, fast. The house's favourite game for a reason.",
          "Banker at 1.06% looks like nothing per hand. Run 700 hands — a long evening at the big table — and see what nothing adds up to.",
-         sessions=700),
+         bets_per_session=700),
     Game('ultimate-texas-holdem', 'ultimate-texas-holdem', "Ultimate Texas Hold'em",
          "Ultimate Texas Hold'em: poker's costume, the house's rules — raise strategy, Trips paytables, hole-carding, and a variance simulator.",
          ('b', 'B&minus;'), "Poker's costume, house's rules. Fun, strategic, and priced fairly if you raise 4x when you should.",
@@ -68,9 +78,10 @@ GAMES = [
     Game('slots', 'slots', 'Slots',
          'Slots: the only game where the price is a secret — reported holds by denomination, the design tricks, and why there is no simulator.',
          ('d', 'D'), "The only game where the price is a secret. That's the tell.",
-         None, more='READ THE ANALYSIS'),
+         None, more='READ THE ANALYSIS', no_sim_note=SLOTS_NO_SIM_NOTE),
 ]
 FAMILY_PAGES = [
-    FamilyPage('blackjack-variants', 'blackjack-variants', 'Blackjack Variants', 'Free Bet Blackjack, Blackjack Switch, Spanish 21, Double Exposure and Super Fun 21: what each gives, what each takes back, the house edge with the right chart, and a variance simulator.', 'blackjack-variants', 'blackjack', 'video-poker'),
+    FamilyPage('blackjack-variants', 'blackjack-variants', 'Blackjack Variants', 'Free Bet Blackjack, Blackjack Switch, Spanish 21, Double Exposure and Super Fun 21: what each gives, what each takes back, the house edge with the right chart, and a variance simulator.', 'blackjack-variants', 'blackjack', 'video-poker',
+               "Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart."),
 ]
-FAMILY = {'blackjack': [('blackjack.html', 'Blackjack'), ('blackjack-variants.html', 'Variants'), ('blackjack-trainer.html', 'Trainer')]}
+FAMILY_TABS = {'blackjack': [('blackjack.html', 'Blackjack'), ('blackjack-variants.html', 'Variants'), ('blackjack-trainer.html', 'Trainer')]}

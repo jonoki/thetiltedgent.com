@@ -1,7 +1,8 @@
 # tools
 
 Build and check scripts for the site. Run every one from the repo root with `py -3 tools/<name>.py`.
-Each finds the repo from its own location, so the working directory only matters for the paths you pass.
+Each finds the repo from its own location, so the working directory only matters for the paths you pass;
+`--repo PATH` points any of them at another checkout. `-h` lists a script's options.
 
 | Script | What it does | Writes |
 |---|---|---|

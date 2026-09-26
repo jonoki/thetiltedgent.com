@@ -8,9 +8,8 @@ what is actually published. A field that cannot be parsed is left out of the rec
 chart, metrics table, structure, index card) add a warning when missing; the rest (exchange, market cap, change,
 key metrics) are simply absent.
 
-usage:  py -3 tools/manifest.py [repo-root] [-o data/reports.json] [--full-metrics]
+usage:  py -3 tools/manifest.py [--repo PATH] [-o data/reports.json] [--full-metrics]
 """
-import argparse
 import glob
 import hashlib
 import os
@@ -289,9 +288,8 @@ def write_shards(shard_dir: str, sectors: dict[str, list[rd.ReportRecord]], repo
         print(f'  removed stale shard {os.path.relpath(stale, repo)}', file=sys.stderr)
 
 
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description='Build the report manifest from the published report pages.')
-    ap.add_argument('repo', nargs='?', default=rd.ROOT, help='repo root (default: the repo this script is in)')
+def main(argv: list[str] | None = None) -> int | str:
+    ap = rd.parser('Build the report manifest from the published report pages.')
     ap.add_argument('-o', dest='out', help='top-level output file (default: <repo>/data/reports.json)')
     ap.add_argument('--full-metrics', action='store_true', help='include every report\'s full metrics table')
     args = ap.parse_args(argv)

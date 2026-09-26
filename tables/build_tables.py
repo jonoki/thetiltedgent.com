@@ -7,11 +7,12 @@ family page (GAMES and FAMILY_PAGES in tables/game_list.py) and the index, table
 lives in the source, the per-game board lines and simulator intros in game_list.py; never edit the built pages. tools/chrome.py writes the nav, the footer and the shared site.css / site.js
 wiring into the source, and every page copies them from there.
 """
+import argparse
 import html
 import os
 import sys
 
-from game_list import DEFAULT_SESSIONS, FAMILY, FAMILY_PAGES, GAMES, FamilyPage, Game
+from game_list import DEFAULT_BETS_PER_SESSION, FAMILY_PAGES, FAMILY_TABS, GAMES, FamilyPage, Game
 
 TABLES = os.path.dirname(os.path.abspath(__file__))   # the tables/ folder: source in, pages out
 SRC = os.path.join(TABLES, '_source', 'casino-games-source.html')
@@ -20,15 +21,15 @@ SPLIT_CSS = os.path.join(TABLES, '_source', 'split-pages.css')   # game cards, p
 AP_MARKER = '    <div class="ap">'    # the advantage-play box; the simulator goes just above it
 
 
-def between(s: str, a: str, b: str, start: int = 0) -> tuple[str, int, int]:
-    """(s from the first a to the end of the following b, its start, its end); ValueError naming the marker when absent."""
-    i = s.find(a, start)
+def between(s: str, a: str, b: str) -> str:
+    """s from the first a to the end of the following b; ValueError naming the marker when absent."""
+    i = s.find(a)
     if i < 0:
         raise ValueError(f'marker not found in the source: {a!r}')
     j = s.find(b, i)
     if j < 0:
         raise ValueError(f'no {b!r} after {a!r} in the source')
-    return s[i:j + len(b)], i, j + len(b)
+    return s[i:j + len(b)]
 
 
 def replace_once(s: str, old: str, new: str) -> str:
@@ -42,12 +43,6 @@ def replace_once(s: str, old: str, new: str) -> str:
 
 # ---------- the simulator section and its scripts ----------
 
-NO_SIM_NOTE = '''
-    <div class="simsec" id="sim">
-      <div class="kicker">Feel the edge</div>
-      <h3 class="simhead">No simulator for slots &mdash; <em>and that's the point</em>.</h3>
-      <div class="slotnote"><b>Slot outcome distributions are not published.</b> Every other game on this site has a simulator because its odds are knowable: the deck, the dice and the wheel are public, and the paytable is printed on the felt or the glass. A slot machine's return and hit frequency are set by the casino from a menu the manufacturer provides, are not displayed anywhere, and vary wildly from one machine to the next &mdash; two identical cabinets can be set years apart in expected cost. Any simulation would be a guess dressed up as a chart, which is exactly the trick the machine itself is playing. <b>What we do know is enough:</b> reported holds run from roughly 2&ndash;4% in high-limit rooms to 10&ndash;15% on penny games and bar tops, at 500&ndash;900 spins an hour. At those numbers a slot is the worst bet in the building by a wide margin, and no amount of simulating changes that. If you want to see what a fast, high-edge game does to a bankroll, run the <a href="craps.html#bet=any-seven&amp;unit=2&amp;n=1200" style="color:var(--cyan-neon)">any-seven bet on the craps page</a> at $2 for 1,200 bets &mdash; that's a penny slot on a good day.</div>
-    </div>'''   # the one game without a simulator (sim_intro None) is slots
 
 
 def sim_section(em: str, sub: str, nojs: str) -> str:
@@ -63,24 +58,23 @@ def sim_section(em: str, sub: str, nojs: str) -> str:
 def game_sim(g: Game) -> str:
     """The game page's simulator section (with the game's callout after it), or the note saying why there is none."""
     if g.sim_intro is None:
-        return NO_SIM_NOTE
+        return g.no_sim_note
     sim = sim_section('before you sit down',
                       "Pick a bet, a unit and a number of bets. The simulator plays <b>1,000 sessions from the bet's actual outcome table</b> &mdash; not a normal approximation &mdash; and shows the spread, the drawdowns, and how long it takes before the house edge stops hiding behind luck. " + g.sim_intro,
                       'The simulator needs JavaScript. The house edge on every bet is in the table above; the simulator only shows what it feels like.')
     return sim + ('\n' + g.callout if g.callout else '')
 
 
-def variant_sim() -> str:
-    return sim_section('at each variant',
-                       "Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart.",
+def variant_sim(p: FamilyPage) -> str:
+    return sim_section('at each variant', p.sim_intro,
                        'The simulator needs JavaScript. The house edge on every variant is in the table above.')
 
 
-def sim_scripts(game: str, sessions: int) -> str:
+def sim_scripts(game: str, bets_per_session: int) -> str:
     return f'''
 <script src="sim/games.js"></script>
 <script src="sim/ttg-sim.js"></script>
-<script>TTGSim.mount('#simmount', {{game: '{game}', n: {sessions}}});</script>'''
+<script>TTGSim.mount('#simmount', {{game: '{game}', n: {bets_per_session}}});</script>'''
 
 
 # ---------- page parts ----------
@@ -96,7 +90,7 @@ def page_links(prev: Game | None, nxt: Game | None) -> str:
 
 
 def family_tabs(slug: str) -> str:
-    for tabs in FAMILY.values():
+    for tabs in FAMILY_TABS.values():
         if any(h == slug + '.html' for h, _ in tabs):
             here = slug + '.html'
             links = ''.join(f'<a href="{h}"' + (' class="on"' if h == here else '') + f'>{t}</a>' for h, t in tabs)
@@ -115,28 +109,26 @@ def with_sim(section: str, gid: str, sim: str) -> str:
     """The game's source section, opened as the page's first section, with the simulator above the
     advantage-play box."""
     sec = replace_once(section, f'<section class="game" id="{gid}">', f'<section class="game first" id="{gid}">')
-    if sec.count(AP_MARKER) != 1:
-        raise ValueError(f'{gid}: expected exactly one advantage-play box in the source section')
-    return sec.replace(AP_MARKER, sim + '\n' + AP_MARKER, 1)
+    return replace_once(sec, AP_MARKER, sim + '\n' + AP_MARKER)
 
 
 class Site:
     """The pieces of the source every page is assembled from, and the page shell around them."""
 
     def __init__(self, src: str) -> None:
-        css, _, _ = between(src, '<style>', '</style>')
+        css = between(src, '<style>', '</style>')
         self.css = css[len('<style>'):-len('</style>')]
         # the shared wiring tools/chrome.py puts into the source: the js class (menu starts closed), site.css, site.js
-        self.js_class = between(src, "<script>document.documentElement.classList.add('js')", '</script>')[0]
-        self.site_css = between(src, '<link rel="stylesheet" href="/assets/site.css"', '>')[0]
-        self.site_js = between(src, '<script src="/assets/site.js"', '</script>')[0]
-        self.nav = between(src, '<!-- ================= NAV ================= -->', '</nav>')[0]
-        self.footer = between(src, '<!-- ================= FOOTER ================= -->', '</footer>')[0]
-        self.hero = between(src, '<!-- ================= HERO ================= -->', '</div>\n</div>\n')[0]
-        self.board = between(src, '<!-- ================= GRADE BOARD ================= -->', '</section>')[0]
-        self.method = between(src, '<!-- ================= METHOD ================= -->', '</section>')[0]
-        self.outro = between(src, '<!-- ================= OUTRO ================= -->', '</section>')[0]
-        self.sections = {g.id: between(src, f'<section class="game" id="{g.id}">', '</section>')[0]
+        self.js_class = between(src, "<script>document.documentElement.classList.add('js')", '</script>')
+        self.site_css = between(src, '<link rel="stylesheet" href="/assets/site.css"', '>')
+        self.site_js = between(src, '<script src="/assets/site.js"', '</script>')
+        self.nav = between(src, '<!-- ================= NAV ================= -->', '</nav>')
+        self.footer = between(src, '<!-- ================= FOOTER ================= -->', '</footer>')
+        self.hero = between(src, '<!-- ================= HERO ================= -->', '</div>\n</div>\n')
+        self.board = between(src, '<!-- ================= GRADE BOARD ================= -->', '</section>')
+        self.method = between(src, '<!-- ================= METHOD ================= -->', '</section>')
+        self.outro = between(src, '<!-- ================= OUTRO ================= -->', '</section>')
+        self.sections = {g.id: between(src, f'<section class="game" id="{g.id}">', '</section>')
                          for g in GAMES + FAMILY_PAGES}
 
     def head(self, title: str, desc: str, url: str, og_type: str = 'article') -> str:
@@ -185,26 +177,29 @@ class Site:
         return self.page(crumb + ('\n' + tabs if tabs else '') + '\n\n' + sec + '\n\n' + links, scripts)
 
 
-def write(name: str, text: str) -> None:
-    with open(os.path.join(TABLES, name), 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(text)
+Page = tuple[str, str]   # (file name in tables/, the page's HTML)
 
 
-def game_page(site: Site, i: int, g: Game) -> None:
+def write(out: str, page: Page) -> None:
+    with open(os.path.join(out, page[0]), 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(page[1])
+
+
+def game_page(site: Site, i: int, g: Game) -> Page:
     sec = with_sim(site.sections[g.id], g.id, game_sim(g))
     links = page_links(GAMES[i - 1] if i > 0 else None, GAMES[i + 1] if i < len(GAMES) - 1 else None)
-    scripts = sim_scripts(g.id, g.sessions) if g.sim_intro is not None else ''
+    scripts = sim_scripts(g.id, g.bets_per_session) if g.sim_intro is not None else ''
     body = site.game_body(crumbs(g.title), family_tabs(g.slug), sec, links, scripts)
-    write(g.slug + '.html', site.head(g.title + ', graded', g.desc, g.slug + '.html') + body)
+    return g.slug + '.html', site.head(g.title + ', graded', g.desc, g.slug + '.html') + body
 
 
-def family_page(site: Site, p: FamilyPage) -> None:
+def family_page(site: Site, p: FamilyPage) -> Page:
     by_slug = {g.slug: g for g in GAMES}
     prev, nxt = by_slug[p.prev], by_slug[p.next]
-    sec = with_sim(site.sections[p.id], p.id, variant_sim())
+    sec = with_sim(site.sections[p.id], p.id, variant_sim(p))
     body = site.game_body(crumbs(p.title, ((f'{prev.slug}.html', prev.title),)), family_tabs(p.slug), sec,
-                          page_links(prev, nxt), sim_scripts(p.sim_game, DEFAULT_SESSIONS))
-    write(p.slug + '.html', site.head(p.title + ', graded', p.desc, p.slug + '.html') + body)
+                          page_links(prev, nxt), sim_scripts(p.sim_game, DEFAULT_BETS_PER_SESSION))
+    return p.slug + '.html', site.head(p.title + ', graded', p.desc, p.slug + '.html') + body
 
 
 def index_hero(hero: str) -> str:
@@ -234,30 +229,38 @@ def games_section() -> str:
 '''
 
 
-def index_page(site: Site) -> None:
+def index_page(site: Site) -> Page:
     board = site.board
     for g in GAMES:   # the board's links jump to the game's section in the source; here they open its page
         board = replace_once(board, f'href="#{g.id}"', f'href="{g.slug}.html"')
     main = index_hero(site.hero) + '\n' + board + '\n\n' + games_section() + '\n' + site.method + '\n\n' + site.outro
     head = site.head('Casino Games, Graded', 'Eight casino games, graded honestly: how each one plays, the house edge on every bet, the best and worst bets, the quirks, advantage play — and a variance simulator on every game page.',
                      'casino-games.html', og_type='website')
-    write('casino-games.html', head + site.page(main))
+    return 'casino-games.html', head + site.page(main)
 
 
-def main() -> int | str:
-    """0 when every page is built, else the problem (a marker or a patched sentence missing from the source)."""
+def build() -> list[Page]:
+    """Every generated file: tables.css, the game pages, the family pages and the index. ValueError naming what is
+    missing from the source; OSError when a source file cannot be read."""
     with open(SRC, encoding='utf-8') as fh:
-        src = fh.read()
+        site = Site(fh.read())
+    with open(SPLIT_CSS, encoding='utf-8') as fh:
+        pages = [('tables.css', site.css.strip('\n') + '\n' + fh.read())]
+    pages += [game_page(site, i, g) for i, g in enumerate(GAMES)]
+    pages += [family_page(site, p) for p in FAMILY_PAGES]
+    return pages + [index_page(site)]
+
+
+def main(argv: list[str] | None = None) -> int | str:
+    """0 when every page is built, else the problem (a marker or a patched sentence missing from the source, or a
+    file that cannot be read or written)."""
+    ap = argparse.ArgumentParser(description='Build the Tables pages from tables/_source/casino-games-source.html.')
+    ap.add_argument('--out', default=TABLES, help='folder to write into (default: tables/)')
+    out = ap.parse_args(argv).out
     try:
-        site = Site(src)
-        with open(SPLIT_CSS, encoding='utf-8') as fh:
-            write('tables.css', site.css.strip('\n') + '\n' + fh.read())
-        for i, g in enumerate(GAMES):
-            game_page(site, i, g)
-        for p in FAMILY_PAGES:
-            family_page(site, p)
-        index_page(site)
-    except ValueError as e:
+        for page in build():
+            write(out, page)
+    except (ValueError, OSError) as e:
         return f'tables/_source/casino-games-source.html: {e}'
     print('built', len(GAMES), 'game pages +', len(FAMILY_PAGES), 'family pages + index + tables.css')
     return 0
