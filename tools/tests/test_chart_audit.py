@@ -1,4 +1,4 @@
-"""Unit tests for chart_audit.py: labels, point classification, the Yahoo cache.   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+"""Unit tests for chart_audit.py: labels, point classification, the Yahoo cache.   Run: py -3 tools/run_checks.py"""
 import contextlib
 import datetime
 import io
@@ -8,8 +8,8 @@ import tempfile
 import unittest
 import unittest.mock
 
-from fixtures import PAGE
-import chart_audit  # noqa: E402
+from tests.fixtures import PAGE
+import chart_audit
 
 
 class ChartAudit(unittest.TestCase):

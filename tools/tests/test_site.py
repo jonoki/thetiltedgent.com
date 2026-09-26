@@ -1,4 +1,4 @@
-"""Unit tests for the site writers: asset cards, chrome, chip masters.   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+"""Unit tests for the site writers: asset cards, chrome, chip masters.   Run: py -3 tools/run_checks.py"""
 import contextlib
 import io
 import os
@@ -7,11 +7,10 @@ import tempfile
 import unittest
 import unittest.mock
 
-import fixtures  # noqa: F401  (puts tools/ on the import path)
-import asset_cards  # noqa: E402
-import build_chips  # noqa: E402
-import chrome  # noqa: E402
-import reportlib as rl  # noqa: E402
+import asset_cards
+import build_chips
+import chrome
+import reportlib as rl
 
 
 class AssetCards(unittest.TestCase):

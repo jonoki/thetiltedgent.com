@@ -63,7 +63,7 @@ The chrome pages are `index.html`, `brand.html`, `reports/index.html`, `reports/
 
 ## Working agreements
 
-- Push straight to `main`; small, descriptive commits.
+- Push straight to `main`; small, descriptive commits. A push is a deploy: run `py -3 tools/run_checks.py` first (tests, engine checks, type check).
 - Before touching any chrome page, open them in a browser (or Playwright) at desktop and 390px mobile widths and check the result; `prefers-reduced-motion` must keep disabling the ticker animation.
 - Never change the report documents' layout in bulk without asking.
 - When you finish something, tell the owner what to look at on the live site.

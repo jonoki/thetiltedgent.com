@@ -1,4 +1,4 @@
-"""Unit tests for the manifest and the pre-publish gate (manifest.py, verify.py).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+"""Unit tests for the manifest and the pre-publish gate (manifest.py, verify.py).   Run: py -3 tools/run_checks.py"""
 import contextlib
 import io
 import json
@@ -7,10 +7,10 @@ import sys
 import tempfile
 import unittest
 
-from fixtures import PAGE
-import manifest  # noqa: E402
-import verify  # noqa: E402
-import repodata as rd  # noqa: E402
+from tests.fixtures import PAGE
+import manifest
+import verify
+import repodata as rd
 
 
 class ManifestFields(unittest.TestCase):

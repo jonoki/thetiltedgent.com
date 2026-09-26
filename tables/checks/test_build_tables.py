@@ -1,16 +1,13 @@
-"""Unit tests for the Tables page builder.   Run from the repo root:  py -3 -m unittest discover -s tables/tests -v
+"""Unit tests for the Tables page builder.   Run: py -3 tools/run_checks.py
 
 The tests build from small, made-up game records and a fixture source, not the live prose, so an edit to the
 source or the game list never breaks them; the builder's run over the real source is its own check.
 """
 import os
-import sys
 import unittest
 import unittest.mock
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tables/
-
-import build_tables  # noqa: E402
+import build_tables
 
 
 class TablesBuilder(unittest.TestCase):

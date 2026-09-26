@@ -20,12 +20,15 @@ date, header price, chart series, 52-week range, metrics table, page skeleton); 
 files are (the repo root, report paths, the index page's cards, the manifest's data files and their record types).
 A change to the report markup is made there once, including the metrics-table reader (`table_rows`) and what
 makes a page structurally sound (`structure_problems`), which `verify.py` gates on and `manifest.py` records.
-The Tables pages have their own builder, `tables/build_tables.py`, and their own checks in `tables/tests/`
+The Tables pages have their own builder, `tables/build_tables.py`, and their own checks in `tables/checks/`
 (see `tables/CLAUDE.md`).
 
-Tests: `py -3 -m unittest discover -s tools/tests -v`. Standard library only, like the scripts
-(`build_chips.py` alone needs fontTools). Every script's `main()` returns its exit status.
-Type check: `py -3 -m mypy` from the repo root (config in `mypy.ini`; mypy is not needed to run the scripts).
+**Every check at once: `py -3 tools/run_checks.py`** (run it before pushing to main, which deploys). It runs the
+tools unit tests (`py -3 -m unittest discover -s tools/tests -t tools`), the Tables builder tests
+(`-s tables/checks -t tables`), the node checks of the craps engine, the simulator outcome tables and the
+blackjack engine (`tables/checks/*.js`), and `py -3 -m mypy` when mypy is installed (config in `mypy.ini`).
+The scripts need Python 3.11 or later and the standard library only (`build_chips.py` alone needs fontTools).
+Every script's `main()` returns its exit status.
 
 After a batch of report builds or refreshes: `manifest.py`, then `style_tags.py`, then `card_tags.py`.
 

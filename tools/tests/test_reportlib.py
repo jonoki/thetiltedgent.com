@@ -1,13 +1,13 @@
-"""Unit tests for reportlib: numbers, dates and what a report page says.   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+"""Unit tests for reportlib: numbers, dates and what a report page says.   Run: py -3 tools/run_checks.py"""
 import os
 import re
 import unittest
 
-from fixtures import PAGE
-import asset_cards  # noqa: E402
-import style_tags  # noqa: E402
-import reportlib as rl  # noqa: E402
-import repodata as rd  # noqa: E402
+from tests.fixtures import PAGE
+import asset_cards
+import style_tags
+import reportlib as rl
+import repodata as rd
 
 
 class Numbers(unittest.TestCase):

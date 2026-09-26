@@ -1,4 +1,4 @@
-"""Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, manifest).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+"""Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, manifest).   Run: py -3 tools/run_checks.py"""
 import contextlib
 import io
 import json
@@ -7,13 +7,13 @@ import tempfile
 import unittest
 from typing import Any, cast
 
-from fixtures import PAGE
-import card_tags  # noqa: E402
-import headoffice  # noqa: E402
-import manifest  # noqa: E402
-import style_tags  # noqa: E402
-import reportlib as rl  # noqa: E402
-import repodata as rd  # noqa: E402
+from tests.fixtures import PAGE
+import card_tags
+import headoffice
+import manifest
+import style_tags
+import reportlib as rl
+import repodata as rd
 
 
 class StyleTagInputs(unittest.TestCase):
