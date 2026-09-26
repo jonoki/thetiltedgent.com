@@ -1,3 +1,34 @@
+// ---- report families: Stocks · ETFs · Crypto · Bonds & cash, one tab each; ?f= keeps the open tab in the URL
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.fam')), panels=[].slice.call(document.querySelectorAll('.fampanel'));
+  if(!tabs.length) return;
+  var KEYS=tabs.map(function(t){return t.getAttribute('data-fam');});
+  window.TTG_FAM='stocks';
+  function show(f, push){
+    if(KEYS.indexOf(f)<0) f='stocks';
+    window.TTG_FAM=f;
+    panels.forEach(function(p){p.hidden=p.id!=='fam-'+f;});
+    tabs.forEach(function(t){
+      var on=t.getAttribute('data-fam')===f;
+      t.setAttribute('aria-selected',on?'true':'false'); t.tabIndex=on?0:-1;
+    });
+    if(push){
+      var p=new URLSearchParams(location.search);
+      if(f==='stocks') p.delete('f'); else { p=new URLSearchParams(); p.set('f',f); }
+      var qs=p.toString();
+      try{history.replaceState(null,'',location.pathname+(qs?'?'+qs:''));}catch(e){}
+    }
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(e){e.preventDefault(); show(t.getAttribute('data-fam'),true);});
+    t.addEventListener('keydown',function(e){
+      var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0; if(!d) return;
+      e.preventDefault(); var n=tabs[(i+d+tabs.length)%tabs.length]; n.focus(); show(n.getAttribute('data-fam'),true);
+    });
+  });
+  show(new URLSearchParams(location.search).get('f')||'stocks',false);
+})();
+
 (function(){
   var $=function(s,r){return (r||document).querySelector(s);},
       all=function(s,r){return [].slice.call((r||document).querySelectorAll(s));};
@@ -7,7 +38,7 @@
       chips=all('.chip'), groups=all('.sgroup'), TOTAL=0;
 
   // one record per card; el stays a single node that we move between views
-  var cards=all('.rep').map(function(el){
+  var cards=all('#fam-stocks .rep').map(function(el){
     var t=$('.tick',el).textContent.trim();
     return {el:el, home:el.parentNode, t:t, tf:t.replace(/[^A-Z0-9]/g,''),
             n:$('h3',el).textContent.trim().toLowerCase(),
@@ -31,7 +62,7 @@
       return d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
     return String(d.getUTCFullYear());
   }
-  all('.rep').forEach(function(card){
+  all('#fam-stocks .rep').forEach(function(card){
     all('.ix',card).forEach(function(ix){
       var label=ix.querySelector('b').textContent,
           iso=label==='DOW'?card.getAttribute('data-dow'):label!=='NDX'?card.getAttribute('data-sp'):null,
@@ -161,6 +192,7 @@
   }
 
   function writeUrl(){
+    if(window.TTG_FAM && window.TTG_FAM!=='stocks') return;   // stock filters only live in the Stocks tab
     var p=[];
     if(st.q) p.push('q='+encodeURIComponent(st.q));
     if(st.ind) p.push('i='+encodeURIComponent(st.ind));
@@ -194,6 +226,28 @@
     }
   });
 
+  // ---- phones: each sector folds, so 544 cards open as eleven headings; a sector chip or a search still opens results
+  var PHONE=window.matchMedia('(max-width:640px)');
+  // the heading stays a heading; on phones a real <button> inside it does the folding
+  groups.forEach(function(g){
+    var h=$('.shead',g); if(!h) return;
+    var id='sg-'+g.getAttribute('data-s'), plain=h.innerHTML, btn=null;
+    $('.grid',g).id=id;
+    g._set=function(open){
+      if(PHONE.matches && !btn){
+        h.innerHTML='<button type="button" class="shead-btn" aria-controls="'+id+'">'+plain+'</button>';
+        btn=h.firstChild;
+        btn.addEventListener('click',function(){ g._set(g.classList.contains('folded')); });
+      }else if(!PHONE.matches && btn){ h.innerHTML=plain; btn=null; }
+      g.classList.toggle('folded',PHONE.matches && !open);
+      if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
+    };
+  });
+  function foldAll(){
+    groups.forEach(function(g){ if(g._set) g._set(!PHONE.matches || st.sector!=='all'); });
+  }
+  if(PHONE.addEventListener) PHONE.addEventListener('change',foldAll);
+
   // ---- restore from the URL
   var p=new URLSearchParams(location.search);
   if(p.get('q')){q.value=p.get('q');st.q=q.value.trim().toLowerCase();}
@@ -202,6 +256,9 @@
   if(['old','new'].indexOf(p.get('sort'))>-1){fSort.value=p.get('sort');st.sort=fSort.value;}
   var s=p.get('s'); if(s&&$('.chip[data-f="'+s.replace(/[^a-z0-9]/g,'')+'"]')) st.sector=s;
   apply(false);
+  foldAll();
+  chips.forEach(function(c){c.addEventListener('click',foldAll);});
+  clearBtn.addEventListener('click',foldAll);
 })();
 
 // ---- card tags: families, tooltips and one-liners from ../data/card_tags.json (built by tools/card_tags.py)
