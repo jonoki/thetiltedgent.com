@@ -5,7 +5,7 @@
 window.CrapsTable = (function () {
   'use strict';
   var CE = window.CrapsEngine;
-  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', min: 10, start: 1000, bank: 1000, stayUp: true, chip: 5, numMode: 'place' };
+  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', min: 10, start: 1000, bank: 1000, stayUp: true, chip: 5 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-crt') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) {} }
 
@@ -34,9 +34,8 @@ window.CrapsTable = (function () {
   function pair(flat, odds) {
     var h = '<span class="cpair" aria-hidden="true">' + (flat > 0 ? stack(flat).replace(/<span class="camt">.*<\/span>$/, '') : '') +
       (odds > 0 ? stack(odds).replace('class="cstk"', 'class="cstk heel"').replace(/<span class="camt">.*<\/span>$/, '') : '') + '</span>';
-    return h + '<span class="camt">' + usd(flat) + (odds > 0 ? ' + ' + usd(odds) : '') + '</span>';
+    return h + '<span class="camt">' + usd(flat) + (odds > 0 ? '<br>+' + usd(odds) : '') + '</span>';
   }
-  function lammer(txt) { return '<span class="lammer">' + txt + '</span>'; }
   function dieHTML(v) { var h = ''; for (var i = 0; i < 9; i++) h += '<i' + (PIPS[v].indexOf(i) >= 0 ? ' class="p"' : '') + '></i>'; return h; }
 
   /* ---------- teaching copy: how each bet works ---------- */
@@ -75,14 +74,14 @@ window.CrapsTable = (function () {
     var h = '<div class="cpt-feltwrap"><div class="cpt-felt" role="group" aria-label="Craps layout">';
     h += '<div class="pass-ext" data-proxy="pass" aria-hidden="true"><span>PASS LINE</span></div>';
     h += '<div class="a-dc">' + z('dontcome', '<b>DON’T COME BAR</b>' + md(6, 6)) + '</div>';
-    /* A number box, as dealt: don't come and lay bets sit in the strip above the number (a lay bet under a
-       LAY button), come bets that travel here sit in the box with their odds on top, and place and buy
-       bets sit on the edge nearest the player (a buy bet under a BUY button). Clicking the box makes the
-       bet chosen in the Numbers selector; clicking your come or don't come stack adds odds to it. */
+    /* A number box: the LAY spot above the number (lay bets, and don't come bets that travel here with their
+       lay odds), the number itself for place bets (come bets that travel here sit in it with their odds
+       heeled on top), and the BUY spot below. Clicking your come or don't come stack adds odds to it. */
     CE.POINTS.forEach(function (n) {
       h += '<div class="cpt-num a-n' + n + '" data-num="' + n + '">' +
-        '<button type="button" class="z z-nbox" data-t="place" data-n="' + n + '"><b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b></button>' +
-        '<span class="ns ns-lay" aria-hidden="true"></span><span class="ns ns-place" aria-hidden="true"></span><span class="ns ns-buy" aria-hidden="true"></span>' +
+        z('lay', '<small>LAY</small>', 'strip', ' data-n="' + n + '"') +
+        z('place', '<b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b>', 'big', ' data-n="' + n + '"') +
+        z('buy', '<small>BUY</small>', 'strip', ' data-n="' + n + '"') +
         '<button type="button" class="z z-cstk cs-come" data-t="odds" data-of="come" data-n="' + n + '" hidden></button>' +
         '<button type="button" class="z z-cstk cs-dc" data-t="layodds" data-of="dontcome" data-n="' + n + '" hidden></button>' +
         '<span class="puck on" hidden aria-hidden="true">ON</span></div>';
@@ -145,8 +144,6 @@ window.CrapsTable = (function () {
             CHIPS.map(function (v) { return '<button type="button" class="pile" data-chip="' + v + '" aria-label="$' + v + ' chip"><span class="chip c' + v + '"></span><small>$' + v + '</small></button>'; }).join('') +
             '<button type="button" class="pile take" data-chip="take"><span class="tk">✕</span><small>Take down</small></button>' +
           '</div></div>' +
-          '<div class="cpt-mode" role="group" aria-label="What a click on a number box places"><span class="k">Numbers</span><div class="seg">' +
-            ['place', 'buy', 'lay'].map(function (m) { return '<button type="button" data-mode="' + m + '">' + cap(m) + '</button>'; }).join('') + '</div></div>' +
           '<div class="cpt-money"><div><span class="k">Rack</span><b class="rack"></b></div><div><span class="k">On the felt</span><b class="onfelt"></b></div>' +
             '<div class="cpt-bankbtns"><button type="button" class="cpt-btn ghost small cpt-clear">Take down all</button><button type="button" class="cpt-btn ghost small cpt-rebuy" hidden>Rebuy</button></div></div>' +
         '</div>' +
@@ -381,7 +378,6 @@ window.CrapsTable = (function () {
       if (b.type === 'come' || b.type === 'dontcome') return n != null ? felt.querySelector('.cpt-num[data-num="' + n + '"]') : felt.querySelector('.z-' + b.type);
       if (b.type === 'odds' || b.type === 'layodds') return b.come ? felt.querySelector('.cpt-num[data-num="' + b.num + '"]') : felt.querySelector('.z-' + (b.type === 'odds' ? 'pass' : 'dontpass'));
       if (b.type === 'pass' || b.type === 'dontpass') return felt.querySelector('.z-' + b.type);
-      if (b.type === 'place' || b.type === 'buy' || b.type === 'lay') return felt.querySelector('.cpt-num[data-num="' + b.num + '"]');
       return felt.querySelector('.z-' + b.type + (b.num != null ? '[data-n="' + b.num + '"]' : ''));
     }
     function short(b) {
@@ -420,7 +416,6 @@ window.CrapsTable = (function () {
     /* ---------- rendering ---------- */
     function render() {
       var point = T.point;
-      $$('.z-nbox').forEach(function (el) { el.dataset.t = S.numMode; });
       $$('.z').forEach(function (el) {
         var t = el.dataset.t, b = betFor(el), s = el.querySelector('.stk');
         var noParent = (t === 'odds' || t === 'layodds') && !parentFor(el);
@@ -441,9 +436,6 @@ window.CrapsTable = (function () {
         var box = felt.querySelector('.cpt-num[data-num="' + n + '"]'), by = {}, co = null, dco = null;
         T.bets.forEach(function (b) { if (b.num === n && b.parent == null) by[b.type] = b; });
         T.bets.forEach(function (b) { if (by.come && b.parent === by.come.id) co = b; if (by.dontcome && b.parent === by.dontcome.id) dco = b; });
-        box.querySelector('.ns-place').innerHTML = by.place ? stack(by.place.amount) : '';
-        box.querySelector('.ns-buy').innerHTML = by.buy ? lammer('BUY') + stack(by.buy.amount) : '';
-        box.querySelector('.ns-lay').innerHTML = by.lay ? lammer('LAY') + stack(by.lay.amount) : '';
         var cs = box.querySelector('.cs-come'), ds = box.querySelector('.cs-dc');
         cs.hidden = !by.come; cs.innerHTML = by.come ? pair(by.come.amount, co ? co.amount : 0) : '';
         ds.hidden = !by.dontcome; ds.innerHTML = by.dontcome ? pair(by.dontcome.amount, dco ? dco.amount : 0) : '';
@@ -452,7 +444,6 @@ window.CrapsTable = (function () {
         box.querySelector('.puck.on').hidden = point !== n;
         box.classList.toggle('point', point === n);
       });
-      $$('.cpt-mode button').forEach(function (m) { m.setAttribute('aria-pressed', String(m.dataset.mode === S.numMode)); });
       var off = $('.cpt-state .puck'); off.hidden = point != null;
       $('.cpt-state .k').textContent = point == null ? 'Come-out roll' : 'Point is ' + point;
       $('.cpt-state .v').textContent = point == null ? 'Puck is off: line bets go down now.' : cap(an(point)) + ' before a 7 wins for pass; the 7 first wins for don’t.';
@@ -573,11 +564,6 @@ window.CrapsTable = (function () {
     $('.cpt-roll').addEventListener('click', roll);
     $('.cpt-clear').addEventListener('click', clearAll);
     $('.cpt-rebuy').addEventListener('click', function () { T.bank += +S.start; rebuys++; persist(); render(); renderSession(); say('Rebought for ' + usd(S.start) + '.', 'info'); });
-    $('.cpt-mode').addEventListener('click', function (e) {
-      var m = e.target.closest('[data-mode]'); if (!m) return;
-      S.numMode = m.dataset.mode; save(S); render();
-      say('A click on a number box now makes a <b>' + S.numMode + '</b> bet. ' + (S.numMode === 'place' ? 'Place bets sit on the edge of the box.' : S.numMode === 'buy' ? 'Buy bets sit on the edge of the box under a BUY button.' : 'Lay bets sit above the number under a LAY button.'), 'info');
-    });
     $('.rackrow').addEventListener('click', function (e) { var p = e.target.closest('.pile'); if (!p || p.disabled) return; S.chip = p.dataset.chip === 'take' ? 'take' : +p.dataset.chip; save(S); render(); });
     $('.cpt-side').addEventListener('click', function (e) {
       var tb = e.target.closest('.cpt-tab');
