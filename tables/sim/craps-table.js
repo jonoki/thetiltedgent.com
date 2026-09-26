@@ -78,8 +78,8 @@ window.CrapsTable = (function () {
     var h = '<div class="cpt-feltwrap"><div class="cpt-felt" role="group" aria-label="Craps layout">';
     h += '<div class="pass-ext" data-proxy="pass" aria-hidden="true"><span>PASS LINE</span></div>';
     h += '<div class="a-dc">' + z('dontcome', '<b>DON’T COME BAR</b>' + md(6, 6)) + '</div>';
-    /* A number column: a LAY box above the number, the number itself (where come and don't come bets that
-       travel here sit, with their odds heeled on top; clicking it places the number), then PLACE and BUY boxes.
+    /* A number column: a LAY box on top, the number itself (where come and don't come bets that
+       travel here sit, with their odds heeled on top; clicking it places the number), then PLACE and BUY side by side.
        Clicking your come or don't come stack adds odds to it. */
     CE.POINTS.forEach(function (n) {
       h += '<div class="cpt-num a-n' + n + '" data-num="' + n + '">' +
@@ -89,8 +89,8 @@ window.CrapsTable = (function () {
           '<b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b>' +
           '<button type="button" class="z z-cstk cs-come" data-t="odds" data-of="come" data-n="' + n + '" hidden></button>' +
         '</div>' +
-        z('place', '<small>PLACE</small>', 'spot', ' data-n="' + n + '"') +
-        z('buy', '<small>BUY</small>', 'spot', ' data-n="' + n + '"') +
+        '<div class="pbrow">' + z('place', '<small>PLACE</small>', 'spot half', ' data-n="' + n + '"') +
+        z('buy', '<small>BUY</small>', 'spot half', ' data-n="' + n + '"') + '</div>' +
         '<span class="puck on" hidden aria-hidden="true">ON</span></div>';
     });
     h += '<div class="a-come">' + z('come', '<b>COME</b>') + '</div>';
