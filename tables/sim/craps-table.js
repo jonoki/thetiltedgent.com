@@ -5,7 +5,7 @@
 window.CrapsTable = (function () {
   'use strict';
   var CE = window.CrapsEngine;
-  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', min: 10, start: 1000, bank: 1000, stayUp: true, chip: 5 };
+  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', min: 10, start: 1000, bank: 1000, stayUp: true, chip: 5, numMode: 'place' };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-crt') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) {} }
 
@@ -30,6 +30,13 @@ window.CrapsTable = (function () {
     c.forEach(function (v, i) { h += '<span class="chip c' + v + '" style="bottom:' + (i * 3) + 'px"></span>'; });
     return h + '</span><span class="camt">' + usd(a) + '</span>';
   }
+  /* A flat bet with its odds heeled on top, as a dealer stacks them. */
+  function pair(flat, odds) {
+    var h = '<span class="cpair" aria-hidden="true">' + (flat > 0 ? stack(flat).replace(/<span class="camt">.*<\/span>$/, '') : '') +
+      (odds > 0 ? stack(odds).replace('class="cstk"', 'class="cstk heel"').replace(/<span class="camt">.*<\/span>$/, '') : '') + '</span>';
+    return h + '<span class="camt">' + usd(flat) + (odds > 0 ? ' + ' + usd(odds) : '') + '</span>';
+  }
+  function lammer(txt) { return '<span class="lammer">' + txt + '</span>'; }
   function dieHTML(v) { var h = ''; for (var i = 0; i < 9; i++) h += '<i' + (PIPS[v].indexOf(i) >= 0 ? ' class="p"' : '') + '></i>'; return h; }
 
   /* ---------- teaching copy: how each bet works ---------- */
@@ -68,23 +75,26 @@ window.CrapsTable = (function () {
     var h = '<div class="cpt-feltwrap"><div class="cpt-felt" role="group" aria-label="Craps layout">';
     h += '<div class="pass-ext" data-proxy="pass" aria-hidden="true"><span>PASS LINE</span></div>';
     h += '<div class="a-dc">' + z('dontcome', '<b>DON’T COME BAR</b>' + md(6, 6)) + '</div>';
+    /* A number box, as dealt: don't come and lay bets sit in the strip above the number (a lay bet under a
+       LAY button), come bets that travel here sit in the box with their odds on top, and place and buy
+       bets sit on the edge nearest the player (a buy bet under a BUY button). Clicking the box makes the
+       bet chosen in the Numbers selector; clicking your come or don't come stack adds odds to it. */
     CE.POINTS.forEach(function (n) {
       h += '<div class="cpt-num a-n' + n + '" data-num="' + n + '">' +
-        z('lay', '<small>LAY</small>', 'strip', ' data-n="' + n + '"') +
-        z('place', '<b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b>', 'big', ' data-n="' + n + '"') +
-        z('buy', '<small>BUY</small>', 'strip', ' data-n="' + n + '"') +
-        '<div class="cbets"><span class="cb dc" hidden></span>' +
-        z('odds', '<small>ODDS</small>', 'mini oddsz', ' data-of="come" data-n="' + n + '"') +
-        z('layodds', '<small>LAY</small>', 'mini oddsz', ' data-of="dontcome" data-n="' + n + '" hidden') + '</div>' +
+        '<button type="button" class="z z-nbox" data-t="place" data-n="' + n + '"><b class="nw' + (n === 6 || n === 9 ? ' word' : '') + '">' + BOX[n] + '</b></button>' +
+        '<span class="ns ns-lay" aria-hidden="true"></span><span class="ns ns-place" aria-hidden="true"></span><span class="ns ns-buy" aria-hidden="true"></span>' +
+        '<button type="button" class="z z-cstk cs-come" data-t="odds" data-of="come" data-n="' + n + '" hidden></button>' +
+        '<button type="button" class="z z-cstk cs-dc" data-t="layodds" data-of="dontcome" data-n="' + n + '" hidden></button>' +
         '<span class="puck on" hidden aria-hidden="true">ON</span></div>';
     });
     h += '<div class="a-come">' + z('come', '<b>COME</b>') + '</div>';
     h += '<div class="a-field">' + z('field', '<b>FIELD</b><span class="fn"><i class="ring">2</i>3 · 4 · 9 · 10 · 11<i class="ring">12</i></span><small class="fx"></small>') + '</div>';
     h += '<div class="a-big">' + z('big', '<b>6</b><small>BIG</small>', '', ' data-n="6"') + z('big', '<b>8</b><small>BIG</small>', '', ' data-n="8"') + '</div>';
+    // lay odds sit on the don't pass bar next to the flat bet; pass odds sit behind the pass line bet, off the line
     h += '<div class="a-dp">' + z('dontpass', '<b>DON’T PASS BAR</b>' + md(6, 6)) + '</div>';
-    h += '<div class="a-lodds">' + z('layodds', '<b>LAY ODDS</b><small>behind don’t pass</small>', 'oddsz', ' data-of="dontpass"') + '</div>';
+    h += '<div class="a-lodds">' + z('layodds', '<small>ODDS</small>', 'ring', ' data-of="dontpass" hidden') + '</div>';
     h += '<div class="a-pass">' + z('pass', '<b>PASS LINE</b>') + '</div>';
-    h += '<div class="a-podds">' + z('odds', '<b>ODDS</b><small>behind the pass line · paid at true odds</small>', 'oddsz', ' data-of="pass"') + '</div>';
+    h += '<div class="a-podds">' + z('odds', '<small>ODDS</small>', 'ring', ' data-of="pass" hidden') + '</div>';
     h += '<div class="a-props"><div class="pk">ONE ROLL</div>' +
       z('any7', '<b>SEVEN</b><small>4 TO 1</small>', 'wide') +
       '<div class="pk">HARDWAYS</div>' +
@@ -135,6 +145,8 @@ window.CrapsTable = (function () {
             CHIPS.map(function (v) { return '<button type="button" class="pile" data-chip="' + v + '" aria-label="$' + v + ' chip"><span class="chip c' + v + '"></span><small>$' + v + '</small></button>'; }).join('') +
             '<button type="button" class="pile take" data-chip="take"><span class="tk">✕</span><small>Take down</small></button>' +
           '</div></div>' +
+          '<div class="cpt-mode" role="group" aria-label="What a click on a number box places"><span class="k">Numbers</span><div class="seg">' +
+            ['place', 'buy', 'lay'].map(function (m) { return '<button type="button" data-mode="' + m + '">' + cap(m) + '</button>'; }).join('') + '</div></div>' +
           '<div class="cpt-money"><div><span class="k">Rack</span><b class="rack"></b></div><div><span class="k">On the felt</span><b class="onfelt"></b></div>' +
             '<div class="cpt-bankbtns"><button type="button" class="cpt-btn ghost small cpt-clear">Take down all</button><button type="button" class="cpt-btn ghost small cpt-rebuy" hidden>Rebuy</button></div></div>' +
         '</div>' +
@@ -189,12 +201,23 @@ window.CrapsTable = (function () {
     }
 
     /* ---------- placing and taking down ---------- */
+    function lineBet(type) { for (var i = 0; i < T.bets.length; i++) if (T.bets[i].type === type) return T.bets[i]; return null; }
     function act(el) {
       if (rolling) return;
+      var redirected = '';
+      // Once the point is set a line bet can't be added to, so chips put behind it are odds, as at a real table.
+      if (S.chip !== 'take' && (el.dataset.t === 'pass' || el.dataset.t === 'dontpass') && T.point != null) {
+        var lb = lineBet(el.dataset.t);
+        if (lb && lb.num != null) {
+          el = felt.querySelector(el.dataset.t === 'pass' ? '.z-odds[data-of="pass"]' : '.z-layodds[data-of="dontpass"]');
+          redirected = el.dataset.t === 'odds' ? 'With the point on, chips behind the pass line are odds. ' : 'With the point on, chips added to the don’t pass bet are lay odds. ';
+        }
+      }
       var t = el.dataset.t, spec, p = null;
       showCard(el);
       if (S.chip === 'take') {
         var b = betFor(el);
+        if (!b && el.classList.contains('z-cstk')) b = parentFor(el);   // no odds on it: the stack itself is the bet
         if (!b) { say('Nothing on ' + label(el) + ' to take down.', 'info'); return; }
         var v = T.v(b), r = T.remove(b.id);
         if (!r.ok) { say(r.reason, 'info'); return; }
@@ -219,7 +242,7 @@ window.CrapsTable = (function () {
       var res = T.place({ type: t, num: spec.num, parent: spec.parent, amount: a });
       if (!res.ok) { say(res.reason, 'info'); return; }
       var vig = res.bet.vig && G.vigRate(t, n).n ? ' (plus ' + usd(CE.num(G.vigRate(t, n)) * a) + ' commission)' : '';
-      say(usd(a) + ' on ' + G.name(t, n) + vig + '.' + (note ? ' <span class="dimn">' + note + '</span>' : ''), 'info');
+      say(redirected + usd(a) + ' on ' + G.name(t, n) + vig + '.' + (note ? ' <span class="dimn">' + note + '</span>' : ''), 'info');
       persist(); render(); renderSession();
     }
     function label(el) { var k = keyFor(el); return k && G.byKey[k] ? G.byKey[k].name : el.dataset.t === 'odds' ? 'the odds' : 'that spot'; }
@@ -253,64 +276,89 @@ window.CrapsTable = (function () {
       else s = t === p ? 'Winner: the point is made' : t === 7 ? 'Seven out' : 'The point is still ' + p;
       return { c: c, s: s };
     }
-    /* The throw: the dice come in from the middle of the table, hit the back wall and settle; the result shows
-       over the felt; then the dice slide back to the tray. Tap the felt (or Roll) to skip. Reduced motion:
-       no travel, the dice and the result simply appear. */
+    /* The throw, in four beats:
+       1. the dice come in from the middle of the table, bounce, hit the back wall and settle on the felt;
+       2. they sit there, un-highlighted, long enough to see where they landed;
+       3. the view zooms in on them under a spotlight, with the total and the stickman's call;
+       4. they zoom back out into the tray and the felt settles the bets.
+       Tap the felt or press Roll to skip. Reduced motion: no travel or zoom; the dice appear, then the result. */
     function tf(x, y, r, s) { return 'translate(' + x + 'px,' + y + 'px) rotate(' + r + 'deg) scale(' + s + ')'; }
     function throwDice(d1, d2, call, net, done) {
       var fr = felt.getBoundingClientRect(), W = fr.width, H = fr.height;
       var vt = Math.max(0, -fr.top), vb = Math.min(H, window.innerHeight - fr.top);
-      if (vb - vt < 200) { vt = 0; vb = H; }
+      if (vb - vt < 240) { vt = 0; vb = H; }
       var cy = (vt + vb) / 2, sz = dice[0].offsetWidth || 52;
-      var restY = Math.min(H - sz - 10, cy + 56), rest = [[W * 0.36 - sz, restY], [W * 0.36 + sz * 0.5, restY - 14]], restRot = [14, -17];
+      function clampY(y) { return Math.max(vt + 6, Math.min(vb - sz - 6, y)); }
+      var rest = [[W * 0.28 - sz / 2, clampY(cy + 6)], [W * 0.28 + sz * 0.85, clampY(cy - 20)]], restRot = [13, -19];
+      // zoomed: both dice side by side, k times bigger, centred in the visible part of the felt
+      var k = Math.min(2.5, (W * 0.34) / sz), Z = k * sz, zy = Math.max(vt + Z / 2 + 14, cy - 40);
+      var zoom = [[W / 2 - Z / 2 - 10 - sz / 2, zy - sz / 2], [W / 2 + Z / 2 + 10 - sz / 2, zy - sz / 2]];
       var timers = [], anims = [], iv = null, ended = false;
       function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
       function end() {
         if (ended) return; ended = true; skipThrow = null;
         timers.forEach(clearTimeout); clearInterval(iv);
         anims.forEach(function (a) { try { a.cancel(); } catch (e) {} });
-        throwEl.hidden = true; throwEl.style.overflow = ''; throwEl.classList.remove('dim'); resultEl.classList.remove('show');
+        throwEl.hidden = true; throwEl.style.overflow = ''; throwEl.classList.remove('dim', 'landed'); resultEl.classList.remove('show');
         dice.forEach(function (d) { d.classList.remove('away'); });
         done();
+      }
+      function move(f, from, to, ms, easing) {
+        var a = f.animate([{ transform: from }, { transform: to }], { duration: ms, easing: easing || 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+        anims.push(a); return a;
       }
       function land() {
         clearInterval(iv);
         fly[0].innerHTML = dieHTML(d1); fly[1].innerHTML = dieHTML(d2);
-        throwEl.classList.add('dim'); resultEl.classList.add('show');
-        later(toTray, 1500);
+        throwEl.classList.add('landed');
+        later(zoomIn, reduce ? 700 : 650);
       }
-      function toTray() {
+      function zoomIn() {
+        throwEl.style.setProperty('--sx', (W / 2) + 'px'); throwEl.style.setProperty('--sy', zy + 'px');
+        throwEl.classList.add('dim');
+        resultEl.style.top = (zy + Z / 2 + 14) + 'px';
+        fly.forEach(function (f, i) {
+          if (reduce) f.style.transform = tf(zoom[i][0], zoom[i][1], 0, k);
+          else move(f, tf(rest[i][0], rest[i][1], restRot[i], 1), tf(zoom[i][0], zoom[i][1], 0, k), 380, 'cubic-bezier(.2,.8,.25,1)');
+        });
+        later(function () { resultEl.classList.add('show'); }, reduce ? 0 : 220);
+        later(zoomOut, reduce ? 1900 : 1750);
+      }
+      function zoomOut() {
         resultEl.classList.remove('show'); throwEl.classList.remove('dim');
         if (reduce) { end(); return; }
         var fr2 = felt.getBoundingClientRect(); throwEl.style.overflow = 'visible';
         fly.forEach(function (f, i) {
           var tr = dice[i].getBoundingClientRect();
-          anims.push(f.animate([{ transform: tf(rest[i][0], rest[i][1], restRot[i], 1) }, { transform: tf(tr.left - fr2.left, tr.top - fr2.top, 0, tr.width / sz) }],
-                               { duration: 420, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }));
+          move(f, tf(zoom[i][0], zoom[i][1], 0, k), tf(tr.left - fr2.left, tr.top - fr2.top, 0, tr.width / sz), 460);
         });
-        later(end, 440);
+        later(end, 480);
       }
       skipThrow = end;
       resultEl.innerHTML = '<div class="n">' + (d1 + d2) + '</div><div class="c">' + call.c + '</div><div class="s">' + call.s + '</div>' +
         (net ? '<div class="s ' + (net > 0 ? 'up' : 'dn') + '">Your bets: ' + signed(net) + '</div>' : '') + '<div class="t">tap to continue</div>';
-      resultEl.style.top = Math.max(70, cy - 34) + 'px';
       throwEl.hidden = false;
       dice.forEach(function (d) { d.classList.add('away'); });
       fly.forEach(function (f) { f.style.width = f.style.height = sz + 'px'; });
       if (reduce) {
         fly.forEach(function (f, i) { f.style.transform = tf(rest[i][0], rest[i][1], restRot[i], 1); });
+        fly[0].innerHTML = dieHTML(d1); fly[1].innerHTML = dieHTML(d2);
         land(); return;
       }
+      // in the air the dice are drawn a little larger; each touch of the felt brings them back to size
       fly.forEach(function (f, i) {
-        var sy = cy + (i ? 34 : -6), wy = cy + (i ? 16 : -38), wall = W * 0.06 + i * 16;
+        var s = i ? 1 : -1, y0 = cy - 50 + i * 56;
         anims.push(f.animate([
-          { transform: tf(W + 30 + i * 36, sy, 0, 1), offset: 0 },
-          { transform: tf(wall, wy, i ? 400 : -430, 1), offset: 0.55 },
-          { transform: tf(rest[i][0], rest[i][1], restRot[i] + (i ? 720 : -720), 1), offset: 1 }
-        ], { duration: 950 + i * 90, easing: 'cubic-bezier(.25,.7,.35,1)', fill: 'forwards' }));
+          { transform: tf(W + 40 + i * 30, y0, 0, 1.35), offset: 0 },
+          { transform: tf(W * 0.52 + i * 24, clampY(cy - 14 + i * 26), s * 260, 1), offset: 0.3, easing: 'ease-out' },
+          { transform: tf(W * 0.3 + i * 14, clampY(cy - 44 + i * 30), s * 390, 1.16), offset: 0.46, easing: 'ease-in' },
+          { transform: tf(W * 0.04 + i * 12, clampY(cy - 4 + i * 22), s * 520, 1), offset: 0.62, easing: 'ease-out' },
+          { transform: tf(rest[i][0] - 16, rest[i][1] - 16, restRot[i] + s * 640, 1.07), offset: 0.82, easing: 'ease-in' },
+          { transform: tf(rest[i][0], rest[i][1], restRot[i] + s * 720, 1), offset: 1 }
+        ], { duration: 1150 + i * 80, easing: 'linear', fill: 'forwards' }));
       });
-      iv = setInterval(function () { fly[0].innerHTML = dieHTML(1 + Math.floor(Math.random() * 6)); fly[1].innerHTML = dieHTML(1 + Math.floor(Math.random() * 6)); }, 70);
-      later(land, 1060);
+      iv = setInterval(function () { fly[0].innerHTML = dieHTML(1 + Math.floor(Math.random() * 6)); fly[1].innerHTML = dieHTML(1 + Math.floor(Math.random() * 6)); }, 65);
+      later(land, 1250);
     }
     function finish(res, hadPlaceOff) {
       var d1 = res.d1, d2 = res.d2;
@@ -331,8 +379,9 @@ window.CrapsTable = (function () {
     }
     function zoneEl(b, n) {
       if (b.type === 'come' || b.type === 'dontcome') return n != null ? felt.querySelector('.cpt-num[data-num="' + n + '"]') : felt.querySelector('.z-' + b.type);
-      if (b.type === 'odds' || b.type === 'layodds') return b.come ? felt.querySelector('.cpt-num[data-num="' + b.num + '"]') : felt.querySelector('.z-' + b.type + '[data-of="' + (b.type === 'odds' ? 'pass' : 'dontpass') + '"]');
+      if (b.type === 'odds' || b.type === 'layodds') return b.come ? felt.querySelector('.cpt-num[data-num="' + b.num + '"]') : felt.querySelector('.z-' + (b.type === 'odds' ? 'pass' : 'dontpass'));
       if (b.type === 'pass' || b.type === 'dontpass') return felt.querySelector('.z-' + b.type);
+      if (b.type === 'place' || b.type === 'buy' || b.type === 'lay') return felt.querySelector('.cpt-num[data-num="' + b.num + '"]');
       return felt.querySelector('.z-' + b.type + (b.num != null ? '[data-n="' + b.num + '"]' : ''));
     }
     function short(b) {
@@ -371,31 +420,39 @@ window.CrapsTable = (function () {
     /* ---------- rendering ---------- */
     function render() {
       var point = T.point;
+      $$('.z-nbox').forEach(function (el) { el.dataset.t = S.numMode; });
       $$('.z').forEach(function (el) {
-        var t = el.dataset.t, b = betFor(el);
+        var t = el.dataset.t, b = betFor(el), s = el.querySelector('.stk');
         var noParent = (t === 'odds' || t === 'layodds') && !parentFor(el);
-        if (t === 'layodds' && el.dataset.of === 'dontcome') el.hidden = noParent;   // lay odds on a don't come bet show only when there is one
-        el.querySelector('.stk').innerHTML = b ? stack(b.amount) : '';
+        if (t === 'odds' || t === 'layodds') el.hidden = noParent;          // an odds spot exists only behind a bet with a number
+        if (s) s.innerHTML = b ? stack(b.amount) : '';
         el.classList.toggle('has', !!b);
-        var closed = noParent || ((t === 'pass' || t === 'dontpass') && point != null && !b) || ((t === 'come' || t === 'dontcome') && point == null);
+        var closed = ((t === 'pass' || t === 'dontpass') && point != null && !b) || ((t === 'come' || t === 'dontcome') && point == null);
         el.classList.toggle('closed', closed);
         var k = keyFor(el), c = k && G.byKey[k];
         el.setAttribute('aria-label', (c ? c.name + ', pays ' + c.pays + ', house edge ' + pct(c.edgePct) : label(el)) + (b ? ', your bet ' + usd(b.amount) : ''));
       });
+      // pass and don't pass odds: an empty ring behind the bet until odds go down, then the chips
+      [['odds', 'pass'], ['layodds', 'dontpass']].forEach(function (x) {
+        var el = felt.querySelector('.z-' + x[0] + '[data-of="' + x[1] + '"]'), b = betFor(el);
+        el.querySelector('small').hidden = !!b;
+      });
       CE.POINTS.forEach(function (n) {
-        var box = felt.querySelector('.cpt-num[data-num="' + n + '"]'), cm = null, dc = null, co = null, dco = null;
-        T.bets.forEach(function (b) {
-          if (b.num !== n) return;
-          if (b.type === 'come') cm = b; else if (b.type === 'dontcome') dc = b;
-        });
-        T.bets.forEach(function (b) { if (cm && b.parent === cm.id) co = b; if (dc && b.parent === dc.id) dco = b; });
-        var de = box.querySelector('.cb.dc'), oz = box.querySelector('.z-odds small');
-        // a come bet that travelled here sits in the box's odds slot, with its odds beside it
-        oz.innerHTML = cm ? '<span class="cf">COME ' + usd(cm.amount) + '</span>' + (co ? 'ODDS ' + usd(co.amount) : '+ ODDS') : 'ODDS';
-        de.hidden = !dc; de.innerHTML = dc ? 'DC ' + usd(dc.amount) + (dco ? '<br><i>lay ' + usd(dco.amount) + '</i>' : '') : '';
+        var box = felt.querySelector('.cpt-num[data-num="' + n + '"]'), by = {}, co = null, dco = null;
+        T.bets.forEach(function (b) { if (b.num === n && b.parent == null) by[b.type] = b; });
+        T.bets.forEach(function (b) { if (by.come && b.parent === by.come.id) co = b; if (by.dontcome && b.parent === by.dontcome.id) dco = b; });
+        box.querySelector('.ns-place').innerHTML = by.place ? stack(by.place.amount) : '';
+        box.querySelector('.ns-buy').innerHTML = by.buy ? lammer('BUY') + stack(by.buy.amount) : '';
+        box.querySelector('.ns-lay').innerHTML = by.lay ? lammer('LAY') + stack(by.lay.amount) : '';
+        var cs = box.querySelector('.cs-come'), ds = box.querySelector('.cs-dc');
+        cs.hidden = !by.come; cs.innerHTML = by.come ? pair(by.come.amount, co ? co.amount : 0) : '';
+        ds.hidden = !by.dontcome; ds.innerHTML = by.dontcome ? pair(by.dontcome.amount, dco ? dco.amount : 0) : '';
+        if (by.come) cs.setAttribute('aria-label', 'Your come bet on the ' + n + ': ' + usd(by.come.amount) + (co ? ', odds ' + usd(co.amount) : '') + '. Add odds');
+        if (by.dontcome) ds.setAttribute('aria-label', 'Your don’t come bet on the ' + n + ': ' + usd(by.dontcome.amount) + (dco ? ', lay odds ' + usd(dco.amount) : '') + '. Lay odds');
         box.querySelector('.puck.on').hidden = point !== n;
         box.classList.toggle('point', point === n);
       });
+      $$('.cpt-mode button').forEach(function (m) { m.setAttribute('aria-pressed', String(m.dataset.mode === S.numMode)); });
       var off = $('.cpt-state .puck'); off.hidden = point != null;
       $('.cpt-state .k').textContent = point == null ? 'Come-out roll' : 'Point is ' + point;
       $('.cpt-state .v').textContent = point == null ? 'Puck is off: line bets go down now.' : cap(an(point)) + ' before a 7 wins for pass; the 7 first wins for don’t.';
@@ -516,6 +573,11 @@ window.CrapsTable = (function () {
     $('.cpt-roll').addEventListener('click', roll);
     $('.cpt-clear').addEventListener('click', clearAll);
     $('.cpt-rebuy').addEventListener('click', function () { T.bank += +S.start; rebuys++; persist(); render(); renderSession(); say('Rebought for ' + usd(S.start) + '.', 'info'); });
+    $('.cpt-mode').addEventListener('click', function (e) {
+      var m = e.target.closest('[data-mode]'); if (!m) return;
+      S.numMode = m.dataset.mode; save(S); render();
+      say('A click on a number box now makes a <b>' + S.numMode + '</b> bet. ' + (S.numMode === 'place' ? 'Place bets sit on the edge of the box.' : S.numMode === 'buy' ? 'Buy bets sit on the edge of the box under a BUY button.' : 'Lay bets sit above the number under a LAY button.'), 'info');
+    });
     $('.rackrow').addEventListener('click', function (e) { var p = e.target.closest('.pile'); if (!p || p.disabled) return; S.chip = p.dataset.chip === 'take' ? 'take' : +p.dataset.chip; save(S); render(); });
     $('.cpt-side').addEventListener('click', function (e) {
       var tb = e.target.closest('.cpt-tab');
