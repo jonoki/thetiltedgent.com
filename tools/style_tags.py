@@ -10,7 +10,6 @@ Inputs per report:
 Every raw text value is kept next to the parsed number so any tag can be traced back to the page.
 """
 import datetime
-import html
 import json
 import os
 import re
@@ -63,18 +62,11 @@ TABLE_ROWS = {'pe_tbl': r'^(Trailing P/E|P/E\b)', 'revg': r'^Revenue Growth', 'r
 
 
 def table_rows(path: str) -> dict[str, str]:
-    t = rl.read_text(path)
-    m = re.search(r'<table class="fin-table".*?</table>', t, re.S)
-    out = {}
-    if not m:
-        return out
-    for row in re.findall(r'<tr[^>]*>(.*?)</tr>', m.group(0), re.S):
-        cells = [html.unescape(re.sub('<[^>]+>', '', c)).strip() for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', row, re.S)]
-        if len(cells) >= 2:
-            for k, pat in TABLE_ROWS.items():
-                if k not in out and re.search(pat, cells[0], re.I):
-                    out[k] = cells[1]
-    return out
+    """The TABLE_ROWS cells of the report's metrics table (class fin-table), keyed as in TABLE_ROWS."""
+    m = re.search(r'<table class="fin-table".*?</table>', rl.read_text(path), re.S)
+    rows = rl.table_rows(m.group(0)) if m else []
+    found = {key: rl.row_value(rows, label, re.I) for key, label in TABLE_ROWS.items()}
+    return {key: value for key, value in found.items() if value is not None}
 
 
 def quantile(vals: list[float], p: float) -> float:

@@ -13,8 +13,9 @@ from typing import TypedDict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo root, from this file's place in tools/
 
+ASSET_FAMILIES = ('etf', 'crypto', 'fixed')   # reports/<family>/: ETFs, crypto, bonds and cash
 STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
-ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ('etf', 'crypto', 'fixed')]
+ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ASSET_FAMILIES]
 
 # The header price must equal the chart's last point, to the cent: the rule every build and refresh is held to.
 PRICE_EXACT = 0.006
@@ -31,11 +32,21 @@ MONTHS['Sept'] = 9
 _DASHES = str.maketrans({'\u2212': '-', '\u2013': '-', '\u2014': '-'})   # minus sign, en dash, em dash
 
 
-# ---------- text and numbers ----------
+# ---------- files, text and numbers ----------
+
+def report_path(slug: str, family: str | None = None, repo: str = ROOT) -> str:
+    """reports/<slug>_analysis.html, or reports/<family>/<slug>_analysis.html for an ETF, crypto or bond report."""
+    return os.path.join(repo, 'reports', *([family] if family else []), f'{slug}_analysis.html')
+
 
 def read_text(path: str) -> str:
     with open(path, encoding='utf-8') as fh:
         return fh.read()
+
+
+def normalize_dashes(s: str) -> str:
+    """Minus sign, en dash and em dash -> '-', so a number typed with any of them reads as negative."""
+    return s.translate(_DASHES)
 
 
 def strip_tags(s: str) -> str:
@@ -47,7 +58,7 @@ def to_number(s: str | None) -> float | None:
     """A whole string read as one number: '1,234.5', '$12.30', '4.1%', '−3.2' -> float; anything else -> None."""
     if s is None:
         return None
-    s = s.replace(',', '').replace('$', '').replace('%', '').strip().translate(_DASHES)
+    s = normalize_dashes(s.replace(',', '').replace('$', '').replace('%', '').strip())
     try:
         return float(s)
     except ValueError:
@@ -61,7 +72,7 @@ def first_number(s: str | int | float | None) -> float | None:
         return None
     if isinstance(s, (int, float)):
         return float(s)
-    s = str(s).replace('\u2212', '-').replace('\u2013', '-')
+    s = normalize_dashes(s)
     if re.search(r'\bn/?m\b|\bn/?a\b|not meaningful', s, re.I):
         return None
     m = re.search(r'(\(?)(-?)\$?\s*(\d[\d,]*\.?\d*)', s)
@@ -101,6 +112,28 @@ def header_price(t: str) -> float | None:
          or re.search(r'class="price[ "][^>]*>\s*\$?([\d,]+\.\d+)', t)
          or re.search(r'class="price-now[ "][^>]*>\s*\$?([\d,]+\.\d+)', t))
     return to_number(m.group(1)) if m else None
+
+
+_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
+_CELL = re.compile(r'<(t[dh])[^>]*>(.*?)</t[dh]>', re.S)
+
+
+def table_rows(t: str) -> list[tuple[str, str]]:
+    """(label, value) text of every table row in t whose second cell is a <td>, in page order. The label is
+    the first cell (<td> or <th>); header rows (all <th>) are skipped. Cells are read with tags stripped,
+    because metrics labels are often split into tooltip spans ("<span>EPS</span> (<span>TTM</span>)"), and
+    whitespace is collapsed. The one reader of report tables: manifest.py, verify.py and style_tags.py use it."""
+    rows = []
+    for row in _ROW.findall(t):
+        cells = _CELL.findall(row)
+        if len(cells) >= 2 and cells[1][0] == 'td':
+            rows.append(tuple(re.sub(r'\s+', ' ', strip_tags(body)) for _, body in cells[:2]))
+    return rows
+
+
+def row_value(rows: list[tuple[str, str]], label: str, flags: int = 0) -> str | None:
+    """The value of the first row whose label matches the regex label (re.match), else None."""
+    return next((value for lab, value in rows if re.match(label, lab, flags)), None)
 
 
 def _js_arrays(t: str, name: str) -> list[str]:
@@ -145,7 +178,23 @@ def range_52w(t: str) -> list[float | None] | None:
     return [to_number(m.group(1)), to_number(m.group(2))] if m else None
 
 
-def structure_counts(t: str) -> dict[str, int]:
+class StructureCounts(TypedDict):
+    """How many of each skeleton element a page has (structure_counts)."""
+    doctype: int
+    html: int
+    head: int
+    head_close: int
+    body: int
+    body_close: int
+    html_close: int
+    style_open: int
+    style_close: int
+    canvas: int
+    lines: int
+    sitenav: int
+
+
+def structure_counts(t: str) -> StructureCounts:
     """How many of each skeleton element the page has; a sound page has exactly one of each tag pair."""
     return {
         'doctype': t.count('<!DOCTYPE'),
@@ -163,7 +212,28 @@ def structure_counts(t: str) -> dict[str, int]:
     }
 
 
-SKELETON = ('doctype', 'html', 'head', 'body', 'body_close', 'html_close')
+SKELETON = ('doctype', 'html', 'head', 'head_close', 'body', 'body_close', 'html_close')
+
+
+def expected_canvases(path: str) -> int:
+    """The price chart and one other; bond and cash reports (reports/fixed/) add the yield curve."""
+    return 3 if os.path.basename(os.path.dirname(os.path.abspath(path))) == 'fixed' else 2
+
+
+def structure_problems(counts: StructureCounts, path: str) -> list[str]:
+    """What is wrong with a page's skeleton, as manifest warning codes; empty for a sound page. The one
+    definition of a sound report: verify.py gates on it and manifest.py records it. A missing </head> (EXPD)
+    or </style> (CAT, blank for five weeks) is caught here."""
+    problems = []
+    if not all(counts[k] == 1 for k in SKELETON):
+        problems.append('document_skeleton_incomplete')
+    if counts['style_open'] != counts['style_close']:
+        problems.append('style_unbalanced')
+    if counts['canvas'] != expected_canvases(path):
+        problems.append(f"canvas_count:{counts['canvas']}")
+    if counts['sitenav']:
+        problems.append('has_legacy_sitenav')
+    return problems
 
 
 # ---------- the index page and the manifest's data files ----------

@@ -17,8 +17,8 @@ from typing import TypedDict
 import reportlib as rl
 
 
-class CheckResult(TypedDict, total=False):
-    """verify.check() for one page: reportlib.structure_counts' keys plus these."""
+class CheckResult(rl.StructureCounts, total=False):
+    """verify.check() for one page: its structure counts plus these."""
     price: float | None
     n_labels: int | None
     n_prices: int | None
@@ -31,19 +31,7 @@ class CheckResult(TypedDict, total=False):
     date: str | None
     title_ticker: str | None
     title_ok: bool
-    OK: bool
-
-
-def table_cells(t: str) -> dict[str, str]:
-    """First two <td> texts of every table row, keyed by the first: metrics labels are often split into
-    tooltip spans ("<span>EPS</span> (<span>TTM</span>)"), so rows are read with tags stripped rather than
-    by a loose pattern over the page, which picks up numbers from prose or the next row."""
-    rows = {}
-    for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', t, re.S):
-        cells = [re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', c)).strip() for c in re.findall(r'<td[^>]*>(.*?)</td>', tr, re.S)]
-        if len(cells) >= 2:
-            rows.setdefault(cells[0], cells[1])
-    return rows
+    ok: bool
 
 
 def plain_value(cell: str) -> float | None:
@@ -54,10 +42,11 @@ def plain_value(cell: str) -> float | None:
 
 
 def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:
-    """(stated trailing P/E, price ÷ EPS) when both are readable and EPS is positive, else (None, None)."""
-    rows = table_cells(t)
-    pe_cell = next((v for k, v in rows.items() if re.match(r'^Trailing P/?E\b', k)), None)
-    eps_cell = next((v for k, v in rows.items() if re.match(r'^(?:Diluted )?EPS \(TTM\b', k)), None)
+    """(stated trailing P/E, price ÷ EPS) when both are readable and EPS is positive, else (None, None). Rows
+    are matched by label, not by a loose pattern over the page, which picks up numbers from prose or the next row."""
+    rows = rl.table_rows(t)
+    pe_cell = rl.row_value(rows, r'Trailing P/?E\b')
+    eps_cell = rl.row_value(rows, r'(?:Diluted )?EPS \(TTM\b')
     pe_v, eps_v = (plain_value(pe_cell) if pe_cell else None), (plain_value(eps_cell) if eps_cell else None)
     if pe_v is not None and eps_v and eps_v > 0 and price:
         return pe_v, round(price / eps_v, 2)
@@ -65,19 +54,17 @@ def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:
 
 
 def passes(o: CheckResult, path: str) -> bool:
-    """The gate: a sound skeleton, the right canvas count, matched <style> tags, the chart ending on the header
-    price, equal label and price counts, no site nav, the price inside its 52-week range and the title ticker
-    matching the file name. Bond/cash reports (reports/fixed/) carry a third canvas, the yield curve."""
-    want_canvas = 3 if re.search(r'[\\/]fixed[\\/]', os.path.abspath(path)) else 2
-    return bool(all(o[k] == 1 for k in rl.SKELETON + ('head_close',))
-                and o['canvas'] == want_canvas and o['style_open'] == o['style_close']
-                and o['price_match'] and o['n_labels'] == o['n_prices'] and o['sitenav'] == 0
+    """The gate: no structure problem (skeleton, canvas count, <style> tags, site nav; reportlib.structure_problems),
+    the chart ending on the header price, equal label and price counts, the price inside its 52-week range and
+    the title ticker matching the file name."""
+    return bool(not rl.structure_problems(o, path)
+                and o['price_match'] and o['n_labels'] == o['n_prices']
                 and o.get('range_ok', True) and o['title_ok'])
 
 
 def check(path: str) -> CheckResult:
     t = rl.read_text(path)
-    out = rl.structure_counts(t)   # a missing </head> (EXPD) or </style> (CAT, blank for five weeks) fails here
+    out = CheckResult(**rl.structure_counts(t))
     price = rl.header_price(t)
     out['price'] = price
     labels, prices = rl.chart_series(t)
@@ -98,13 +85,13 @@ def check(path: str) -> CheckResult:
     out['title_ticker'] = rl.parse_title(t)[0]
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
     out['title_ok'] = norm(out['title_ticker']) == norm(slug)
-    out['OK'] = passes(out, path)
+    out['ok'] = passes(out, path)
     return out
 
 
 def line(path: str, o: CheckResult) -> str:
     skel = ''.join(str(o[k]) for k in ('doctype', 'html', 'head', 'body', 'body_close', 'html_close'))
-    return (f"{'PASS' if o['OK'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
+    return (f"{'PASS' if o['ok'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
             f"n={o['n_labels']}/{o['n_prices']} skel={skel} canvas={o['canvas']} lines={o['lines']} "
             f"pe={o['pe_stated']}/{o['pe_calc']} range={o.get('range_ok')} date={o['date']} title={o['title_ticker']}")
 
@@ -114,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     failed = 0
     for f in files:
         o = check(f)
-        failed += not o['OK']
+        failed += not o['ok']
         print(line(f, o))
     return 1 if failed else 0
 

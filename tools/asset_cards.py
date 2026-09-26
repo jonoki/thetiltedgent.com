@@ -21,7 +21,7 @@ FAMILIES = {  # folder: (heading, one-line note, sort)
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
     'crypto': ('Crypto', 'Cryptoassets, priced at the UTC daily close.', 'az'),
     'fixed': ('Bonds &amp; cash', 'Government bonds and bills, priced by their yield. Shortest term first.', 'term'),
-}
+}   # one per reportlib.ASSET_FAMILIES folder (a unit test checks)
 LABEL = {  # slug: category line on the card
     'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&amp;P 500 in Canadian dollars',
     'voo': 'S&amp;P 500', 'xeqt': 'Global stocks, all in one',
@@ -49,8 +49,9 @@ def section_01(page: str) -> str:
 
 def quoted_definition(page: str) -> str:
     p = re.search(r'<p[^>]*>(.*?)</p>', section_01(page), re.S)
-    txt = html.unescape(re.sub(r'<[^>]+>', '', p.group(1))).strip()
-    m = re.match(r'^[A-Za-z]+:\s*"[^"]+"', txt)
+    if not p:
+        raise ValueError('section 01 has no <p> paragraph')
+    m = re.match(r'^[A-Za-z]+:\s*"[^"]+"', rl.strip_tags(p.group(1)))
     if not m:
         raise ValueError('section 01 does not open with a quoted definition')
     return m.group(0)
@@ -59,8 +60,7 @@ def quoted_definition(page: str) -> str:
 def first_sentence(page: str) -> str:
     body = section_01(page)
     for p in re.findall(r'<p[^>]*>(.*?)</p>', body, re.S):
-        txt = html.unescape(re.sub(r'<[^>]+>', '', p)).strip()
-        txt = re.sub(r'^What it is\.\s*', '', txt)
+        txt = re.sub(r'^What it is\.\s*', '', rl.strip_tags(p))
         if re.match(r'^[A-Za-z]+:\s*"', txt):   # a paragraph that opens by quoting a source: use the next one
             continue
         # split on sentence ends, not on "U.S." or a quote that opens the paragraph
@@ -78,11 +78,9 @@ def card(folder: str, path: str) -> tuple[str, str]:
     slug = os.path.basename(path).split('_')[0]
     if slug not in LABEL:
         raise ValueError(f'add a LABEL for {slug} in tools/asset_cards.py')
-    tm = re.search(r'<title>(.*?)</title>', page, re.S)
-    parts = re.split(r'\s+[—-]\s+', html.unescape(tm.group(1)).strip().split('|')[0], maxsplit=1) if tm else []
-    if len(parts) != 2:
+    tick, name = rl.parse_title(page)
+    if not tick or not name:
         raise ValueError('expected a <title> like "VOO — Vanguard S&P 500 ETF | ETF Analysis"')
-    tick, name = (x.strip() for x in parts)
     line = quoted_definition(page) if slug in QUOTED_DEFINITION else first_sentence(page)
     e = lambda s: html.escape(s, quote=False)
     return slug, (f'      <a class="rep asset" href="view.html?r={folder}/{slug}"><span class="tick">{e(tick)}</span>'
@@ -96,7 +94,7 @@ def main() -> int | str:
         t = fh.read()
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
-        for p in glob.glob(os.path.join(rl.ROOT, 'reports', folder, '*_analysis.html')):
+        for p in glob.glob(rl.report_path('*', folder)):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:

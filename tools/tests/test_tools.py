@@ -6,6 +6,7 @@ here before it shows up as a wrong tag or a failed gate on the live library.
 import datetime
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -134,6 +135,31 @@ class ReportPage(unittest.TestCase):
         self.assertEqual(s['canvas'], 2)
         self.assertEqual(s['style_open'], s['style_close'])
 
+    def test_structure_problems(self):
+        problems = lambda t, path='reports/acme_analysis.html': rl.structure_problems(rl.structure_counts(t), path)
+        self.assertEqual(problems(PAGE), [])
+        self.assertEqual(problems(PAGE, 'reports/fixed/acme_analysis.html'), ['canvas_count:2'])   # bonds add the yield curve
+        self.assertEqual(problems(PAGE.replace('</head>', '')), ['document_skeleton_incomplete'])
+        self.assertEqual(problems(PAGE.replace('</style>', '')), ['style_unbalanced'])
+        self.assertEqual(problems(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>')), ['has_legacy_sitenav'])
+
+    def test_table_rows(self):
+        t = ('<table><thead><tr><th>Metric</th><th>ACME</th></tr></thead><tbody>'
+             '<tr><td><span class="tip">EPS</span> (<span>TTM</span>)</td><td>$1.20</td></tr>'
+             '<tr style="background:#111"><td>Net Interest Margin</td><td>2.96%</td></tr>'   # was missed before 26 Sep 2026
+             '<tr><th>CET1\n  Ratio</th><td>9.9%</td></tr><tr><td>lonely</td></tr></tbody></table>')
+        rows = rl.table_rows(t)
+        self.assertEqual(rows, [('EPS (TTM)', '$1.20'), ('Net Interest Margin', '2.96%'), ('CET1 Ratio', '9.9%')])
+        self.assertEqual(rl.row_value(rows, r'net interest', re.I), '2.96%')
+        self.assertIsNone(rl.row_value(rows, r'ROTCE'))
+
+    def test_every_asset_family_has_a_tab(self):
+        self.assertEqual(tuple(asset_cards.FAMILIES), rl.ASSET_FAMILIES)
+
+    def test_report_path(self):
+        self.assertEqual(rl.report_path('aapl', repo='r'), os.path.join('r', 'reports', 'aapl_analysis.html'))
+        self.assertEqual(rl.report_path('voo', 'etf', repo='r'), os.path.join('r', 'reports', 'etf', 'voo_analysis.html'))
+
 
 class ManifestRecords(unittest.TestCase):
     def test_only_listed_shards_are_read(self):
@@ -181,20 +207,20 @@ class Verify(unittest.TestCase):
 
     def test_a_sound_page_passes(self):
         o = self.check(PAGE)
-        self.assertTrue(o['OK'], o)
+        self.assertTrue(o['ok'], o)
         self.assertEqual((o['pe_stated'], o['pe_calc']), (24.1, 24.1))
 
     def test_each_gate_fails_on_its_own(self):
-        self.assertFalse(self.check(PAGE, 'zzz_analysis.html')['OK'])                       # title/file mismatch
-        self.assertFalse(self.check(PAGE.replace('1234.5];', '1230];'))['OK'])              # chart end != header
-        self.assertFalse(self.check(PAGE.replace('</head>', ''))['OK'])                     # skeleton
-        self.assertFalse(self.check(PAGE.replace('<canvas></canvas>', '', 1))['OK'])         # canvas count
-        self.assertFalse(self.check(PAGE.replace('$1,300.00', '$1,200.00'))['OK'])           # price outside 52w
-        self.assertFalse(self.check(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>'))['OK'])
+        self.assertFalse(self.check(PAGE, 'zzz_analysis.html')['ok'])                       # title/file mismatch
+        self.assertFalse(self.check(PAGE.replace('1234.5];', '1230];'))['ok'])              # chart end != header
+        self.assertFalse(self.check(PAGE.replace('</head>', ''))['ok'])                     # skeleton
+        self.assertFalse(self.check(PAGE.replace('<canvas></canvas>', '', 1))['ok'])         # canvas count
+        self.assertFalse(self.check(PAGE.replace('$1,300.00', '$1,200.00'))['ok'])           # price outside 52w
+        self.assertFalse(self.check(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>'))['ok'])
 
     def test_pe_is_reported_but_not_a_gate(self):
         o = self.check(PAGE.replace('24.1x', '30.0x'))
-        self.assertTrue(o['OK'])
+        self.assertTrue(o['ok'])
         self.assertEqual((o['pe_stated'], o['pe_calc']), (30.0, 24.1))
 
     def test_exit_code(self):

@@ -30,7 +30,6 @@ KEY_METRICS = {
     'EPS (TTM)': 'eps_ttm', 'Dividend Yield': 'yield_pct', 'Beta': 'beta',
     'Shares Outstanding': 'shares_out', 'Free Cash Flow': 'fcf',
 }
-METRIC_ROW = re.compile(r'<tr>\s*<t[dh][^>]*>(?P<label>.*?)</t[dh]>\s*<td[^>]*>(?P<value>.*?)</td>', re.S)
 MIN_METRICS = 5
 
 
@@ -47,15 +46,11 @@ def extract_metrics(t: str) -> dict[str, dict[str, str | float | None]]:
 
     Deliberately generic: REIT reports carry P/FFO where others carry P/E, banks carry NIM and CET1.
     Capturing the table as-is keeps those without the manifest needing to know every sector's
-    substitutions in advance. Only <tbody> rows are read, so the header row's cells cannot bleed into
-    the first label ("MetricTICKERIndustry Avg...Trailing P/E").
+    substitutions in advance. The first row with a label wins; labels over 60 characters are prose, not metrics.
     """
     metrics = {}
-    for body in re.findall(r'<tbody[^>]*>(.*?)</tbody>', t, re.S) or [t]:
-        for m in METRIC_ROW.finditer(body):
-            label, value = rl.strip_tags(m.group('label')), rl.strip_tags(m.group('value'))
-            if not label or not value or '\n' in label or len(label) > 60 or label in metrics:
-                continue
+    for label, value in rl.table_rows(t):
+        if label and value and len(label) <= 60 and label not in metrics:
             metrics[label] = {'text': value, 'number': rl.to_number(value)}
     return metrics
 
@@ -148,15 +143,11 @@ def editions(t: str, as_of: str | None, price: float | None, warn: list[str]) ->
             box.group('state'))
 
 
-def structure_ok(t: str, warn: list[str]) -> bool:
-    s = rl.structure_counts(t)
-    if not all(s[k] == 1 for k in rl.SKELETON):
-        warn.append('document_skeleton_incomplete')
-    if s['canvas'] != 2:
-        warn.append(f"canvas_count:{s['canvas']}")
-    if s['sitenav']:
-        warn.append('has_legacy_sitenav')
-    return not any(w.startswith(('document_skeleton', 'canvas_count')) for w in warn)
+def structure_ok(t: str, path: str, warn: list[str]) -> bool:
+    """reportlib's structure problems go into warn; a legacy site nav is recorded but does not make the page unsound."""
+    problems = rl.structure_problems(rl.structure_counts(t), path)
+    warn.extend(problems)
+    return not any(p != 'has_legacy_sitenav' for p in problems)
 
 
 def card_checks(card: rl.IndexCard | dict, ticker: str | None, warn: list[str]) -> None:
@@ -191,7 +182,7 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
     if len(metrics) < MIN_METRICS:
         warn.append(f'few_metrics:{len(metrics)}')
     eds, delta_state = editions(t, as_of, price, warn)
-    struct_ok = structure_ok(t, warn)
+    struct_ok = structure_ok(t, path, warn)
     sha, size = blob_sha(path)
     card = cards.get(slug, {})
     card_checks(card, ticker, warn)
@@ -253,29 +244,22 @@ def print_coverage(reports: list[rl.ReportRecord], full_metrics: bool) -> None:
         print(f'     {w:34s} {c}', file=sys.stderr)
 
 
-def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(description='Build the report manifest from the published report pages.')
-    ap.add_argument('repo', nargs='?', default='.', help='repo root (default: current directory)')
-    ap.add_argument('-o', dest='out', help='top-level output file (default: <repo>/data/reports.json)')
-    ap.add_argument('--full-metrics', action='store_true', help='include every report\'s full metrics table')
-    args = ap.parse_args(argv)
-    repo = args.repo
-    out_path = args.out or os.path.join(repo, 'data', 'reports.json')
+def by_sector(reports: list[rl.ReportRecord]) -> dict[str, list[rl.ReportRecord]]:
+    """Records grouped by sector key, reports without one under 'unclassified'.
 
-    cards = rl.parse_index_cards(repo)
-    files = sorted(glob.glob(os.path.join(repo, rl.STOCK_REPORTS)))
-    reports = [extract(f, cards, args.full_metrics) for f in files]
-    reports.sort(key=lambda r: r.get('ticker') or r['slug'])
-
-    # Sharded by sector. A single 208 KB file cannot be published through the GitHub connector (one
-    # push_files call must carry the whole file, ~113k tokens of minified JSON), and sharding is the better
-    # shape anyway: a consumer that wants one sector fetches ~18 KB, not the lot.
-    by_sector = {}
+    Sharded by sector. A single 208 KB file cannot be published through the GitHub connector (one
+    push_files call must carry the whole file, ~113k tokens of minified JSON), and sharding is the better
+    shape anyway: a consumer that wants one sector fetches ~18 KB, not the lot."""
+    groups: dict[str, list[rl.ReportRecord]] = {}
     for r in reports:
-        by_sector.setdefault(r.get('sector_key') or 'unclassified', []).append(r)
+        groups.setdefault(r.get('sector_key') or 'unclassified', []).append(r)
+    return groups
 
-    # The top-level file answers "what is stale?" and "does the site reconcile?" in one fetch.
-    doc = {
+
+def manifest_doc(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard],
+                 sectors: dict[str, list[rl.ReportRecord]]) -> rl.Manifest:
+    """The top-level file: answers "what is stale?" and "does the site reconcile?" in one fetch."""
+    return {
         'schema_version': SCHEMA_VERSION,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'source': f'extracted from the published report HTML; generated by {GENERATOR}, never hand-edited',
@@ -283,26 +267,45 @@ def main(argv: list[str] | None = None) -> None:
         'reconciliation': reconciliation(reports, cards),
         'index_fields': ['ticker', 'slug', 'sector_key', 'as_of', 'price'],
         'index': [[r.get('ticker'), r['slug'], r.get('sector_key'), r.get('as_of'), r.get('price')] for r in reports],
-        'shards': {k: f'data/reports/{k}.json' for k in sorted(by_sector)},
-        'shard_counts': {k: len(v) for k, v in sorted(by_sector.items())},
+        'shards': {k: f'data/reports/{k}.json' for k in sorted(sectors)},
+        'shard_counts': {k: len(v) for k, v in sorted(sectors.items())},
     }
-    n = write_json(out_path, doc)
-    print(f'wrote {out_path}  ({len(reports)} reports indexed, {n:,} bytes)', file=sys.stderr)
 
-    shard_dir = os.path.join(os.path.dirname(out_path), 'reports')
-    for key, rs in sorted(by_sector.items()):
+
+def write_shards(shard_dir: str, sectors: dict[str, list[rl.ReportRecord]], repo: str) -> None:
+    """One file per sector, then remove any shard this build did not write: it belongs to an older build
+    and, left in place, duplicates records."""
+    for key, rs in sorted(sectors.items()):
         # deliberately no generated_at: a shard should change only when its content changes
         sn = write_json(os.path.join(shard_dir, key + '.json'),
                         {'schema_version': SCHEMA_VERSION, 'sector_key': key, 'count': len(rs), 'reports': rs})
         print(f'  data/reports/{key}.json  {len(rs):3d} reports  {sn:7,} bytes', file=sys.stderr)
-    # a shard this build did not write belongs to an older build; left in place it duplicates records
     for stale in sorted(set(glob.glob(os.path.join(shard_dir, '*.json'))) -
-                        {os.path.join(shard_dir, k + '.json') for k in by_sector}):
+                        {os.path.join(shard_dir, k + '.json') for k in sectors}):
         os.remove(stale)
         print(f'  removed stale shard {os.path.relpath(stale, repo)}', file=sys.stderr)
 
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description='Build the report manifest from the published report pages.')
+    ap.add_argument('repo', nargs='?', default=rl.ROOT, help='repo root (default: the repo this script is in)')
+    ap.add_argument('-o', dest='out', help='top-level output file (default: <repo>/data/reports.json)')
+    ap.add_argument('--full-metrics', action='store_true', help='include every report\'s full metrics table')
+    args = ap.parse_args(argv)
+    out_path = args.out or os.path.join(args.repo, 'data', 'reports.json')
+
+    cards = rl.parse_index_cards(args.repo)
+    files = sorted(glob.glob(os.path.join(args.repo, rl.STOCK_REPORTS)))
+    reports = [extract(f, cards, args.full_metrics) for f in files]
+    reports.sort(key=lambda r: r.get('ticker') or r['slug'])
+    sectors = by_sector(reports)
+
+    n = write_json(out_path, manifest_doc(reports, cards, sectors))
+    print(f'wrote {out_path}  ({len(reports)} reports indexed, {n:,} bytes)', file=sys.stderr)
+    write_shards(os.path.join(os.path.dirname(out_path), 'reports'), sectors, args.repo)
     print_coverage(reports, args.full_metrics)
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
