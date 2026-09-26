@@ -4,7 +4,9 @@ Every builder and checker in a recurring report run (new builds, earnings refres
 
 Counts are "times a checker had to correct it", tallied from checker returns. When a category gets a new hit, bump its count and add the example; when a new kind of error appears twice, give it its own entry and a prevention rule, and copy the rule into the relevant brief.
 
-Last tally: **22 Sep 2026** — 64 new S&P builds (batches p–t), 17 earnings refreshes, library chart audit.
+Last tally: **25 Sep 2026** — AZO earnings refresh (T1): 10 tags from the builder's self-check, 13 from the independent checker. Before that, 22 Sep 2026: 64 new S&P builds (batches p–t), 17 earnings refreshes, library chart audit.
+
+25 Sep 2026 tally (AZO): **E ×5** (carried over from the previous edition: CFO bio "from Nielsen… a CPA" — joined from Hertz, no CPA; "has never split its stock" — 2:1 in 1992 and 1994; FY2025 called a 53-week year — the release says 52; "Nasdaq-100 holds no meaningful auto-aftermarket exposure" — ORLY is a member) · **F ×6** (RSI "20s–30s" when it ran 33–42; "23% drop" beside its own −20.9%; a "$2,950–$3,200 band" contradicted by May 2024 $2,769.94; −14.3% → −14.4%; "more than almost anything else on the NYSE"; "130,000+" employees) · **B ×3** (stockanalysis forecast panel and average target include Sep 24 actions; companiesmarketcap rank at Sep 25 prices) · **D ×3** (a WebFetch summary gave one executive's line to another, twice; a full stop moved inside a quote) · **G ×2** (a quarter's 34% read as full-year; an inferred "GAAP basis") · **C ×1** (May 27 analyst names not on the fetched page) · **H ×1** (buybacks presented as the cause of 97.98% institutional ownership) · **I ×1** (stockanalysis cash-flow statistics still on the prior quarter) · **L ×1** (a process caveat on the page) · **J ×1** (delta box `--print` when the edition also corrects errors: use `--fix`). New rule copied into REFRESH.md: facts carried over from the previous edition are re-verified, not inherited (E hit 5 times in one refresh).
 
 ---
 
