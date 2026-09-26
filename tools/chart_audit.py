@@ -85,41 +85,61 @@ Monthly = dict[tuple[int, int], tuple[float, float | None]]   # (year, month) ->
 Splits = list[tuple[str, float]]                              # (ISO date, ratio), oldest first
 
 
+def monthly_closes(res: dict) -> Monthly:
+    """{(year, month): (close, adjclose)} from one Yahoo chart result; months without a close are left out."""
+    closes = res['indicators']['quote'][0].get('close') or []
+    adj = ((res['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(closes)
+    offset = res['meta'].get('gmtoffset') or 0
+    monthly = {}
+    for ts, c, a in zip(res.get('timestamp') or [], closes, adj):
+        if c is not None:
+            d = datetime.datetime.fromtimestamp(ts + offset, datetime.UTC)
+            monthly[(d.year, d.month)] = (c, a)
+    return monthly
+
+
+def split_events(res: dict) -> Splits:
+    """[(ISO date, ratio), ...] of the splits in one Yahoo chart result, oldest first."""
+    events = (res.get('events') or {}).get('splits', {})
+    return sorted((datetime.datetime.fromtimestamp(int(k), datetime.UTC).date().isoformat(), v['numerator'] / v['denominator'])
+                  for k, v in events.items())
+
+
 def read_series(path: str) -> tuple[Monthly, Splits]:
-    """Cached Yahoo JSON -> ({(year, month): (close, adjclose)}, [(split date, ratio), ...]). A file that is not
-    a Yahoo chart response (truncated, an error page, a changed schema) raises YahooError, like a failed fetch."""
+    """Cached Yahoo JSON -> (monthly closes, splits). A file that is not a Yahoo chart response (truncated, an
+    error page, a changed schema) raises YahooError, like a failed fetch."""
     try:
         with open(path, encoding='utf-8') as fh:
-            res = (json.load(fh).get('chart') or {}).get('result')
-        if not res:
+            results = (json.load(fh).get('chart') or {}).get('result')
+        if not results:
             raise YahooError('no result')
-        res = res[0]
-        closes = res['indicators']['quote'][0].get('close') or []
-        adj = ((res['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(closes)
-        offset = res['meta'].get('gmtoffset') or 0
-        monthly = {}
-        for ts, c, a in zip(res.get('timestamp') or [], closes, adj):
-            if c is not None:
-                d = datetime.datetime.fromtimestamp(ts + offset, datetime.UTC)
-                monthly[(d.year, d.month)] = (c, a)
-        splits = sorted((datetime.datetime.fromtimestamp(int(k), datetime.UTC).date().isoformat(), v['numerator'] / v['denominator'])
-                        for k, v in (res.get('events') or {}).get('splits', {}).items())
+        return monthly_closes(results[0]), split_events(results[0])
     except (ValueError, KeyError, IndexError, TypeError, AttributeError, ZeroDivisionError) as e:   # JSONDecodeError is a ValueError
         raise YahooError(f'unreadable series ({type(e).__name__})') from e
-    return monthly, splits
+
+
+def cached_series(path: str, as_of: str | None) -> tuple[Monthly, Splits] | None:
+    """The cached series when it reads and reaches the report's as-of month; None (saying why when the file
+    is unreadable) when it has to be fetched again."""
+    if not os.path.exists(path):
+        return None
+    try:
+        monthly, splits = read_series(path)
+    except YahooError as e:
+        print(f'  {os.path.basename(path)}: cached series {e}; fetching it again', file=sys.stderr)
+        return None
+    if monthly and max(monthly) >= (year_month(as_of) or min(monthly)):
+        return monthly, splits
+    return None
 
 
 def yahoo(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, Splits]:
-    """The monthly series for a report: from the cache when the cached file reads and reaches the report's as-of
-    month, else fetched again (a refreshed report's newest points are never skipped silently)."""
+    """The monthly series for a report: from the cache when it is readable and current, else fetched again (a
+    refreshed report's newest points are never skipped silently)."""
     path = os.path.join(CACHE, slug + '.ev.json')
-    if os.path.exists(path):
-        try:
-            monthly, splits = read_series(path)
-            if monthly and max(monthly) >= (year_month(as_of) or min(monthly)):
-                return monthly, splits
-        except YahooError:
-            pass                                  # a corrupt cache file is replaced below
+    cached = cached_series(path, as_of)
+    if cached:
+        return cached
     fetch(slug, ticker, path)
     return read_series(path)
 

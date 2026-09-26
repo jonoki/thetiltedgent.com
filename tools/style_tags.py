@@ -168,25 +168,42 @@ def as_of_note(d: TagInputs) -> str:
 
 
 def tags_for(d: TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
-    """[tag, tooltip] pairs for one report. Formulas and rationale: claude/TAG_FORMULAS.md."""
-    tags, when = [], as_of_note(d)
+    """[tag, tooltip] pairs for one report, in display order. Formulas and rationale: claude/TAG_FORMULAS.md."""
+    when = as_of_note(d)
+    return (earnings_tags(d, th, u, when) + rank_tags(d, th, u, when) + beta_tags(d, th, when)
+            + size_and_price_tags(d, th, when) + quality_tags(d, th, u, when))
+
+
+def earnings_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+    """Not yet profitable (a loss over 12 months), else Value (the cheapest 20% by trailing P/E)."""
+    tags = []
     profitable = d['eps'] is None or d['eps'] > 0
     if not profitable:
         tags.append(['Not yet profitable', f"Lost money over the last 12 months: earnings per share were {d['raw']['eps_ttm']}." + when])
     if profitable and d['pe'] and 0 < d['pe'] <= th['value_pe_max']:
         tags.append(['Value', f"Priced at {d['pe']:.1f} times last year's earnings, cheaper than {100 - pct_rank(d['pe'], u['pe'])}% of S&P 500 companies. The median S&P 500 stock trades at {th['pe_median']:.1f} times. Value means the cheapest 20%." + when])
+    return tags
+
+
+def rank_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], when: str) -> list[list[str]]:
+    """Growth, Income and Cash machine: the top 20% of S&P 500 members by revenue growth, yield and FCF yield."""
+    tags = []
     if d['revg'] is not None and d['revg'] >= th['growth_revg_min']:
         tags.append(['Growth', f"Revenue grew {d['revg']:.1f}% over the last year, faster than {pct_rank(d['revg'], u['revg'])}% of S&P 500 companies. The median grew {th['revg_median']:.1f}%. Growth means the fastest-growing 20%." + when])
     if d['yield'] and d['yield'] >= th['income_yield_min']:
         tags.append(['Income', f"Pays a {d['yield']:.2f}% dividend yield, about ${d['yield']:.2f} a year per $100 invested. That beats {pct_rank(d['yield'], u['yield'])}% of S&P 500 dividend payers; the median pays {th['yield_median']:.2f}%. Income means the top 20% of payers." + when])
     if d['fcf_yield'] is not None and d['fcf_yield'] >= th['cash_fcfy_min']:
         tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], u['fcf_yield'])}% of S&P 500 companies (median {th['fcfy_median']:.1f}%)." + when])
-    tags += beta_tags(d, th, when)
+    return tags
+
+
+def size_and_price_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
+    """Giant (market cap over the cut-off) and Beaten down (price at or under the ratio of its 52-week high)."""
+    tags = []
     if d['mcap'] and d['mcap'] >= th['giant_mcap_min']:
         tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies." + when])
     if d['price'] and d['w52_high'] and d['price'] <= th['beaten_down_ratio'] * d['w52_high']:
         tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}." + when])
-    tags += quality_tags(d, th, u, when)
     return tags
 
 

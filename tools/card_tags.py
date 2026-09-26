@@ -5,7 +5,7 @@ usage: py -3 tools/card_tags.py      (run tools/style_tags.py first)
 Per report slug:
   st   style tags [label, tooltip] from data/style_tags.json (formulas: claude/TAG_FORMULAS.md)
   dv   dividend yield % (0 = pays none; missing = unknown), from the manifest
-  hq   [short label, full head-office text] from the report's "HQ:" line
+  hq   [short label, full head-office text] from the report's "HQ:" line (tools/headoffice.py)
   ed   [latest edition date, previous edition date, previous price] when the report has been refreshed
   ln   one-line hook (claude/card_lines.json; empty until written)
   sp   [year, sentence] overriding the S&P 500 badge's year and tooltip (SP_NOTE below)
@@ -13,44 +13,19 @@ Per report slug:
   lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
 """
-import html
 import json
 import os
-import re
 import sys
 from collections import Counter
 from typing import TypedDict
 
 import reportlib as rl
+from headoffice import hq_of
 from style_tags import TagInputs
 
-# Full names only, so a street or city word ("West Wen Yi Road", "New Delhi", "Prince Edward Island") never
-# reads as a state; multi-word names are matched whole, longest first.
-US_STATES = [
-    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida',
-    'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine',
-    'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska',
-    'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
-    'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas',
-    'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
-]
-STATE_RE = re.compile(r'\b(' + '|'.join(re.escape(s) for s in sorted(US_STATES, key=len, reverse=True))
-                      + r'|D\.?C\.?|USA|U\.S\.A?\.?|United States)\b')
-US_ABBR = re.compile(r',\s*(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b')
-COUNTRY = {'united kingdom': 'UK', 'england': 'UK', 'uk': 'UK', 'the netherlands': 'Netherlands',
-           'republic of ireland': 'Ireland', 'people\'s republic of china': 'China', 'south korea': 'South Korea',
-           'korea': 'South Korea', 'taiwan (roc)': 'Taiwan',
-           # Canadian provinces and a city that appear as the last part of a head-office line
-           'ontario': 'Canada', 'alberta': 'Canada', 'quebec': 'Canada', 'québec': 'Canada',
-           'british columbia': 'Canada', 'nova scotia': 'Canada', 'n.s.': 'Canada', 'toronto': 'Canada',
-           'manitoba': 'Canada', 'saskatchewan': 'Canada', 'new brunswick': 'Canada',
-           'prince edward island': 'Canada', 'newfoundland and labrador': 'Canada'}
 # S&P 500 badge overrides where the join year shown differs from the card's data-sp date (Oki's decisions)
 SP_NOTE: dict[str, list[int | str]] = {
     'lmt': [1984, 'Lockheed Corporation joined in 1984 and merged with Martin Marietta to form Lockheed Martin in 1995.'],
-}
-HQ_FALLBACK = {  # reports with no "HQ:" line (from Wikipedia's constituent list or the report text)
-    'hd': 'Atlanta, Georgia', 'unh': 'Minnetonka, Minnesota',
 }
 
 
@@ -62,31 +37,10 @@ class CardTags(TypedDict, total=False):
     ed: list[str | float]
     ln: str
     sp: list[int | str]
-    hw: list
-    th: list
-    pp: list
+    hw: list[list[str]]
+    th: list[list[str]]
+    pp: list[list[str]]
     lg: str
-
-
-def hq_of(slug: str, text: str) -> list[str] | None:
-    """[short label, full head-office text] from the page's "HQ:" line, or None when it cannot be reduced to one."""
-    m = re.search(r'HQ:?\s*</span>\s*([^<]{3,160})|HQ:\s*([^<]{3,160})', text)
-    full = html.unescape((m.group(1) or m.group(2)).strip()) if m else HQ_FALLBACK.get(slug)
-    if not full:
-        return None
-    full = re.sub(r'\s+', ' ', full).strip(' ·;')
-    # classify on the stated head office only, not on notes in brackets ("(executive offices in Columbus, Ohio)")
-    main = re.split(r'\s*[·;]', re.sub(r'\([^)]*\)', '', full))[0].strip(' ,')
-    if ',' not in main:             # "Mayfield Village (300 N. Commons Blvd., Mayfield, OH 44143)": the place is in the brackets
-        main = full
-    if STATE_RE.search(main) or US_ABBR.search(main) or re.search(r'\b[A-Z]{2} \d{5}\b', main):
-        return ['US-based', full]
-    parts = [p.strip() for p in main.split(',') if p.strip()]
-    country = parts[-1] if parts else main
-    country = COUNTRY.get(country.lower(), country)
-    if len(country) > 18:           # free text we can't reduce to a country: show no tag rather than a wrong one
-        return None
-    return [f'{country}-based', full]
 
 
 def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
@@ -98,7 +52,7 @@ def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
         return json.load(fh)
 
 
-def hand_tags(h: dict[str, list]) -> 'CardTags':
+def hand_tags(h: dict[str, list]) -> CardTags:
     """The ♥ what-you-know-them-for, ♠ theme and ★ key-people tags the report has."""
     c: CardTags = {}
     if h.get('hw'):
