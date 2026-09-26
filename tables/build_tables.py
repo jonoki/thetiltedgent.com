@@ -1,25 +1,50 @@
 #!/usr/bin/env python3
-"""Split tables/casino-games.html into one page per game + an index, with the variance simulator.
-Run from the repo root: python3 tables/build_tables.py
-Source of truth for the prose is tables/_source/casino-games-source.html (the original single page)."""
-import re, os, html
+"""Build the Tables pages from their one source: tables/_source/casino-games-source.html.
+
+Run from the repo root:   py -3 tables/build_tables.py        (after py -3 tools/chrome.py when the nav changed)
+Writes tables/tables.css, one page per game (GAMES), the family pages (FAMILY_PAGES) and the index,
+tables/casino-games.html. The prose lives only in the source; never edit the built pages by hand.
+tools/chrome.py writes the nav and footer into the source, and every page copies them from there.
+"""
+import html
+import os
+from typing import NamedTuple
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, '_source', 'casino-games-source.html')
-src = open(SRC, encoding='utf-8').read()
 
-GAMES = [  # id, slug, title, short name, og description
-    ('blackjack', 'blackjack', 'Blackjack', 'Blackjack: the only game where the house shows you its hand — rules, house edge on every bet, 6:5 vs 3:2, card counting, and a variance simulator.'),
-    ('video-poker', 'video-poker', 'Video Poker', 'Video Poker: the slot machine that tells you the truth — paytables, returns, strategy, advantage play, and a variance simulator.'),
-    ('craps', 'craps', 'Craps', 'Craps: two great bets and forty terrible ones — house edge on every bet, best and worst bets, dice control, and a variance simulator.'),
-    ('baccarat', 'baccarat', 'Baccarat', 'Baccarat: coin-flipping in a tuxedo — Banker vs Player vs Tie, side bets, edge sorting, and a variance simulator.'),
-    ('ultimate-texas-holdem', 'ultimate-texas-holdem', "Ultimate Texas Hold'em", "Ultimate Texas Hold'em: poker's costume, the house's rules — raise strategy, Trips paytables, hole-carding, and a variance simulator."),
-    ('three-card-poker', 'three-card-poker', 'Three Card Poker', 'Three Card Poker: one decision, one trap — Q-6-4, Pair Plus paytables, and a variance simulator.'),
-    ('roulette', 'roulette', 'Roulette', 'Roulette: pick the wheel, not the bet — single, double and triple zero, la partage, wheel bias, and a variance simulator.'),
-    ('slots', 'slots', 'Slots', 'Slots: the only game where the price is a secret — reported holds by denomination, the design tricks, and why there is no simulator.'),
+
+class Game(NamedTuple):
+    """A game on the grade board: its <section id> in the source, page slug, title and meta description."""
+    id: str
+    slug: str
+    title: str
+    desc: str
+
+
+class FamilyPage(NamedTuple):
+    """A page in a game's family that is not on the grade board, with its simulator game and page neighbours."""
+    id: str
+    slug: str
+    title: str
+    desc: str
+    sim_game: str
+    prev: str
+    next: str
+
+
+GAMES = [
+    Game('blackjack', 'blackjack', 'Blackjack', 'Blackjack: the only game where the house shows you its hand — rules, house edge on every bet, 6:5 vs 3:2, card counting, and a variance simulator.'),
+    Game('video-poker', 'video-poker', 'Video Poker', 'Video Poker: the slot machine that tells you the truth — paytables, returns, strategy, advantage play, and a variance simulator.'),
+    Game('craps', 'craps', 'Craps', 'Craps: two great bets and forty terrible ones — house edge on every bet, best and worst bets, dice control, and a variance simulator.'),
+    Game('baccarat', 'baccarat', 'Baccarat', 'Baccarat: coin-flipping in a tuxedo — Banker vs Player vs Tie, side bets, edge sorting, and a variance simulator.'),
+    Game('ultimate-texas-holdem', 'ultimate-texas-holdem', "Ultimate Texas Hold'em", "Ultimate Texas Hold'em: poker's costume, the house's rules — raise strategy, Trips paytables, hole-carding, and a variance simulator."),
+    Game('three-card-poker', 'three-card-poker', 'Three Card Poker', 'Three Card Poker: one decision, one trap — Q-6-4, Pair Plus paytables, and a variance simulator.'),
+    Game('roulette', 'roulette', 'Roulette', 'Roulette: pick the wheel, not the bet — single, double and triple zero, la partage, wheel bias, and a variance simulator.'),
+    Game('slots', 'slots', 'Slots', 'Slots: the only game where the price is a secret — reported holds by denomination, the design tricks, and why there is no simulator.'),
 ]
-EXTRA = [  # pages in a family, not on the grade board: (id, slug, title, desc, sim game, prev slug, next slug)
-    ('blackjack-variants', 'blackjack-variants', 'Blackjack Variants', 'Free Bet Blackjack, Blackjack Switch, Spanish 21, Double Exposure and Super Fun 21: what each gives, what each takes back, the house edge with the right chart, and a variance simulator.', 'blackjack-variants', 'blackjack', 'video-poker'),
+FAMILY_PAGES = [
+    FamilyPage('blackjack-variants', 'blackjack-variants', 'Blackjack Variants', 'Free Bet Blackjack, Blackjack Switch, Spanish 21, Double Exposure and Super Fun 21: what each gives, what each takes back, the house edge with the right chart, and a variance simulator.', 'blackjack-variants', 'blackjack', 'video-poker'),
 ]
 FAMILY = {'blackjack': [('blackjack.html', 'Blackjack'), ('blackjack-variants.html', 'Variants'), ('blackjack-trainer.html', 'Trainer')]}
 GRADES = {'blackjack': ('a', 'A'), 'video-poker': ('a', 'A&minus;'), 'craps': ('b', 'B+'), 'baccarat': ('b', 'B'),
@@ -34,28 +59,20 @@ ONELINE = {
     'roulette': 'Elegant, slow, and every bet on the felt costs the same — pick the wheel, not the bet.',
     'slots': "The only game where the price is a secret. That's the tell.",
 }
+SIM_INTRO = {
+    'blackjack': "Play a thousand sessions of basic strategy and watch how long the half-percent edge stays invisible — then switch the table to 6:5 and watch it stop hiding.",
+    'video-poker': "The same 500 hands on a 9/6 machine and an 8/5 machine, side by side, is the most persuasive argument on this page. Try both.",
+    'craps': "Pass line with full odds, then any seven, at the same unit and the same number of bets. That's the whole craps lesson in two runs.",
+    'baccarat': "Banker at 1.06% looks like nothing per hand. Run 700 hands — a long evening at the big table — and see what nothing adds up to.",
+    'ultimate-texas-holdem': "The variance here is the story: 4x raises make the swings enormous even though the edge on the money is only half a percent.",
+    'three-card-poker': "Ante & Play versus Pair Plus on the 6-3-1 table, same unit, same hands. One of these is a game and one is a donation.",
+    'roulette': "Same bet, three wheels. Run even money on single zero, double zero and triple zero and watch the median line steepen.",
+}
+SIM_SESSIONS = {'baccarat': 700}   # default bets per simulated session is 500
+AP_MARKER = '    <div class="ap">'    # the advantage-play box; the simulator goes just above it
+NAVSCRIPT = '<script src="/assets/site.js" defer></script>'   # shared menu script; tools/chrome.py writes the nav
 
-def between(s, a, b, start=0):
-    i = s.index(a, start); j = s.index(b, i) + len(b)
-    return s[i:j], i, j
-
-# ---------- pieces of the source ----------
-css, _, _ = between(src, '<style>', '</style>')
-css = css[len('<style>'):-len('</style>')]
-nav, _, _ = between(src, '<!-- ================= NAV ================= -->', '</nav>')
-footer, _, _ = between(src, '<!-- ================= FOOTER ================= -->', '</footer>')
-navscript = '<script src="/assets/site.js" defer></script>'  # shared menu script; tools/chrome.py writes the nav
-hero, _, _ = between(src, '<!-- ================= HERO ================= -->', '</div>\n</div>\n')
-board, _, _ = between(src, '<!-- ================= GRADE BOARD ================= -->', '</section>')
-method, _, _ = between(src, '<!-- ================= METHOD ================= -->', '</section>')
-outro, _, _ = between(src, '<!-- ================= OUTRO ================= -->', '</section>')
-sections = {}
-for gid, *_ in GAMES + [(e[0],) for e in EXTRA]:
-    sec, _, _ = between(src, '<section class="game" id="%s">' % gid, '</section>')
-    sections[gid] = sec
-
-# ---------- extra CSS for the split pages ----------
-extra_css = r'''
+EXTRA_CSS = r'''
   /* ===== SPLIT PAGES: game cards on the index, page nav, simulator ===== */
   .gamegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px;}
   @media(max-width:980px){.gamegrid{grid-template-columns:repeat(2,1fr);}}
@@ -129,11 +146,18 @@ extra_css = r'''
   .slotnote{border:1px solid rgba(224,56,79,.45);background:rgba(224,56,79,.06);border-radius:12px;padding:20px 22px;margin-top:14px;color:var(--dim);font-size:15px;line-height:1.7;}
   .slotnote b{color:var(--cream);font-weight:500;}
 '''
-open(os.path.join(ROOT, 'tables.css'), 'w', encoding='utf-8', newline='\n').write(css.strip('\n') + '\n' + extra_css)
 
-# ---------- shared head ----------
+
+def between(s, a, b, start=0):
+    """(s from the first a to the end of the following b, its start, its end); ValueError when absent."""
+    i = s.index(a, start)
+    j = s.index(b, i) + len(b)
+    return s[i:j], i, j
+
+
 def head(title, desc, url, extra=''):
-    t = html.escape(title, quote=False); d = html.escape(desc, quote=True)
+    t = html.escape(title, quote=False)
+    d = html.escape(desc, quote=True)
     return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -168,109 +192,143 @@ def head(title, desc, url, extra=''):
 
 '''
 
-SIM_INTRO = {
-    'blackjack': "Play a thousand sessions of basic strategy and watch how long the half-percent edge stays invisible — then switch the table to 6:5 and watch it stop hiding.",
-    'video-poker': "The same 500 hands on a 9/6 machine and an 8/5 machine, side by side, is the most persuasive argument on this page. Try both.",
-    'craps': "Pass line with full odds, then any seven, at the same unit and the same number of bets. That's the whole craps lesson in two runs.",
-    'baccarat': "Banker at 1.06% looks like nothing per hand. Run 700 hands — a long evening at the big table — and see what nothing adds up to.",
-    'ultimate-texas-holdem': "The variance here is the story: 4x raises make the swings enormous even though the edge on the money is only half a percent.",
-    'three-card-poker': "Ante & Play versus Pair Plus on the 6-3-1 table, same unit, same hands. One of these is a game and one is a donation.",
-    'roulette': "Same bet, three wheels. Run even money on single zero, double zero and triple zero and watch the median line steepen.",
-}
 
-def sim_block(gid):
-    if gid == 'slots':
-        return '''
+# ---------- the simulator section and its scripts ----------
+
+SLOTS_NOTE = '''
     <div class="simsec" id="sim">
       <div class="kicker">Feel the edge</div>
       <h3 class="simhead">No simulator for slots &mdash; <em>and that's the point</em>.</h3>
       <div class="slotnote"><b>Slot outcome distributions are not published.</b> Every other game on this site has a simulator because its odds are knowable: the deck, the dice and the wheel are public, and the paytable is printed on the felt or the glass. A slot machine's return and hit frequency are set by the casino from a menu the manufacturer provides, are not displayed anywhere, and vary wildly from one machine to the next &mdash; two identical cabinets can be set years apart in expected cost. Any simulation would be a guess dressed up as a chart, which is exactly the trick the machine itself is playing. <b>What we do know is enough:</b> reported holds run from roughly 2&ndash;4% in high-limit rooms to 10&ndash;15% on penny games and bar tops, at 500&ndash;900 spins an hour. At those numbers a slot is the worst bet in the building by a wide margin, and no amount of simulating changes that. If you want to see what a fast, high-edge game does to a bankroll, run the <a href="craps.html#bet=any-seven&amp;unit=2&amp;n=1200" style="color:var(--cyan-neon)">any-seven bet on the craps page</a> at $2 for 1,200 bets &mdash; that's a penny slot on a good day.</div>
     </div>'''
+
+
+def sim_section(em, sub, nojs):
     return f'''
     <div class="simsec" id="sim">
       <div class="kicker">Feel the edge</div>
-      <h3 class="simhead">Run a session <em>before you sit down</em>.</h3>
-      <p class="simsub">Pick a bet, a unit and a number of bets. The simulator plays <b>1,000 sessions from the bet's actual outcome table</b> &mdash; not a normal approximation &mdash; and shows the spread, the drawdowns, and how long it takes before the house edge stops hiding behind luck. {SIM_INTRO[gid]}</p>
-      <div id="simmount"><div class="simnojs">The simulator needs JavaScript. The house edge on every bet is in the table above; the simulator only shows what it feels like.</div></div>
+      <h3 class="simhead">Run a session <em>{em}</em>.</h3>
+      <p class="simsub">{sub}</p>
+      <div id="simmount"><div class="simnojs">{nojs}</div></div>
     </div>'''
 
-def page_nav(idx):
-    prev = GAMES[idx - 1] if idx > 0 else None
-    nxt = GAMES[idx + 1] if idx < len(GAMES) - 1 else None
-    a = ''
-    if prev: a += f'<a class="prev" href="{prev[1]}.html"><div class="k">&larr; Previous</div><div class="t">{prev[2]}</div></a>'
-    else: a += '<span></span>'
-    if nxt: a += f'<a class="next" href="{nxt[1]}.html"><div class="k">Next &rarr;</div><div class="t">{nxt[2]}</div></a>'
-    return f'<div class="wrap pagenav">{a}</div><div class="wrap allgames"><a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>'
+
+def game_sim(gid):
+    if gid == 'slots':
+        return SLOTS_NOTE
+    return sim_section('before you sit down',
+                       "Pick a bet, a unit and a number of bets. The simulator plays <b>1,000 sessions from the bet's actual outcome table</b> &mdash; not a normal approximation &mdash; and shows the spread, the drawdowns, and how long it takes before the house edge stops hiding behind luck. " + SIM_INTRO[gid],
+                       'The simulator needs JavaScript. The house edge on every bet is in the table above; the simulator only shows what it feels like.')
+
+
+def variant_sim():
+    return sim_section('at each variant',
+                       "Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart.",
+                       'The simulator needs JavaScript. The house edge on every variant is in the table above.')
+
+
+def sim_scripts(game):
+    return f'''
+<script src="sim/games.js"></script>
+<script src="sim/ttg-sim.js"></script>
+<script>TTGSim.mount('#simmount', {{game: '{game}', n: {SIM_SESSIONS.get(game, 500)}}});</script>'''
+
+
+# ---------- page parts ----------
+
+def page_links(prev, nxt):
+    """Previous / next page cards, then the link back to the board. prev and nxt are Games or None."""
+    a = (f'<a class="prev" href="{prev.slug}.html"><div class="k">&larr; Previous</div><div class="t">{prev.title}</div></a>'
+         if prev else '<span></span>')
+    if nxt:
+        a += f'<a class="next" href="{nxt.slug}.html"><div class="k">Next &rarr;</div><div class="t">{nxt.title}</div></a>'
+    return (f'<div class="wrap pagenav">{a}</div><div class="wrap allgames">'
+            '<a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>')
+
 
 def family_tabs(slug):
-    for fam, tabs in FAMILY.items():
-        if any(t[0] == slug + '.html' for t in tabs):
-            links = ''
-            for h, t in tabs:
-                cls = ' class="on"' if h == slug + '.html' else ''
-                links += '<a href="%s"%s>%s</a>' % (h, cls, t)
+    for tabs in FAMILY.values():
+        if any(h == slug + '.html' for h, _ in tabs):
+            links = ''.join('<a href="%s"%s>%s</a>' % (h, ' class="on"' if h == slug + '.html' else '', t) for h, t in tabs)
             return '<div class="wrap famtabs">' + links + '</div>'
     return ''
 
-def nav_for(current):
-    n = nav.replace('<a href="casino-games.html">The Tables</a>', '<a href="casino-games.html" aria-current="page">The Tables</a>')
-    return n
 
-# ---------- game pages ----------
-for i, (gid, slug, title, desc) in enumerate(GAMES):
-    sec = sections[gid]
-    sec = sec.replace('<section class="game" id="%s">' % gid, '<section class="game first" id="%s">' % gid, 1)
-    # insert the simulator between the body grid and the advantage-play box
-    marker = '    <div class="ap">'
-    assert sec.count(marker) == 1, gid
-    sec = sec.replace(marker, sim_block(gid) + '\n' + marker, 1)
-    if gid == 'blackjack':
-        sec = sec.replace('    <div class="ap">', '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>
-    <div class="ap">''', 1)
-    scripts = '' if gid == 'slots' else f'''
-<script src="sim/games.js"></script>
-<script src="sim/ttg-sim.js"></script>
-<script>TTGSim.mount('#simmount', {{game: '{gid}', n: {'700' if gid == 'baccarat' else '500'}}});</script>'''
-    crumbs = f'<div class="wrap crumbs"><a href="../">Home</a><span>/</span><a href="casino-games.html">The Tables</a><span>/</span>{html.escape(title, quote=False)}</div>'
-    body = nav_for(gid) + '\n\n' + crumbs + (('\n' + family_tabs(slug)) if family_tabs(slug) else '') + '\n\n' + sec + '\n\n' + page_nav(i) + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
-    out = head(title + ', graded', desc, slug + '.html') + body
-    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8', newline='\n').write(out)
+def crumbs(*trail):
+    """Home / The Tables / … / the current page (its title, escaped); trail items before it are (href, text)."""
+    *links, here = trail
+    parts = ['<a href="../">Home</a>', '<a href="casino-games.html">The Tables</a>']
+    parts += [f'<a href="{h}">{t}</a>' for h, t in links] + [html.escape(here, quote=False)]
+    return '<div class="wrap crumbs">' + '<span>/</span>'.join(parts) + '</div>'
 
-# ---------- extra (family) pages ----------
-for gid, slug, title, desc, simgame, prev, nxt in EXTRA:
-    sec = sections[gid].replace('<section class="game" id="%s">' % gid, '<section class="game first" id="%s">' % gid, 1)
-    marker = '    <div class="ap">'; assert sec.count(marker) == 1, gid
-    simblk = f'''
-    <div class="simsec" id="sim">
-      <div class="kicker">Feel the edge</div>
-      <h3 class="simhead">Run a session <em>at each variant</em>.</h3>
-      <p class="simsub">Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart.</p>
-      <div id="simmount"><div class="simnojs">The simulator needs JavaScript. The house edge on every variant is in the table above.</div></div>
-    </div>'''
-    sec = sec.replace(marker, simblk + '\n' + marker, 1)
-    prevT = next(g[2] for g in GAMES if g[1] == prev); nxtT = next(g[2] for g in GAMES if g[1] == nxt)
-    pnav = f'<div class="wrap pagenav"><a class="prev" href="{prev}.html"><div class="k">&larr; Previous</div><div class="t">{prevT}</div></a><a class="next" href="{nxt}.html"><div class="k">Next &rarr;</div><div class="t">{nxtT}</div></a></div><div class="wrap allgames"><a class="btn ghost" href="casino-games.html#board">&larr; All eight games, graded</a></div>'
-    crumbs = f'<div class="wrap crumbs"><a href="../">Home</a><span>/</span><a href="casino-games.html">The Tables</a><span>/</span><a href="{prev}.html">{prevT}</a><span>/</span>{html.escape(title, quote=False)}</div>'
-    scripts = f'''
-<script src="sim/games.js"></script>
-<script src="sim/ttg-sim.js"></script>
-<script>TTGSim.mount('#simmount', {{game: '{simgame}', n: 500}});</script>'''
-    body = nav_for(gid) + '\n\n' + crumbs + '\n' + family_tabs(slug) + '\n\n' + sec + '\n\n' + pnav + '\n\n' + footer + '\n\n' + navscript + scripts + '\n</body>\n</html>\n'
-    open(os.path.join(ROOT, slug + '.html'), 'w', encoding='utf-8', newline='\n').write(head(title + ', graded', desc, slug + '.html') + body)
 
-# ---------- index ----------
-board_i = board
-for gid, slug, title, desc in GAMES:
-    board_i = board_i.replace(f'href="#{gid}"', f'href="{slug}.html"')
-hero_i = hero.replace('<span class="stat"><b>60+</b> BETS PRICED</span>', '<span class="stat"><b>60+</b> BETS PRICED</span>\n        <span class="stat"><b>7</b> VARIANCE SIMULATORS</span>')
-hero_i = hero_i.replace("and where a disciplined player can flip the edge — legally. Then a grade, so you know what a night at each table is worth.",
+def with_sim(section, gid, sim):
+    """The game's source section, opened as the page's first section, with the simulator above the
+    advantage-play box."""
+    sec = section.replace('<section class="game" id="%s">' % gid, '<section class="game first" id="%s">' % gid, 1)
+    if sec.count(AP_MARKER) != 1:
+        raise ValueError(f'{gid}: expected exactly one advantage-play box in the source section')
+    return sec.replace(AP_MARKER, sim + '\n' + AP_MARKER, 1)
+
+
+class Site:
+    """The pieces of the source every page is assembled from."""
+
+    def __init__(self, src):
+        css, _, _ = between(src, '<style>', '</style>')
+        self.css = css[len('<style>'):-len('</style>')]
+        self.nav = between(src, '<!-- ================= NAV ================= -->', '</nav>')[0]
+        self.footer = between(src, '<!-- ================= FOOTER ================= -->', '</footer>')[0]
+        self.hero = between(src, '<!-- ================= HERO ================= -->', '</div>\n</div>\n')[0]
+        self.board = between(src, '<!-- ================= GRADE BOARD ================= -->', '</section>')[0]
+        self.method = between(src, '<!-- ================= METHOD ================= -->', '</section>')[0]
+        self.outro = between(src, '<!-- ================= OUTRO ================= -->', '</section>')[0]
+        self.sections = {g.id: between(src, '<section class="game" id="%s">' % g.id, '</section>')[0]
+                         for g in GAMES + FAMILY_PAGES}
+
+    def body(self, crumb, tabs, sec, links, scripts):
+        return (self.nav + '\n\n' + crumb + ('\n' + tabs if tabs else '') + '\n\n' + sec + '\n\n' + links + '\n\n'
+                + self.footer + '\n\n' + NAVSCRIPT + scripts + '\n</body>\n</html>\n')
+
+
+def write(name, text):
+    with open(os.path.join(ROOT, name), 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(text)
+
+
+def game_page(site, i, g):
+    sec = with_sim(site.sections[g.id], g.id, game_sim(g.id))
+    if g.id == 'blackjack':
+        sec = sec.replace(AP_MARKER, '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>
+''' + AP_MARKER, 1)
+    links = page_links(GAMES[i - 1] if i > 0 else None, GAMES[i + 1] if i < len(GAMES) - 1 else None)
+    scripts = '' if g.id == 'slots' else sim_scripts(g.id)
+    body = site.body(crumbs(g.title), family_tabs(g.slug), sec, links, scripts)
+    write(g.slug + '.html', head(g.title + ', graded', g.desc, g.slug + '.html') + body)
+
+
+def family_page(site, p):
+    by_slug = {g.slug: g for g in GAMES}
+    prev, nxt = by_slug[p.prev], by_slug[p.next]
+    sec = with_sim(site.sections[p.id], p.id, variant_sim())
+    body = site.body(crumbs((f'{prev.slug}.html', prev.title), p.title), family_tabs(p.slug), sec,
+                     page_links(prev, nxt), sim_scripts(p.sim_game))
+    write(p.slug + '.html', head(p.title + ', graded', p.desc, p.slug + '.html') + body)
+
+
+def index_page(site):
+    board = site.board
+    for g in GAMES:
+        board = board.replace(f'href="#{g.id}"', f'href="{g.slug}.html"')
+    hero = site.hero.replace('<span class="stat"><b>60+</b> BETS PRICED</span>', '<span class="stat"><b>60+</b> BETS PRICED</span>\n        <span class="stat"><b>7</b> VARIANCE SIMULATORS</span>')
+    hero = hero.replace("and where a disciplined player can flip the edge — legally. Then a grade, so you know what a night at each table is worth.",
                         "and where a disciplined player can flip the edge — legally. Each game has its own page with a <b>variance simulator</b> that plays a thousand sessions from the real odds, and a grade, so you know what a night at each table is worth.")
-cards = ''
-for gid, slug, title, desc in GAMES:
-    gc, gl = GRADES[gid]
-    cards += f'''      <a class="gcard" href="{slug}.html"><div class="top"><h3>{html.escape(title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[gid]}</p><span class="more">{'READ THE ANALYSIS' if gid == 'slots' else ('ANALYSIS · VARIANTS · TRAINER' if gid == 'blackjack' else 'ANALYSIS + SIMULATOR')} &rarr;</span></a>\n'''
-games_section = f'''<!-- ================= GAME PAGES ================= -->
+    cards = ''
+    for g in GAMES:
+        gc, gl = GRADES[g.id]
+        more = 'READ THE ANALYSIS' if g.id == 'slots' else ('ANALYSIS · VARIANTS · TRAINER' if g.id == 'blackjack' else 'ANALYSIS + SIMULATOR')
+        cards += f'''      <a class="gcard" href="{g.slug}.html"><div class="top"><h3>{html.escape(g.title, quote=False)}</h3><span class="grade {gc} sm">{gl}</span></div><p>{ONELINE[g.id]}</p><span class="more">{more} &rarr;</span></a>\n'''
+    games_section = f'''<!-- ================= GAME PAGES ================= -->
 <section id="games">
   <div class="wrap">
     <div class="kicker">The Games</div>
@@ -281,7 +339,24 @@ games_section = f'''<!-- ================= GAME PAGES ================= -->
   </div>
 </section>
 '''
-index_body = nav + '\n\n' + hero_i + '\n' + board_i + '\n\n' + games_section + '\n' + method + '\n\n' + outro + '\n\n' + footer + '\n\n' + navscript + '\n</body>\n</html>\n'
-index_head = head('Casino Games, Graded', 'Eight casino games, graded honestly: how each one plays, the house edge on every bet, the best and worst bets, the quirks, advantage play — and a variance simulator on every game page.', 'casino-games.html').replace('<title>Casino Games, Graded — The Tilted Gent</title>', '<title>Casino Games, Graded — The Tilted Gent</title>').replace('property="og:type" content="article"', 'property="og:type" content="website"')
-open(os.path.join(ROOT, 'casino-games.html'), 'w', encoding='utf-8', newline='\n').write(index_head + index_body)
-print('built', len(GAMES), 'game pages +', len(EXTRA), 'family pages + index + tables.css')
+    body = (site.nav + '\n\n' + hero + '\n' + board + '\n\n' + games_section + '\n' + site.method + '\n\n' + site.outro
+            + '\n\n' + site.footer + '\n\n' + NAVSCRIPT + '\n</body>\n</html>\n')
+    index_head = head('Casino Games, Graded', 'Eight casino games, graded honestly: how each one plays, the house edge on every bet, the best and worst bets, the quirks, advantage play — and a variance simulator on every game page.',
+                      'casino-games.html').replace('property="og:type" content="article"', 'property="og:type" content="website"')
+    write('casino-games.html', index_head + body)
+
+
+def main():
+    with open(SRC, encoding='utf-8') as fh:
+        site = Site(fh.read())
+    write('tables.css', site.css.strip('\n') + '\n' + EXTRA_CSS)
+    for i, g in enumerate(GAMES):
+        game_page(site, i, g)
+    for p in FAMILY_PAGES:
+        family_page(site, p)
+    index_page(site)
+    print('built', len(GAMES), 'game pages +', len(FAMILY_PAGES), 'family pages + index + tables.css')
+
+
+if __name__ == '__main__':
+    main()

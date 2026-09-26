@@ -9,11 +9,18 @@ Inputs per report:
   reports/index.html cards: S&P 500 membership (data-sp) and the industry label
 Every raw text value is kept next to the parsed number so any tag can be traced back to the page.
 """
-import glob, html, json, os, re, statistics, sys
+import datetime
+import html
+import json
+import os
+import re
+import statistics
+from collections import Counter
 
-R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(R, 'tools'))
-from manifest import parse_index_cards  # noqa: E402
+import reportlib as rl
+from reportlib import first_number as num
+
+R = rl.ROOT
 
 # Reports to leave out of tagging, slug -> reason. Empty: CBOE and MTD were excluded on 22 Sep 2026 over
 # swapped <title> tags (bodies were correct); titles fixed the same day.
@@ -29,22 +36,6 @@ GIANT_MCAP = 200e9          # convention, not an official line
 BEATEN_DOWN = 0.60          # price <= 60% of the 52-week high
 QUALITY_MAX_DE = 1.0
 PCT = 0.20                  # top / bottom 20% of S&P 500 members for every rank-based tag
-
-
-def num(s):
-    """First number in a text cell. None for n/m, n/a, blank. Parentheses or a leading minus -> negative."""
-    if s is None:
-        return None
-    if isinstance(s, (int, float)):
-        return float(s)
-    s = str(s).replace('−', '-').replace('–', '-')
-    if re.search(r'\bn/?m\b|\bn/?a\b|not meaningful', s, re.I):
-        return None
-    m = re.search(r'(\(?)(-?)\$?\s*(\d[\d,]*\.?\d*)', s)
-    if not m:
-        return None
-    v = float(m.group(3).replace(',', ''))
-    return -v if (m.group(1) or m.group(2)) else v
 
 
 def money(s):
@@ -63,7 +54,7 @@ TABLE_ROWS = {'pe_tbl': r'^(Trailing P/E|P/E\b)', 'revg': r'^Revenue Growth', 'r
 
 
 def table_rows(path):
-    t = open(path, encoding='utf-8').read()
+    t = rl.read_text(path)
     m = re.search(r'<table class="fin-table".*?</table>', t, re.S)
     out = {}
     if not m:
@@ -91,15 +82,8 @@ def pct_rank(v, vals):
 
 
 def load():
-    cards = parse_index_cards(R)
-    recs = {}
-    for f in sorted(glob.glob(os.path.join(R, 'data', 'reports', '*.json'))):
-        shard = os.path.basename(f)[:-5]
-        for r in json.load(open(f, encoding='utf-8'))['reports']:
-            # the manifest currently duplicates some records into 'unclassified'; keep the sector copy
-            if r['slug'] in recs and shard == 'unclassified':
-                continue
-            recs[r['slug']] = r
+    cards = rl.parse_index_cards(R)
+    recs = rl.load_report_records(R)
     rows = []
     for slug, r in sorted(recs.items()):
         path = os.path.join(R, 'reports', f'{slug}_analysis.html')
@@ -161,7 +145,6 @@ def main():
     N = {'pe': len(pe_sp), 'revg': len(g_sp), 'yield': len(y_sp), 'fcf_yield': len(f_sp), 'beta': len(b_sp), 'roic': len(q_sp)}
 
     def asof(d):
-        import datetime
         x = datetime.date.fromisoformat(d['as_of'])
         return f" Figures as of {x:%b} {x.day}, {x.year}."
 
@@ -196,7 +179,6 @@ def main():
            'thresholds': T, 'sample_sizes': N, 'excluded': EXCLUDE, 'reports': rows}
     json.dump(out, open(os.path.join(R, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n'), indent=1, ensure_ascii=False)
 
-    from collections import Counter
     c = Counter(t['tag'] for d in live for t in d['tags'])
     print(f"{len(rows)} reports ({len(live)} tagged, {len(rows) - len(live)} excluded); S&P members used for thresholds: {len(sp)}")
     for k, v in T.items():

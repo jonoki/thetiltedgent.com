@@ -1,0 +1,227 @@
+"""Shared knowledge of the report library: where the repo is, how a published report page is read, and
+how the manifest's data files are loaded. Imported by the scripts in tools/; not run on its own.
+
+Everything that reads a report page reads it through here, so a change to the report markup (a new
+title format, a renamed price class) is made once rather than in four scripts that drift apart.
+"""
+import glob
+import html as htmllib
+import json
+import os
+import re
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo root, from this file's place in tools/
+
+STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
+ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ('etf', 'crypto', 'fixed')]
+
+# The header price must equal the chart's last point, to the cent: the rule every build and refresh is held to.
+PRICE_EXACT = 0.006
+# A looser reconciliation for the manifest: chart series are often rounded (1 dp, or whole dollars on a
+# four-figure price), so a stored series is only flagged when it misses by more than 5 cents and 0.1%.
+PRICE_ROUNDED_ABS, PRICE_ROUNDED_REL = 0.05, 0.001
+
+_FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December']
+MONTHS = {m: i + 1 for i, m in enumerate(_FULL_MONTHS)}
+MONTHS.update({m[:3]: i + 1 for i, m in enumerate(_FULL_MONTHS)})   # 'Aug 12, 2026'
+MONTHS['Sept'] = 9
+
+_DASHES = str.maketrans({'\u2212': '-', '\u2013': '-', '\u2014': '-'})   # minus sign, en dash, em dash
+
+
+# ---------- text and numbers ----------
+
+def read_text(path):
+    with open(path, encoding='utf-8') as fh:
+        return fh.read()
+
+
+def strip_tags(s):
+    """Markup removed and entities decoded: the text a reader sees in a cell or span."""
+    return htmllib.unescape(re.sub(r'<[^>]+>', '', s)).strip()
+
+
+def to_number(s):
+    """A whole string read as one number: '1,234.5', '$12.30', '4.1%', '−3.2' -> float; anything else -> None."""
+    if s is None:
+        return None
+    s = s.replace(',', '').replace('$', '').replace('%', '').strip().translate(_DASHES)
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def first_number(s):
+    """The first number in a text cell: '12.4x (vs 18x)' -> 12.4. None for n/m, n/a or no number.
+    Brackets or a leading minus make it negative: '($1.2B)' -> -1.2. Numbers pass through as floats."""
+    if s is None:
+        return None
+    if isinstance(s, (int, float)):
+        return float(s)
+    s = str(s).replace('\u2212', '-').replace('\u2013', '-')
+    if re.search(r'\bn/?m\b|\bn/?a\b|not meaningful', s, re.I):
+        return None
+    m = re.search(r'(\(?)(-?)\$?\s*(\d[\d,]*\.?\d*)', s)
+    if not m:
+        return None
+    v = float(m.group(3).replace(',', ''))
+    return -v if (m.group(1) or m.group(2)) else v
+
+
+def iso_date(text):
+    """'September 10, 2026' -> '2026-09-10'; None when it is not a date in that form."""
+    if not text:
+        return None
+    m = re.match(r'([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})', text.strip())
+    if not m or m.group(1) not in MONTHS:
+        return None
+    return f'{int(m.group(3)):04d}-{MONTHS[m.group(1)]:02d}-{int(m.group(2)):02d}'
+
+
+# ---------- what a report page says ----------
+
+def parse_title(t):
+    """(ticker, name) from the <title>: 'AAPL — Apple Inc. | Stock Analysis' or 'Apple Inc. (AAPL) — …'.
+    Either part is None when the title is in neither form."""
+    m = re.search(r'<title>\s*([A-Z][A-Z0-9.\-]*)\s*[\u2014\u2013\-]\s*(.*?)\s*(?:\|[^<]*)?</title>', t, re.S)
+    if m:
+        return m.group(1), htmllib.unescape(m.group(2))
+    m = re.search(r'<title>\s*(.*?)\s*\(([A-Z][A-Z0-9.\-]*)\)\s*[\u2014\u2013\-]\s*.*?</title>', t, re.S)
+    if m:
+        return m.group(2), htmllib.unescape(m.group(1))
+    return None, None
+
+
+def header_price(t):
+    """The price in the report header ($ and commas removed), or None."""
+    m = (re.search(r'class="price-current"[^>]*>\s*\$?([\d,]+\.\d+)', t)
+         or re.search(r'class="price[ "][^>]*>\s*\$?([\d,]+\.\d+)', t)
+         or re.search(r'class="price-now[ "][^>]*>\s*\$?([\d,]+\.\d+)', t))
+    return to_number(m.group(1)) if m else None
+
+
+def _js_arrays(t, name):
+    """The body of every `const|let|var <name> = [...]` in the page's scripts."""
+    return [m.group(1) for m in re.finditer(r'(?:const|let|var)\s+' + name + r'\s*=\s*\[(.*?)\]\s*;', t, re.S)]
+
+
+def _labels(body):
+    """Quoted strings in an array body, unescaped; allows 'Sep \\'21', "Oct '21" and `Nov 21`."""
+    out = []
+    for dq, sq, bq in re.findall(r'"((?:\\.|[^"\\])*)"|\'((?:\\.|[^\'\\])*)\'|`([^`]*)`', body):
+        out.append((dq or sq or bq).replace("\\'", "'").replace('\\"', '"'))
+    return out
+
+
+def _numbers(body):
+    """Numbers in an array body, split on commas (a character class containing ',' would swallow a
+    whole array written without spaces as one token). Entries that are not numbers are dropped."""
+    vals = (to_number(part.strip()) for part in body.split(',') if part.strip())
+    return [v for v in vals if v is not None]
+
+
+def chart_series(t):
+    """(labels, prices) of the main price chart, or (None, None) when the page defines no arrays.
+    A page may define more than one series; the main one is the first labels/prices pair of equal length,
+    else the first of each."""
+    label_arrays = [_labels(b) for b in _js_arrays(t, 'labels')]
+    price_arrays = [_numbers(b) for b in _js_arrays(t, 'prices')]
+    if not label_arrays or not price_arrays:
+        return None, None
+    return next(((la, pa) for la in label_arrays for pa in price_arrays if len(la) == len(pa)),
+                (label_arrays[0], price_arrays[0]))
+
+
+_DASH = r'(?:&ndash;|&mdash;|&#8211;|&#x2013;|[\u2013\-\u2014])'
+
+
+def range_52w(t):
+    """[low, high] from the metrics-table 52-week row (else the first '52-week range $x – $y' in the page)."""
+    m = (re.search(r'52-Week Range[^<]*</t[dh]>\s*<td[^>]*>\s*\$?([\d,]+\.\d+)\s*' + _DASH + r'\s*\$?([\d,]+\.\d+)', t, re.S)
+         or re.search(r'52[- ]Week Range.{0,120}?\$([\d,]+\.\d+)\s*' + _DASH + r'\s*\$([\d,]+\.\d+)', t, re.S))
+    return [to_number(m.group(1)), to_number(m.group(2))] if m else None
+
+
+def structure_counts(t):
+    """How many of each skeleton element the page has; a sound page has exactly one of each tag pair."""
+    return {
+        'doctype': t.count('<!DOCTYPE'),
+        'html': len(re.findall(r'<html[\s>]', t)),
+        'head': len(re.findall(r'<head[\s>]', t)),
+        'head_close': t.count('</head>'),
+        'body': len(re.findall(r'<body[\s>]', t)),
+        'body_close': t.count('</body>'),
+        'html_close': t.count('</html>'),
+        'style_open': len(re.findall(r'<style[\s>]', t)),
+        'style_close': t.count('</style>'),
+        'canvas': t.count('<canvas'),
+        'lines': t.count('\n'),
+        'sitenav': t.count('tg-sitenav'),
+    }
+
+
+SKELETON = ('doctype', 'html', 'head', 'body', 'body_close', 'html_close')
+
+
+# ---------- the index page and the manifest's data files ----------
+
+def parse_index_cards(repo=ROOT):
+    """Per report slug on reports/index.html: ticker, name, industry, sector group and index membership."""
+    p = os.path.join(repo, 'reports', 'index.html')
+    if not os.path.exists(p):
+        return {}
+    t = read_text(p)
+    sector_of = {}
+    for g in re.finditer(r'<section class="sgroup" data-s="([a-z]+)">(.*?)</section>', t, re.S):
+        for sl in re.findall(r'href="view\.html\?r=([a-z0-9.\-]+)"', g.group(2)):
+            sector_of[sl] = g.group(1)
+    card_re = re.compile(
+        r'<a class="rep"(?P<attrs>[^>]*?)href="view\.html\?r=(?P<slug>[a-z0-9.\-]+)">'
+        r'<span class="tick">(?P<tick>[^<]+)</span>'
+        r'<h3>(?P<name>.*?)</h3>'
+        r'<span class="sect">(?P<ind>[^<]*)</span>'
+        r'<span class="ixrow">(?P<ix>.*?)</span></a>')
+    out = {}
+    for m in card_re.finditer(t):
+        a = m.group('attrs')
+        sp = re.search(r'data-sp="([\d-]+)"', a)
+        dow = re.search(r'data-dow="([\d-]+)"', a)
+        gl = re.search(r'data-gl="([A-Z ]+)"', a)   # global (non-US-index) names carry their home exchange
+        out[m.group('slug')] = {
+            'ticker': m.group('tick'),
+            'card_name': htmllib.unescape(m.group('name')),
+            'card_industry': htmllib.unescape(m.group('ind')),
+            'card_sector_key': sector_of.get(m.group('slug')),
+            'indices': {
+                'sp500_added': sp.group(1) if sp else None,
+                'nasdaq100': 'data-ndx' in a,
+                'dow30_added': dow.group(1) if dow else None,
+                'global_exchange': gl.group(1) if gl else None,
+            },
+        }
+    return out
+
+
+def load_manifest(repo=ROOT):
+    """data/reports.json, the manifest's top-level file."""
+    with open(os.path.join(repo, 'data', 'reports.json'), encoding='utf-8') as fh:
+        return json.load(fh)
+
+
+def load_report_records(repo=ROOT):
+    """Every manifest record, slug -> record, from the shards the manifest lists (not every file in the
+    folder, so a shard left over from an older build cannot add stale or duplicate records)."""
+    recs = {}
+    for rel in load_manifest(repo)['shards'].values():
+        with open(os.path.join(repo, rel), encoding='utf-8') as fh:
+            for r in json.load(fh)['reports']:
+                recs[r['slug']] = r
+    return recs
+
+
+def report_paths(repo=ROOT, assets=False):
+    """Sorted paths of the stock reports (and the ETF, crypto and bond reports when assets=True)."""
+    pats = [STOCK_REPORTS] + (ASSET_REPORTS if assets else [])
+    return sorted(p for pat in pats for p in glob.glob(os.path.join(repo, pat)))

@@ -8,9 +8,13 @@ and the builder copies the nav and footer from there.
 
 Each page keeps its own fine print: the <p> inside its old footer that starts with a <b>…fine print…</b>
 label is carried into the new footer unchanged."""
-import os, re, sys
+import os
+import re
+import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import reportlib as rl
+
+ROOT = rl.ROOT
 
 LINKS = [  # (key, label, href) — root-relative so the same markup works at any depth
     ('learn', 'Learn', '/#learn'),
@@ -29,6 +33,7 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('reports/view.html', 'reports', False),   # the report fills the screen; no footer
     ('tables/_source/casino-games-source.html', 'tables', True),
     ('tables/blackjack-trainer.html', 'tables', True),
+    ('tables/craps-table.html', 'tables', True),
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "
@@ -83,20 +88,23 @@ def old_fine(block):
     return SITE_FINE
 
 
-def process(path, active, has_footer):
+def write_chrome(path, active, has_footer):
+    """Put the current nav (and footer) into one page and make sure it loads site.css and site.js.
+    Returns True when the page changed; raises ValueError when there is no nav or footer to replace."""
     full = os.path.join(ROOT, path)
-    t = open(full, encoding='utf-8', newline='').read()
+    with open(full, encoding='utf-8', newline='') as fh:
+        t = fh.read()
     before = t
     m = re.search(r'<nav\b[^>]*>.*?</nav>', t, re.S)
     if not m:
-        sys.exit(f'{path}: no <nav> found')
+        raise ValueError(f'{path}: no <nav> found')
     t = t[:m.start()] + nav(active) + t[m.end():]
     if has_footer:
         m = re.search(r'<footer\b[^>]*>.*?</footer>', t, re.S)
         if not m:
-            sys.exit(f'{path}: no <footer> found')
+            raise ValueError(f'{path}: no <footer> found')
         t = t[:m.start()] + footer(old_fine(m.group(0))) + t[m.end():]
-    # the page's own menu script is replaced by the shared one
+    # the page's own inline menu script (the old copies open with this comment) is replaced by the shared one
     t = re.sub(r'<script>\s*/\* Mobile nav toggle\..*?</script>\s*', '', t, flags=re.S)
     if 'classList.add(\'js\')' not in t:
         t = t.replace('<meta charset="UTF-8">', '<meta charset="UTF-8">\n<script>document.documentElement.classList.add(\'js\');</script>', 1)
@@ -105,13 +113,20 @@ def process(path, active, has_footer):
         t = t[:first_css.start()] + '<link rel="stylesheet" href="/assets/site.css">\n' + t[first_css.start():]
     if '/assets/site.js' not in t:
         t = t.replace('</body>', '<script src="/assets/site.js" defer></script>\n</body>', 1)
-    if t != before:
-        open(full, 'w', encoding='utf-8', newline='\n').write(t)
-        print('updated', path)
-    else:
-        print('unchanged', path)
+    if t == before:
+        return False
+    with open(full, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(t)
+    return True
+
+
+def main():
+    for path, active, has_footer in PAGES:
+        try:
+            print('updated' if write_chrome(path, active, has_footer) else 'unchanged', path)
+        except ValueError as e:
+            sys.exit(str(e))
 
 
 if __name__ == '__main__':
-    for path, active, has_footer in PAGES:
-        process(path, active, has_footer)
+    main()

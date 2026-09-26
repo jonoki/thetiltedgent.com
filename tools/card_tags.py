@@ -13,27 +13,37 @@ Per report slug:
   lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
 """
-import glob, html, json, os, re
+import html
+import json
+import os
+import re
+from collections import Counter
 
-R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import reportlib as rl
 
-US_STATES = ('Alabama Alaska Arizona Arkansas California Colorado Connecticut Delaware Florida Georgia Hawaii Idaho '
-             'Illinois Indiana Iowa Kansas Kentucky Louisiana Maine Maryland Massachusetts Michigan Minnesota '
-             'Mississippi Missouri Montana Nebraska Nevada New Hampshire|New Jersey|New Mexico|New York|North Carolina|'
-             'North Dakota|Ohio Oklahoma Oregon Pennsylvania Rhode Island|South Carolina|South Dakota|Tennessee Texas Utah '
-             'Vermont Virginia Washington West Virginia|Wisconsin Wyoming')
-STATE_RE = re.compile(r'\b(' + '|'.join(p.strip() for chunk in US_STATES.split('|') for p in
-                      ([chunk] if ' ' in chunk.strip() and chunk.strip() in (
-                          'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota',
-                          'Rhode Island', 'South Carolina', 'South Dakota', 'West Virginia') else chunk.split())) +
-                      r'|D\.?C\.?|USA|U\.S\.A?\.?|United States)\b')
+R = rl.ROOT
+
+# Full names only, so a street or city word ("West Wen Yi Road", "New Delhi", "Prince Edward Island") never
+# reads as a state; multi-word names are matched whole, longest first.
+US_STATES = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida',
+    'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine',
+    'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska',
+    'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+    'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas',
+    'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
+]
+STATE_RE = re.compile(r'\b(' + '|'.join(re.escape(s) for s in sorted(US_STATES, key=len, reverse=True))
+                      + r'|D\.?C\.?|USA|U\.S\.A?\.?|United States)\b')
 US_ABBR = re.compile(r',\s*(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b')
 COUNTRY = {'united kingdom': 'UK', 'england': 'UK', 'uk': 'UK', 'the netherlands': 'Netherlands',
            'republic of ireland': 'Ireland', 'people\'s republic of china': 'China', 'south korea': 'South Korea',
            'korea': 'South Korea', 'taiwan (roc)': 'Taiwan',
            # Canadian provinces and a city that appear as the last part of a head-office line
            'ontario': 'Canada', 'alberta': 'Canada', 'quebec': 'Canada', 'québec': 'Canada',
-           'british columbia': 'Canada', 'nova scotia': 'Canada', 'n.s.': 'Canada', 'toronto': 'Canada'}
+           'british columbia': 'Canada', 'nova scotia': 'Canada', 'n.s.': 'Canada', 'toronto': 'Canada',
+           'manitoba': 'Canada', 'saskatchewan': 'Canada', 'new brunswick': 'Canada',
+           'prince edward island': 'Canada', 'newfoundland and labrador': 'Canada'}
 # S&P 500 badge overrides where the join year shown differs from the card's data-sp date (Oki's decisions)
 SP_NOTE = {
     'lmt': [1984, 'Lockheed Corporation joined in 1984 and merged with Martin Marietta to form Lockheed Martin in 1995.'],
@@ -71,13 +81,7 @@ def main():
     hand = json.load(open(hand_p, encoding='utf-8')) if os.path.exists(hand_p) else {}
     logos_p = os.path.join(R, 'assets', 'logos', 'index.json')   # logo files + where each came from
     logos = json.load(open(logos_p, encoding='utf-8')) if os.path.exists(logos_p) else {}
-    man = {}
-    for f in sorted(glob.glob(os.path.join(R, 'data', 'reports', '*.json'))):
-        shard = os.path.basename(f)[:-5]
-        for r in json.load(open(f, encoding='utf-8'))['reports']:
-            if r['slug'] in man and shard == 'unclassified':
-                continue
-            man[r['slug']] = r
+    man = rl.load_report_records(R)
     out, no_hq = {}, []
     for slug in sorted(style):
         s, r = style[slug], man.get(slug, {})
@@ -113,7 +117,6 @@ def main():
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
     p = os.path.join(R, 'data', 'card_tags.json')
     json.dump(doc, open(p, 'w', encoding='utf-8', newline='\n'), ensure_ascii=False, separators=(',', ':'))
-    from collections import Counter
     print(f'{len(out)} cards -> {os.path.relpath(p, R)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
     print('no HQ tag:', no_hq)

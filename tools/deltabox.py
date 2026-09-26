@@ -9,8 +9,33 @@ Three states, because the refresh run found three genuinely different outcomes:
   price  — the multiple moved, the business did not (5 of the 7)
   print  — the company reported; numbers are new
   fix    — this edition corrects something the previous one got wrong
+
+usage:  py -3 tools/deltabox.py [repo-root]
+
+The records below are the September 2026 refresh editions this script was written for; every one of those
+reports has its box, so a run now skips them all. Later refreshes write their own box (claude/briefs/REFRESH.md,
+which takes the box CSS from CSS below). The script only ever adds a box where none exists; it never rewrites one.
 """
-import re, sys, datetime, os
+import datetime
+import os
+import re
+import sys
+from typing import NamedTuple
+
+import reportlib as rl
+
+
+class Edition(NamedTuple):
+    """One refreshed report's box: the previous and current editions, the box state (TAGS) and its text."""
+    prior_date: str      # YYYY-MM-DD
+    prior_price: float
+    as_of: str           # YYYY-MM-DD
+    price: float
+    state: str           # 'price' | 'print' | 'fix'
+    claim: str
+    paras: list          # body paragraphs (HTML)
+    check: str           # the closing "re-verified / not re-verified" line (HTML)
+
 
 ANCHOR_RE = re.compile(r'<!-- =+ 01 (COMPANY )?OVERVIEW')   # the '=' run length and title vary by era
 
@@ -54,8 +79,8 @@ TAGS = {'price': 'Since the last edition',
         'print': 'Updated at the print',
         'fix': 'Corrected in this edition'}
 
-# prior_date, prior_price, as_of, price, state, claim, body paragraphs, verified line
-R = {
+# slug -> the fields of an Edition, in order (built into EDITIONS below)
+_RECORDS = {
  'adbe': ('2026-08-17', 254.04, '2026-09-01', 286.08, 'price',
    'The price moved. Nothing else did.',
    ["Adobe has not reported since the previous edition. The rally tracked a broad enterprise-software "
@@ -182,54 +207,65 @@ R = {
 }
 
 
-def box(slug, rec):
-    pd, pp, ad, cp, state, claim, paras, check = rec
-    d0 = datetime.date(*map(int, pd.split('-')))
-    d1 = datetime.date(*map(int, ad.split('-')))
-    days = (d1 - d0).days
-    pct = (cp / pp - 1) * 100
-    cls = 'up' if pct >= 0 else 'dn'
-    fmt = lambda d: d.strftime('%-d %b %Y')
-    body = '\n  '.join(f'<p>{p}</p>' for p in paras)
+EDITIONS = {slug: Edition(*fields) for slug, fields in _RECORDS.items()}
+
+
+def day(d):
+    """'1 Sep 2026' (no leading zero, on every platform: Windows strftime has no %-d)."""
+    return f'{d.day} {d:%b %Y}'
+
+
+def box(e):
+    d0, d1 = datetime.date.fromisoformat(e.prior_date), datetime.date.fromisoformat(e.as_of)
+    pct = (e.price / e.prior_price - 1) * 100
+    body = '\n  '.join(f'<p>{p}</p>' for p in e.paras)
     return f"""<!-- ============ WHAT CHANGED SINCE THE LAST EDITION ============ -->
-<section class="tg-d tg-d--{state}" data-prior-as-of="{pd}" data-prior-price="{pp}" data-as-of="{ad}" data-price="{cp}">
+<section class="tg-d tg-d--{e.state}" data-prior-as-of="{e.prior_date}" data-prior-price="{e.prior_price}" data-as-of="{e.as_of}" data-price="{e.price}">
   <div class="tg-d-top">
-    <span class="tg-d-tag">{TAGS[state]}</span>
-    <span class="tg-d-when">{fmt(d0)} &rarr; {fmt(d1)} &middot; {days} days</span>
+    <span class="tg-d-tag">{TAGS[e.state]}</span>
+    <span class="tg-d-when">{day(d0)} &rarr; {day(d1)} &middot; {(d1 - d0).days} days</span>
   </div>
-  <p class="tg-d-claim">{claim}</p>
+  <p class="tg-d-claim">{e.claim}</p>
   <div class="tg-d-move">
-    <div class="tg-d-px">${pp:,.2f}<span>PREVIOUS EDITION</span></div>
+    <div class="tg-d-px">${e.prior_price:,.2f}<span>PREVIOUS EDITION</span></div>
     <div class="tg-d-arw">&rarr;</div>
-    <div class="tg-d-px">${cp:,.2f}<span>THIS EDITION</span></div>
-    <div class="tg-d-pct {cls}">{pct:+.1f}%</div>
+    <div class="tg-d-px">${e.price:,.2f}<span>THIS EDITION</span></div>
+    <div class="tg-d-pct {'up' if pct >= 0 else 'dn'}">{pct:+.1f}%</div>
   </div>
   {body}
-  <p class="tg-d-check">{check}</p>
+  <p class="tg-d-check">{e.check}</p>
 </section>
 
 """
 
 
-def main():
-    root = sys.argv[1]
-    for slug, rec in R.items():
+def insert_box(path, e):
+    """Add the box (and, once, its CSS) to one report. Returns False when it already has one."""
+    t = rl.read_text(path)
+    if 'class="tg-d ' in t:
+        return False
+    if not ANCHOR_RE.search(t):
+        raise ValueError('section-01 anchor comment not found')
+    if '</style>' not in t:
+        raise ValueError('no </style> to add the box CSS before')
+    i = t.rindex('</style>')                     # CSS once, before the last </style>
+    t = t[:i] + CSS + t[i:]
+    j = ANCHOR_RE.search(t).start()              # the box immediately above section 01
+    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(t[:j] + box(e) + t[j:])
+    return True
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    root = args[0] if args else rl.ROOT
+    for slug, e in EDITIONS.items():
         p = os.path.join(root, 'reports', f'{slug}_analysis.html')
-        t = open(p, encoding='utf-8').read()
-        if 'class="tg-d ' in t:
-            print(f'  {slug}: already has a box, skipping')
-            continue
-        am = ANCHOR_RE.search(t)
-        assert am, f'{slug}: section-01 anchor not found'
-        assert '</style>' in t, f'{slug}: no style block'
-        # CSS once, before the last </style>
-        i = t.rindex('</style>')
-        t = t[:i] + CSS + t[i:]
-        # box immediately above section 01
-        j = ANCHOR_RE.search(t).start()
-        t = t[:j] + box(slug, rec) + t[j:]
-        open(p, 'w', encoding='utf-8').write(t)
-        print(f'  {slug}: box inserted ({rec[4]})')
+        try:
+            inserted = insert_box(p, e)
+        except (OSError, ValueError) as err:
+            sys.exit(f'{slug}: {err}')
+        print(f'  {slug}: box inserted ({e.state})' if inserted else f'  {slug}: already has a box, skipping')
 
 
 if __name__ == '__main__':

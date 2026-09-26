@@ -7,9 +7,15 @@ Run from the repo root after adding or renaming a report in reports/etf/, report
 For each report: ticker and name come from its <title> ("VOO — Vanguard S&P 500 ETF | ETF Analysis"),
 the "What it is" line is the first sentence of its section 01, and the category label comes from LABEL below
 (add one when you add a report; the script stops if one is missing). The family tab counts are updated too."""
-import glob, html, os, re, sys
+import glob
+import html
+import os
+import re
+import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import reportlib as rl
+
+ROOT = rl.ROOT
 INDEX = os.path.join(ROOT, 'reports', 'index.html')
 
 FAMILIES = {  # folder: (heading, one-line note, sort)
@@ -38,7 +44,7 @@ def section_01(page):
     page = page[page.find('<body'):]        # the class name also appears in the page's CSS
     m = re.search(r'class="section-title[^>]*>.*?</(?:div|h2)>(.*?)(?:<div class="section"|</section>)', page, re.S)
     if not m:
-        sys.exit('no section 01 found')
+        raise ValueError('no section 01 found')
     return m.group(1)
 
 
@@ -47,7 +53,7 @@ def quoted_definition(page):
     txt = html.unescape(re.sub(r'<[^>]+>', '', p.group(1))).strip()
     m = re.match(r'^[A-Za-z]+:\s*"[^"]+"', txt)
     if not m:
-        sys.exit('expected a quoted definition')
+        raise ValueError('section 01 does not open with a quoted definition')
     return m.group(0)
 
 
@@ -63,16 +69,21 @@ def first_sentence(page):
             s = s.strip()
             if len(s) >= 30 and not re.match(r'^[A-Za-z]+:\s*"', s):
                 return s
-    sys.exit('no usable first sentence')
+    raise ValueError('no sentence of 30+ characters in section 01')
 
 
 def card(folder, path):
-    page = open(path, encoding='utf-8').read()
+    """(slug, card markup) for one report. Raises ValueError, saying what is missing, when the page cannot
+    be made into a card; main() adds the file name."""
+    page = rl.read_text(path)
     slug = os.path.basename(path).split('_')[0]
-    title = html.unescape(re.search(r'<title>(.*?)</title>', page, re.S).group(1)).strip()
-    tick, name = [x.strip() for x in re.split(r'\s+[—-]\s+', title.split('|')[0], maxsplit=1)]
     if slug not in LABEL:
-        sys.exit(f'add a LABEL for {slug} in tools/asset_cards.py')
+        raise ValueError(f'add a LABEL for {slug} in tools/asset_cards.py')
+    tm = re.search(r'<title>(.*?)</title>', page, re.S)
+    parts = re.split(r'\s+[—-]\s+', html.unescape(tm.group(1)).strip().split('|')[0], maxsplit=1) if tm else []
+    if len(parts) != 2:
+        raise ValueError('expected a <title> like "VOO — Vanguard S&P 500 ETF | ETF Analysis"')
+    tick, name = (x.strip() for x in parts)
     line = quoted_definition(page) if slug in QUOTED_DEFINITION else first_sentence(page)
     e = lambda s: html.escape(s, quote=False)
     return slug, (f'      <a class="rep asset" href="view.html?r={folder}/{slug}"><span class="tick">{e(tick)}</span>'
@@ -81,9 +92,15 @@ def card(folder, path):
 
 
 def main():
-    t = open(INDEX, encoding='utf-8', newline='').read()
+    with open(INDEX, encoding='utf-8', newline='') as fh:
+        t = fh.read()
     for folder, (head, note, order) in FAMILIES.items():
-        cards = [card(folder, p) for p in glob.glob(os.path.join(ROOT, 'reports', folder, '*_analysis.html'))]
+        cards = []
+        for p in glob.glob(os.path.join(ROOT, 'reports', folder, '*_analysis.html')):
+            try:
+                cards.append(card(folder, p))
+            except ValueError as e:
+                sys.exit(f'{os.path.relpath(p, ROOT)}: {e}')
         cards.sort(key=(lambda c: TERM.get(c[0], 99)) if order == 'term' else (lambda c: c[0]))
         block = (f'<!-- asset-cards:{folder} (written by tools/asset_cards.py) -->\n<div class="wrap">\n'
                  f'  <h2 class="shead">{head} <span class="scount">{len(cards)}</span></h2>\n'
@@ -96,7 +113,8 @@ def main():
         print(f'{folder}: {len(cards)} cards')
     stocks = len(re.findall(r'<a class="rep"(?! asset)', t))
     t = re.sub(r'(data-fam="stocks"[^>]*>.*?<b class="fam-n">)\d+(</b>)', r'\g<1>%d\g<2>' % stocks, t, count=1)
-    open(INDEX, 'w', encoding='utf-8', newline='\n').write(t)
+    with open(INDEX, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(t)
     print(f'stocks: {stocks}')
 
 
