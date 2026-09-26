@@ -21,17 +21,17 @@ The metrics table must have a row whose label cell is exactly `EPS (TTM)` (toolt
 - Chart: ~60 MONTHLY closes: `const labels = [...]`, `const prices = [...]`, equal lengths, last point = the settled close. digrin.com/stocks/detail/<T>/price "Real price" column is the usual source (ignore its header price); cross-check the last two month-ends against stockanalysis daily rows. Yahoo finance.yahoo.com/quote/<T>/history/?frequency=1mo is the fallback. Never daily or <5y data under a 5-year heading; if <5y of history exists, say so in the heading/note.
 - Every number from a fetched page. Unsourced → "n/v"/"—"/"not sourced". Estimates labelled. Trailing P/E == price ÷ TTM EPS (check arithmetic). 52-week range must contain the price. If you recompute market cap etc. at your price, say so.
 - Named analyst calls, executives and quotes ONLY if seen on a fetched page.
-- Voice: story first, math second, lecture never. Never name or show gambling operators. Keep the disclaimer.
+- Voice, reader and gambling-company rules: CLAUDE.md (Voice, Reader, Gambling operators). Keep the disclaimer.
 - Check history (splits, spin-offs, mergers, bankruptcies) before trusting long-run per-share series.
 
 ## Verify
 `py -3 tools/chart_audit.py <slug>` must report 0 wrong points (every chart point within 3% of Yahoo's month-end close, or of its dividend-adjusted close if the chart says it is dividend-adjusted).
-`python tools/verify.py reports/<slug>_analysis.html` must print PASS and its pe=stated/calc pair must agree (±0.1). Extract the <script> body to $TEMP and `node --check` it. Fix until clean.
+`py -3 tools/verify.py reports/<slug>_analysis.html` must print PASS and its pe=stated/calc pair must agree (±0.1). Extract the <script> body to $TEMP and `node --check` it. Fix until clean.
 
 ## Return (short, no file contents)
-1 verify line + chart_audit line · 2 index-card company name · 3 sector key (communicationservices consumerdiscretionary consumerstaples energy financials healthcare industrials materials realestate technology utilities) · 4 industry label in index style — reuse one of the existing labels in reports/index.html's #find options when one fits · 5 S&P 500 add date YYYY-MM-DD + source · 6 Nasdaq-100 member now? · 7 price, date, source URLs · 8 anything unsourced or doubtful (brief).
+1 verify line + chart_audit line · 2 index-card company name · 3 sector key (communicationservices consumerdiscretionary consumerstaples energy financials healthcare industrials materials realestate technology utilities) · 4 industry label in index style — reuse one of the existing labels in reports/index.html's #find options when one fits · 5 S&P 500 add date YYYY-MM-DD + source · 6 Nasdaq-100 member now? · 7 price, date, source URLs · 8 anything unsourced or doubtful (brief) · 9 `PITFALLS:` any error class from REPORT_PITFALLS.md you caught yourself mid-build (letter + one-line example) — this feeds the log.
 
-PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). If a site (e.g. sec.gov) demands a contact user-agent, skip it and use another source.
+PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). Read sec.gov with WebFetch; never add a contact user-agent yourself. If WebFetch can't read a page, use another source.
 
 ## Lessons from the last checker round (hard rules)
 - Nothing dated AFTER the banner date may appear (analyst calls, news, "52-week change", RSI, peer quotes). stockanalysis/companiesmarketcap live fields during the next session are intraday — recompute at the banner-date close or omit.
@@ -40,5 +40,3 @@ PRIVACY: never put the user's email, name or any personal data in any request (h
 - Analyst calls: firm, analyst, rating, prior→new target and date must all be on a fetched page; drop what isn't.
 - Search-result snippets and AI "summaries" are not sources. Label them ("as summarised by …") or leave the claim out.
 - Never write a count or superlative ("five straight years", "only cut", "same week") without checking it against your own data.
-
-9 · `PITFALLS:` any error class from REPORT_PITFALLS.md you caught yourself mid-build (letter + one-line example) — this feeds the log.

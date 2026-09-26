@@ -14,7 +14,7 @@ Also read and obey every data rule in `claude/briefs/BUILD.md`, including its "L
 - **Price move with no news found:** do not refresh; log "price only" in the queue.
 
 ## Why this refresh exists
-The company reported earnings AFTER this report's as-of date. The rule (TTG Reports Refresh Policy, 2 Sep 2026): a report is stale when the company reports, not when the price moves.
+The company reported earnings, or had material news, after this report's as-of date. The rule (TTG Reports Refresh Policy, 2 Sep 2026): a report is stale when the company reports, not when the price moves.
 
 ## Step 1 — read the current report in full
 Record: its as-of date and header price (these become the delta box's "previous edition" values), what it says about the business, guidance, segments, catalysts.

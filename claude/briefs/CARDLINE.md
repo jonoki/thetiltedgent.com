@@ -11,7 +11,7 @@ Each card on `reports/index.html` carries one line, framed as **Their hand**, th
 - **Never:** stock-price moves, CEO biography or trivia, one-off events, records or backlogs, analyst views, "random factoids". Oki: "insight into what the business does, not random factoids."
 - **Length:** 70–120 characters. One sentence, or two short ones.
 - **Reader:** smart but doesn't follow markets. Explain jargon with a plain word (no "FCF", "NIM", "EPS", "TAM"). Never define everyday words (data center, AI, CEO).
-- **Voice:** story first, plain, confident. No hype, no exclamation marks, no buy/sell language, no verdicts ("undervalued", "cheap", "must-own"), no price targets. Never name a gambling operator; for casino-exposed companies describe the business without naming operators.
+- **Voice:** story first, plain, confident. No hype, no exclamation marks, no buy/sell language, no verdicts ("undervalued", "cheap", "must-own"), no price targets. Casino and betting companies are described like any other company (CLAUDE.md, Gambling operators).
 - **Durability:** the line must stay true past the report's date. No "this year", "today" or "recently". Round counts that grow ("over 15,000 buildings"). Prefer shares and structures over exact figures that change quarterly.
 - **Facts:** every fact must be in that company's report (extract: `cardline_src/<slug>.txt`, hero + sections 01–03). No outside knowledge. Numbers exact or obviously rounded (92.5% → "over 90%"). If the report has no clear "what they do + surprising angle", write the plainest accurate description of the business and mark it `WEAK`.
 

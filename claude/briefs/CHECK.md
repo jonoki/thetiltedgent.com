@@ -16,7 +16,7 @@ The builder rules are in `claude/briefs/BUILD.md` (and `REFRESH.md` for refreshe
 6. Re-run `py -3 tools/verify.py reports/<slug>_analysis.html` (PASS, pe pair within ±0.1) and `node --check` on the extracted script body. LF line endings.
 
 WebFetch needs a domain surfaced by a WebSearch first (one search per new domain). stockanalysis.com blocks curl — use WebFetch.
-PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). If a site (e.g. sec.gov) demands a contact user-agent, skip it.
+PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). Read sec.gov with WebFetch; never add a contact user-agent yourself. If WebFetch can't read a page, use another source.
 
 ## Return (short, no file contents), one block per report
 - PITFALLS: one tag per correction you made, `<letter>:<short example>` using the classes in REPORT_PITFALLS.md (new class → `NEW:<description>`). Required — the orchestrator tallies these into the log.
@@ -24,4 +24,4 @@ PRIVACY: never put the user's email, name or any personal data in any request (h
 - verify line
 - what you changed (one line each)
 - anything still unconfirmed and how it is labelled on the page
-- if asked for a card line: slug|Company Name|sectorkey|INDUSTRY LABEL (reuse an existing label from reports/index.html #find options, `&amp;` for &)|S&P add date YYYY-MM-DD|yes/no Nasdaq-100
+- if asked for an index-card record (not the "Their hand" line): slug|Company Name|sectorkey|INDUSTRY LABEL (reuse an existing label from reports/index.html #find options, `&amp;` for &)|S&P add date YYYY-MM-DD|yes/no Nasdaq-100

@@ -1,6 +1,6 @@
 # Report pitfalls — what builders keep getting wrong, and the rule that prevents it
 
-Every recurring report run (new builds, earnings refreshes, news updates, chart fixes) **reads this file first** and **appends to it last**. Builders and checkers are briefed to do both (see `claude/briefs/`).
+Every builder and checker in a recurring report run (new builds, earnings refreshes, news updates, chart fixes) **reads this file first**; the orchestrator **appends to it last** from the checkers' `PITFALLS:` tags (retro protocol below).
 
 Counts are "times a checker had to correct it", tallied from checker returns. When a category gets a new hit, bump its count and add the example; when a new kind of error appears twice, give it its own entry and a prevention rule, and copy the rule into the relevant brief.
 
