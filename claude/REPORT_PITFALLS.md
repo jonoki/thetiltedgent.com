@@ -4,7 +4,11 @@ Every builder and checker in a recurring report run (new builds, earnings refres
 
 Counts are "times a checker had to correct it", tallied from checker returns. When a category gets a new hit, bump its count and add the example; when a new kind of error appears twice, give it its own entry and a prevention rule, and copy the rule into the relevant brief.
 
-Last tally: **25 Sep 2026** — AZO earnings refresh (T1): 10 tags from the builder's self-check, 13 from the independent checker. Before that, 22 Sep 2026: 64 new S&P builds (batches p–t), 17 earnings refreshes, library chart audit.
+Last tally: **26 Sep 2026** — fix run: trailing P/E on 10 reports (CTAS DHR GM IRM MCHP MRK ROST V WAT XYZ) and the SONY chart, 3 checkers.
+
+26 Sep 2026 tally: **F ×10** (trailing P/E copied from the data site's P/E field, which divides by unrounded EPS, instead of header price ÷ the page's EPS: CTAS 40.95→40.83, DHR 38.31→38.21, GM 44.20→44.10, IRM 80.48→80.64, MCHP 109.32→109.07, MRK 104.4→104.7, ROST 28.02→27.89, V 30.9→30.8, WAT 181.34→181.74, XYZ 134.41→134.02; prose quoting the old figure in DHR ×4, MCHP hero, ROST premium ~15%→~14%, WAT 181×→182× ×3); **G ×3** (StockAnalysis TTM EPS vs the sum of reported quarters: MRK 1.27 vs 1.25, WAT 2.21 vs 3.99 after the share count rose 59.7M→98.2M, XYZ 0.59 vs 0.56 — basis now stated on the page); **A ×1 + I new** (SONY: digrin "Real price" was back-adjusted for the Sep 2025 SFGI spin, ~×0.967 before Sep 2025, while the page said the series was not spin-adjusted — 48 points rebuilt from Yahoo close; derived prose: 5-yr return 10.3%→6.6%, Apr 2026 RSI 31.2→29.8).
+
+25 Sep 2026: AZO earnings refresh (T1): 10 tags from the builder's self-check, 13 from the independent checker. Before that, 22 Sep 2026: 64 new S&P builds (batches p–t), 17 earnings refreshes, library chart audit.
 
 25 Sep 2026 tally (AZO): **E ×5** (carried over from the previous edition: CFO bio "from Nielsen… a CPA" — joined from Hertz, no CPA; "has never split its stock" — 2:1 in 1992 and 1994; FY2025 called a 53-week year — the release says 52; "Nasdaq-100 holds no meaningful auto-aftermarket exposure" — ORLY is a member) · **F ×6** (RSI "20s–30s" when it ran 33–42; "23% drop" beside its own −20.9%; a "$2,950–$3,200 band" contradicted by May 2024 $2,769.94; −14.3% → −14.4%; "more than almost anything else on the NYSE"; "130,000+" employees) · **B ×3** (stockanalysis forecast panel and average target include Sep 24 actions; companiesmarketcap rank at Sep 25 prices) · **D ×3** (a WebFetch summary gave one executive's line to another, twice; a full stop moved inside a quote) · **G ×2** (a quarter's 34% read as full-year; an inferred "GAAP basis") · **C ×1** (May 27 analyst names not on the fetched page) · **H ×1** (buybacks presented as the cause of 97.98% institutional ownership) · **I ×1** (stockanalysis cash-flow statistics still on the prior quarter) · **L ×1** (a process caveat on the page) · **J ×1** (delta box `--print` when the edition also corrects errors: use `--fix`). New rule copied into REFRESH.md: facts carried over from the previous edition are re-verified, not inherited (E hit 5 times in one refresh).
 
@@ -64,6 +68,7 @@ APTV margin 12.7% vs 11.2%; PODD EPS growth measured from the wrong base; MKC "m
 
 **Rules**
 - Every count, streak, superlative and % change is recomputed from the page's own data (or a fetched series) before it is written. If you can't compute it, don't claim it.
+- Trailing P/E is computed as header price ÷ the page's own EPS (TTM) cell, never copied from a data site's P/E field (those divide by unrounded EPS; 10 reports off by 0.1–0.4 on 26 Sep 2026). Sweep the prose for the old figure.
 
 ## G. Basis confusion in consensus and estimates — ~10 corrections
 DE revenue consensus on a different basis from reported revenue; INTU FY consensus set before stock-comp moved into non-GAAP; forward P/E on unstated EPS basis; StockAnalysis TTM EPS vs sum of quarters (KR, DECK, ALB); fiscal-year label offsets (LULU); LOW consensus $4.38 vs $4.22.
@@ -83,6 +88,7 @@ PNW said O&M rose faster than rates (it fell); AVY and TJX said the stock fell a
 - digrin: header price stale (use the table); some tickers live under a different symbol (BF-B not BF.B; old P = Pandora); the "Adjusted" column is dividend-adjusted.
 - digrin "Real price" is **not split-adjusted** (23 Sep 2026: KLAC May-22 shows $364.85 vs split-adjusted $36.49 after the 10:1; NOW 5:1, NFLX 10:1, AMZN/GOOGL 20:1 the same). Divide every pre-split month by the split ratio before charting, or chart Yahoo's close and use digrin only as the cross-check.
 - Yahoo books spin-offs and capital returns as small fractional "splits" (IP 1.056 Sylvamo, T 1.324 WBD, WDC 1.323 SanDisk, MMM 1.196 Solventum) and back-adjusts its close for them — a real pre-spin close will not match Yahoo's close. Yahoo also re-bases the whole history for splits dated after a report's as-of (APH 2:1 on 1 Sep 2026): the report stays on its as-of share basis. `tools/chart_audit.py` knows both since 23 Sep and lists them as BASIS STEPS, not errors.
+- digrin "Real price" can be **back-adjusted for a spin-off** (26 Sep 2026: SONY ×~0.967 before the Sep 2025 SFGI spin). Check a pre-spin month against Yahoo's close or a daily history row before charting from it.
 - Wikipedia: add dates can be placeholders (1957/1978/1987) or weekends.
 - Yahoo v8 chart API close = split-adjusted, adjclose = + dividends.
 - Nasdaq earnings calendar: past dates show "time-not-supplied" — confirm pre/after-market on the company release.
