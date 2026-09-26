@@ -8,7 +8,7 @@ import tempfile
 import unittest
 import unittest.mock
 
-import fixtures  # noqa: F401  (puts tools/ on the import path)
+from fixtures import PAGE
 import chart_audit  # noqa: E402
 
 
@@ -85,6 +85,29 @@ class ChartAudit(unittest.TestCase):
         row = chart_audit.check_points(labels, [100.0, 100.0, 100.0, 0], {k: (50.0, None) for k in yh},
                                        [('2026-10-01', 2.0)], '2026-09-21')
         self.assertEqual((row['checked'], row['bad'], row['splits_after_as_of']), (3, [], 2.0))
+
+    def test_a_report_is_audited_from_its_own_page_not_the_manifest(self):
+        """A new build (not in data/reports.json yet) is still checked, with the page's own ticker and as-of date."""
+        seen = []
+
+        def fake_yahoo(slug, ticker, as_of):
+            seen.append((slug, ticker, as_of))
+            return {(2021, 9): (1100.5, None), (2021, 10): (1200.0, None)}, []
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'reports'))
+            with open(os.path.join(repo, 'reports', 'acme_analysis.html'), 'w', encoding='utf-8') as fh:
+                fh.write(PAGE)
+            with unittest.mock.patch.object(chart_audit, 'yahoo', fake_yahoo):
+                row = chart_audit.audit('acme', repo=repo)
+            missing = chart_audit.audit('gone', repo=repo)
+        self.assertEqual(seen, [('acme', 'ACME', '2026-09-10')])
+        self.assertEqual((row['checked'], row['bad']), (2, []))
+        self.assertTrue(missing['err'].startswith('no page'))
+
+    def test_an_unknown_slug_fails_the_run(self):
+        with contextlib.redirect_stdout(io.StringIO()), \
+                unittest.mock.patch.object(chart_audit, 'WORK', tempfile.gettempdir()):
+            self.assertEqual(chart_audit.main(['notareport']), 1)
 
 
 if __name__ == '__main__':

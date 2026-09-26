@@ -94,6 +94,21 @@ def iso_date(text: str | None) -> str | None:
 
 # ---------- what a report page says ----------
 
+def as_of(t: str) -> tuple[str | None, bool]:
+    """(the report's as-of date as YYYY-MM-DD or None, whether the page gave a range). The first "as of"
+    statement wins; a range ('August 19–20, 2026') gives its first day."""
+    day = r'(?:the\s+)?(?:[A-Za-z]+day,?\s+)?'
+    single = (re.search(r'Static data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
+              or re.search(r'Data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
+              or re.search(r'as of ' + day + r'([A-Za-z]+ \d+, \d{4})\s*(?:close|market close|\(market close\))', t))
+    if single:
+        return iso_date(single.group(1)), False
+    span = re.search(r'Static data as of ([A-Za-z]+ \d+)[–\-—]\d+, (\d{4})', t)
+    if span:
+        return iso_date(f'{span.group(1)}, {span.group(2)}'), True
+    return None, False
+
+
 def parse_title(t: str) -> tuple[str | None, str | None]:
     """(ticker, name) from the <title>: 'AAPL — Apple Inc. | Stock Analysis' or 'Apple Inc. (AAPL) — …'.
     Either part is None when the title is in neither form."""

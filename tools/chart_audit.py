@@ -175,9 +175,17 @@ def classify(point: float, close: float, adjclose: float | None, spin: float) ->
     return 'wrong'
 
 
-def audit(slug: str, ticker: str, as_of: str | None, repo: str = rl.ROOT) -> AuditRow:
-    """One report's chart against Yahoo; {'slug', 'err'} when it cannot be audited (no chart arrays, no series)."""
-    t = rl.read_text(rl.report_path(slug, repo=repo))
+def audit(slug: str, repo: str = rl.ROOT) -> AuditRow:
+    """One report's chart against Yahoo, with its ticker and as-of date read from the page itself (so a new or
+    just-refreshed report is checked before the manifest is rebuilt); {'slug', 'err'} when it cannot be audited
+    (no such page, no ticker in the title, no chart arrays, no Yahoo series)."""
+    path = rl.report_path(slug, repo=repo)
+    if not os.path.exists(path):
+        return {'slug': slug, 'err': f'no page {os.path.relpath(path, repo)}'}
+    t = rl.read_text(path)
+    ticker, as_of = rl.parse_title(t)[0], rl.as_of(t)[0]
+    if not ticker:
+        return {'slug': slug, 'err': 'no ticker in the <title>'}
     labels, prices = rl.chart_series(t)
     if not labels or not prices:
         return {'slug': slug, 'err': 'arrays'}
@@ -217,10 +225,11 @@ def check_points(labels: list[str], prices: list[float], yh: Mapping[tuple[int, 
 
 
 def main(argv: list[str] | None = None) -> int:
-    only = set(sys.argv[1:] if argv is None else argv)
+    """Audit the named slugs, or every stock report page; 1 when any point is wrong or any report could not be audited."""
+    slugs = (sys.argv[1:] if argv is None else argv) or [os.path.basename(p).replace('_analysis.html', '')
+                                                          for p in rl.report_paths()]
     os.makedirs(CACHE, exist_ok=True)
-    rows = [audit(slug, ticker, as_of) for ticker, slug, _sector, as_of, _price in rl.load_manifest()['index']
-            if not only or slug in only]
+    rows = sorted((audit(slug) for slug in slugs), key=lambda r: r.get('ticker') or r['slug'])   # the manifest's order
     with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:
         json.dump(rows, fh, indent=0)
     errs = [r for r in rows if 'err' in r]

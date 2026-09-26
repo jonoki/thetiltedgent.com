@@ -85,7 +85,9 @@ daily files (bonds). Brief: `claude/briefs/BUILD_ASSETS.md`.
     py -3 tools/chart_audit.py aapl intc       # named reports
 
 `verify.py` only checks that the last chart point equals the header price. This
-checks all the others: a point is wrong when it is more than 3% from Yahoo's
+checks all the others, reading each report's ticker and as-of date from the page
+itself, so a new or just-refreshed report is checked before `manifest.py` runs
+(a slug with no page is an error, exit 1): a point is wrong when it is more than 3% from Yahoo's
 split-adjusted month-end close *and* from its dividend-adjusted close. It also
 lists series that are dividend-adjusted without saying so. **Exits 1 on any
 wrong point or fetch error.** Read-only on the repo; caches Yahoo responses in

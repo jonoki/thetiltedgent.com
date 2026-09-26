@@ -100,17 +100,9 @@ def change_pct(t: str) -> float | None:
 def as_of_date(t: str, warn: list[str]) -> str | None:
     """The report's as-of date, YYYY-MM-DD, from its first "as of" statement; a range ('August 19–20, 2026')
     gives its first day and a warning."""
-    day = r'(?:the\s+)?(?:[A-Za-z]+day,?\s+)?'
-    single = (re.search(r'Static data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
-              or re.search(r'Data as of ' + day + r'([A-Za-z]+ \d+, \d{4})', t)
-              or re.search(r'as of ' + day + r'([A-Za-z]+ \d+, \d{4})\s*(?:close|market close|\(market close\))', t))
-    text = single.group(1) if single else None
-    if not single:
-        span = re.search(r'Static data as of ([A-Za-z]+ \d+)[–\-—]\d+, (\d{4})', t)
-        if span:
-            text = f'{span.group(1)}, {span.group(2)}'
-            warn.append('as_of_was_a_date_range')
-    as_of = rl.iso_date(text)
+    as_of, was_range = rl.as_of(t)
+    if was_range:
+        warn.append('as_of_was_a_date_range')
     if not as_of:
         warn.append('as_of_missing')
     return as_of
