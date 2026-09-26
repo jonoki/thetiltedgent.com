@@ -1,5 +1,4 @@
-"""Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, deltabox).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
-import datetime
+"""Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, manifest).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
 import os
 import tempfile
 import unittest
@@ -7,7 +6,6 @@ from typing import Any, cast
 
 from fixtures import PAGE
 import card_tags  # noqa: E402
-import deltabox  # noqa: E402
 import headoffice  # noqa: E402
 import manifest  # noqa: E402
 import style_tags  # noqa: E402
@@ -113,44 +111,23 @@ class HeadOffice(unittest.TestCase):
 
 
 class DeltaBox(unittest.TestCase):
-    def test_day_has_no_leading_zero_on_any_platform(self):
-        self.assertEqual(deltabox.day(datetime.date(2026, 9, 1)), '1 Sep 2026')
-        self.assertEqual(deltabox.day(datetime.date(2026, 8, 17)), '17 Aug 2026')
-
-    BOX = deltabox.DeltaBox(prior_date='2026-08-17', prior_price=994.79, as_of='2026-09-01', price=816.64,
-                            state='fix', claim='It fell.', paras=['One.', 'Two.'], check='Checked.')
-
-    def test_box_marks_direction_and_carries_the_prior_edition(self):
-        b = deltabox.box(self.BOX)
-        self.assertIn('tg-d--fix', b)
-        self.assertIn('<span class="tg-d-tag">Corrected in this edition</span>', b)
-        self.assertIn('data-prior-as-of="2026-08-17"', b)
-        self.assertIn('tg-d-pct dn">-17.9%', b)
-        self.assertIn('17 Aug 2026 &rarr; 1 Sep 2026 &middot; 15 days', b)
-        self.assertIn('<p>One.</p>\n  <p>Two.</p>', b)
+    # a "what changed" box in the markup claude/briefs/REFRESH.md prescribes
+    BOX = ('<section class="tg-d tg-d--fix" data-prior-as-of="2026-08-17" data-prior-price="994.79" '
+           'data-as-of="2026-09-01" data-price="816.64">\n  <p class="tg-d-claim">It fell.</p>\n</section>')
 
     def test_the_box_round_trips_through_the_manifest_to_the_card(self):
-        """deltabox writes the prior edition into the page; manifest reads it back; card_tags shows it."""
+        """A refresh writes the prior edition into the page; manifest reads it back; card_tags shows it."""
         warn: list[str] = []
-        eds, state = manifest.editions(deltabox.box(self.BOX), '2026-09-01', 816.64, warn)
+        eds, state = manifest.editions(self.BOX, '2026-09-01', 816.64, warn)
         self.assertEqual((eds, state, warn), ([['2026-08-17', 994.79, 'previous edition'],
                                                ['2026-09-01', 816.64, 'refreshed']], 'fix', []))
         card = card_tags.card_for('acme', StyleTagRules.inputs(), {'editions': eds}, '', None, {}, None)
         self.assertEqual(card['ed'], ['2026-09-01', '2026-08-17', 994.79])
 
-    def test_insert_box_adds_css_once_and_never_a_second_box(self):
-        page = ('<html><head><style>a{}</style><style>b{}</style></head><body>\n'
-                '<!-- ======== 01 COMPANY OVERVIEW ======== -->\n</body></html>')
-        with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, 'acme_analysis.html')
-            with open(p, 'w', encoding='utf-8') as fh:
-                fh.write(page)
-            self.assertTrue(deltabox.insert_box(p, self.BOX))
-            self.assertFalse(deltabox.insert_box(p, self.BOX))
-            t = rl.read_text(p)
-        self.assertEqual(t.count(deltabox.CSS), 1)
-        self.assertLess(t.index('<style>b{}' + deltabox.CSS), t.index('</style></head>'))   # before the last </style>
-        self.assertLess(t.index('class="tg-d '), t.index('01 COMPANY OVERVIEW'))
+    def test_a_prior_edition_that_is_not_earlier_is_flagged(self):
+        warn: list[str] = []
+        manifest.editions(self.BOX, '2026-08-17', 816.64, warn)
+        self.assertEqual(warn, ['delta_box_prior_edition_not_earlier'])
 
 
 if __name__ == '__main__':

@@ -12,7 +12,6 @@ Each finds the repo from its own location, so the working directory only matters
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
-| `deltabox.py` | the "what changed since the last edition" box (September 2026 refreshes) | report pages without a box |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
 `reportlib.py` is not run on its own: it is what every script above knows about the repo and a report page

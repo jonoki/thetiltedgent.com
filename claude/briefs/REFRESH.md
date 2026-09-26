@@ -34,7 +34,7 @@ New as-of = the most recent settled close (a stockanalysis history row WITH Adj.
 - "The business is unchanged; the multiple re-rated" is a correct and welcome finding. Do not manufacture a narrative to explain a price move.
 
 ## Delta box (required)
-Insert immediately before the `<!-- ... 01 ... OVERVIEW` comment (the Company Overview section). If the page has no `.tg-d` CSS yet, copy the CSS string from tools/deltabox.py (the `CSS = """ … """` block) into the page's main <style> just before `</style>`. Markup — mirror reports/nvda_analysis.html exactly:
+Insert immediately before the `<!-- ... 01 ... OVERVIEW` comment (the Company Overview section). If the page has no `.tg-d` CSS yet, copy claude/briefs/delta-box.css (the whole file) into the page's main <style> just before `</style>`. Markup — mirror reports/nvda_analysis.html exactly:
 
 ```html
 <section class="tg-d tg-d--print" data-prior-as-of="YYYY-MM-DD" data-prior-price="P0" data-as-of="YYYY-MM-DD" data-price="P1">
