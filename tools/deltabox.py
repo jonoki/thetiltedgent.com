@@ -6,7 +6,7 @@ taken from the report's own prose or from claude/REFRESH_POLICY.md — nothing i
 newly researched here, it is existing analysis given a consistent structure.
 
 Three states, because the refresh run found three genuinely different outcomes:
-  price  — the multiple moved, the business did not (5 of the 7)
+  price  — the multiple moved, the business did not
   print  — the company reported; numbers are new
   fix    — this edition corrects something the previous one got wrong
 

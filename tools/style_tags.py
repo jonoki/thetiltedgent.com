@@ -20,7 +20,7 @@ from collections import Counter
 import reportlib as rl
 from reportlib import first_number as num
 
-R = rl.ROOT
+ROOT = rl.ROOT
 
 # Reports to leave out of tagging, slug -> reason. Empty: CBOE and MTD were excluded on 22 Sep 2026 over
 # swapped <title> tags (bodies were correct); titles fixed the same day.
@@ -82,11 +82,11 @@ def pct_rank(v, vals):
 
 
 def load():
-    cards = rl.parse_index_cards(R)
-    recs = rl.load_report_records(R)
+    cards = rl.parse_index_cards(ROOT)
+    recs = rl.load_report_records(ROOT)
     rows = []
     for slug, r in sorted(recs.items()):
-        path = os.path.join(R, 'reports', f'{slug}_analysis.html')
+        path = os.path.join(ROOT, 'reports', f'{slug}_analysis.html')
         if not os.path.exists(path):
             continue
         card = cards.get(slug, {})
@@ -132,7 +132,7 @@ def main():
     b_sp = [d['beta'] for d in sp if d['beta'] is not None]
     q_sp = [d['roic'] for d in sp if d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '')]
 
-    T = {
+    thresholds = {
         'value_pe_max': quantile(pe_sp, PCT), 'pe_median': statistics.median(pe_sp),
         'growth_revg_min': quantile(g_sp, 1 - PCT), 'revg_median': statistics.median(g_sp),
         'income_yield_min': quantile(y_sp, 1 - PCT), 'yield_median': statistics.median(y_sp),
@@ -141,8 +141,8 @@ def main():
         'quality_roic_min': quantile(q_sp, 1 - PCT), 'roic_median': statistics.median(q_sp),
         'quality_de_max': QUALITY_MAX_DE, 'giant_mcap_min': GIANT_MCAP, 'beaten_down_ratio': BEATEN_DOWN,
     }
-    T = {k: round(v, 3) for k, v in T.items()}
-    N = {'pe': len(pe_sp), 'revg': len(g_sp), 'yield': len(y_sp), 'fcf_yield': len(f_sp), 'beta': len(b_sp), 'roic': len(q_sp)}
+    thresholds = {k: round(v, 3) for k, v in thresholds.items()}
+    sample_sizes = {'pe': len(pe_sp), 'revg': len(g_sp), 'yield': len(y_sp), 'fcf_yield': len(f_sp), 'beta': len(b_sp), 'roic': len(q_sp)}
 
     def asof(d):
         x = datetime.date.fromisoformat(d['as_of'])
@@ -153,35 +153,36 @@ def main():
         profitable = d['eps'] is None or d['eps'] > 0
         if d['eps'] is not None and d['eps'] <= 0:
             tags.append(['Not yet profitable', f"Lost money over the last 12 months: earnings per share were {d['raw']['eps_ttm']}." + asof(d)])
-        if profitable and d['pe'] and 0 < d['pe'] <= T['value_pe_max']:
-            tags.append(['Value', f"Priced at {d['pe']:.1f} times last year's earnings, cheaper than {100 - pct_rank(d['pe'], pe_sp)}% of S&P 500 companies. The median S&P 500 stock trades at {T['pe_median']:.1f} times. Value means the cheapest 20%." + asof(d)])
-        if d['revg'] is not None and d['revg'] >= T['growth_revg_min']:
-            tags.append(['Growth', f"Revenue grew {d['revg']:.1f}% over the last year, faster than {pct_rank(d['revg'], g_sp)}% of S&P 500 companies. The median grew {T['revg_median']:.1f}%. Growth means the fastest-growing 20%." + asof(d)])
-        if d['yield'] and d['yield'] >= T['income_yield_min']:
-            tags.append(['Income', f"Pays a {d['yield']:.2f}% dividend yield, about ${d['yield']:.2f} a year per $100 invested. That beats {pct_rank(d['yield'], y_sp)}% of S&P 500 dividend payers; the median pays {T['yield_median']:.2f}%. Income means the top 20% of payers." + asof(d)])
-        if d['fcf_yield'] is not None and d['fcf_yield'] >= T['cash_fcfy_min']:
-            tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], f_sp)}% of S&P 500 companies (median {T['fcfy_median']:.1f}%)." + asof(d)])
-        if d['beta'] is not None and d['beta'] <= T['steady_beta_max']:
+        if profitable and d['pe'] and 0 < d['pe'] <= thresholds['value_pe_max']:
+            tags.append(['Value', f"Priced at {d['pe']:.1f} times last year's earnings, cheaper than {100 - pct_rank(d['pe'], pe_sp)}% of S&P 500 companies. The median S&P 500 stock trades at {thresholds['pe_median']:.1f} times. Value means the cheapest 20%." + asof(d)])
+        if d['revg'] is not None and d['revg'] >= thresholds['growth_revg_min']:
+            tags.append(['Growth', f"Revenue grew {d['revg']:.1f}% over the last year, faster than {pct_rank(d['revg'], g_sp)}% of S&P 500 companies. The median grew {thresholds['revg_median']:.1f}%. Growth means the fastest-growing 20%." + asof(d)])
+        if d['yield'] and d['yield'] >= thresholds['income_yield_min']:
+            tags.append(['Income', f"Pays a {d['yield']:.2f}% dividend yield, about ${d['yield']:.2f} a year per $100 invested. That beats {pct_rank(d['yield'], y_sp)}% of S&P 500 dividend payers; the median pays {thresholds['yield_median']:.2f}%. Income means the top 20% of payers." + asof(d)])
+        if d['fcf_yield'] is not None and d['fcf_yield'] >= thresholds['cash_fcfy_min']:
+            tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], f_sp)}% of S&P 500 companies (median {thresholds['fcfy_median']:.1f}%)." + asof(d)])
+        if d['beta'] is not None and d['beta'] <= thresholds['steady_beta_max']:
             tags.append(['Steady', f"Beta of {d['beta']:.2f}: when the market has moved 10%, this stock has typically moved about {10 * d['beta']:.0f}%. Among the calmest 20% of the S&P 500." + asof(d)])
-        if d['beta'] is not None and d['beta'] >= T['rollercoaster_beta_min']:
+        if d['beta'] is not None and d['beta'] >= thresholds['rollercoaster_beta_min']:
             tags.append(['Rollercoaster', f"Beta of {d['beta']:.2f}: when the market has moved 10%, this stock has typically moved about {10 * d['beta']:.0f}%, in either direction. Among the most volatile 20% of the S&P 500." + asof(d)])
         if d['mcap'] and d['mcap'] >= GIANT_MCAP:
             tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies." + asof(d)])
         if d['price'] and d['w52_high'] and d['price'] <= BEATEN_DOWN * d['w52_high']:
             tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}." + asof(d)])
-        if (d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '') and d['roic'] >= T['quality_roic_min']
+        if (d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '') and d['roic'] >= thresholds['quality_roic_min']
                 and d['de'] is not None and 0 <= d['de'] < QUALITY_MAX_DE):
             tags.append(['Quality', f"Earns {d['roic']:.1f}% a year on the money invested in the business, better than {pct_rank(d['roic'], q_sp)}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {d['de']:.2f})." + asof(d)])
         d['tags'] = [{'tag': t, 'tip': tip} for t, tip in tags]
 
     out = {'generated_by': 'tools/style_tags.py', 'formulas': 'claude/TAG_FORMULAS.md',
            'universe': 'thresholds from S&P 500 members on reports/index.html (data-sp); applied to every report',
-           'thresholds': T, 'sample_sizes': N, 'excluded': EXCLUDE, 'reports': rows}
-    json.dump(out, open(os.path.join(R, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n'), indent=1, ensure_ascii=False)
+           'thresholds': thresholds, 'sample_sizes': sample_sizes, 'excluded': EXCLUDE, 'reports': rows}
+    with open(os.path.join(ROOT, 'data', 'style_tags.json'), 'w', encoding='utf-8', newline='\n') as fh:
+        json.dump(out, fh, indent=1, ensure_ascii=False)
 
     c = Counter(t['tag'] for d in live for t in d['tags'])
     print(f"{len(rows)} reports ({len(live)} tagged, {len(rows) - len(live)} excluded); S&P members used for thresholds: {len(sp)}")
-    for k, v in T.items():
+    for k, v in thresholds.items():
         print(f'  {k:24} {v}')
     for k, v in c.most_common():
         print(f'  {k:20} {v}')

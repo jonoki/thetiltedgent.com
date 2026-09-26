@@ -12,8 +12,10 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tools/
 
+import asset_cards  # noqa: E402
 import card_tags    # noqa: E402
 import deltabox     # noqa: E402
+import manifest     # noqa: E402
 import reportlib as rl   # noqa: E402
 import style_tags   # noqa: E402
 import verify       # noqa: E402
@@ -60,6 +62,47 @@ class Numbers(unittest.TestCase):
         self.assertEqual(rl.iso_date('September 10, 2026'), '2026-09-10')
         self.assertEqual(rl.iso_date('Sept 3, 2026'), '2026-09-03')
         self.assertIsNone(rl.iso_date('10/09/2026'))
+
+
+class StyleTagInputs(unittest.TestCase):
+    def test_quantile_and_rank_set_the_twenty_percent_cutoffs(self):
+        vals = [1, 2, 3, 4, 5]
+        self.assertEqual(style_tags.quantile(vals, 0.2), 1.8)
+        self.assertEqual(style_tags.quantile(vals, 0.8), 4.2)
+        self.assertEqual(style_tags.pct_rank(4, vals), 60)   # share strictly below, in %
+
+    def test_table_rows_reads_the_fin_table(self):
+        page = PAGE.replace('<tr><td>EPS (TTM)</td>', '<tr><td>Revenue Growth</td><td>12.5%</td></tr><tr><td>Beta</td><td>1.10</td></tr><tr><td>EPS (TTM)</td>')
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'acme_analysis.html')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write(page)
+            rows = style_tags.table_rows(p)
+        self.assertEqual(rows, {'pe_tbl': '24.1x', 'revg': '12.5%', 'beta': '1.10'})
+
+
+class ManifestFields(unittest.TestCase):
+    def test_as_of_date_range_takes_the_first_day(self):
+        warn = []
+        self.assertEqual(manifest.as_of_date('Static data as of August 19–20, 2026', warn), '2026-08-19')
+        self.assertEqual(warn, ['as_of_was_a_date_range'])
+
+    def test_unparseable_page_gives_warnings_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'blank_analysis.html')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write('<html></html>')
+            rec = manifest.extract(p, {})
+        self.assertNotIn('price', rec)
+        self.assertIn('price_missing', rec['warnings'])
+        self.assertIn('title_unparsed', rec['warnings'])
+
+
+class AssetCards(unittest.TestCase):
+    def test_first_sentence_does_not_split_on_us(self):
+        page = ('<body><div class="section-title">01 What it is</div><p>What it is. The U.S. government borrows for ten '
+                'years through this note. It pays interest twice a year.</p><div class="section">')
+        self.assertEqual(asset_cards.first_sentence(page), 'The U.S. government borrows for ten years through this note.')
 
 
 class ReportPage(unittest.TestCase):
