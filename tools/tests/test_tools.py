@@ -14,11 +14,8 @@ import unittest.mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # tools/
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'tables'))
-
 import asset_cards  # noqa: E402
 import build_chips  # noqa: E402
-import build_tables  # noqa: E402
 import card_tags    # noqa: E402
 import chart_audit  # noqa: E402
 import chrome       # noqa: E402
@@ -332,8 +329,23 @@ class Chrome(unittest.TestCase):
             out = rl.read_text(p)
         self.assertIn('aria-current="page">Reports</a>', out)
         self.assertIn('<b>The fine print:</b> ours.', out)
-        self.assertIn('/assets/site.css', out)
-        self.assertIn('/assets/site.js', out)
+        self.assertIn('<meta charset="UTF-8">\n' + chrome.JS_CLASS, out)
+        self.assertIn(chrome.SITE_CSS + '\n<style>', out)
+        self.assertIn(chrome.SITE_JS + '\n</body>', out)
+
+    def test_missing_anchors_for_the_shared_wiring_are_errors(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'page.html')
+            for page, missing in (('<html><head></head><body><nav></nav></body></html>', 'charset'),
+                                  ('<html><head><meta charset="UTF-8"></head><body><nav></nav></html>', '</body>')):
+                with open(p, 'w', encoding='utf-8') as fh:
+                    fh.write(page)
+                with self.assertRaisesRegex(ValueError, missing):
+                    chrome.write_chrome(p, None, False)
+            with open(p, 'w', encoding='utf-8') as fh:   # no stylesheet yet: site.css goes before </head>
+                fh.write('<html><head><meta charset="UTF-8"></head><body><nav></nav></body></html>')
+            chrome.write_chrome(p, None, False)
+            self.assertIn(chrome.SITE_CSS + '\n</head>', rl.read_text(p))
 
     def test_a_page_without_a_nav_is_an_error(self):
         with tempfile.TemporaryDirectory() as d:
@@ -342,31 +354,6 @@ class Chrome(unittest.TestCase):
                 fh.write('<html><body></body></html>')
             with self.assertRaises(ValueError):
                 chrome.write_chrome(p, None, False)
-
-
-class TablesBuilder(unittest.TestCase):
-    def test_page_links(self):
-        first, second = build_tables.GAMES[0], build_tables.GAMES[1]
-        self.assertIn('<span></span>', build_tables.page_links(None, second))
-        self.assertIn(f'href="{first.slug}.html"', build_tables.page_links(first, None))
-        self.assertNotIn('class="next"', build_tables.page_links(first, None))
-
-    def test_crumbs_escape_the_current_title(self):
-        c = build_tables.crumbs(('blackjack.html', 'Blackjack'), 'Hold & Draw')
-        self.assertTrue(c.endswith('<a href="blackjack.html">Blackjack</a><span>/</span>Hold &amp; Draw</div>'))
-
-    def test_family_tabs(self):
-        self.assertIn('<a href="blackjack-variants.html" class="on">Variants</a>', build_tables.family_tabs('blackjack-variants'))
-        self.assertEqual(build_tables.family_tabs('roulette'), '')
-
-    def test_simulator_needs_one_advantage_play_box(self):
-        with self.assertRaises(ValueError):
-            build_tables.with_sim('<section class="game" id="x"></section>', 'x', 'SIM')
-        sec = build_tables.with_sim('<section class="game" id="x">\n' + build_tables.AP_MARKER + '</div></section>', 'x', 'SIM')
-        self.assertIn('class="game first"', sec)
-        self.assertIn('SIM\n' + build_tables.AP_MARKER, sec)
-        self.assertIn('n: 700', build_tables.sim_scripts('baccarat'))
-        self.assertIn('n: 500', build_tables.sim_scripts('craps'))
 
 
 class ChartAudit(unittest.TestCase):

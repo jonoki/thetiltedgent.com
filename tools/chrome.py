@@ -24,6 +24,11 @@ LINKS = [  # (key, label, href) — root-relative so the same markup works at an
 ]
 CTA = ('Take a Seat', '/#learn')
 
+# The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
+JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
+SITE_CSS = '<link rel="stylesheet" href="/assets/site.css">'
+SITE_JS = '<script src="/assets/site.js" defer></script>'
+
 PAGES = [  # (path, active nav key or None, has a footer)
     ('index.html', None, True),
     ('brand.html', None, True),
@@ -42,7 +47,7 @@ SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on t
 
 def nav(active: str | None) -> str:
     links = '\n'.join(
-        '      <a href="%s"%s>%s</a>' % (href, ' aria-current="page"' if key == active else '', label)
+        f'      <a href="{href}"' + (' aria-current="page"' if key == active else '') + f'>{label}</a>'
         for key, label, href in LINKS)
     return f'''<nav class="site" aria-label="Site">
   <div class="wrap navrow">
@@ -60,7 +65,7 @@ def nav(active: str | None) -> str:
 
 
 def footer(fine: str) -> str:
-    links = ' '.join('<a href="%s">%s</a>' % (href, label) for _, label, href in LINKS)
+    links = ' '.join(f'<a href="{href}">{label}</a>' for _, label, href in LINKS)
     return f'''<footer class="site">
   <div class="wrap foot">
     <div>
@@ -87,10 +92,20 @@ def old_fine(block: str) -> str:
     return SITE_FINE
 
 
-def write_chrome(path: str, active: str | None, has_footer: bool) -> bool:
+def insert_once(t: str, anchor: str, text: str, path: str, after: bool = False) -> str:
+    """t with text put just before (or after) the first anchor; ValueError naming the page when there is none."""
+    i = t.find(anchor)
+    if i < 0:
+        raise ValueError(f'{path}: no {anchor} to put {text.strip()[:40]} next to')
+    at = i + len(anchor) if after else i
+    return t[:at] + text + t[at:]
+
+
+def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rl.ROOT) -> bool:
     """Put the current nav (and footer) into one page and make sure it loads site.css and site.js.
-    Returns True when the page changed; raises ValueError when there is no nav or footer to replace."""
-    full = os.path.join(rl.ROOT, path)
+    Returns True when the page changed; raises ValueError, naming the page and what is missing, when there is
+    no nav or footer to replace or nowhere to put the shared wiring."""
+    full = os.path.join(repo, path)
     with open(full, encoding='utf-8', newline='') as fh:
         t = fh.read()
     before = t
@@ -103,15 +118,13 @@ def write_chrome(path: str, active: str | None, has_footer: bool) -> bool:
         if not m:
             raise ValueError(f'{path}: no <footer> found')
         t = t[:m.start()] + footer(old_fine(m.group(0))) + t[m.end():]
-    # the page's own inline menu script (the old copies open with this comment) is replaced by the shared one
-    t = re.sub(r'<script>\s*/\* Mobile nav toggle\..*?</script>\s*', '', t, flags=re.S)
-    if 'classList.add(\'js\')' not in t:
-        t = t.replace('<meta charset="UTF-8">', '<meta charset="UTF-8">\n<script>document.documentElement.classList.add(\'js\');</script>', 1)
-    if '/assets/site.css' not in t:
+    if JS_CLASS not in t:
+        t = insert_once(t, '<meta charset="UTF-8">', '\n' + JS_CLASS, path, after=True)
+    if SITE_CSS not in t:
         first_css = re.search(r'<link rel="stylesheet"|<style>', t)
-        t = t[:first_css.start()] + '<link rel="stylesheet" href="/assets/site.css">\n' + t[first_css.start():]
-    if '/assets/site.js' not in t:
-        t = t.replace('</body>', '<script src="/assets/site.js" defer></script>\n</body>', 1)
+        t = insert_once(t, first_css.group(0) if first_css else '</head>', SITE_CSS + '\n', path)
+    if SITE_JS not in t:
+        t = insert_once(t, '</body>', SITE_JS + '\n', path)
     if t == before:
         return False
     with open(full, 'w', encoding='utf-8', newline='\n') as fh:

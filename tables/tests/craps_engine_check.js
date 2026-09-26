@@ -1,4 +1,4 @@
-/* Checks tables/sim/craps-engine.js. Run from the repo root:  node tools/craps_engine_check.js
+/* Checks tables/sim/craps-engine.js. Run from the repo root:  node tables/tests/craps_engine_check.js
    1. Every edge, from exact fractions, against tables/sim/games.js and the table on tables/craps.html
       (value and colour band), and the published average rolls per pass / don't pass decision.
    2. Bellman check, exact: for every bet, in every state, under 64 rule sets, the expected value after
@@ -10,7 +10,7 @@
    Exits 1 on any failure. */
 'use strict';
 var fs = require('fs'), path = require('path'), vm = require('vm');
-var ROOT = path.join(__dirname, '..');
+var ROOT = path.join(__dirname, '..', '..');
 var CE = require(path.join(ROOT, 'tables/sim/craps-engine.js'));
 var num = CE.num, fq = CE.fq, Q = CE.Q;
 var fails = 0;

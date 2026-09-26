@@ -14,15 +14,16 @@ Each finds the repo from its own location, so the working directory only matters
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
 | `deltabox.py` | the "what changed since the last edition" box (September 2026 refreshes) | report pages without a box |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
-| `craps_engine_check.js` | exact-odds checks for the Craps Table engine (`node tools/craps_engine_check.js`) | nothing |
 
 `reportlib.py` is not run on its own: it is what every script above knows about the repo and a report page
 (the title, header price, chart series, 52-week range, page skeleton, index cards and the manifest's files).
-A change to the report markup is made there once. The Tables pages have their own builder,
-`tables/build_tables.py` (see `tables/CLAUDE.md`).
+A change to the report markup is made there once, including the metrics-table reader (`table_rows`) and what
+makes a page structurally sound (`structure_problems`), which `verify.py` gates on and `manifest.py` records.
+The Tables pages have their own builder, `tables/build_tables.py`, and their own checks in `tables/tests/`
+(see `tables/CLAUDE.md`).
 
 Tests: `py -3 -m unittest discover -s tools/tests -v`. Standard library only, like the scripts
-(`build_chips.py` alone needs fontTools).
+(`build_chips.py` alone needs fontTools). Every script's `main()` returns its exit status.
 
 After a batch of report builds or refreshes: `manifest.py`, then `style_tags.py`, then `card_tags.py`.
 

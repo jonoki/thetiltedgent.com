@@ -1,5 +1,5 @@
 /* The Tilted Gent — craps engine for the Craps Table. Vanilla JS, no dependencies; runs in the browser
-   (window.CrapsEngine) and in Node (module.exports) for tools/craps_engine_check.js.
+   (window.CrapsEngine) and in Node (module.exports) for tables/tests/craps_engine_check.js.
    Every probability is exact: counted from the 36 dice combinations and carried as a fraction.
    A bet's value V (expected net result from now until it settles, per $1) is derived from the same
    step() that settles it at the table, so the edge shown and the money paid cannot disagree.
