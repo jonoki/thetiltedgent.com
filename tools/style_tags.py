@@ -1,11 +1,11 @@
 """Style tags ("what kind of stock") for every report: inputs, thresholds, tags and tooltip text.
 
 usage: py -3 tools/style_tags.py            writes data/style_tags.json, prints counts
-Formulas and rationale: claude/TAG_FORMULAS.md. Read-only on reports; writes one data file.
+Formulas and rationale: claude/TAG_FORMULAS.md. Run tools/manifest.py first; writes one data file.
 
 Inputs per report:
-  manifest shard records (data/reports/*.json): price, market_cap, eps_ttm, pe_trailing, yield_pct, fcf, w52, as_of
-  the report's own metrics table (.fin-table): Revenue Growth, ROIC, Debt-to-Equity, Beta
+  manifest shard records (data/reports/*.json): price, market_cap, eps_ttm, pe_trailing, yield_pct, fcf, w52, as_of,
+    and fin_table: the report's metrics-table cells for Revenue Growth, ROIC, Debt-to-Equity, Beta and P/E
   reports/index.html cards: S&P 500 membership (data-sp) and the industry label
 Every raw text value is kept next to the parsed number so any tag can be traced back to the page.
 """
@@ -58,15 +58,8 @@ def money(s: str | None) -> float | None:
     return -v if (m.group(1) or m.group(2)) else v
 
 
-TABLE_ROWS = {'pe_tbl': r'^(Trailing P/E|P/E\b)', 'revg': r'^Revenue Growth', 'roic': r'^ROIC', 'de': r'^Debt[- ]to[- ]Equity', 'beta': r'^Beta'}
-
-
-def table_rows(path: str) -> dict[str, str]:
-    """The TABLE_ROWS cells of the report's metrics table (class fin-table), keyed as in TABLE_ROWS."""
-    m = re.search(r'<table class="fin-table".*?</table>', rl.read_text(path), re.S)
-    rows = rl.table_rows(m.group(0)) if m else []
-    found = {key: rl.row_value(rows, label, re.I) for key, label in TABLE_ROWS.items()}
-    return {key: value for key, value in found.items() if value is not None}
+# data/style_tags.json keeps each table cell under 'raw' with these names: manifest fin_table key -> raw key
+RAW_NAMES = {'pe_trailing': 'pe_tbl', 'revenue_growth': 'revg', 'roic': 'roic', 'debt_to_equity': 'de', 'beta': 'beta'}
 
 
 def quantile(vals: Sequence[float], p: float) -> float:
@@ -97,9 +90,11 @@ def fcf_yield(fcf: float | None, mcap: float | None, industry: str | None) -> fl
     return round(100 * fcf / mcap, 2)
 
 
-def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None, tbl: dict[str, str]) -> TagInputs:
+def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None) -> TagInputs:
     """One report's tag inputs: who it is about (the index card wins over the manifest), every parsed number,
     and under 'raw' the page text each number came from."""
+    cells = r.get('fin_table', {})
+    tbl = {RAW_NAMES[k]: v for k, v in cells.items()}
     industry = (card['card_industry'] if card else None) or r.get('industry')
     w52 = r.get('w52')
     pe, mcap, fcf = rl.first_number(r.get('pe_trailing')), money(r.get('market_cap')), usd_fcf(r.get('fcf'))
@@ -122,14 +117,12 @@ def tag_inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | None, tbl: di
 
 
 def load_tag_inputs(repo: str = rl.ROOT) -> list[TagInputs]:
-    """Tag inputs for every report in the manifest whose page exists, by slug."""
+    """Tag inputs for every report in the manifest, by slug. ValueError when the manifest predates fin_table."""
     cards = rl.parse_index_cards(repo)
-    rows = []
-    for slug, r in sorted(rl.load_report_records(repo).items()):
-        path = rl.report_path(slug, repo=repo)
-        if os.path.exists(path):
-            rows.append(tag_inputs(slug, r, cards.get(slug), table_rows(path)))
-    return rows
+    records = rl.load_report_records(repo)
+    if records and not any('fin_table' in r for r in records.values()):
+        raise ValueError('the manifest has no fin_table fields: run py -3 tools/manifest.py first')
+    return [tag_inputs(slug, r, cards.get(slug)) for slug, r in sorted(records.items())]
 
 
 def universe(sp: list[TagInputs]) -> dict[str, list[float]]:
@@ -227,8 +220,11 @@ def quality_tags(d: TagInputs, th: dict[str, float], u: dict[str, list[float]], 
     return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f})." + when]]
 
 
-def main(repo: str = rl.ROOT) -> int:
-    rows = load_tag_inputs(repo)
+def main(repo: str = rl.ROOT) -> int | str:
+    try:
+        rows = load_tag_inputs(repo)
+    except ValueError as e:
+        return str(e)
     live = [d for d in rows if 'excluded' not in d]
     sp = [d for d in live if d['sp500']]
     u = universe(sp)

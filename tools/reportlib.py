@@ -147,6 +147,19 @@ def table_rows(t: str) -> list[tuple[str, str]]:
     return rows
 
 
+# The .fin-table rows the style tags use, by the key the manifest stores them under: label patterns, case-insensitive.
+FIN_TABLE_ROWS = {'pe_trailing': r'^(Trailing P/E|P/E\b)', 'revenue_growth': r'^Revenue Growth', 'roic': r'^ROIC',
+                  'debt_to_equity': r'^Debt[- ]to[- ]Equity', 'beta': r'^Beta'}
+
+
+def fin_table(t: str) -> dict[str, str]:
+    """The FIN_TABLE_ROWS cells of the page's metrics table (class fin-table) as text, the first match for each."""
+    m = re.search(r'<table class="fin-table".*?</table>', t, re.S)
+    rows = table_rows(m.group(0)) if m else []
+    found = {key: row_value(rows, label, re.I) for key, label in FIN_TABLE_ROWS.items()}
+    return {key: value for key, value in found.items() if value is not None}
+
+
 def row_value(rows: list[tuple[str, str]], label: str, flags: int = 0) -> str | None:
     """The value of the first row whose label matches the regex label (re.match), else None."""
     return next((value for lab, value in rows if re.match(label, lab, flags)), None)
@@ -303,6 +316,7 @@ class ReportRecord(TypedDict, total=False):
     beta: float | str
     shares_out: float | str
     fcf: float | str
+    fin_table: dict[str, str]       # FIN_TABLE_ROWS cells of the .fin-table, as text (style_tags' inputs)
     metrics: dict[str, 'Metric']    # only with --full-metrics
 
 

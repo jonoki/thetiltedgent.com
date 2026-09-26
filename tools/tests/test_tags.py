@@ -1,4 +1,5 @@
 """Unit tests for the card data: style tags, head office, the what-changed box (style_tags, headoffice, card_tags, manifest).   Run from the repo root:  py -3 -m unittest discover -s tools/tests -v"""
+import json
 import os
 import tempfile
 import unittest
@@ -19,25 +20,24 @@ class StyleTagInputs(unittest.TestCase):
         self.assertEqual(style_tags.quantile(vals, 0.8), 4.2)
         self.assertEqual(style_tags.pct_rank(4, vals), 60)   # share strictly below, in %
 
-    def test_table_rows_reads_the_fin_table(self):
+    def test_fin_table_reads_the_metrics_table_cells(self):
         page = PAGE.replace('<tr><td>EPS (TTM)</td>', '<tr><td>Revenue Growth</td><td>12.5%</td></tr><tr><td>Beta</td><td>1.10</td></tr><tr><td>EPS (TTM)</td>')
-        with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, 'acme_analysis.html')
-            with open(p, 'w', encoding='utf-8') as fh:
-                fh.write(page)
-            rows = style_tags.table_rows(p)
-        self.assertEqual(rows, {'pe_tbl': '24.1x', 'revg': '12.5%', 'beta': '1.10'})
+        self.assertEqual(rl.fin_table(page), {'pe_trailing': '24.1x', 'revenue_growth': '12.5%', 'beta': '1.10'})
+        self.assertEqual(rl.fin_table('<table><tr><td>Beta</td><td>1.1</td></tr></table>'), {})   # only the fin-table
 
     def test_tag_inputs_prefer_the_card_and_fall_back_to_the_table_pe(self):
         r: rl.ReportRecord = {'ticker': 'ACM', 'industry': 'BANKS - REGIONAL', 'as_of': '2026-09-21', 'price': 50.0, 'w52': [40.0, 100.0],
-             'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1}
+             'market_cap': '$250.0B', 'fcf': '$20.0B', 'eps_ttm': '$2.00', 'yield_pct': 3.1,
+             'fin_table': {'pe_trailing': '25.0x', 'beta': '0.8'}}
         card: rl.IndexCard = {'ticker': 'ACME', 'card_name': 'Acme', 'card_industry': 'SOFTWARE', 'card_sector_key': None,
                               'indices': {'sp500_added': '2001-01-01', 'nasdaq100': False, 'dow30_added': None,
                                           'global_exchange': None}}
-        d = style_tags.tag_inputs('acme', r, card, {'pe_tbl': '25.0x', 'beta': '0.8'})
+        d = style_tags.tag_inputs('acme', r, card)
         self.assertEqual((d['ticker'], d['industry'], d['sp500'], d['pe'], d['beta']), ('ACME', 'SOFTWARE', True, 25.0, 0.8))
         self.assertEqual((d['mcap'], d['fcf_yield'], d['w52_high']), (250e9, 8.0, 100.0))
-        d = style_tags.tag_inputs('acme', r, None, {})
+        self.assertEqual(d['raw']['pe_tbl'], '25.0x')                          # the page text stays traceable
+        r = {k: v for k, v in r.items() if k != 'fin_table'}                   # type: ignore[assignment]
+        d = style_tags.tag_inputs('acme', r, None)
         self.assertEqual((d['ticker'], d['sp500'], d['fcf_yield'], d['pe']), ('ACM', False, None, None))   # banks: no FCF yield
 
 
@@ -128,6 +128,20 @@ class DeltaBox(unittest.TestCase):
         warn: list[str] = []
         manifest.editions(self.BOX, '2026-08-17', 816.64, warn)
         self.assertEqual(warn, ['delta_box_prior_edition_not_earlier'])
+
+
+class StyleTagsNeedTheNewManifest(unittest.TestCase):
+    def test_a_manifest_without_fin_table_stops_the_run(self):
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'data', 'reports'))
+            os.makedirs(os.path.join(repo, 'reports'))
+            with open(os.path.join(repo, 'reports', 'index.html'), 'w', encoding='utf-8') as fh:
+                fh.write('')
+            with open(os.path.join(repo, 'data', 'reports.json'), 'w', encoding='utf-8') as fh:
+                json.dump({'shards': {'x': 'data/reports/x.json'}}, fh)
+            with open(os.path.join(repo, 'data', 'reports', 'x.json'), 'w', encoding='utf-8') as fh:
+                json.dump({'reports': [{'slug': 'acme', 'price': 1.0}]}, fh)
+            self.assertIn('manifest.py', str(style_tags.main(repo)))
 
 
 if __name__ == '__main__':

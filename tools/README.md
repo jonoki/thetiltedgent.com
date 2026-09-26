@@ -37,7 +37,9 @@ separate record, so the manifest cannot drift from what is actually on the
 site. A field it cannot parse is left out of the record, and the record's
 warnings say why; nothing is guessed. Key metrics (P/E, EPS, yield, beta, FCF …)
 are stored as a number when the cell is a plain number, otherwise as the cell's
-text ("n/m", "$1.2B"); read them with `reportlib.first_number`.
+text ("n/m", "$1.2B"); read them with `reportlib.first_number`. Each record's `fin_table` holds the
+metrics-table cells the style tags use (P/E, revenue growth, ROIC, debt-to-equity, beta) as page text
+(schema_version 2, 26 Sep 2026); `style_tags.py` reads them from there and stops if the manifest is older.
 
 **Run it after every batch, and after any index rebuild.** The top-level
 `data/reports.json` carries a `reconciliation` block — report files vs index

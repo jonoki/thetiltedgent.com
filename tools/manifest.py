@@ -20,7 +20,7 @@ from typing import Mapping, cast
 
 import reportlib as rl
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2 (26 Sep 2026): fin_table, the style-tag inputs from the page's metrics table
 GENERATOR = 'tools/manifest.py'
 
 # Metrics a client-side live-price recompute needs: everything price-derived on the page can be rebuilt
@@ -207,13 +207,13 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
         'as_of': as_of, 'price': price, 'change_pct': change_pct(t), 'market_cap': meta_field(t, r'Mkt Cap'),
         'w52': w52, 'chart_points': points, 'chart_ok': chart_ok,
         'metrics_count': len(metrics), 'bytes': size, 'blob_sha': sha, 'structure_ok': struct_ok,
-        'editions': eds, 'delta_state': delta_state, 'warnings': warn or None,
+        'editions': eds, 'delta_state': delta_state, 'warnings': warn or None, 'fin_table': rl.fin_table(t),
     }
     rec.update(key_metrics(metrics))
     if full_metrics:
         rec['metrics'] = metrics
     # drop nulls: a missing key means "not extracted", which the warnings explain; the keys are ReportRecord's
-    return cast(rl.ReportRecord, {k: v for k, v in rec.items() if v is not None and v != []})
+    return cast(rl.ReportRecord, {k: v for k, v in rec.items() if v is not None and v != [] and v != {}})
 
 
 # ---------- the files ----------
