@@ -13,6 +13,7 @@ import math
 import os
 import re
 import sys
+from typing import NamedTuple
 
 import reportlib as rl
 
@@ -21,76 +22,109 @@ OUT_CARDS = os.path.join(rl.ROOT, 'assets', 'cards')
 CHIP_SIZE = 1080                 # chip SVG viewBox, square
 CARD_W, CARD_H = 750, 1050       # poker card, 2.5 x 3.5 in
 LATTICE_STEP = 34                # card-back diagonal lattice spacing
-
-GS = CMAP = UPM = None           # the loaded font's glyph set, character map and units per em (see load_font)
-
-
-def load_font(path: str) -> None:
-    """Load the Cinzel font the text is drawn in. Raises ImportError when fontTools is not installed."""
-    global GS, CMAP, UPM
-    from fontTools.ttLib import TTFont   # imported here: only this script needs fontTools
-    font = TTFont(path)
-    GS, CMAP, UPM = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
+MONOGRAM_GROUP = '<g transform="translate(540 540) scale(0.8772) translate(-685.5 -688.0)">'   # in the source mark
 
 
-def text_path(s: str, size: float, x: float, y: float, anchor: str = 'middle', spacing: float = 0) -> str:
-    """Return SVG <path>s for string s in Cinzel 700, baseline at y, sized in px."""
-    from fontTools.pens.svgPathPen import SVGPathPen   # see load_font
-    scale = size / UPM; parts = []; adv = 0
-    glyphs = [CMAP.get(ord(c)) for c in s]
-    widths = [GS[g].width if g else 0 for g in glyphs]
-    total = sum(w * scale for w in widths) + spacing * (len(s) - 1)
-    x0 = x - total / 2 if anchor == 'middle' else (x - total if anchor == 'end' else x)
-    for g, w in zip(glyphs, widths):
-        if g:
-            pen = SVGPathPen(GS); GS[g].draw(pen); d = pen.getCommands()
-            if d: parts.append('<path transform="translate(%.2f %.2f) scale(%.5f %.5f)" d="%s"/>' % (x0 + adv, y, scale, -scale, d))
-        adv += w * scale + spacing
-    return ''.join(parts)
+class Font:
+    """The Cinzel font the text is drawn in: its glyph set, character map and units per em."""
+
+    def __init__(self, path: str) -> None:
+        """Raises ImportError when fontTools is not installed."""
+        from fontTools.ttLib import TTFont   # imported here: only this script needs fontTools
+        font = TTFont(path)
+        self.glyphs, self.cmap, self.upm = font.getGlyphSet(), font.getBestCmap(), font['head'].unitsPerEm
+
+    def text_path(self, s: str, size: float, x: float, y: float, anchor: str = 'middle', spacing: float = 0) -> str:
+        """SVG <path>s for string s, baseline at y, sized in px; anchor is 'start', 'middle' or 'end'."""
+        from fontTools.pens.svgPathPen import SVGPathPen   # see __init__
+        scale = size / self.upm
+        names = [self.cmap.get(ord(c)) for c in s]
+        widths = [self.glyphs[g].width if g else 0 for g in names]
+        total = sum(w * scale for w in widths) + spacing * (len(s) - 1)
+        x0 = x - total / 2 if anchor == 'middle' else (x - total if anchor == 'end' else x)
+        parts, adv = [], 0.0
+        for g, w in zip(names, widths):
+            if g:
+                pen = SVGPathPen(self.glyphs)
+                self.glyphs[g].draw(pen)
+                d = pen.getCommands()
+                if d:
+                    parts.append(f'<path transform="translate({x0 + adv:.2f} {y:.2f}) scale({scale:.5f} {-scale:.5f})" d="{d}"/>')
+            adv += w * scale + spacing
+        return ''.join(parts)
+
+
+def cut(src: str, start: str, end: str, what: str, from_: int = 0) -> tuple[str, int]:
+    """(src from start through end, where it begins); ValueError naming the part of the mark when either is missing."""
+    i = src.find(start, from_)
+    j = src.find(end, i) if i >= 0 else -1
+    if j < 0:
+        raise ValueError(f'the chip mark has no {what} ({start!r} ... {end!r})')
+    return src[i:j + len(end)], i
 
 
 def read_mark(path: str) -> tuple[str, str]:
     """(the <defs> block, the monogram's paths) from the source chip mark."""
     with open(path, encoding='utf-8') as fh:
         src = fh.read()
-    defs = src[src.index('<defs>'):src.index('</defs>') + 7]
-    mono_start = src.index('<g transform="translate(540 540) scale(0.8772) translate(-685.5 -688.0)">')
-    mono = src[mono_start:src.index('</g>', mono_start) + 4]
-    return defs, mono[mono.index('>') + 1:-4]   # the paths only
+    defs, _ = cut(src, '<defs>', '</defs>', '<defs> block')
+    mono, _ = cut(src, MONOGRAM_GROUP, '</g>', 'monogram group')
+    return defs, mono[len(MONOGRAM_GROUP):-len('</g>')]   # the paths only
 
 
 def spots(a: str, b: str) -> str:
     """The eight edge spots: arcs at r=470, alternating colours a and b."""
     out = ''
     for i in range(8):
-        th0 = math.radians(i * 45 - 7.5); th1 = math.radians(i * 45 + 7.5)
-        x0, y0 = 540 + 470 * math.sin(th0), 540 - 470 * math.cos(th0); x1, y1 = 540 + 470 * math.sin(th1), 540 - 470 * math.cos(th1)
-        out += '<path d="M %.2f %.2f A 470 470 0 0 1 %.2f %.2f" fill="none" stroke-width="104" stroke-linecap="round" stroke="%s"/>\n' % (x0, y0, x1, y1, a if i % 2 == 0 else b)
+        th0, th1 = math.radians(i * 45 - 7.5), math.radians(i * 45 + 7.5)
+        x0, y0 = 540 + 470 * math.sin(th0), 540 - 470 * math.cos(th0)
+        x1, y1 = 540 + 470 * math.sin(th1), 540 - 470 * math.cos(th1)
+        colour = a if i % 2 == 0 else b
+        out += (f'<path d="M {x0:.2f} {y0:.2f} A 470 470 0 0 1 {x1:.2f} {y1:.2f}" fill="none" stroke-width="104" '
+                f'stroke-linecap="round" stroke="{colour}"/>\n')
     return out
 
 
-CHIPS = [  # value, inlay gradient (centre, mid, edge), rim/body field (chip colour, darker toward the edge), edge-spot colours, value text colour
-    (1,   ('#FBF6EA', '#F1E6CF', '#D9CDB0'), ('#F4EBD6', '#E6D9BC', '#C9BB9A'), ('#0B0913', '#C21E38'), '#7A1122'),
-    (5,   ('#D8334A', '#B71E36', '#8A1428'), ('#C42239', '#8F1A2B', '#5C0F1B'), ('#F1E6CF', '#0B0913'), '#F1E6CF'),
-    (25,  ('#2F9862', '#1F7A4D', '#145233'), ('#237A4E', '#175A38', '#0D3A24'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
-    (100, ('#2A2434', '#161120', '#08060E'), ('#1E1830', '#0E0B16', '#06050B'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
-    (500, ('#7A4CCB', '#5A339E', '#3B2170'), ('#5E38A8', '#452A80', '#2A1750'), ('#F1E6CF', '#D9A85C'), '#FFD57A'),
+class Chip(NamedTuple):
+    """One chip: its value, inlay gradient and rim/body field (centre, mid, edge; darker toward the edge),
+    edge-spot colours and value text colour."""
+    value: int
+    disc: tuple[str, str, str]
+    body: tuple[str, str, str]
+    spots: tuple[str, str]
+    text: str
+
+
+CHIPS = [
+    Chip(1,   ('#FBF6EA', '#F1E6CF', '#D9CDB0'), ('#F4EBD6', '#E6D9BC', '#C9BB9A'), ('#0B0913', '#C21E38'), '#7A1122'),
+    Chip(5,   ('#D8334A', '#B71E36', '#8A1428'), ('#C42239', '#8F1A2B', '#5C0F1B'), ('#F1E6CF', '#0B0913'), '#F1E6CF'),
+    Chip(25,  ('#2F9862', '#1F7A4D', '#145233'), ('#237A4E', '#175A38', '#0D3A24'), ('#F1E6CF', '#C21E38'), '#F1E6CF'),
+    Chip(100, ('#2A2434', '#161120', '#08060E'), ('#1E1830', '#0E0B16', '#06050B'), ('#F1E6CF', '#C21E38'), '#FFD57A'),
+    Chip(500, ('#7A4CCB', '#5A339E', '#3B2170'), ('#5E38A8', '#452A80', '#2A1750'), ('#F1E6CF', '#D9A85C'), '#FFD57A'),
 ]
 
 
-def chip_svg(defs: str, monogram: str, v: int, disc: tuple[str, str, str], body: tuple[str, str, str],
-             spot: tuple[str, str], txtc: str) -> str:
-    d = re.sub(r'<radialGradient id="body".*?</radialGradient>', '<radialGradient id="body" cx="38%%" cy="30%%" r="78%%"><stop offset="0" stop-color="%s"/><stop offset="0.55" stop-color="%s"/><stop offset="1" stop-color="%s"/></radialGradient>' % body, defs, flags=re.S)
-    d = re.sub(r'<radialGradient id="disc".*?</radialGradient>', '<radialGradient id="disc" cx="42%%" cy="34%%" r="72%%"><stop offset="0" stop-color="%s"/><stop offset="0.62" stop-color="%s"/><stop offset="1" stop-color="%s"/></radialGradient>' % disc, d, flags=re.S)
-    label = '$' + ('{:,}'.format(v))
-    val = text_path(label, 150 if v < 100 else 132, 540, 792, 'middle', 4)
-    tiny = text_path('THE TILTED GENT', 26, 540, 268, 'middle', 6)
+def gradient(gid: str, cx: str, cy: str, r: str, mid: str, colours: tuple[str, str, str]) -> str:
+    c0, c1, c2 = colours
+    return (f'<radialGradient id="{gid}" cx="{cx}" cy="{cy}" r="{r}"><stop offset="0" stop-color="{c0}"/>'
+            f'<stop offset="{mid}" stop-color="{c1}"/><stop offset="1" stop-color="{c2}"/></radialGradient>')
+
+
+def chip_svg(font: Font, defs: str, monogram: str, chip: Chip) -> str:
+    """One chip: the mark's defs with this chip's body and inlay gradients, its spots, value and the monogram."""
+    d = re.sub(r'<radialGradient id="body".*?</radialGradient>',
+               lambda _: gradient('body', '38%', '30%', '78%', '0.55', chip.body), defs, flags=re.S)
+    d = re.sub(r'<radialGradient id="disc".*?</radialGradient>',
+               lambda _: gradient('disc', '42%', '34%', '72%', '0.62', chip.disc), d, flags=re.S)
+    label = f'${chip.value:,}'
+    val = font.text_path(label, 150 if chip.value < 100 else 132, 540, 792, 'middle', 4)
+    tiny = font.text_path('THE TILTED GENT', 26, 540, 268, 'middle', 6)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {CHIP_SIZE} {CHIP_SIZE}" width="{CHIP_SIZE}" height="{CHIP_SIZE}" role="img" aria-label="The Tilted Gent {label} chip">
 <title>The Tilted Gent — {label} chip</title>
 {d}
 <g clip-path="url(#chipClip)">
   <circle cx="540" cy="540" r="540" fill="url(#body)"/>
-{spots(*spot)}  <circle cx="540" cy="540" r="540" fill="url(#sheen)"/>
+{spots(*chip.spots)}  <circle cx="540" cy="540" r="540" fill="url(#sheen)"/>
   <circle cx="540" cy="540" r="398" fill="none" stroke="url(#gold)" stroke-width="15"/>
   <circle cx="540" cy="540" r="374" fill="none" stroke="#D9A85C" stroke-width="3.5" opacity="0.55"/>
   <circle cx="540" cy="540" r="368" fill="#0A0305"/>
@@ -101,19 +135,22 @@ def chip_svg(defs: str, monogram: str, v: int, disc: tuple[str, str, str], body:
 {monogram}
   </g>
   <line x1="420" y1="676" x2="660" y2="676" stroke="#D9A85C" stroke-width="3" opacity="0.6"/>
-  <g fill="{txtc}">{val}</g>
+  <g fill="{chip.text}">{val}</g>
   <circle cx="540" cy="540" r="540" fill="url(#vig)"/>
 </g>
 </svg>
 '''
 
 
-def card_back_svg(defs: str, monogram: str) -> str:
-    lattice = ''.join('<line x1="%d" y1="0" x2="%d" y2="%d" stroke="#D9A85C" stroke-opacity="0.22" stroke-width="2"/>' % (x, x + CARD_H, CARD_H)
-                      for x in range(-CARD_H, CARD_W, LATTICE_STEP))
-    lattice += ''.join('<line x1="%d" y1="0" x2="%d" y2="%d" stroke="#D9A85C" stroke-opacity="0.22" stroke-width="2"/>' % (x, x - CARD_H, CARD_H)
-                       for x in range(0, CARD_W + CARD_H, LATTICE_STEP))
-    gold_defs = defs[defs.index('<linearGradient id="gold"'):defs.index('</linearGradient>') + 17]
+def lattice() -> str:
+    """The card back's diagonal lattice: lines one way, then the other, LATTICE_STEP apart."""
+    line = '<line x1="{}" y1="0" x2="{}" y2="{}" stroke="#D9A85C" stroke-opacity="0.22" stroke-width="2"/>'
+    return (''.join(line.format(x, x + CARD_H, CARD_H) for x in range(-CARD_H, CARD_W, LATTICE_STEP))
+            + ''.join(line.format(x, x - CARD_H, CARD_H) for x in range(0, CARD_W + CARD_H, LATTICE_STEP)))
+
+
+def card_back_svg(font: Font, defs: str, monogram: str) -> str:
+    gold_defs, _ = cut(defs, '<linearGradient id="gold"', '</linearGradient>', 'gold gradient')
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {CARD_W} {CARD_H}" width="{CARD_W}" height="{CARD_H}" role="img" aria-label="The Tilted Gent card back">
 <title>The Tilted Gent — card back</title>
 <defs>{gold_defs}
@@ -128,7 +165,7 @@ def card_back_svg(defs: str, monogram: str) -> str:
   <rect x="40" y="40" width="670" height="970" rx="24" fill="none" stroke="#D9A85C" stroke-width="2" opacity="0.7"/>
   <g clip-path="url(#innerClip)">
     <rect x="52" y="52" width="646" height="946" fill="url(#field)"/>
-    {lattice}
+    {lattice()}
     <ellipse cx="375" cy="470" rx="250" ry="290" fill="#06050B" opacity="0.72"/>
     <ellipse cx="375" cy="470" rx="250" ry="290" fill="none" stroke="url(#gold)" stroke-width="5"/>
     <ellipse cx="375" cy="470" rx="236" ry="276" fill="none" stroke="#D9A85C" stroke-width="1.5" opacity="0.6"/>
@@ -136,8 +173,8 @@ def card_back_svg(defs: str, monogram: str) -> str:
   <g transform="translate(375 470) scale(0.60) translate(-685.5 -688.0)">
 {monogram}
   </g>
-  <g fill="#D9A85C">{text_path('THE TILTED GENT', 34, 375, 830, 'middle', 7)}</g>
-  <g fill="#D9A85C" opacity="0.7">{text_path('MARKETS · ODDS · RISK', 20, 375, 872, 'middle', 5)}</g>
+  <g fill="#D9A85C">{font.text_path('THE TILTED GENT', 34, 375, 830, 'middle', 7)}</g>
+  <g fill="#D9A85C" opacity="0.7">{font.text_path('MARKETS · ODDS · RISK', 20, 375, 872, 'middle', 5)}</g>
 </g>
 </svg>
 '''
@@ -149,6 +186,7 @@ def write(path: str, text: str) -> None:
 
 
 def main(argv: list[str] | None = None) -> int | str:
+    """0 when every master is written, else what stopped it (a missing input, fontTools, a malformed mark)."""
     ap = argparse.ArgumentParser(description='Build the TTG chip and card-back SVG masters.')
     ap.add_argument('--font', required=True, help='Cinzel 700 font file (cinzel-latin-700-normal.woff)')
     ap.add_argument('--mark', required=True, help='the source chip mark, ttg-chip.svg')
@@ -157,13 +195,17 @@ def main(argv: list[str] | None = None) -> int | str:
     if missing:
         return f'not found: {", ".join(missing)}'
     try:
-        load_font(args.font)
+        font = Font(args.font)
     except ImportError:
         return 'build_chips.py needs fontTools: py -3 -m pip install fonttools'
-    defs, monogram = read_mark(args.mark)
-    for v, disc, body, spot, txtc in CHIPS:
-        write(os.path.join(OUT_CHIPS, 'ttg-chip-%d.svg' % v), chip_svg(defs, monogram, v, disc, body, spot, txtc))
-    write(os.path.join(OUT_CARDS, 'ttg-card-back.svg'), card_back_svg(defs, monogram))
+    try:
+        defs, monogram = read_mark(args.mark)
+        back = card_back_svg(font, defs, monogram)
+    except ValueError as e:
+        return f'{args.mark}: {e}'
+    for chip in CHIPS:
+        write(os.path.join(OUT_CHIPS, f'ttg-chip-{chip.value}.svg'), chip_svg(font, defs, monogram, chip))
+    write(os.path.join(OUT_CARDS, 'ttg-card-back.svg'), back)
     print('chips + card back written')
     return 0
 

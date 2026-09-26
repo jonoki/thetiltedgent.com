@@ -463,8 +463,28 @@ class Chips(unittest.TestCase):
         self.assertEqual(s.count('<path '), 8)
         self.assertEqual((s.count('#aaa'), s.count('#bbb')), (4, 4))
 
-    def test_imports_without_fonttools(self):
-        self.assertIsNone(build_chips.GS)   # the font is only loaded by main()
+    def test_read_mark_names_the_missing_part(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'mark.svg')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write('<svg><defs><linearGradient id="gold"></linearGradient></defs>'
+                         + build_chips.MONOGRAM_GROUP + '<path d="M0 0"/></g></svg>')
+            self.assertEqual(build_chips.read_mark(p),
+                             ('<defs><linearGradient id="gold"></linearGradient></defs>', '<path d="M0 0"/>'))
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write('<svg><defs></defs></svg>')
+            with self.assertRaisesRegex(ValueError, 'monogram group'):
+                build_chips.read_mark(p)
+
+    def test_a_chip_takes_its_own_gradients(self):
+        font = unittest.mock.Mock(spec=build_chips.Font)
+        font.text_path.return_value = ''
+        defs = '<defs><radialGradient id="body">old</radialGradient><radialGradient id="disc">old</radialGradient></defs>'
+        svg = build_chips.chip_svg(font, defs, '', build_chips.CHIPS[0])
+        self.assertIn('<radialGradient id="body" cx="38%" cy="30%" r="78%"><stop offset="0" stop-color="#F4EBD6"/>', svg)
+        self.assertIn('<stop offset="0.62" stop-color="#F1E6CF"/>', svg)
+        self.assertIn('aria-label="The Tilted Gent $1 chip"', svg)
+        self.assertNotIn('>old<', svg)
 
 
 if __name__ == '__main__':
