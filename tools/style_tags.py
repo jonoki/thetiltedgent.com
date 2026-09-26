@@ -16,6 +16,7 @@ import os
 import re
 import statistics
 from collections import Counter
+from typing import TypedDict
 
 import reportlib as rl
 from reportlib import first_number as num
@@ -34,6 +35,16 @@ GIANT_MCAP = 200e9          # convention, not an official line
 BEATEN_DOWN = 0.60          # price <= 60% of the 52-week high
 QUALITY_MAX_DE = 1.0
 PCT = 0.20                  # top / bottom 20% of S&P 500 members for every rank-based tag
+
+# One report's tag inputs (keys include 'yield', a keyword, hence the functional form). Each number sits next
+# to the page text it was read from, under 'raw'; 'tags' is added once the thresholds are known.
+TagInputs = TypedDict('TagInputs', {
+    'slug': str, 'ticker': str | None, 'as_of': str | None, 'industry': str | None, 'sp500': bool,
+    'raw': dict[str, str | float | None], 'price': float | None, 'w52_high': float | None, 'mcap': float | None,
+    'fcf': float | None, 'eps': float | None, 'pe': float | None, 'yield': float | None, 'revg': float | None,
+    'roic': float | None, 'de': float | None, 'beta': float | None, 'fcf_yield': float | None,
+    'excluded': str, 'tags': list[dict[str, str]],
+}, total=False)
 
 
 def money(s: str | None) -> float | None:
@@ -79,10 +90,18 @@ def pct_rank(v: float, vals: list[float]) -> int:
     return round(100 * sum(x < v for x in vals) / len(vals))
 
 
-def inputs(slug: str, r: dict, card: dict, tbl: dict[str, str]) -> dict:
+def usd_fcf(raw: object) -> float | None:
+    """Free cash flow in US dollars, or None when it is missing or quoted in another currency (which cannot be
+    divided by a US-dollar market cap)."""
+    if isinstance(raw, str) and '$' in raw and not FOREIGN_CCY.search(raw):
+        return money(raw)
+    return None
+
+
+def inputs(slug: str, r: rl.ReportRecord, card: rl.IndexCard | dict, tbl: dict[str, str]) -> TagInputs:
     """One report's tag inputs: every parsed number, with the raw text it came from under 'raw'."""
     w52 = r.get('w52') or [None, None]
-    d = {
+    d: TagInputs = {
         'slug': slug, 'ticker': card.get('ticker') or r.get('ticker'), 'as_of': r.get('as_of'),
         'industry': card.get('card_industry') or r.get('industry'),
         'sp500': bool((card.get('indices') or {}).get('sp500_added')),
@@ -92,9 +111,7 @@ def inputs(slug: str, r: dict, card: dict, tbl: dict[str, str]) -> dict:
     d['price'] = num(r.get('price'))
     d['w52_high'] = num(w52[1])
     d['mcap'] = money(r.get('market_cap'))
-    fcf_raw = r.get('fcf')
-    usd_fcf = isinstance(fcf_raw, str) and '$' in fcf_raw and not FOREIGN_CCY.search(fcf_raw)
-    d['fcf'] = money(fcf_raw) if usd_fcf else None
+    d['fcf'] = usd_fcf(r.get('fcf'))
     d['eps'] = num(r.get('eps_ttm'))
     d['pe'] = num(r.get('pe_trailing'))
     if d['pe'] is None:
@@ -110,7 +127,7 @@ def inputs(slug: str, r: dict, card: dict, tbl: dict[str, str]) -> dict:
     return d
 
 
-def load() -> list[dict]:
+def load() -> list[TagInputs]:
     cards = rl.parse_index_cards()
     rows = []
     for slug, r in sorted(rl.load_report_records().items()):
@@ -120,7 +137,7 @@ def load() -> list[dict]:
     return rows
 
 
-def universe(sp: list[dict]) -> dict[str, list[float]]:
+def universe(sp: list[TagInputs]) -> dict[str, list[float]]:
     """The S&P 500 members' values each rank-based tag is measured against."""
     return {
         'pe': [d['pe'] for d in sp if d['pe'] and d['pe'] > 0 and (d['eps'] is None or d['eps'] > 0)],
@@ -145,12 +162,12 @@ def thresholds_for(u: dict[str, list[float]]) -> dict[str, float]:
     return {k: round(v, 3) for k, v in th.items()}
 
 
-def as_of_note(d: dict) -> str:
+def as_of_note(d: TagInputs) -> str:
     x = datetime.date.fromisoformat(d['as_of'])
     return f" Figures as of {x:%b} {x.day}, {x.year}."
 
 
-def tags_for(d: dict, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
+def tags_for(d: TagInputs, th: dict[str, float], u: dict[str, list[float]]) -> list[list[str]]:
     """[tag, tooltip] pairs for one report. Formulas and rationale: claude/TAG_FORMULAS.md."""
     tags, when = [], as_of_note(d)
     profitable = d['eps'] is None or d['eps'] > 0
@@ -174,7 +191,7 @@ def tags_for(d: dict, th: dict[str, float], u: dict[str, list[float]]) -> list[l
     return tags
 
 
-def beta_tags(d: dict, th: dict[str, float], when: str) -> list[list[str]]:
+def beta_tags(d: TagInputs, th: dict[str, float], when: str) -> list[list[str]]:
     if d['beta'] is None:
         return []
     if d['beta'] <= th['steady_beta_max']:
@@ -184,7 +201,7 @@ def beta_tags(d: dict, th: dict[str, float], when: str) -> list[list[str]]:
     return []
 
 
-def quality(d: dict, th: dict[str, float]) -> bool:
+def quality(d: TagInputs, th: dict[str, float]) -> bool:
     return (d['roic'] is not None and not NO_QUALITY.search(d['industry'] or '') and d['roic'] >= th['quality_roic_min']
             and d['de'] is not None and 0 <= d['de'] < QUALITY_MAX_DE)
 

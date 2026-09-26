@@ -12,8 +12,26 @@ PASS: the EPS row's wording varies too much between reports for a pattern match 
 import os
 import re
 import sys
+from typing import TypedDict
 
 import reportlib as rl
+
+
+class CheckResult(TypedDict, total=False):
+    """verify.check() for one page: reportlib.structure_counts' keys plus these."""
+    price: float | None
+    n_labels: int | None
+    n_prices: int | None
+    last_price: float | None
+    price_match: bool
+    pe_stated: float | None
+    pe_calc: float | None
+    range: tuple[float, float]
+    range_ok: bool
+    date: str | None
+    title_ticker: str | None
+    title_ok: bool
+    OK: bool
 
 
 def table_cells(t: str) -> dict[str, str]:
@@ -46,7 +64,7 @@ def pe_pair(t: str, price: float | None) -> tuple[float | None, float | None]:
     return None, None
 
 
-def passes(o: dict, path: str) -> bool:
+def passes(o: CheckResult, path: str) -> bool:
     """The gate: a sound skeleton, the right canvas count, matched <style> tags, the chart ending on the header
     price, equal label and price counts, no site nav, the price inside its 52-week range and the title ticker
     matching the file name. Bond/cash reports (reports/fixed/) carry a third canvas, the yield curve."""
@@ -57,7 +75,7 @@ def passes(o: dict, path: str) -> bool:
                 and o.get('range_ok', True) and o['title_ok'])
 
 
-def check(path: str) -> dict:
+def check(path: str) -> CheckResult:
     t = rl.read_text(path)
     out = rl.structure_counts(t)   # a missing </head> (EXPD) or </style> (CAT, blank for five weeks) fails here
     price = rl.header_price(t)
@@ -84,7 +102,7 @@ def check(path: str) -> dict:
     return out
 
 
-def line(path: str, o: dict) -> str:
+def line(path: str, o: CheckResult) -> str:
     skel = ''.join(str(o[k]) for k in ('doctype', 'html', 'head', 'body', 'body_close', 'html_close'))
     return (f"{'PASS' if o['OK'] else 'FAIL'} {os.path.basename(path):22s} price={o['price']} last={o['last_price']} "
             f"n={o['n_labels']}/{o['n_prices']} skel={skel} canvas={o['canvas']} lines={o['lines']} "

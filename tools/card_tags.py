@@ -72,7 +72,7 @@ def hq_of(slug: str, text: str) -> list[str] | None:
     return [f'{country}-based', full]
 
 
-def load_json(*parts: str, default: dict | None = None) -> dict:
+def load_json(*parts: str, default: dict[str, object] | None = None) -> dict[str, object]:
     """A JSON file under the repo; `default` when it does not exist (None: it must exist)."""
     p = os.path.join(rl.ROOT, *parts)
     if default is not None and not os.path.exists(p):
@@ -81,7 +81,7 @@ def load_json(*parts: str, default: dict | None = None) -> dict:
         return json.load(fh)
 
 
-def hand_tags(h: dict) -> dict[str, list]:
+def hand_tags(h: dict[str, list]) -> dict[str, list]:
     """The ♥ what-you-know-them-for, ♠ theme and ★ key-people tags the report has."""
     c = {k: h[k] for k in ('hw', 'th') if h.get(k)}
     if h.get('pp'):
@@ -90,7 +90,8 @@ def hand_tags(h: dict) -> dict[str, list]:
     return c
 
 
-def card_for(slug: str, style: dict, record: dict, text: str, line: str | None, hand: dict, logo: dict) -> dict:
+def card_for(slug: str, style: dict[str, object], record: rl.ReportRecord | dict, text: str, line: str | None,
+             hand: dict[str, list], logo: dict[str, str]) -> dict[str, object]:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
     c = {}
     if style.get('tags'):

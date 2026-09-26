@@ -175,6 +175,58 @@ class IndexMembership(TypedDict):
     global_exchange: str | None  # home exchange of a non-US-index name
 
 
+class ReportRecord(TypedDict, total=False):
+    """One report in the manifest (data/reports/<sector>.json). A key is absent when it was not extracted;
+    the record's warnings say why. Key metrics are numbers when the page cell is a plain number, else its text."""
+    ticker: str
+    slug: str
+    name: str
+    sector_key: str
+    industry: str
+    industry_raw: str
+    exchange: str
+    sp500_added: str
+    ndx: bool
+    dow30_added: str
+    global_exchange: str
+    as_of: str                      # YYYY-MM-DD
+    price: float
+    change_pct: float
+    market_cap: str
+    w52: list[float | None]         # [low, high]
+    chart_points: int
+    chart_ok: bool
+    metrics_count: int
+    bytes: int
+    blob_sha: str
+    structure_ok: bool
+    editions: list[list]            # [as_of, price, note] per published edition, newest last
+    delta_state: str
+    warnings: list[str]
+    pe_trailing: float | str
+    pe_forward: float | str
+    peg: float | str
+    eps_ttm: float | str
+    yield_pct: float | str
+    beta: float | str
+    shares_out: float | str
+    fcf: float | str
+    metrics: dict[str, dict]        # only with --full-metrics
+
+
+class Manifest(TypedDict):
+    """data/reports.json."""
+    schema_version: int
+    generated_at: str
+    source: str
+    count: int
+    reconciliation: dict[str, object]
+    index_fields: list[str]
+    index: list[list]               # [ticker, slug, sector_key, as_of, price]
+    shards: dict[str, str]          # sector key -> path of its shard
+    shard_counts: dict[str, int]
+
+
 class IndexCard(TypedDict):
     ticker: str
     card_name: str
@@ -220,13 +272,13 @@ def parse_index_cards(repo: str = ROOT) -> dict[str, 'IndexCard']:
     return out
 
 
-def load_manifest(repo: str = ROOT) -> dict:
+def load_manifest(repo: str = ROOT) -> Manifest:
     """data/reports.json, the manifest's top-level file."""
     with open(os.path.join(repo, 'data', 'reports.json'), encoding='utf-8') as fh:
         return json.load(fh)
 
 
-def load_report_records(repo: str = ROOT) -> dict[str, dict]:
+def load_report_records(repo: str = ROOT) -> dict[str, ReportRecord]:
     """Every manifest record, slug -> record, from the shards the manifest lists (not every file in the
     folder, so a shard left over from an older build cannot add stale or duplicate records)."""
     recs = {}

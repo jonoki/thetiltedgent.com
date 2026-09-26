@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from typing import TypedDict
 
 import reportlib as rl
 
@@ -31,6 +32,21 @@ SPIN_RATIO_LO, SPIN_RATIO_HI = 0.9, 1.45
 ADJ_UNLABELLED_MIN = 10   # this many adjusted-close matches means the series is dividend-adjusted
 MIN_COMPARABLE = 30       # fewer comparable points than this usually means the labels did not parse
 MAX_LISTED = 60
+CENTURY = 2000          # two-digit chart years ('Sep '21') are 20xx
+
+
+class AuditRow(TypedDict, total=False):
+    """One report's audit result; 'err' alone when it could not be audited."""
+    slug: str
+    err: str
+    tick: str
+    asof: str | None
+    checked: int
+    bad: list[tuple[str, float, float, float]]   # (label, chart value, Yahoo close, % off)
+    adj_pts: int
+    step_pts: int
+    splits_after_asof: float
+    adj_labelled: bool
 
 
 class YahooError(Exception):
@@ -43,7 +59,7 @@ def parse_label(s: str) -> tuple[int, int] | None:
     m = re.match(r'([A-Za-z]{3})[a-z]*[\s\'’\-]*(\d{2,4})', s)
     if m and m.group(1).lower() in MON:
         y = int(m.group(2))
-        return (y + 2000 if y < 100 else y, MON[m.group(1).lower()])
+        return (y + CENTURY if y < 100 else y, MON[m.group(1).lower()])
     m = re.match(r'(\d{4})-(\d{2})', s)
     return (int(m.group(1)), int(m.group(2))) if m else None
 
@@ -82,7 +98,10 @@ def read_series(path: str) -> tuple[dict[tuple[int, int], tuple[float, float | N
     return monthly, splits
 
 
-def yahoo(slug: str, tick: str, asof_ym: tuple[int, int] | None) -> tuple[dict, list[tuple[str, float]]]:
+Monthly = dict[tuple[int, int], tuple[float, float | None]]   # (year, month) -> (close, adjclose)
+
+
+def yahoo(slug: str, tick: str, asof_ym: tuple[int, int] | None) -> tuple[Monthly, list[tuple[str, float]]]:
     """The monthly series for a report, from the cache when it reaches the report's as-of month."""
     path = os.path.join(CACHE, slug + '.ev.json')
     if not os.path.exists(path):
@@ -116,7 +135,7 @@ def classify(point: float, close: float, adjclose: float | None, spin: float) ->
     return 'wrong'
 
 
-def audit(slug: str, tick: str, asof: str | None) -> dict:
+def audit(slug: str, tick: str, asof: str | None) -> AuditRow:
     t = rl.read_text(os.path.join(rl.ROOT, 'reports', slug + '_analysis.html'))
     labels, prices = rl.chart_series(t)
     if not labels or not prices:
@@ -133,20 +152,30 @@ def audit(slug: str, tick: str, asof: str | None) -> dict:
     for dt, r in splits:
         if asof and dt > asof:
             after *= r
-    bad, n, adj_ok, step_ok = [], 0, 0, 0
-    for lab, pr in zip(labels[:-1], prices[:-1]):   # the last point is the as-of close, checked by verify.py
+    row = check_points(labels, prices, yh, splits, after, asof)
+    row.update({'slug': slug, 'tick': tick, 'asof': asof, 'splits_after_asof': after,
+                'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))})
+    return row
+
+
+def check_points(labels: list[str], prices: list[float], yh: Monthly, splits: list[tuple[str, float]],
+                 after: float, asof: str | None) -> AuditRow:
+    """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
+    verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones."""
+    asof_ym = tuple(int(x) for x in asof.split('-')[:2]) if asof else None
+    row: AuditRow = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0}
+    for lab, pr in zip(labels[:-1], prices[:-1]):
         ym = parse_label(lab)
         if not ym or ym not in yh or (asof_ym and ym >= asof_ym):
             continue
-        n += 1
+        row['checked'] += 1
         c, a = yh[ym]
         verdict = classify(pr, c * after, a * after if a else None, spin_factor(splits, ym, asof))
-        adj_ok += verdict == 'adjusted'
-        step_ok += verdict == 'basis step'
+        row['adj_pts'] += verdict == 'adjusted'
+        row['step_pts'] += verdict == 'basis step'
         if verdict == 'wrong':
-            bad.append((lab, pr, round(c * after, 2), round((pr - c * after) / (c * after) * 100, 1)))
-    return {'slug': slug, 'tick': tick, 'asof': asof, 'checked': n, 'bad': bad, 'adj_pts': adj_ok, 'step_pts': step_ok,
-            'splits_after_asof': after, 'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))}
+            row['bad'].append((lab, pr, round(c * after, 2), round((pr - c * after) / (c * after) * 100, 1)))
+    return row
 
 
 def main(argv: list[str] | None = None) -> int:

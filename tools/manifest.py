@@ -159,20 +159,20 @@ def structure_ok(t: str, warn: list[str]) -> bool:
     return not any(w.startswith(('document_skeleton', 'canvas_count')) for w in warn)
 
 
-def card_checks(card: dict, ticker: str | None, warn: list[str]) -> None:
+def card_checks(card: rl.IndexCard | dict, ticker: str | None, warn: list[str]) -> None:
     if not card:
         warn.append('not_carded_on_index')
     elif ticker and card.get('ticker') != ticker:
         warn.append(f"card_ticker_mismatch:{card.get('ticker')}")
 
 
-def key_metrics(metrics: dict) -> dict[str, float | str]:
+def key_metrics(metrics: dict[str, dict[str, str | float | None]]) -> dict[str, float | str]:
     """The KEY_METRICS the page has: the number when the cell is one, else its text."""
     return {key: (metrics[label]['number'] if metrics[label]['number'] is not None else metrics[label]['text'])
             for label, key in KEY_METRICS.items() if label in metrics}
 
 
-def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = False) -> dict:
+def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = False) -> rl.ReportRecord:
     """One report page -> its manifest record."""
     t = rl.read_text(path)
     slug = os.path.basename(path).replace('_analysis.html', '')
@@ -217,7 +217,7 @@ def extract(path: str, cards: dict[str, rl.IndexCard], full_metrics: bool = Fals
 
 # ---------- the files ----------
 
-def write_json(path: str, obj: dict) -> int:
+def write_json(path: str, obj: dict[str, object]) -> int:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(obj, fh, ensure_ascii=False, sort_keys=False, separators=(',', ':'), indent=None)
@@ -225,7 +225,7 @@ def write_json(path: str, obj: dict) -> int:
     return os.path.getsize(path)
 
 
-def reconciliation(reports: list[dict], cards: dict[str, rl.IndexCard]) -> dict:
+def reconciliation(reports: list[rl.ReportRecord], cards: dict[str, rl.IndexCard]) -> dict[str, object]:
     carded, filed = set(cards), {r['slug'] for r in reports}
     return {
         'report_files': len(filed),
@@ -238,7 +238,7 @@ def reconciliation(reports: list[dict], cards: dict[str, rl.IndexCard]) -> dict:
     }
 
 
-def print_coverage(reports: list[dict], full_metrics: bool) -> None:
+def print_coverage(reports: list[rl.ReportRecord], full_metrics: bool) -> None:
     fields = ['ticker', 'name', 'exchange', 'sector_key', 'industry', 'industry_raw', 'as_of', 'price',
               'change_pct', 'market_cap', 'w52', 'chart_points', 'eps_ttm', 'pe_forward', 'yield_pct']
     for f in fields:
