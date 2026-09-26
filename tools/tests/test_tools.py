@@ -297,12 +297,40 @@ class DeltaBox(unittest.TestCase):
         self.assertEqual(deltabox.day(datetime.date(2026, 9, 1)), '1 Sep 2026')
         self.assertEqual(deltabox.day(datetime.date(2026, 8, 17)), '17 Aug 2026')
 
+    BOX = deltabox.DeltaBox(prior_date='2026-08-17', prior_price=994.79, as_of='2026-09-01', price=816.64,
+                            state='fix', claim='It fell.', paras=['One.', 'Two.'], check='Checked.')
+
     def test_box_marks_direction_and_carries_the_prior_edition(self):
-        b = deltabox.box(deltabox.EDITIONS['stx'])
-        self.assertIn('tg-d--price', b)
+        b = deltabox.box(self.BOX)
+        self.assertIn('tg-d--fix', b)
+        self.assertIn('<span class="tg-d-tag">Corrected in this edition</span>', b)
         self.assertIn('data-prior-as-of="2026-08-17"', b)
-        self.assertIn('tg-d-pct dn', b)
+        self.assertIn('tg-d-pct dn">-17.9%', b)
         self.assertIn('17 Aug 2026 &rarr; 1 Sep 2026 &middot; 15 days', b)
+        self.assertIn('<p>One.</p>\n  <p>Two.</p>', b)
+
+    def test_the_box_round_trips_through_the_manifest_to_the_card(self):
+        """deltabox writes the prior edition into the page; manifest reads it back; card_tags shows it."""
+        warn = []
+        eds, state = manifest.editions(deltabox.box(self.BOX), '2026-09-01', 816.64, warn)
+        self.assertEqual((eds, state, warn), ([['2026-08-17', 994.79, 'previous edition'],
+                                               ['2026-09-01', 816.64, 'refreshed']], 'fix', []))
+        card = card_tags.card_for('acme', {}, {'editions': eds}, '', None, {}, None)
+        self.assertEqual(card['ed'], ['2026-09-01', '2026-08-17', 994.79])
+
+    def test_insert_box_adds_css_once_and_never_a_second_box(self):
+        page = ('<html><head><style>a{}</style><style>b{}</style></head><body>\n'
+                '<!-- ======== 01 COMPANY OVERVIEW ======== -->\n</body></html>')
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, 'acme_analysis.html')
+            with open(p, 'w', encoding='utf-8') as fh:
+                fh.write(page)
+            self.assertTrue(deltabox.insert_box(p, self.BOX))
+            self.assertFalse(deltabox.insert_box(p, self.BOX))
+            t = rl.read_text(p)
+        self.assertEqual(t.count(deltabox.CSS), 1)
+        self.assertLess(t.index('<style>b{}' + deltabox.CSS), t.index('</style></head>'))   # before the last </style>
+        self.assertLess(t.index('class="tg-d '), t.index('01 COMPANY OVERVIEW'))
 
 
 class Chrome(unittest.TestCase):

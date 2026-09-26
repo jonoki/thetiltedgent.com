@@ -17,9 +17,11 @@ import html
 import json
 import os
 import re
+import sys
 from collections import Counter
 
 import reportlib as rl
+from style_tags import TagInputs
 
 # Full names only, so a street or city word ("West Wen Yi Road", "New Delhi", "Prince Edward Island") never
 # reads as a state; multi-word names are matched whole, longest first.
@@ -72,9 +74,9 @@ def hq_of(slug: str, text: str) -> list[str] | None:
     return [f'{country}-based', full]
 
 
-def load_json(*parts: str, default: dict[str, object] | None = None) -> dict[str, object]:
+def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
     """A JSON file under the repo; `default` when it does not exist (None: it must exist)."""
-    p = os.path.join(rl.ROOT, *parts)
+    p = os.path.join(repo, *parts)
     if default is not None and not os.path.exists(p):
         return default
     with open(p, encoding='utf-8') as fh:
@@ -90,10 +92,18 @@ def hand_tags(h: dict[str, list]) -> dict[str, list]:
     return c
 
 
-def card_for(slug: str, style: dict[str, object], record: rl.ReportRecord | dict, text: str, line: str | None,
-             hand: dict[str, list], logo: dict[str, str]) -> dict[str, object]:
+def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
+    """The card's logo path relative to reports/, when assets/logos/index.json lists one and the file is there."""
+    ext = logo.get('ext')
+    if ext and os.path.exists(os.path.join(repo, 'assets', 'logos', f'{slug}.{ext}')):
+        return f'../assets/logos/{slug}.{ext}'
+    return None
+
+
+def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: str, line: str | None,
+             hand: dict[str, list], logo: str | None) -> dict[str, object]:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
-    c = {}
+    c: dict[str, object] = {}
     if style.get('tags'):
         c['st'] = [[t['tag'], t['tip']] for t in style['tags']]
     if style.get('yield') is not None:
@@ -101,7 +111,7 @@ def card_for(slug: str, style: dict[str, object], record: rl.ReportRecord | dict
     hq = hq_of(slug, text)
     if hq:
         c['hq'] = hq
-    eds = record.get('editions') or []
+    eds = (record.get('editions') if record else None) or []
     if len(eds) > 1:
         c['ed'] = [eds[-1][0], eds[-2][0], eds[-2][1]]
     if line:
@@ -109,31 +119,33 @@ def card_for(slug: str, style: dict[str, object], record: rl.ReportRecord | dict
     if slug in SP_NOTE:
         c['sp'] = SP_NOTE[slug]
     c.update(hand_tags(hand))
-    if logo.get('ext') and os.path.exists(os.path.join(rl.ROOT, 'assets', 'logos', f"{slug}.{logo['ext']}")):
-        c['lg'] = f"../assets/logos/{slug}.{logo['ext']}"
+    if logo:
+        c['lg'] = logo
     return c
 
 
-def main() -> None:
-    style = {d['slug']: d for d in load_json('data', 'style_tags.json')['reports']}
-    lines = load_json('claude', 'card_lines.json', default={})
-    hand = load_json('claude', 'hand_tags.json', default={})           # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
-    logos = load_json('assets', 'logos', 'index.json', default={})     # logo files + where each came from
-    man = rl.load_report_records()
+def main(repo: str = rl.ROOT) -> int:
+    style: dict[str, TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
+    lines = load_json(repo, 'claude', 'card_lines.json', default={})
+    hand = load_json(repo, 'claude', 'hand_tags.json', default={})           # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
+    logos = load_json(repo, 'assets', 'logos', 'index.json', default={})     # logo files + where each came from
+    records = rl.load_report_records(repo)
     out = {}
     for slug in sorted(style):
-        text = rl.read_text(os.path.join(rl.ROOT, 'reports', f'{slug}_analysis.html'))[:80000]
-        out[slug] = card_for(slug, style[slug], man.get(slug, {}), text, lines.get(slug), hand.get(slug) or {}, logos.get(slug) or {})
+        text = rl.read_text(rl.report_path(slug, repo=repo))[:80000]
+        out[slug] = card_for(slug, style[slug], records.get(slug), text, lines.get(slug), hand.get(slug) or {},
+                             logo_path(repo, slug, logos.get(slug) or {}))
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
-    p = os.path.join(rl.ROOT, 'data', 'card_tags.json')
+    p = os.path.join(repo, 'data', 'card_tags.json')
     with open(p, 'w', encoding='utf-8', newline='\n') as fh:
         json.dump(doc, fh, ensure_ascii=False, separators=(',', ':'))
-    print(f'{len(out)} cards -> {os.path.relpath(p, rl.ROOT)} ({os.path.getsize(p) // 1024} KB)')
+    print(f'{len(out)} cards -> {os.path.relpath(p, repo)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
     print('no HQ tag:', [slug for slug, c in out.items() if 'hq' not in c])
     print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()),
           ' hand tags:', sum('hw' in c for c in out.values()), ' logos:', sum('lg' in c for c in out.values()))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
