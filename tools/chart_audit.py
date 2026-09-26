@@ -39,13 +39,13 @@ class AuditRow(TypedDict, total=False):
     """One report's audit result; 'err' alone when it could not be audited."""
     slug: str
     err: str
-    tick: str
-    asof: str | None
+    ticker: str
+    as_of: str | None
     checked: int
     bad: list[tuple[str, float, float, float]]   # (label, chart value, Yahoo close, % off)
     adj_pts: int
     step_pts: int
-    splits_after_asof: float
+    splits_after_as_of: float
     adj_labelled: bool
 
 
@@ -64,10 +64,14 @@ def parse_label(s: str) -> tuple[int, int] | None:
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def fetch(slug: str, tick: str, path: str) -> None:
-    url = YAHOO_CHART.format(sym=YAHOO_SYMBOL.get(slug, tick.replace('.', '-')))
-    if not url.startswith('https://'):
-        raise YahooError(f'refusing non-https url {url}')
+def year_month(as_of: str | None) -> tuple[int, int] | None:
+    """'2026-09-21' -> (2026, 9); None stays None."""
+    return (int(as_of[:4]), int(as_of[5:7])) if as_of else None
+
+
+def fetch(slug: str, ticker: str, path: str) -> None:
+    """Download the Yahoo series for one report into path. Network, HTTP and timeout errors -> YahooError."""
+    url = YAHOO_CHART.format(sym=YAHOO_SYMBOL.get(slug, ticker.replace('.', '-')))
     try:
         body = urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=FETCH_TIMEOUT_S).read()  # nosec B310 - fixed https host
     except Exception as e:                        # network, HTTP or timeout: reported per report, not fatal
@@ -77,48 +81,64 @@ def fetch(slug: str, tick: str, path: str) -> None:
     time.sleep(FETCH_PAUSE_S)
 
 
-def read_series(path: str) -> tuple[dict[tuple[int, int], tuple[float, float | None]], list[tuple[str, float]]]:
-    """Cached Yahoo JSON -> ({(year, month): (close, adjclose)}, [(split date, ratio), ...])."""
-    with open(path, encoding='utf-8') as fh:
-        j = json.load(fh)
-    res = (j.get('chart') or {}).get('result')
-    if not res:
-        raise YahooError('no result')
-    res = res[0]
-    closes = res['indicators']['quote'][0].get('close') or []
-    adj = ((res['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(closes)
-    offset = res['meta'].get('gmtoffset') or 0
-    monthly = {}
-    for ts, c, a in zip(res.get('timestamp') or [], closes, adj):
-        if c is not None:
-            d = datetime.datetime.fromtimestamp(ts + offset, datetime.UTC)
-            monthly[(d.year, d.month)] = (c, a)
-    splits = sorted((datetime.datetime.fromtimestamp(int(k), datetime.UTC).date().isoformat(), v['numerator'] / v['denominator'])
-                    for k, v in (res.get('events') or {}).get('splits', {}).items())
-    return monthly, splits
-
-
 Monthly = dict[tuple[int, int], tuple[float, float | None]]   # (year, month) -> (close, adjclose)
+Splits = list[tuple[str, float]]                              # (ISO date, ratio), oldest first
 
 
-def yahoo(slug: str, tick: str, asof_ym: tuple[int, int] | None) -> tuple[Monthly, list[tuple[str, float]]]:
-    """The monthly series for a report, from the cache when it reaches the report's as-of month."""
-    path = os.path.join(CACHE, slug + '.ev.json')
-    if not os.path.exists(path):
-        fetch(slug, tick, path)
-    monthly, splits = read_series(path)
-    if asof_ym and monthly and max(monthly) < asof_ym:
-        fetch(slug, tick, path)
-        monthly, splits = read_series(path)
+def read_series(path: str) -> tuple[Monthly, Splits]:
+    """Cached Yahoo JSON -> ({(year, month): (close, adjclose)}, [(split date, ratio), ...]). A file that is not
+    a Yahoo chart response (truncated, an error page, a changed schema) raises YahooError, like a failed fetch."""
+    try:
+        with open(path, encoding='utf-8') as fh:
+            res = (json.load(fh).get('chart') or {}).get('result')
+        if not res:
+            raise YahooError('no result')
+        res = res[0]
+        closes = res['indicators']['quote'][0].get('close') or []
+        adj = ((res['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(closes)
+        offset = res['meta'].get('gmtoffset') or 0
+        monthly = {}
+        for ts, c, a in zip(res.get('timestamp') or [], closes, adj):
+            if c is not None:
+                d = datetime.datetime.fromtimestamp(ts + offset, datetime.UTC)
+                monthly[(d.year, d.month)] = (c, a)
+        splits = sorted((datetime.datetime.fromtimestamp(int(k), datetime.UTC).date().isoformat(), v['numerator'] / v['denominator'])
+                        for k, v in (res.get('events') or {}).get('splits', {}).items())
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError, ZeroDivisionError) as e:   # JSONDecodeError is a ValueError
+        raise YahooError(f'unreadable series ({type(e).__name__})') from e
     return monthly, splits
 
 
-def spin_factor(splits: list[tuple[str, float]], ym: tuple[int, int], asof: str | None) -> float:
+def yahoo(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, Splits]:
+    """The monthly series for a report: from the cache when the cached file reads and reaches the report's as-of
+    month, else fetched again (a refreshed report's newest points are never skipped silently)."""
+    path = os.path.join(CACHE, slug + '.ev.json')
+    if os.path.exists(path):
+        try:
+            monthly, splits = read_series(path)
+            if monthly and max(monthly) >= (year_month(as_of) or min(monthly)):
+                return monthly, splits
+        except YahooError:
+            pass                                  # a corrupt cache file is replaced below
+    fetch(slug, ticker, path)
+    return read_series(path)
+
+
+def splits_after(splits: Splits, as_of: str | None) -> float:
+    """Product of the splits dated after the as-of: Yahoo's closes are adjusted for them, the report is not."""
+    f = 1.0
+    for dt, r in splits:
+        if as_of and dt > as_of:
+            f *= r
+    return f
+
+
+def spin_factor(splits: Splits, ym: tuple[int, int], as_of: str | None) -> float:
     """Product of the small fractional "splits" (spin-offs, capital returns) dated after month ym and by the
     as-of; a real pre-spin close sits this factor above Yahoo's back-adjusted one."""
     f = 1.0
     for dt, r in splits:
-        if dt[:7] > f'{ym[0]}-{ym[1]:02d}' and (not asof or dt <= asof) and SPIN_RATIO_LO < r < SPIN_RATIO_HI and r != 1:
+        if dt[:7] > f'{ym[0]}-{ym[1]:02d}' and (not as_of or dt <= as_of) and SPIN_RATIO_LO < r < SPIN_RATIO_HI and r != 1:
             f *= r
     return f
 
@@ -135,42 +155,39 @@ def classify(point: float, close: float, adjclose: float | None, spin: float) ->
     return 'wrong'
 
 
-def audit(slug: str, tick: str, asof: str | None) -> AuditRow:
-    t = rl.read_text(os.path.join(rl.ROOT, 'reports', slug + '_analysis.html'))
+def audit(slug: str, ticker: str, as_of: str | None, repo: str = rl.ROOT) -> AuditRow:
+    """One report's chart against Yahoo; {'slug', 'err'} when it cannot be audited (no chart arrays, no series)."""
+    t = rl.read_text(rl.report_path(slug, repo=repo))
     labels, prices = rl.chart_series(t)
     if not labels or not prices:
         return {'slug': slug, 'err': 'arrays'}
-    asof_ym = tuple(int(x) for x in asof.split('-')[:2]) if asof else None
     try:
-        yh, splits = yahoo(slug, tick, asof_ym)
+        yh, splits = yahoo(slug, ticker, as_of)
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
-    # Yahoo's close is adjusted for every split it knows, including ones after the report's as-of (the report
-    # is on its as-of share basis) and spin-offs booked as fractional "splits" (a report may show the real
-    # pre-spin close). Both are a basis step, not a wrong point.
-    after = 1.0
-    for dt, r in splits:
-        if asof and dt > asof:
-            after *= r
-    row = check_points(labels, prices, yh, splits, after, asof)
-    row.update({'slug': slug, 'tick': tick, 'asof': asof, 'splits_after_asof': after,
+    row = check_points(labels, prices, yh, splits, as_of)
+    row.update({'slug': slug, 'ticker': ticker, 'as_of': as_of,
                 'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))})
     return row
 
 
-def check_points(labels: list[str], prices: list[float], yh: Monthly, splits: list[tuple[str, float]],
-                 after: float, asof: str | None) -> AuditRow:
+def check_points(labels: list[str], prices: list[float], yh: Monthly, splits: Splits, as_of: str | None) -> AuditRow:
     """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
-    verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones."""
-    asof_ym = tuple(int(x) for x in asof.split('-')[:2]) if asof else None
-    row: AuditRow = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0}
+    verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones.
+
+    Yahoo's close is adjusted for every split it knows, including ones after the report's as-of (the report
+    is on its as-of share basis) and spin-offs booked as fractional "splits" (a report may show the real
+    pre-spin close). Both are a basis step, not a wrong point."""
+    as_of_ym = year_month(as_of)
+    after = splits_after(splits, as_of)
+    row: AuditRow = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after}
     for lab, pr in zip(labels[:-1], prices[:-1]):
         ym = parse_label(lab)
-        if not ym or ym not in yh or (asof_ym and ym >= asof_ym):
+        if not ym or ym not in yh or (as_of_ym and ym >= as_of_ym):
             continue
         row['checked'] += 1
         c, a = yh[ym]
-        verdict = classify(pr, c * after, a * after if a else None, spin_factor(splits, ym, asof))
+        verdict = classify(pr, c * after, a * after if a else None, spin_factor(splits, ym, as_of))
         row['adj_pts'] += verdict == 'adjusted'
         row['step_pts'] += verdict == 'basis step'
         if verdict == 'wrong':
@@ -181,7 +198,7 @@ def check_points(labels: list[str], prices: list[float], yh: Monthly, splits: li
 def main(argv: list[str] | None = None) -> int:
     only = set(sys.argv[1:] if argv is None else argv)
     os.makedirs(CACHE, exist_ok=True)
-    rows = [audit(slug, tick, asof) for tick, slug, _sec, asof, _px in rl.load_manifest()['index']
+    rows = [audit(slug, ticker, as_of) for ticker, slug, _sector, as_of, _price in rl.load_manifest()['index']
             if not only or slug in only]
     with open(os.path.join(WORK, 'chart_audit.json'), 'w', encoding='utf-8') as fh:
         json.dump(rows, fh, indent=0)
@@ -193,10 +210,10 @@ def main(argv: list[str] | None = None) -> int:
           '| dividend-adjusted but unlabelled:', len(adj_unl), '| <30 comparable', len(unparsed))
     print('ADJ-UNLABELLED', [r['slug'] for r in adj_unl])
     print('BASIS STEPS (pre-spin real closes / split after as-of; not errors)',
-          [(r['slug'], r['step_pts'], r['splits_after_asof']) for r in rows if r.get('step_pts') or r.get('splits_after_asof', 1) != 1])
+          [(r['slug'], r['step_pts'], r['splits_after_as_of']) for r in rows if r.get('step_pts') or r.get('splits_after_as_of', 1) != 1])
     for r in sorted(flag, key=lambda r: -len(r['bad']))[:MAX_LISTED]:
         worst = max(r['bad'], key=lambda b: abs(b[3]))
-        print(f"{r['slug']:6} as-of {r['asof']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
+        print(f"{r['slug']:6} as-of {r['as_of']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
     print('ERR', [(r['slug'], r['err']) for r in errs][:20])
     print('LOWCOUNT', [(r['slug'], r['checked']) for r in unparsed][:40])
     return 1 if (flag or errs) else 0
