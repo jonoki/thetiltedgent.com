@@ -197,7 +197,8 @@ window.TTGSim = (function () {
     if (!root || !window.TTG_GAMES) return;
     var game = window.TTG_GAMES[opts.game]; if (!game) return;
     var h = readHash();
-    var state = { bet: game.bets[h.bet] ? h.bet : game.defaultBet, unit: +h.unit > 0 ? +h.unit : game.unit,
+    // own keys only: '#bet=constructor' or '#bet=toString' would otherwise find Object.prototype's members
+    var state = { bet: Object.prototype.hasOwnProperty.call(game.bets, h.bet) ? h.bet : game.defaultBet, unit: +h.unit > 0 ? +h.unit : game.unit,
                   n: +h.n > 0 ? Math.min(Math.round(+h.n), 20000) : (opts.n || 500), seed: +h.seed > 0 ? +h.seed : 20260910 };
     root.innerHTML = '';
     var wrap = el('div', 'simbox');
