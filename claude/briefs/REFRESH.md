@@ -19,6 +19,8 @@ The company reported earnings, or had material news, after this report's as-of d
 ## Step 1 — read the current report in full
 Record: its as-of date and header price (these become the delta box's "previous edition" values), what it says about the business, guidance, segments, catalysts.
 
+Treat the previous edition as a claim to check, not a source. Executive bios, company history (splits, IPO, fiscal-year length), index membership and every count or superlative you keep must be re-confirmed on a fetched page or dropped. On 25 Sep 2026 the AZO edition carried a wrong CFO bio, a false "never split" and a wrong 53-week year; errors you find this way make the delta box `tg-d--fix`.
+
 ## TASK A — numbers (always)
 New as-of = the most recent settled close (a stockanalysis history row WITH Adj. Close; do not use a row without it). Update:
 - header price/change, banner date ("Static data as of <Month D, YYYY> …"), market cap and every price-derived ratio (recompute at the new close);
