@@ -43,6 +43,14 @@ class CardTags(TypedDict, total=False):
     lg: str
 
 
+class HandTags(TypedDict, total=False):
+    """One report's entry in claude/hand_tags.json: [label, tooltip] tags per family, and the New CEO's start month."""
+    hw: list[list[str]]
+    th: list[list[str]]
+    pp: list[list[str]]
+    since: str
+
+
 def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
     """A JSON file under the repo; `default` when it does not exist (None: it must exist)."""
     p = os.path.join(repo, *parts)
@@ -52,7 +60,7 @@ def load_json(repo: str, *parts: str, default: dict | None = None) -> dict:
         return json.load(fh)
 
 
-def hand_tags(h: dict[str, list]) -> CardTags:
+def hand_tags(h: HandTags) -> CardTags:
     """The ♥ what-you-know-them-for, ♠ theme and ★ key-people tags the report has."""
     c: CardTags = {}
     if h.get('hw'):
@@ -74,7 +82,7 @@ def logo_path(repo: str, slug: str, logo: dict[str, str]) -> str | None:
 
 
 def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: str, line: str | None,
-             hand: dict[str, list], logo: str | None) -> CardTags:
+             hand: HandTags, logo: str | None) -> CardTags:
     """Everything on one report card besides its index badges (keys listed in the module docstring)."""
     c: CardTags = {}
     if style.get('tags'):
@@ -101,13 +109,13 @@ def card_for(slug: str, style: TagInputs, record: rl.ReportRecord | None, text: 
 def main(repo: str = rl.ROOT) -> int:
     style: dict[str, TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
     lines = load_json(repo, 'claude', 'card_lines.json', default={})
-    hand = load_json(repo, 'claude', 'hand_tags.json', default={})           # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
+    hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json', default={})         # ♥ ♠ ★ tags, checked (brief: claude/briefs/HANDTAGS.md)
     logos = load_json(repo, 'assets', 'logos', 'index.json', default={})     # logo files + where each came from
     records = rl.load_report_records(repo)
     out = {}
     for slug in sorted(style):
         text = rl.read_text(rl.report_path(slug, repo=repo))[:80000]
-        out[slug] = card_for(slug, style[slug], records.get(slug), text, lines.get(slug), hand.get(slug) or {},
+        out[slug] = card_for(slug, style[slug], records.get(slug), text, lines.get(slug), hand.get(slug, {}),
                              logo_path(repo, slug, logos.get(slug) or {}))
     doc = {'v': 1, 'source': 'tools/card_tags.py', 'cards': out}
     p = os.path.join(repo, 'data', 'card_tags.json')
