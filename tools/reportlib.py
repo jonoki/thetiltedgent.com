@@ -214,6 +214,7 @@ class StructureCounts(TypedDict):
     html_close: int
     style_open: int
     style_close: int
+    style_in_comment: int
     canvas: int
     lines: int
     sitenav: int
@@ -231,6 +232,8 @@ def structure_counts(t: str) -> StructureCounts:
         'html_close': t.count('</html>'),
         'style_open': len(re.findall(r'<style[\s>]', t)),
         'style_close': t.count('</style>'),
+        # a style tag written inside a CSS comment still ends the style element, but balances the two counts above
+        'style_in_comment': len(re.findall(r'/\*(?:(?!\*/).)*?</?style', t, re.S)),
         'canvas': t.count('<canvas'),
         'lines': t.count('\n'),
         'sitenav': t.count('tg-sitenav'),
@@ -248,12 +251,15 @@ def expected_canvases(path: str) -> int:
 def structure_problems(counts: StructureCounts, path: str) -> list[str]:
     """What is wrong with a page's skeleton, as manifest warning codes; empty for a sound page. The one
     definition of a sound report: verify.py gates on it and manifest.py records it. A missing </head> (EXPD)
-    or </style> (CAT, blank for five weeks) is caught here."""
+    or </style> (CAT, blank for five weeks) is caught here, and so is a style tag inside a CSS comment (the
+    delta-box CSS header, 30 Sep 2026), which ends the style element early and shows the rest of the CSS as text."""
     problems = []
     if not all(counts[k] == 1 for k in SKELETON):
         problems.append('document_skeleton_incomplete')
     if counts['style_open'] != counts['style_close']:
         problems.append('style_unbalanced')
+    if counts['style_in_comment']:
+        problems.append('style_tag_in_css_comment')
     if counts['canvas'] != expected_canvases(path):
         problems.append(f"canvas_count:{counts['canvas']}")
     if counts['sitenav']:

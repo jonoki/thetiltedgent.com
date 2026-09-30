@@ -66,6 +66,8 @@ class ReportPage(unittest.TestCase):
         self.assertEqual(problems(PAGE, 'reports/fixed/acme_analysis.html'), ['canvas_count:2'])   # bonds add the yield curve
         self.assertEqual(problems(PAGE.replace('</head>', '')), ['document_skeleton_incomplete'])
         self.assertEqual(problems(PAGE.replace('</style>', '')), ['style_unbalanced'])
+        self.assertEqual(problems(PAGE.replace('</style>', '/* paste into <style>, just before </style> */</style>')),
+                         ['style_tag_in_css_comment'])   # balanced counts, but the browser ends the style at the comment
         self.assertEqual(problems(PAGE.replace('<body>', '<body><nav id="tg-sitenav"></nav>')), ['has_legacy_sitenav'])
 
     def test_table_rows(self):
