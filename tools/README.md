@@ -13,6 +13,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
+| `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
 Two shared modules are not run on their own. `reportlib.py` is how a report page is read (the title, as-of
@@ -110,6 +111,21 @@ basis, so Yahoo's close is scaled back up), and a real pre-spin close where
 Yahoo books the spin-off as a small fractional split (IP, T, WDC, MMM …).
 Before 23 Sep 2026 the parser skipped charts declared with `var`/`let` or with
 labels like `'Sep \'21'` / `"Oct '21"`, so 13 reports were never audited.
+
+## `refresh_queue.py` — the earnings refresh queue
+
+    py -3 tools/refresh_queue.py                     # as of today; --today YYYY-MM-DD to replay a day
+
+Crosses the Nasdaq earnings calendar (one file per day, cached in `tasks/queue/calendar/`; the last 7 days are
+re-fetched each run) with each report's as-of date from the manifest. For every report whose company reported
+after its as-of: the release date and time, the T+2 as-of (NYSE holidays built in, `claude/briefs/REFRESH.md`),
+the status (upcoming, waiting for T+2, due, overdue after 5 sessions), the first-session move (Yahoo daily
+closes) and the tier: T1 for Dow 30, Nasdaq-100, a market cap of $200B or more, an EPS surprise of 10% or more,
+or a first-session move of 5% or more; T2 otherwise (the builder may still raise it on guidance or news).
+Writes `tasks/queue/queue.json` and `tasks/queue/today.md`, never the repo: `tasks/` is excluded from git.
+Nasdaq often drops a release's time once it has happened; the queue keeps the time an earlier fetch saw, and
+with no time at all it assumes after the close (the later T+2) and takes the larger of the two possible moves.
+Exits 1 if any calendar day could not be fetched.
 
 ## `build_chips.py` — chip and card-back masters
 
