@@ -13,6 +13,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
+| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
@@ -126,6 +127,22 @@ Writes `tasks/queue/queue.json` and `tasks/queue/today.md`, never the repo: `tas
 Nasdaq often drops a release's time once it has happened; the queue keeps the time an earlier fetch saw, and
 with no time at all it assumes after the close (the later T+2) and takes the larger of the two possible moves.
 Exits 1 if any calendar day could not be fetched.
+
+## `auto_refresh.py` — unattended refreshes onto the review branch
+
+    py -3 tools/auto_refresh.py --dry-run          # what would run today, and the first builder prompt
+    py -3 tools/auto_refresh.py                    # the scheduled run (--base origin/main by default)
+
+Keeps its own worktree (`.claude/worktrees/auto-refresh`, branch `claude/auto-refresh`, no upstream), merges the
+base in, copies the private agent files in, runs `refresh_queue.py`, and takes the due and overdue reports: every
+T1, then up to 8 T2 (`--t2-cap`), at most 2 attempts per report and print. For each, four at a time (`--jobs`):
+a headless `claude -p --agent ttg-report-builder`, then `--agent ttg-report-checker` with the builder's return,
+both in `dontAsk` mode with the tool allow-list in the script (no git, no deletes; denials are logged). Then it
+re-runs `verify.py` and `chart_audit.py` itself and commits the report only if both pass, LF only, and the checker
+did not say HOLD; anything else is reverted, with the rejected page and both agents' JSON results kept in
+`tasks/queue/runs/<date>/`. After the reports: manifest, style and card tags, `run_checks.py`, push of the review
+branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines collect in
+`tasks/queue/pitfalls_pending.md` for the next retro.
 
 ## `build_chips.py` — chip and card-back masters
 
