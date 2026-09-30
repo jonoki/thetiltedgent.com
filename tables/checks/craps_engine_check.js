@@ -9,8 +9,8 @@
       the bankroll balances to the cent, luck per roll averages zero, and after every roll every bet on the felt
       is one a dealer would book (audit).
    6. The table refuses every illegal bet on a list (put bets, come bets on the come-out, odds over the limit or
-      in the wrong units or on the wrong side, bets under the minimum, place and buy on one number, …) and books
-      the legal ones at their limits.
+      in the wrong units or on the wrong side, bets under the minimum or over the $500 maximum, …) and books
+      the legal ones at their limits (incl. place and buy on one number, and odds past the table maximum).
    Exits 1 on any failure. */
 'use strict';
 var fs = require('fs'), path = require('path'), vm = require('vm');
@@ -172,7 +172,7 @@ console.log('   ' + g.catalogue.length + ' bets; largest |z| = ' + worst.toFixed
 
 /* ---------- 5. a long session with a random bettor ---------- */
 /* Every bet on the felt must be one a dealer would book: whole dollars, the bet's unit and minimum, odds behind the
-   right side of a bet with a number and within the limit, one place-or-buy per number, and (between rolls) no line
+   right side of a bet with a number and within the limit, nothing but odds over the table maximum, and (between rolls) no line
    bet without a point and nothing left in the come boxes. Returns what is wrong. */
 function audit(T) {
   var bad = [], lines = {};
@@ -187,7 +187,7 @@ function audit(T) {
     }
     if (b.amount % g.unit(b.type, n)) bad.push(tag + ': not a multiple of $' + g.unit(b.type, n));
     if (b.amount < g.minBet(b.type, n)) bad.push(tag + ': under the $' + g.minBet(b.type, n) + ' minimum');
-    if (b.type === 'place' && T.find({ type: 'buy', num: b.num })) bad.push(tag + ': placed and bought');
+    if (!odds && b.amount > g.maxBet(b.type, n)) bad.push(tag + ': over the $' + g.rules.max + ' table maximum');
     if ((b.type === 'pass' || b.type === 'dontpass') && (lines[b.type] = (lines[b.type] || 0) + 1) > 1) bad.push(tag + ': two line bets');
     if ((b.type === 'pass' || b.type === 'dontpass') && (b.num == null) !== (T.point == null)) bad.push(tag + ': line bet out of step with the point');
     if ((b.type === 'come' || b.type === 'dontcome') && b.num == null) bad.push(tag + ': still in the come box after the roll');
@@ -264,8 +264,9 @@ var CASES = [
   [none, { type: 'hard', num: 5, amount: 5 }, 'a hard 5'],
   [none, { type: 'horn', amount: 5 }, 'a horn bet not in $4 units'],
   [none, { type: 'field', amount: 5 }, 'a field bet under the minimum'],
-  [function (X) { X.place({ type: 'place', num: 8, amount: 12 }); }, { type: 'buy', num: 8, amount: 20 }, 'buying the 8 while it is placed'],
-  [function (X) { X.place({ type: 'buy', num: 4, amount: 20 }); }, { type: 'place', num: 4, amount: 10 }, 'placing the 4 while it is bought'],
+  [none, { type: 'pass', amount: 510 }, 'a pass line bet over the $500 table maximum'],
+  [none, { type: 'place', num: 6, amount: 504 }, 'place 6 over the maximum ($498 in $6 units at a $500 table)'],
+  [function (X) { X.place({ type: 'field', amount: 500 }); }, { type: 'field', amount: 1 }, 'pressing a field bet past the maximum'],
 ];
 var refused = 0; CASES.forEach(function (c) { if (refuses(c[0], c[1], c[2])) refused++; });
 var X = g.Table({ seed: 3, bankroll: 1e6 }); withPoint(X, 6);
@@ -274,10 +275,13 @@ ok(contract, 'should refuse: taking down a pass line bet with a point');
 ok(dontOff, 'a don’t pass bet may be taken down');
 var legal = [[pt6, { type: 'odds', parent: 1, amount: 50 }], [pt6, { type: 'layodds', parent: 2, amount: 60 }], [pt5, { type: 'odds', parent: 1, amount: 40 }],
              [pt6, { type: 'come', amount: 10 }], [none, { type: 'place', num: 6, amount: 12 }], [none, { type: 'buy', num: 4, amount: 20 }],
-             [none, { type: 'lay', num: 4, amount: 40 }], [none, { type: 'hard', num: 8, amount: 1 }], [none, { type: 'horn', amount: 4 }]];
+             [none, { type: 'lay', num: 4, amount: 40 }], [none, { type: 'hard', num: 8, amount: 1 }], [none, { type: 'horn', amount: 4 }],
+             [function (X) { X.place({ type: 'place', num: 8, amount: 12 }); }, { type: 'buy', num: 8, amount: 20 }],   // placed and bought (Oki: allowed)
+             [none, { type: 'place', num: 6, amount: 498 }],
+             [function (X) { X.place({ type: 'pass', amount: 500 }); X.roll(2, 4); }, { type: 'odds', parent: 1, amount: 2500 }]];   // odds past the table max
 var booked = 0; legal.forEach(function (c) { var Y = g.Table({ seed: 3, bankroll: 1e6 }); c[0](Y); if (ok(Y.place(c[1]).ok, 'should book: ' + JSON.stringify(c[1]))) booked++; });
 console.log('\n6. Table rules: ' + refused + ' of ' + CASES.length + ' illegal bets refused, pass line with a point stays up: ' + (contract ? 'yes' : 'NO') +
-            '; ' + booked + ' of ' + legal.length + ' legal bets booked (full 3-4-5x odds, lay to 6x, $12 place 6, $20 buy, $40 lay, $1 hard 8, $4 horn)');
+            '; ' + booked + ' of ' + legal.length + ' legal bets booked (full 3-4-5x odds, lay to 6x, $12 place 6, $20 buy, $40 lay, $1 hard 8, $4 horn, place and buy on one number, $498 place 6, $2,500 odds behind a $500 pass)');
 
 console.log('\n' + (fails ? 'FAILED: ' + fails + ' check(s)' : 'ALL CHECKS PASS'));
 process.exit(fails ? 1 : 0);

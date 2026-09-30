@@ -5,7 +5,7 @@
 window.CrapsTable = (function () {
   'use strict';
   var CE = window.CrapsEngine;
-  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', start: 1000, bank: 1000, stayUp: true, chip: 5 };
+  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', max: 500, placeOnComeOut: false, start: 1000, bank: 1000, stayUp: true, chip: 5 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-crt') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) {} }
 
@@ -48,8 +48,8 @@ window.CrapsTable = (function () {
       case 'dontcome': return 'A don’t pass bet made while the point is on. Next roll: 2 or 3 wins, 12 pushes, 7 or 11 loses; any other number moves it behind that number, where it wins if a 7 comes first.';
       case 'odds': return 'Extra money behind a pass or come bet once it has a number, paid at the true odds of that number beating the 7. The house has no edge on it at all. This table allows ' + lim + '. Odds behind come bets are off on the come-out roll and come back to you if the bet settles then.';
       case 'layodds': return 'Extra money behind a don’t bet, laid at the true odds against the number. No house edge. At ' + lim + ' you may lay enough to win what the pass-side odds would win' + (R.odds === '345' ? ' (6x your flat bet on any number)' : '') + '.';
-      case 'place': return 'Wins if the number rolls before a 7; you choose the number, no come-out needed. Off on the come-out roll. It pays less than the true odds, and that gap is the house edge.';
-      case 'buy': return 'A place bet paid at the true odds, less a 5% commission charged ' + (R.buyVig === 'win' ? 'only when it wins' : 'up front, when the bet goes down') + '. Off on the come-out roll.';
+      case 'place': return 'Wins if the number rolls before a 7; you choose the number, no come-out needed. ' + (R.placeOnComeOut ? 'Working on the come-out roll too (called on in the table settings).' : 'Off on the come-out roll unless you call it working (table settings).') + ' It pays less than the true odds, and that gap is the house edge.';
+      case 'buy': return 'A place bet paid at the true odds, less a 5% commission charged ' + (R.buyVig === 'win' ? 'only when it wins' : 'up front, when the bet goes down') + '. ' + (R.placeOnComeOut ? 'Working on the come-out roll too.' : 'Off on the come-out roll unless you call it working.');
       case 'lay': return 'Bets that a 7 comes before the number. Paid at the true odds, less 5% of the win, charged ' + (R.layVig === 'win' ? 'only when it wins' : 'up front') + '. Working on every roll.';
       case 'hard': return 'Wins if the number rolls as a pair (3+3 for hard 6) before it rolls any other way or a 7 shows. ' + (R.hardOnComeOut ? 'Working on the come-out (the Las Vegas rule).' : 'Off on the come-out (the Atlantic City rule).');
       case 'big': return 'Wins even money if the number rolls before a 7. The same event as a Place 6 or 8, which pays 7:6 instead of 1:1.';
@@ -135,6 +135,8 @@ window.CrapsTable = (function () {
         sel('hardOnComeOut', 'Hardways on come-out', [['true', 'Working (Las Vegas)'], ['false', 'Off (Atlantic City)']], String(S.hardOnComeOut)) +
         sel('buyVig', 'Buy commission', [['win', 'On the win'], ['upfront', 'Up front']], S.buyVig) +
         sel('layVig', 'Lay commission', [['upfront', 'Up front'], ['win', 'On the win']], S.layVig) +
+        sel('placeOnComeOut', 'Place &amp; buy on come-out', [['false', 'Off (standard)'], ['true', 'Working']], String(S.placeOnComeOut)) +
+        sel('max', 'Table maximum', [[500, '$500'], [1000, '$1,000'], [2000, '$2,000'], [5000, '$5,000']], S.max) +
         sel('start', 'Buy-in', [[500, '$500'], [1000, '$1,000'], [5000, '$5,000']], S.start) +
         '<label class="cpt-toggle"><input type="checkbox" data-k="stayUp"' + (S.stayUp ? ' checked' : '') + '> Winning bets stay up</label>' +
         '<p class="cpt-note">Changing a table rule clears the felt and starts a new session.</p>' +
@@ -172,7 +174,8 @@ window.CrapsTable = (function () {
     var felt = $('.cpt-felt'), msg = $('.cpt-msg'), hint = $('.cpt-hint'), dice = $$('.cpt-dice .die');
     var throwEl = $('.cpt-throw'), resultEl = $('.cpt-result'), fly = $$('.cpt-throw .die'), skipThrow = null;
 
-    function rules() { return { odds: S.odds, field12: +S.field12, hardOnComeOut: S.hardOnComeOut === true || S.hardOnComeOut === 'true', buyVig: S.buyVig, layVig: S.layVig }; }   // one $10 table (the engine's minimum; Oki, 30 Sep 2026: no minimum option)
+    function rules() { return { odds: S.odds, field12: +S.field12, hardOnComeOut: S.hardOnComeOut === true || S.hardOnComeOut === 'true', buyVig: S.buyVig, layVig: S.layVig,
+                             placeOnComeOut: S.placeOnComeOut === true || S.placeOnComeOut === 'true', max: +S.max }; }   // the minimum is the engine's $10 (Oki, 30 Sep 2026: a maximum option, no minimum option)
     function newSession() {
       G = CE.create(rules()); T = G.Table({ bankroll: S.bank }); rebuys = 0; lastRoll = null;
       $('.z-field .fx').textContent = '2 pays double · 12 pays ' + (G.rules.field12 === 3 ? 'triple' : 'double');
@@ -240,6 +243,11 @@ window.CrapsTable = (function () {
       var a = Math.max(1, Math.round(S.chip / u)) * u, note = '';
       if (a !== S.chip) note = G.name(t, n) + ' goes down in $' + u + ' units so it pays in whole dollars.';
       if (have + a < mn) { a = mn - have; note = 'The minimum on ' + G.name(t, n) + ' is ' + usd(mn) + '.'; }
+      var mxb = G.maxBet(t, n);
+      if (mxb != null) {
+        if (have >= mxb) { say(G.name(t, n) + ' is at the table maximum: ' + usd(have) + '.', 'info'); return; }
+        if (have + a > mxb) { a = mxb - have; note = 'Filled to the table maximum: ' + usd(mxb) + ' on ' + G.name(t, n) + '.'; }
+      }
       if (p) {
         var room = Math.floor((G.maxOdds(t, n, p.amount) - have) / u) * u;
         if (room <= 0) { say('That’s the most ' + CE.ODDS_LABEL[G.rules.odds] + ' odds allow behind ' + usd(p.amount) + ' on the ' + n + ': ' + usd(have) + '.', 'info'); return; }
@@ -482,7 +490,7 @@ window.CrapsTable = (function () {
         (c.trueOdds ? '<dt>True odds</dt><dd>' + c.trueOdds + ' against</dd>' : '') +
         '<dt>Settles in</dt><dd>' + (CE.num(c.rolls) === 1 ? '1 roll' : CE.num(c.rolls).toFixed(2) + ' rolls on average') + '</dd>' +
         '<dt>Edge per roll</dt><dd>' + pct(c.perRollPct, 3) + '</dd>' +
-        '<dt>Bet size</dt><dd>' + (u > 1 ? 'multiples of ' + usd(u) + ', ' : '') + 'minimum ' + usd(mn) + (c.type === 'odds' || c.type === 'layodds' ? ', up to ' + CE.ODDS_LABEL[R.odds] : '') + '</dd>' +
+        '<dt>Bet size</dt><dd>' + (u > 1 ? 'multiples of ' + usd(u) + ', ' : '') + 'minimum ' + usd(mn) + (c.type === 'odds' || c.type === 'layodds' ? ', up to ' + CE.ODDS_LABEL[R.odds] + ' (the table maximum doesn’t apply to odds)' : ', maximum ' + usd(G.maxBet(c.type, c.num))) + '</dd>' +
         (b ? '<dt>Your bet</dt><dd>' + usd(b.amount) + ', worth ' + signed(T.v(b)) + ' on average from here</dd>' : '') + '</dl>' +
         '<p class="cpt-help">' + how(c.type, R) + '</p>' +
         (c.type === 'pass' || c.type === 'come' ? '<p class="cpt-help">With full ' + CE.ODDS_LABEL[R.odds] + ' odds behind it, the expected loss is still ' + pct(c.edgePct) + ' of the line bet, but only <b>' + pct(100 * CE.num(G.combo('pass').edge), 3) + '</b> of all the money you put up.</p>' : '') +

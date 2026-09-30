@@ -57,7 +57,8 @@
     placeOnComeOut: false,      // place and buy bets are off on the come-out unless called on
     hardOnComeOut: true,        // hardways work on the come-out (Las Vegas); false = Atlantic City
     comeOddsOnComeOut: false,   // odds behind come bets are off on the come-out (returned if the bet settles)
-    min: 10                     // table minimum for line, come, field and big 6/8 bets
+    min: 10,                    // table minimum for line, come, field and big 6/8 bets
+    max: 500                    // table maximum on every bet but odds (odds are capped by the odds limit)
   };
   var ODDS_LIMITS = ['1', '2', '3', '4', '345', '5', '10'];
   var ODDS_LABEL = { '1': '1x', '2': '2x', '3': '3x', '4': '4x', '345': '3-4-5x', '5': '5x', '10': '10x' };
@@ -175,6 +176,12 @@
       if (type === 'place') return Math.ceil(R.min / u) * u;
       return u;
     }
+    /* The most one bet may hold: the table maximum rounded down to the bet's unit; odds have no table cap. */
+    function maxBet(type, n) {
+      if (type === 'odds' || type === 'layodds') return null;
+      var u = unit(type, n);
+      return Math.floor(R.max / u) * u;
+    }
     function oddsMult(n) { return R.odds === '345' ? { 4: 3, 10: 3, 5: 4, 9: 4, 6: 5, 8: 5 }[n] : +R.odds; }
     /* Most odds allowed behind a flat bet of `flat` on point n. The don't side may lay enough to win
        what the pass odds would win: 3-4-5x lays 6x on every point (Wizard of Odds). */
@@ -242,7 +249,7 @@
     ['field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'].forEach(function (t) { entry(t); });
     var byKey = {}; catalogue.forEach(function (c) { byKey[c.key] = c; });
 
-    return { rules: R, step: step, value: value, rolls: rolls, edge: edge, vigRate: vigRate, unit: unit, minBet: minBet,
+    return { rules: R, step: step, value: value, rolls: rolls, edge: edge, vigRate: vigRate, unit: unit, minBet: minBet, maxBet: maxBet,
              oddsMult: oddsMult, maxOdds: maxOdds, combo: combo, catalogue: catalogue, byKey: byKey, band: band, name: name,
              Table: function (opts) { return new Table(this, opts || {}); } };
   }
@@ -307,13 +314,11 @@
       var mx = g.maxOdds(t, nt, p.amount);
       if (have + a > mx) return 'At ' + ODDS_LABEL[g.rules.odds] + ' the most you can ' + (t === 'odds' ? 'take' : 'lay') + ' behind $' + p.amount + ' on the ' + nt + ' is $' + mx + '.';
     } else if (NUMBERED[t] && (n == null || !g.byKey[t + n])) return 'Pick a number for that bet.';
-    if (t === 'place' || t === 'buy') {   // the dealer books a number as one bet: placed or bought, never both
-      var other = t === 'place' ? 'buy' : 'place';
-      if (this.find({ type: other, num: n })) return 'The ' + n + ' is already ' + (other === 'buy' ? 'bought' : 'placed') + '. A number is placed or bought, not both: take that bet down first.';
-    }
     var u = g.unit(t, nt), mn = g.minBet(t, nt);
     if ((have + a) % u) return name(g, t, nt) + ' goes down in multiples of $' + u + ' so it pays in whole dollars.';
     if (have + a < mn) return 'The minimum for ' + name(g, t, nt) + ' is $' + mn + '.';
+    var mxb = g.maxBet(t, nt);
+    if (mxb != null && have + a > mxb) return 'The most ' + name(g, t, nt) + ' can hold is $' + mxb + ' (the table maximum is $' + g.rules.max + '; odds are not capped by it).';
     var vig = num(g.vigRate(t, nt)) * a;
     if (a + vig > this.bank) return 'Not enough in the rack.';
     return null;
