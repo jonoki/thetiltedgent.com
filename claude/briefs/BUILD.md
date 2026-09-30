@@ -40,3 +40,5 @@ PRIVACY: never put the user's email, name or any personal data in any request (h
 - Analyst calls: firm, analyst, rating, prior→new target and date must all be on a fetched page; drop what isn't.
 - Search-result snippets and AI "summaries" are not sources. Label them ("as summarised by …") or leave the claim out.
 - Never write a count or superlative ("five straight years", "only cut", "same week") without checking it against your own data.
+- Short interest always carries its settlement date ("at the Sep 15 settlement"), never the date you read it.
+- Figures from financial statements (capex, cash flow, segments, debt) come from the filing's raw text, not a WebFetch summary; summaries returned wrong capex twice on one report (30 Sep 2026).
