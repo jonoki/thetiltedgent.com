@@ -5,7 +5,7 @@
 window.CrapsTable = (function () {
   'use strict';
   var CE = window.CrapsEngine;
-  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', min: 10, start: 1000, bank: 1000, stayUp: true, chip: 5 };
+  var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', start: 1000, bank: 1000, stayUp: true, chip: 5 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-crt') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) {} }
 
@@ -135,7 +135,6 @@ window.CrapsTable = (function () {
         sel('hardOnComeOut', 'Hardways on come-out', [['true', 'Working (Las Vegas)'], ['false', 'Off (Atlantic City)']], String(S.hardOnComeOut)) +
         sel('buyVig', 'Buy commission', [['win', 'On the win'], ['upfront', 'Up front']], S.buyVig) +
         sel('layVig', 'Lay commission', [['upfront', 'Up front'], ['win', 'On the win']], S.layVig) +
-        sel('min', 'Table minimum', [[5, '$5'], [10, '$10'], [25, '$25']], S.min) +
         sel('start', 'Buy-in', [[500, '$500'], [1000, '$1,000'], [5000, '$5,000']], S.start) +
         '<label class="cpt-toggle"><input type="checkbox" data-k="stayUp"' + (S.stayUp ? ' checked' : '') + '> Winning bets stay up</label>' +
         '<p class="cpt-note">Changing a table rule clears the felt and starts a new session.</p>' +
@@ -173,7 +172,7 @@ window.CrapsTable = (function () {
     var felt = $('.cpt-felt'), msg = $('.cpt-msg'), hint = $('.cpt-hint'), dice = $$('.cpt-dice .die');
     var throwEl = $('.cpt-throw'), resultEl = $('.cpt-result'), fly = $$('.cpt-throw .die'), skipThrow = null;
 
-    function rules() { return { odds: S.odds, field12: +S.field12, hardOnComeOut: S.hardOnComeOut === true || S.hardOnComeOut === 'true', buyVig: S.buyVig, layVig: S.layVig, min: +S.min }; }
+    function rules() { return { odds: S.odds, field12: +S.field12, hardOnComeOut: S.hardOnComeOut === true || S.hardOnComeOut === 'true', buyVig: S.buyVig, layVig: S.layVig }; }   // one $10 table (the engine's minimum; Oki, 30 Sep 2026: no minimum option)
     function newSession() {
       G = CE.create(rules()); T = G.Table({ bankroll: S.bank }); rebuys = 0; lastRoll = null;
       $('.z-field .fx').textContent = '2 pays double · 12 pays ' + (G.rules.field12 === 3 ? 'triple' : 'double');

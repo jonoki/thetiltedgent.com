@@ -307,6 +307,10 @@
       var mx = g.maxOdds(t, nt, p.amount);
       if (have + a > mx) return 'At ' + ODDS_LABEL[g.rules.odds] + ' the most you can ' + (t === 'odds' ? 'take' : 'lay') + ' behind $' + p.amount + ' on the ' + nt + ' is $' + mx + '.';
     } else if (NUMBERED[t] && (n == null || !g.byKey[t + n])) return 'Pick a number for that bet.';
+    if (t === 'place' || t === 'buy') {   // the dealer books a number as one bet: placed or bought, never both
+      var other = t === 'place' ? 'buy' : 'place';
+      if (this.find({ type: other, num: n })) return 'The ' + n + ' is already ' + (other === 'buy' ? 'bought' : 'placed') + '. A number is placed or bought, not both: take that bet down first.';
+    }
     var u = g.unit(t, nt), mn = g.minBet(t, nt);
     if ((have + a) % u) return name(g, t, nt) + ' goes down in multiples of $' + u + ' so it pays in whole dollars.';
     if (have + a < mn) return 'The minimum for ' + name(g, t, nt) + ' is $' + mn + '.';
