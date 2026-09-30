@@ -55,10 +55,34 @@ class AssetCards(unittest.TestCase):
 
 class Chrome(unittest.TestCase):
     def test_nav_marks_only_the_active_section(self):
-        n = chrome.nav('tables')
-        self.assertEqual(n.count('aria-current="page"'), 1)
-        self.assertIn('<a href="/tables/casino-games.html" aria-current="page">The Tables</a>', n)
+        n = chrome.nav('tables')   # a section is a <details>; its summary carries the mark
+        self.assertEqual(n.count('class="on"'), 1)
+        self.assertIn('<summary class="on">The Tables</summary>', n)
+        self.assertNotIn('aria-current', n)
+        self.assertEqual(chrome.nav('about').count('aria-current="page"'), 1)
         self.assertNotIn('aria-current', chrome.nav(None))
+        self.assertNotIn('class="on"', chrome.nav(None))
+
+    def test_nav_sections_and_badges(self):
+        n = chrome.nav(None)
+        self.assertEqual(n.count('<details class="navmenu"'), 2)
+        for href in ('/tables/craps-table.html', '/tables/blackjack-trainer.html', '/reports/?f=etf', '/reports/?f=fixed'):
+            self.assertIn(f'<a href="{href}">', n)
+        self.assertIn('aria-label="Learn (coming soon)">Learn <span class="soon">Soon</span></a>', n)
+        self.assertNotIn('/#tools', n)   # the Toolbox is a homepage section, in the footer only
+        self.assertIn('/#tools', chrome.footer(chrome.SITE_FINE))
+
+    def test_asset_stamp_replaces_an_old_one(self):
+        with tempfile.TemporaryDirectory() as repo:
+            p = os.path.join(repo, 'x.html')
+            rl.write_text(p, '<html><head><meta charset="UTF-8">\n<link rel="stylesheet" href="/assets/site.css?v=1">\n'
+                             '</head><body><nav>x</nav>\n<script src="/assets/site.js" defer></script>\n</body></html>')
+            chrome.write_chrome('x.html', None, False, repo)
+            out = rl.read_text(p)
+        self.assertEqual(out.count('/assets/site.css'), 1)
+        self.assertEqual(out.count('/assets/site.js'), 1)
+        self.assertIn(chrome.SITE_CSS, out)
+        self.assertIn(chrome.SITE_JS, out)
 
     def test_a_page_keeps_its_own_fine_print(self):
         own = '<footer><p><b>The fine print, craps edition.</b> A practice table.</p></footer>'
@@ -75,7 +99,7 @@ class Chrome(unittest.TestCase):
             self.assertTrue(chrome.write_chrome(p, 'reports', True))
             self.assertFalse(chrome.write_chrome(p, 'reports', True))   # a second run changes nothing
             out = rl.read_text(p)
-        self.assertIn('aria-current="page">Reports</a>', out)
+        self.assertIn('<summary class="on">Reports</summary>', out)
         self.assertIn('<b>The fine print:</b> ours.', out)
         self.assertIn('<meta charset="UTF-8">\n' + chrome.JS_CLASS, out)
         self.assertIn(chrome.SITE_CSS + '\n<style>', out)

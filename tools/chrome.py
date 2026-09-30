@@ -12,24 +12,60 @@ import os
 import re
 import subprocess
 import sys
+from typing import NamedTuple
 
 import reportlib as rl
 import repodata as rd
 
-LINKS = [  # (key, label, href) — root-relative so the same markup works at any depth
-    ('learn', 'Learn', '/#learn'),
-    ('tables', 'The Tables', '/tables/casino-games.html'),
-    ('degens', 'Le Degens', '/#degens'),
-    ('tools', 'The Toolbox', '/#tools'),
-    ('reports', 'Reports', '/reports/'),
-    ('about', 'The Gent', '/#about'),
+class NavLink(NamedTuple):
+    """A top-level link; badge is a short chip after the label (e.g. 'Soon')."""
+    key: str
+    label: str
+    href: str
+    badge: str = ''
+
+
+class NavMenu(NamedTuple):
+    """A top-level section that opens a panel of links, in headed groups of (label, href)."""
+    key: str
+    label: str
+    groups: list[tuple[str, list[tuple[str, str]]]]
+
+
+# The site nav (Oki, 30 Sep 2026): Learn and Le Degens stay, marked Soon; Reports and The Tables open panels, and
+# every trainer sits under The Tables. The Toolbox stays a homepage section, linked from the footer.
+# Hrefs are root-relative so the same markup works at any depth. Games follow the board's order (best grade first).
+NAV: list[NavLink | NavMenu] = [
+    NavLink('learn', 'Learn', '/#learn', 'Soon'),
+    NavMenu('reports', 'Reports', [('Reports', [
+        ('Stocks', '/reports/'), ('ETFs', '/reports/?f=etf'), ('Crypto', '/reports/?f=crypto'),
+        ('Bonds &amp; cash', '/reports/?f=fixed')])]),
+    NavMenu('tables', 'The Tables', [
+        ('Games, graded', [
+            ('All games: the grades', '/tables/casino-games.html'), ('Blackjack', '/tables/blackjack.html'),
+            ('Blackjack Variants', '/tables/blackjack-variants.html'), ('Video Poker', '/tables/video-poker.html'),
+            ('Craps', '/tables/craps.html'), ('Baccarat', '/tables/baccarat.html'),
+            ('Ultimate Texas Hold&rsquo;em', '/tables/ultimate-texas-holdem.html'),
+            ('Three Card Poker', '/tables/three-card-poker.html'), ('Roulette', '/tables/roulette.html'),
+            ('Slots', '/tables/slots.html')]),
+        ('Trainers', [('Blackjack Trainer', '/tables/blackjack-trainer.html'),
+                      ('Craps Table', '/tables/craps-table.html')])]),
+    NavLink('degens', 'Le Degens', '/#degens', 'Soon'),
+    NavLink('about', 'The Gent', '/#about'),
 ]
+FOOT_LINKS = [('Learn', '/#learn'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
+              ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
 CTA = ('Take a Seat', '/#learn')
 
 # The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
-SITE_CSS = '<link rel="stylesheet" href="/assets/site.css">'
-SITE_JS = '<script src="/assets/site.js" defer></script>'
+# Bump ASSET_V whenever site.css or site.js changes: Pages caches for ten minutes, and new nav markup with the old
+# stylesheet shows an unstyled menu. write_chrome replaces any older stamp.
+ASSET_V = '20260930'
+SITE_CSS = f'<link rel="stylesheet" href="/assets/site.css?v={ASSET_V}">'
+SITE_JS = f'<script src="/assets/site.js?v={ASSET_V}" defer></script>'
+OLD_SITE_CSS = re.compile(r'<link rel="stylesheet" href="/assets/site\.css(?:\?v=[^"]*)?">')
+OLD_SITE_JS = re.compile(r'<script src="/assets/site\.js(?:\?v=[^"]*)?" defer></script>')
 
 PAGES = [  # (path, active nav key or None, has a footer)
     ('index.html', None, True),
@@ -47,10 +83,27 @@ SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on t
              "something — help exists and taking it is the +EV play.")
 
 
+def nav_item(item: NavLink | NavMenu, active: str | None) -> str:
+    """One top-level entry. A section is a native disclosure (<details>): it opens without JS and needs no ARIA
+    menu roles; site.js adds one-open-at-a-time, Esc, click-outside and the current page's mark."""
+    if isinstance(item, NavLink):
+        cur = ' aria-current="page"' if item.key == active else ''
+        if not item.badge:
+            return f'      <a href="{item.href}"{cur}>{item.label}</a>'
+        return (f'      <a href="{item.href}"{cur} aria-label="{item.label} (coming {item.badge.lower()})">'
+                f'{item.label} <span class="soon">{item.badge}</span></a>')
+    groups = '\n'.join(
+        f'          <div class="navgroup"><p class="navgh">{head}</p><ul>'
+        + ''.join(f'<li><a href="{href}">{label}</a></li>' for label, href in links) + '</ul></div>'
+        for head, links in item.groups)
+    on = ' class="on"' if item.key == active else ''
+    return (f'      <details class="navmenu" name="navmenu" data-menu="{item.key}"><summary{on}>{item.label}</summary>\n'
+            f'        <div class="navpanel{" navwide" if len(item.groups) > 1 else ""}">\n{groups}\n        </div>\n'
+            '      </details>')
+
+
 def nav(active: str | None) -> str:
-    links = '\n'.join(
-        f'      <a href="{href}"' + (' aria-current="page"' if key == active else '') + f'>{label}</a>'
-        for key, label, href in LINKS)
+    links = '\n'.join(nav_item(item, active) for item in NAV)
     return f'''<nav class="site" aria-label="Site">
   <div class="wrap navrow">
     <a class="navbrand" href="/">
@@ -67,7 +120,7 @@ def nav(active: str | None) -> str:
 
 
 def footer(fine: str) -> str:
-    links = ' '.join(f'<a href="{href}">{label}</a>' for _, label, href in LINKS)
+    links = ' '.join(f'<a href="{href}">{label}</a>' for label, href in FOOT_LINKS)
     return f'''<footer class="site">
   <div class="wrap foot">
     <div>
@@ -122,6 +175,7 @@ def write_chrome(path: str, active: str | None, has_footer: bool, repo: str = rd
         t = t[:m.start()] + footer(old_fine(m.group(0))) + t[m.end():]
     if JS_CLASS not in t:
         t = insert_once(t, '<meta charset="UTF-8">', '\n' + JS_CLASS, path, after=True)
+    t = OLD_SITE_JS.sub(SITE_JS, OLD_SITE_CSS.sub(SITE_CSS, t))   # restamp the version on pages that have them
     if SITE_CSS not in t:
         first_css = re.search(r'<link rel="stylesheet"|<style>', t)
         t = insert_once(t, first_css.group(0) if first_css else '</head>', SITE_CSS + '\n', path)

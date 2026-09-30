@@ -120,8 +120,8 @@ class Site:
         self.css = css[len('<style>'):-len('</style>')]
         # the shared wiring tools/chrome.py puts into the source: the js class (menu starts closed), site.css, site.js
         self.js_class = between(src, "<script>document.documentElement.classList.add('js')", '</script>')
-        self.site_css = between(src, '<link rel="stylesheet" href="/assets/site.css"', '>')
-        self.site_js = between(src, '<script src="/assets/site.js"', '</script>')
+        self.site_css = between(src, '<link rel="stylesheet" href="/assets/site.css', '>')   # with or without ?v=
+        self.site_js = between(src, '<script src="/assets/site.js', '</script>')
         self.nav = between(src, '<!-- ================= NAV ================= -->', '</nav>')
         self.footer = between(src, '<!-- ================= FOOTER ================= -->', '</footer>')
         self.hero = between(src, '<!-- ================= HERO ================= -->', '</div>\n</div>\n')
