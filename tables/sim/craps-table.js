@@ -125,7 +125,7 @@ window.CrapsTable = (function () {
 
   function mount(where) {
     var root = document.querySelector(where); if (!root || !CE) return;
-    var S = load(), G, T, rolling = false, lastCard = null, rebuys = 0, lastRoll = null;
+    var S = load(), G, T, rolling = false, lastCard = null, lastBetId = null, rebuys = 0, lastRoll = null;
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     root.innerHTML = '<div class="cpt">' +
@@ -158,6 +158,7 @@ window.CrapsTable = (function () {
           '<div class="cpt-money"><div><span class="k">Rack</span><b class="rack"></b></div><div><span class="k">On the felt</span><b class="onfelt"></b></div>' +
             '<div class="cpt-bankbtns"><button type="button" class="cpt-btn ghost small cpt-clear">Take down all</button><button type="button" class="cpt-btn ghost small cpt-rebuy" hidden>Rebuy</button></div></div>' +
         '</div>' +
+        '<section class="cpt-fl" aria-label="Bets on the felt"><div class="k">Bets on the felt</div><div class="cpt-fl-body"></div></section>' +
       '</div>' +
       '<aside class="cpt-side">' +
         '<div class="cpt-tabs" role="tablist">' +
@@ -468,14 +469,83 @@ window.CrapsTable = (function () {
       $$('.pile').forEach(function (p) { var v = p.dataset.chip; p.setAttribute('aria-pressed', String(v === String(S.chip))); p.disabled = v !== 'take' && +v > T.bank; });
       $('.rack').textContent = usd(T.bank); $('.onfelt').textContent = usd(T.onFelt());
       $('.cpt-rebuy').hidden = !(T.bank < G.minBet('pass') && !T.bets.length);
-      if (lastCard) showCard(lastCard);
+      if (lastCard) showCard(lastCard, lastBetId != null ? T.get(lastBetId) : null);
       renderOddsPoint();
+      renderFelt();
+    }
+
+    /* ---------- Bets on the felt: every bet down, its price and what it is worth from here ----------
+       No new game math: each row reads the engine.
+         house edge     = the catalogue edge of the bet as a fresh bet (odds 0)
+         worth from here = T.v(b) = V(state) x amount, the bet's expected net from this roll until it settles
+                           (the same figure as the bet card's "worth ... on average from here")
+         edge from here  = -sum(worth) / sum(amount)
+         edge as booked  = sum(edge x money put up) / sum(money put up); money put up = amount x (1 + upfront commission rate)
+         cost per roll   = sum(edge x money put up / average rolls to settle a fresh bet) = sum(perRollPct/100 x money put up),
+                           the cost of keeping this spread up, re-betting each bet as it settles; per hour = x 100 rolls (an estimate)
+         rolls to settle = G.rolls() of the bet in its current state, counting every roll as working */
+    var ORDER = ['pass', 'dontpass', 'come', 'dontcome', 'place', 'buy', 'lay', 'big', 'hard', 'field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'];
+    function catKey(b) { return b.type === 'pass' || b.type === 'dontpass' || b.type === 'come' || b.type === 'dontcome' ? b.type : b.type + (b.num != null ? b.num : ''); }
+    function rowName(b) {
+      if (b.type === 'odds' || b.type === 'layodds') return short(b);
+      if (b.type === 'pass' || b.type === 'dontpass') return G.name(b.type) + (b.num != null ? ', point ' + b.num : '');
+      if (b.type === 'come' || b.type === 'dontcome') return G.name(b.type) + (b.num != null ? ' on the ' + b.num : ' (in the box)');
+      return G.name(b.type, b.num);
+    }
+    function isOff(b) {
+      if (T.point != null) return false;
+      var R = G.rules;
+      return ((b.type === 'place' || b.type === 'buy') && !R.placeOnComeOut) || (b.type === 'hard' && !R.hardOnComeOut) || (b.type === 'odds' && b.come && !R.comeOddsOnComeOut);
+    }
+    function feltOrder() {
+      var top = T.bets.filter(function (b) { return b.parent == null; }).sort(function (a, b) {
+        return ORDER.indexOf(a.type) - ORDER.indexOf(b.type) || (a.num || 0) - (b.num || 0);
+      }), out = [], seen = {};
+      top.forEach(function (p) { out.push(p); seen[p.id] = 1; T.bets.forEach(function (x) { if (x.parent === p.id) { out.push(x); seen[x.id] = 1; } }); });
+      T.bets.forEach(function (x) { if (!seen[x.id]) out.push(x); });
+      return out;
+    }
+    function zoneFor(b) {
+      if (b.type === 'odds') return b.come ? felt.querySelector('.cs-come[data-n="' + b.num + '"]') : felt.querySelector('.z-odds[data-of="pass"]');
+      if (b.type === 'layodds') return b.come ? felt.querySelector('.cs-dc[data-n="' + b.num + '"]') : felt.querySelector('.z-layodds[data-of="dontpass"]');
+      if (b.type === 'pass' || b.type === 'dontpass' || b.type === 'come' || b.type === 'dontcome') return felt.querySelector('.z-' + b.type);
+      return felt.querySelector('.z-' + b.type + (b.num != null ? '[data-n="' + b.num + '"]' : ''));
+    }
+    function renderFelt() {
+      if (rolling) return;                       // the felt panel waits for the dice, like the felt itself
+      var body = $('.cpt-fl-body');
+      if (!T.bets.length) { body.innerHTML = '<p class="cpt-help">No bets down — the Pass line is the place to start.</p>'; return; }
+      var cls = function (x) { return x > 0.005 ? 'up' : x < -0.005 ? 'dn' : ''; };
+      var signed2 = function (x) { x = Math.round(x * 100) / 100; return (x > 0 ? '+' : x < 0 ? '−' : '') + '$' + Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      var sumAmt = 0, sumV = 0, sumPut = 0, sumBooked = 0, sumRoll = 0;
+      var h = '<div class="tw"><table class="cpt-t fl"><thead><tr><th>Bet</th><th>Amount</th><th>House edge</th><th>Worth on average from here</th></tr></thead><tbody>';
+      feltOrder().forEach(function (b) {
+        var c = G.byKey[catKey(b)], free = b.type === 'odds' || b.type === 'layodds';
+        var e = free || !c ? 0 : CE.num(c.edge), band = free || !c ? 'up' : c.band, pr = free || !c ? 0 : c.perRollPct / 100;
+        var put = b.amount * (1 + CE.num(G.vigRate(b.type, b.num))), v = T.v(b);
+        var r = CE.num(G.rolls({ type: b.type, num: b.num }));
+        sumAmt += b.amount; sumV += v; sumPut += put; sumBooked += e * put; sumRoll += pr * put;
+        var sub = (isOff(b) ? 'off on the come-out · ' : '') + (r === 1 ? 'settles next roll' : '~' + r.toFixed(1) + ' rolls to settle');
+        h += '<tr' + (b.parent != null ? ' class="kid"' : '') + '><td><button type="button" class="cpt-fl-b" data-id="' + b.id + '">' + esc(rowName(b)) + '</button><small>' + sub + '</small></td>' +
+          '<td>' + usd(b.amount) + '</td><td><span class="band ' + band + '">' + pct(100 * e) + '</span></td><td class="' + cls(v) + '">' + signed2(v) + '</td></tr>';
+      });
+      h += '</tbody><tfoot><tr><td>Total</td><td>' + usd(sumAmt) + '</td><td></td><td class="' + cls(sumV) + '">' + signed2(sumV) + '</td></tr></tfoot></table></div>';
+      var here = sumAmt ? -sumV / sumAmt * 100 : 0, booked = sumPut ? sumBooked / sumPut * 100 : 0;
+      var hb = here < 2 ? 'up' : here < 5 ? 'au' : 'dn', bb = booked < 2 ? 'up' : booked < 5 ? 'au' : 'dn';
+      var hereTxt = (here < -0.005 ? '−' : '') + pct(Math.abs(here));
+      h += '<div class="cpt-stats">' +
+        tile('Edge from here', '<span class="' + hb + '">' + hereTxt + '</span>', '', here < -0.005 ? 'in your favour: the spread as it stands' : 'what the spread as it stands gives up per dollar') +
+        tile('Edge as booked', '<span class="' + bb + '">' + pct(booked) + '</span>', '', 'each bet’s house edge, weighted by its size') +
+        tile('Cost per roll', usd(sumRoll), '', 'expected, if you keep this spread up') +
+        tile('Cost per hour', usd(sumRoll * 100), '', 'an estimate at about 100 rolls an hour') + '</div>';
+      body.innerHTML = h;
     }
 
     /* ---------- bet card (side pane + the one-line hint under the felt) ---------- */
-    function showCard(el) {
-      lastCard = el;
-      var t = el.dataset.t, k = keyFor(el), c = k && G.byKey[k], b = betFor(el), R = G.rules;
+    /* bet: the bet to describe when the spot alone doesn't say which (a come bet that has travelled to a number). */
+    function showCard(el, bet) {
+      lastCard = el; lastBetId = bet ? bet.id : null;
+      var t = el.dataset.t, k = keyFor(el), c = k && G.byKey[k], b = bet || betFor(el), R = G.rules;
       var pane = $('.cpt-pane[data-p="card"]');
       if (!c) {
         hint.innerHTML = '<b>' + (t === 'odds' ? 'Odds' : 'Lay odds') + '</b> · true odds · house edge <span class="band up">0.00%</span>';
@@ -585,9 +655,18 @@ window.CrapsTable = (function () {
     $('.cpt-clear').addEventListener('click', clearAll);
     $('.cpt-rebuy').addEventListener('click', function () { T.bank += +S.start; rebuys++; persist(); render(); renderSession(); say('Rebought for ' + usd(S.start) + '.', 'info'); });
     $('.rackrow').addEventListener('click', function (e) { var p = e.target.closest('.pile'); if (!p || p.disabled) return; S.chip = p.dataset.chip === 'take' ? 'take' : +p.dataset.chip; save(S); render(); });
+    function selectTab(tb) { $$('.cpt-tab').forEach(function (x) { var on = x === tb; x.classList.toggle('on', on); x.setAttribute('aria-selected', String(on)); }); $$('.cpt-pane').forEach(function (p) { p.hidden = p.dataset.p !== tb.dataset.p; }); }
+    /* A row in Bets on the felt opens that bet's card. */
+    $('.cpt-fl').addEventListener('click', function (e) {
+      var btn = e.target.closest('.cpt-fl-b'); if (!btn) return;
+      var b = T.get(+btn.dataset.id), el = b && zoneFor(b); if (!el) return;
+      selectTab($('.cpt-tab[data-p="card"]')); showCard(el, b);
+      var side = $('.cpt-side'), r = side.getBoundingClientRect();
+      if (r.top > window.innerHeight - 80 || r.bottom < 0) side.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
     $('.cpt-side').addEventListener('click', function (e) {
       var tb = e.target.closest('.cpt-tab');
-      if (tb) { $$('.cpt-tab').forEach(function (x) { var on = x === tb; x.classList.toggle('on', on); x.setAttribute('aria-selected', String(on)); }); $$('.cpt-pane').forEach(function (p) { p.hidden = p.dataset.p !== tb.dataset.p; }); if (tb.dataset.p === 'card' && lastCard) showCard(lastCard); return; }
+      if (tb) { selectTab(tb); if (tb.dataset.p === 'card' && lastCard) showCard(lastCard, lastBetId != null ? T.get(lastBetId) : null); return; }
       if (e.target.closest('.cpt-reset')) { S.bank = +S.start; newSession(); say('New session: ' + usd(S.start) + ' in the rack.', 'info'); persist(); }
     });
     $('.cpt-bar').addEventListener('change', function (e) {
