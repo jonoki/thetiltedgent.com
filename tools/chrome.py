@@ -49,7 +49,9 @@ NAV: list[NavLink | NavMenu] = [
             ('Three Card Poker', '/tables/three-card-poker.html'), ('Roulette', '/tables/roulette.html'),
             ('Slots', '/tables/slots.html')]),
         ('Trainers', [('Blackjack Trainer', '/tables/blackjack-trainer.html'),
-                      ('Craps Table', '/tables/craps-table.html')])]),
+                      ('Craps Table', '/tables/craps-table.html'),
+                      ('Baccarat Table', '/tables/baccarat-table.html'),
+                      ('Three Card Poker Table', '/tables/three-card-poker-table.html')])]),
     NavLink('degens', 'Le Degens', '/#degens', 'Soon'),
     NavLink('about', 'The Gent', '/#about'),
 ]
@@ -75,6 +77,8 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('tables/_source/casino-games-source.html', 'tables', True),
     ('tables/blackjack-trainer.html', 'tables', True),
     ('tables/craps-table.html', 'tables', True),
+    ('tables/baccarat-table.html', 'tables', True),
+    ('tables/three-card-poker-table.html', 'tables', True),
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "

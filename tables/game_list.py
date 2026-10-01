@@ -13,6 +13,8 @@ SLOTS_NO_SIM_NOTE = '''
     </div>'''
 
 CRAPS_TABLE_CALLOUT = '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice table.</b> The <a href="craps-table.html" style="color:var(--cyan-neon)">Craps Table</a> is a full layout with fair dice and play money: put chips anywhere on the felt and see what each bet pays, its true odds and its exact house edge before you roll, with a session recap that separates the house edge from luck. &rarr;</div>'''
+BACCARAT_TABLE_CALLOUT = '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice table.</b> The <a href="baccarat-table.html" style="color:var(--cyan-neon)">Baccarat Table</a> deals a real eight-deck shoe by the drawing rules, with play money: put chips on Banker, Player, Tie or the pairs and see each bet&rsquo;s exact house edge and what your bets are worth before the cards come out, with a session recap that separates the house edge from luck. &rarr;</div>'''
+TCP_TABLE_CALLOUT = '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice table.</b> The <a href="three-card-poker-table.html" style="color:var(--cyan-neon)">Three Card Poker Table</a> deals real hands with play money: bet the Ante and Pair Plus, see your three cards, and get the exact value of playing and of folding against every hand the dealer could hold, with a session recap that separates the house edge, your decisions and luck. &rarr;</div>'''
 BLACKJACK_TRAINER_CALLOUT = '''    <div class="callout" style="margin-top:22px;border-left-color:var(--cyan);background:rgba(31,203,227,.05);"><b>Practice room.</b> The <a href="blackjack-trainer.html" style="color:var(--cyan-neon)">Blackjack Trainer</a> is a simulated table for learning the chart and then the count: choose decks and rules, seat other players, set the deal speed, get every decision graded, and check your running count against the real one. &rarr;</div>'''
 
 
@@ -63,7 +65,7 @@ GAMES = [
          'Baccarat: coin-flipping in a tuxedo — Banker vs Player vs Tie, side bets, edge sorting, and a variance simulator.',
          ('b', 'B'), "Zero decisions, low edge, fast. The house's favourite game for a reason.",
          "Banker at 1.06% looks like nothing per hand. Run 700 hands — a long evening at the big table — and see what nothing adds up to.",
-         bets_per_session=700),
+         bets_per_session=700, more='ANALYSIS · SIMULATOR · TABLE', callout=BACCARAT_TABLE_CALLOUT),
     Game('ultimate-texas-holdem', 'ultimate-texas-holdem', "Ultimate Texas Hold'em",
          "Ultimate Texas Hold'em: poker's costume, the house's rules — raise strategy, Trips paytables, hole-carding, and a variance simulator.",
          ('b', 'B&minus;'), "Poker's costume, house's rules. Fun, strategic, and priced fairly if you raise 4x when you should.",
@@ -71,7 +73,8 @@ GAMES = [
     Game('three-card-poker', 'three-card-poker', 'Three Card Poker',
          'Three Card Poker: one decision, one trap — Q-6-4, Pair Plus paytables, and a variance simulator.',
          ('c', 'C+'), 'One decision (Q-6-4), one trap (Pair Plus), one pleasant hour.',
-         "Ante & Play versus Pair Plus on the 6-3-1 table, same unit, same hands. One of these is a game and one is a donation."),
+         "Ante & Play versus Pair Plus on the 6-3-1 table, same unit, same hands. One of these is a game and one is a donation.",
+         more='ANALYSIS · SIMULATOR · TABLE', callout=TCP_TABLE_CALLOUT),
     Game('roulette', 'roulette', 'Roulette',
          'Roulette: pick the wheel, not the bet — single, double and triple zero, la partage, wheel bias, and a variance simulator.',
          ('c', 'C&minus;'), 'Elegant, slow, and every bet on the felt costs the same — pick the wheel, not the bet.',
@@ -86,4 +89,6 @@ FAMILY_PAGES = [
                "Pick a variant and a rule set. The simulator plays <b>1,000 sessions</b> from a result shape calibrated to the published house edge (these are labelled approximate &mdash; the variants don't have the clean combinatorics of a single bet). Try Spanish 21 against Super Fun 21 at the same unit: same cards, a percentage point apart."),
 ]
 FAMILY_TABS = {'blackjack': [('blackjack.html', 'Blackjack'), ('blackjack-variants.html', 'Variants'), ('blackjack-trainer.html', 'Trainer')],
-               'craps': [('craps.html', 'Craps'), ('craps-table.html', 'Table')]}
+               'craps': [('craps.html', 'Craps'), ('craps-table.html', 'Table')],
+               'baccarat': [('baccarat.html', 'Baccarat'), ('baccarat-table.html', 'Table')],
+               'three-card-poker': [('three-card-poker.html', 'Three Card Poker'), ('three-card-poker-table.html', 'Table')]}
