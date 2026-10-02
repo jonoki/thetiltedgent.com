@@ -136,13 +136,15 @@ def git(wt: str, *args: str) -> str:
     return p.stdout
 
 
-def claude(agent: str, prompt: str, wt: str, log: str) -> dict:
+def claude(agent: str, prompt: str, wt: str, log: str, model: str | None = None) -> dict:
     """One headless agent session; its JSON result (or an error record) is also written to log."""
     exe = shutil.which('claude') or 'claude'
     # --strict-mcp-config with no --mcp-config: no MCP servers (Gmail, Drive, Playwright …); the agents use none of
     # them and their tool listings cost ~2.4k tokens on every call (measured 30 Sep 2026). Not --bare: it drops the login.
     cmd = [exe, '-p', '--agent', agent, '--permission-mode', 'dontAsk', '--permission-prompts', 'none',
-           '--strict-mcp-config', '--max-turns', MAX_TURNS, '--output-format', 'json', '--allowedTools', *ALLOWED_TOOLS, '--', prompt]
+           '--strict-mcp-config', '--max-turns', MAX_TURNS, '--output-format', 'json',
+           *(['--model', model] if model else []),   # else the agent file's model (Opus)
+           '--allowedTools', *ALLOWED_TOOLS, '--', prompt]
     try:
         p = run(cmd, wt, AGENT_TIMEOUT_S)
         out = p.stdout
@@ -167,15 +169,17 @@ def gates(wt: str, slug: str) -> tuple[bool, str]:
     return ok and not crlf, f"{v.stdout.strip()} | {audit}" + (f' | {crlf} CRLF' if crlf else '')
 
 
-def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock) -> Outcome:
+def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, models: dict[str, str | None] | None = None) -> Outcome:
+    models = models or {}
     slug = i['slug']
     out: Outcome = {'slug': slug, 'ticker': i['ticker'], 'tier': i['tier'], 'verdict': 'failed', 'detail': '',
                     'cost_usd': 0.0, 'denials': [], 'pitfalls': [], 'usage': []}
-    b = claude('ttg-report-builder', builder_prompt(i, wt), wt, os.path.join(logs, f'{slug}.builder.json'))
+    b = claude('ttg-report-builder', builder_prompt(i, wt), wt, os.path.join(logs, f'{slug}.builder.json'),
+               models.get('builder'))
     c: dict = {}
     if not b.get('is_error'):
         c = claude('ttg-report-checker', checker_prompt(i, wt, str(b.get('result', ''))), wt,
-                   os.path.join(logs, f'{slug}.checker.json'))
+                   os.path.join(logs, f'{slug}.checker.json'), models.get('checker'))
     for who, r in (('builder', b), ('checker', c)):
         out['cost_usd'] += float(r.get('total_cost_usd') or 0)
         if r:
@@ -238,7 +242,8 @@ def usage_of(who: str, r: dict) -> dict:
     context, so 'read' (input + cache writes + cache reads) is the number to watch; output includes thinking."""
     u = r.get('usage') or {}
     read = sum(int(u.get(k) or 0) for k in ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
-    return {'agent': who, 'calls': int(r.get('num_turns') or 0), 'read': read,
+    main = [m for m in (r.get('modelUsage') or {}) if 'haiku' not in m]   # Haiku is web fetch's page reader
+    return {'agent': who, 'model': (main[0] if main else '?').replace('claude-', ''), 'calls': int(r.get('num_turns') or 0), 'read': read,
             'cache_read': int(u.get('cache_read_input_tokens') or 0), 'output': int(u.get('output_tokens') or 0)}
 
 
@@ -252,7 +257,7 @@ def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: li
         lines.append(f"- **{o['ticker']}** {o['tier']} — {o['verdict']}: {o['detail']} · ~${o['cost_usd']:.2f} "
                      "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else ''))
         for u in o['usage']:
-            lines.append(f"  - {u['agent']}: {u['calls']} calls · {mtok(u['read'])} tokens read "
+            lines.append(f"  - {u['agent']} ({u.get('model', '?')}): {u['calls']} calls ·{mtok(u['read'])} tokens read "
                          f"({mtok(u['cache_read'])} from cache) · {u['output']:,} out")
     if outcomes:   # the number to compare run to run (baseline 2 Oct 2026: 209 calls, 16.6M read per refresh)
         calls = sum(u['calls'] for o in outcomes for u in o['usage'])
@@ -272,6 +277,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--jobs', type=int, default=JOBS)
     ap.add_argument('--only', nargs='*', help='limit the run to these slugs')
     ap.add_argument('--tiers', default='T1,T2', help='tiers to refresh, e.g. T1 (the daily run) or T2 (the weekly run)')
+    ap.add_argument('--builder-model', help='model for the builders, e.g. sonnet (default: the agent file\'s, Opus)')
+    ap.add_argument('--checker-model', help='model for the checkers (default: the agent file\'s, Opus)')
     ap.add_argument('--dry-run', action='store_true', help='show what would run; no agents, commits or push')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]
@@ -303,7 +310,8 @@ def main(argv: list[str] | None = None) -> int:
     rd.write_json(att_path, attempts, indent=1)
     lock = threading.Lock()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
-        outcomes = list(ex.map(lambda i: refresh_one(i, wt, logs, lock), work))
+        models = {'builder': args.builder_model, 'checker': args.checker_model}
+        outcomes = list(ex.map(lambda i: refresh_one(i, wt, logs, lock, models), work))
     notes = []
     if any(o['verdict'] == 'committed' for o in outcomes):
         for tool in ('manifest.py', 'style_tags.py', 'card_tags.py'):
