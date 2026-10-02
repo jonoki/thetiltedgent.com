@@ -7,7 +7,8 @@ nothing else; it raises PatchError, naming the page and the field, unless the ma
 refresh_data.py lists the prose that still carries an old value (stale_hits.txt) for the builder.
 
 Fields: header price (set_header_price), the day's change (set_header_change), the "Static data as of" banner and its
-copies (set_banner_date), the chart's labels and prices arrays (set_chart_series), the metrics-table 52-week range
+copies (set_banner_date), the chart's labels and prices arrays (set_chart_series) and its events when the oldest
+points are dropped (shift_events), the metrics-table 52-week range
 (set_range_52w) and any metrics-table value cell (set_fin_row, set_fin_number). Chart labels are read and written
 with point_label / format_label, which know the library's label styles ('Sep 21', 'Sep \\'21', 'Sep 2021',
 'Oct 1 26', 'Sep 10 \\'26', 'Sep 21, 2026', '18 Sep 26', 'Sep 26*').
@@ -276,21 +277,27 @@ def _price_elements(body: str, page: str) -> list[tuple[int, int, float]]:
 
 
 def _rewrite(body: str, elems: Sequence[tuple[int, int, T]], new: Sequence[T], render: Callable[[T], str],
-             same: Callable[[T, T], bool]) -> str:
-    """The array body with new values: the elements they share with the old array at the front keep their text
-    (spacing, line breaks), the rest are written in the array's own separator."""
-    k = 0
-    while k < min(len(elems), len(new)) and same(elems[k][2], new[k]):
-        k += 1
-    if k == len(elems) == len(new):
-        return body
+             same: Callable[[T, T], bool], drop: int = 0) -> str:
+    """The array body with new values, element by element: the first `drop` elements are removed with the text up to
+    the next one; each remaining old element pairs with the new value at its position and keeps its text (spacing,
+    line breaks) when the value is the same, else is rewritten in place; old elements beyond the new values are
+    removed, and new values beyond the old elements are appended with the array's own separator."""
+    if not elems:
+        lead = len(body) - len(body.lstrip())
+        return body[:lead] + ','.join(render(v) for v in new) + body[lead:]
     seps = [body[elems[i][1]:elems[i + 1][0]] for i in range(len(elems) - 1)]
     flat = [s for s in seps if '\n' not in s]
     sep = flat[-1] if flat else ','
-    start = elems[k - 1][1] if k else (elems[0][0] if elems else len(body) - len(body.lstrip()))
-    tail = body[elems[-1][1]:] if elems else body[start:]
-    rest = ''.join((sep if i or k else '') + render(v) for i, v in enumerate(new[k:]))
-    return body[:start] + rest + tail
+    kept = list(elems[drop:])
+    n = min(len(kept), len(new))
+    parts = [body[:elems[0][0]]]
+    for j in range(n):
+        s, e, v = kept[j]
+        if j:
+            parts.append(body[kept[j - 1][1]:s])
+        parts.append(body[s:e] if same(v, new[j]) else render(new[j]))
+    parts += [(sep if j else '') + render(new[j]) for j in range(n, len(new))]
+    return ''.join(parts) + body[elems[-1][1]:]
 
 
 def _quote(s: str, q: str) -> str:
@@ -299,10 +306,12 @@ def _quote(s: str, q: str) -> str:
     return q + s.replace('\\', '\\\\').replace(q, '\\' + q) + q
 
 
-def set_chart_series(t: str, labels: Sequence[str], prices: Sequence[float], page: str = '') -> str:
+def set_chart_series(t: str, labels: Sequence[str], prices: Sequence[float], page: str = '', drop: int = 0) -> str:
     """The main chart's labels and prices arrays. The page must define each exactly once, and no other hard-coded
     array may run parallel to them (one page carries ma3/ma10/rsi arrays of the same length: extending the prices
-    alone would put them out of step). New prices are written to the cent; unchanged leading entries keep their text."""
+    alone would put them out of step). New prices are written to the cent; unchanged entries keep their text.
+    drop = how many of the page's oldest points the new series leaves out (the window trim; the events move with
+    shift_events)."""
     if len(labels) != len(prices):
         raise PatchError(page, 'chart', f'{len(labels)} labels for {len(prices)} prices')
     ml = _once(LABELS_ARRAY, t, page, 'chart labels')
@@ -313,10 +322,12 @@ def set_chart_series(t: str, labels: Sequence[str], prices: Sequence[float], pag
         if m.group(1) not in ('labels', 'prices') and '{' not in m.group(2) and \
                 len([x for x in m.group(2).split(',') if x.strip()]) == len(pr_el):
             raise PatchError(page, 'chart', f'hard-coded array {m.group(1)!r} runs parallel to the prices')
+    if drop and not 0 < drop < min(len(lab_el), len(pr_el)):
+        raise PatchError(page, 'chart', f'cannot drop {drop} of {len(pr_el)} points')
     q = ml.group(2)[lab_el[0][0]] if lab_el else "'"
-    new_l = _rewrite(ml.group(2), lab_el, list(labels), lambda s: _quote(s, q), lambda a, b: a == b)
+    new_l = _rewrite(ml.group(2), lab_el, list(labels), lambda s: _quote(s, q), lambda a, b: a == b, drop)
     new_p = _rewrite(mp.group(2), pr_el, [round(p, 2) for p in prices], lambda v: f'{v:.2f}',
-                     lambda a, b: abs(a - b) < 1e-9)
+                     lambda a, b: abs(a - b) < 1e-9, drop)
     edits = sorted([(ml.start(2), ml.end(2), new_l), (mp.start(2), mp.end(2), new_p)], reverse=True)
     for s, e, new in edits:
         t = _splice(t, s, e, new)
@@ -324,6 +335,165 @@ def set_chart_series(t: str, labels: Sequence[str], prices: Sequence[float], pag
     if got_l != list(labels) or got_p is None or [round(p, 2) for p in got_p] != [round(p, 2) for p in prices]:
         raise PatchError(page, 'chart', 'the rewritten arrays do not read back as written')
     return t
+
+
+# ---------- chart events (the annotated points, by index into the chart arrays) ----------
+
+# The library's two forms (surveyed 2 Oct 2026): an array of objects with an `idx` field (`const events = [{ idx: 4,
+# label: '…', color: '…' }, …]`, 541 pages) and an object keyed by index (`const events = {2: "…", …}` on DOW, HD, UNH;
+# `const eventIdx = {2: "…", …}` on GWW). Everything else the pages do with events derives from these.
+EVENTS_DEF = re.compile(r'(?:const|let|var)\s+(events|eventIdx)\s*=\s*([\[{])')
+# a chart index written as a number outside the events (FISV: `if (i === 51) notes.push(…)`); 0 is harmless
+_HARD_INDEX = re.compile(r'\b(?:i|idx|index|dataIndex)\s*[!=]==?\s*([1-9]\d*)\b')
+_SCRIPT = re.compile(r'<script\b[^>]*>(.*?)</script>', re.S | re.I)
+
+
+def _js_marks(s: str, start: int, end: int) -> list[tuple[int, str]]:
+    """(position, char) of the brackets and commas of JavaScript source s[start:end], outside strings, template
+    literals and comments."""
+    out = []
+    i = start
+    while i < end:
+        c = s[i]
+        if c in '\'"`':
+            j = i + 1
+            while j < end and s[j] != c:
+                j += 2 if s[j] == '\\' else 1
+            i = j + 1
+            continue
+        if s.startswith('//', i):
+            j = s.find('\n', i, end)
+            i = end if j < 0 else j
+            continue
+        if s.startswith('/*', i):
+            j = s.find('*/', i + 2, end)
+            i = end if j < 0 else j + 2
+            continue
+        if c in '[]{}(),':
+            out.append((i, c))
+        i += 1
+    return out
+
+
+def _closing(s: str, open_pos: int) -> int:
+    """The position of the bracket that closes the one at open_pos."""
+    depth = 0
+    for i, c in _js_marks(s, open_pos, len(s)):
+        if c in '[{(':
+            depth += 1
+        elif c in ']})':
+            depth -= 1
+            if depth == 0:
+                return i
+    raise ValueError('unclosed bracket')
+
+
+def _skip_blank(s: str, i: int, end: int) -> int:
+    """The first position from i that is not whitespace or a comment."""
+    while i < end:
+        if s[i].isspace():
+            i += 1
+        elif s.startswith('//', i):
+            j = s.find('\n', i, end)
+            i = end if j < 0 else j
+        elif s.startswith('/*', i):
+            j = s.find('*/', i + 2, end)
+            i = end if j < 0 else j + 2
+        else:
+            break
+    return i
+
+
+def _items(s: str, a: int, b: int) -> list[tuple[int, int]]:
+    """(start, end) of each top-level comma-separated item of s[a:b], without the blank text around it."""
+    cuts, depth = [a], 0
+    for i, c in _js_marks(s, a, b):
+        if c in '[{(':
+            depth += 1
+        elif c in ']})':
+            depth -= 1
+        elif c == ',' and depth == 0:
+            cuts.append(i + 1)
+    out = []
+    for x, y in zip(cuts, cuts[1:] + [b + 1]):
+        start, stop = _skip_blank(s, x, y - 1), y - 1
+        while stop > start and s[stop - 1].isspace():
+            stop -= 1
+        if stop > start:
+            out.append((start, stop))
+    return out
+
+
+_IDX = re.compile(r'\bidx\s*:\s*(\d+)')
+_KEY = re.compile(r'(\d+)(\s*:)')
+_TEXT = re.compile(r'"((?:\\.|[^"\\])*)"|\'((?:\\.|[^\'\\])*)\'|`([^`]*)`')
+
+
+def _event_label(text: str, form: str, m: re.Match[str]) -> str:
+    """An event's text: its label field (array form) or its value (keyed form); the whole item if neither reads."""
+    if form == '[':
+        lm = re.search(r'\blabel\s*:\s*', text)
+        rest = text[lm.end():] if lm else ''
+    else:
+        rest = text[m.end():].lstrip()
+    s = _TEXT.match(rest)
+    return next(g for g in s.groups() if g is not None) if s else text
+
+
+def shift_events(t: str, k: int, page: str = '') -> tuple[str, int, list[dict]]:
+    """The chart events moved k points to the left, for a chart that lost its k oldest points: every index minus k;
+    an event whose index falls below 0 is removed (with its separator). Returns (text, events kept, events removed as
+    {'idx', 'label'}). A page without events is returned as it is. PatchError when the events are defined more than
+    once, an item has no single index, or a script compares a chart index with a number outside the events (it would
+    point at the wrong month)."""
+    defs = list(EVENTS_DEF.finditer(t))
+    if not defs or not k:
+        return t, 0, []
+    if len(defs) != 1:
+        raise PatchError(page, 'events', f'{len(defs)} event definitions (expected one)')
+    d = defs[0]
+    open_pos = d.end() - 1
+    try:
+        close = _closing(t, open_pos)
+    except ValueError as e:
+        raise PatchError(page, 'events', str(e)) from e
+    for sm in _SCRIPT.finditer(t):
+        for h in _HARD_INDEX.finditer(sm.group(1)):
+            pos = sm.start(1) + h.start()
+            if not open_pos <= pos <= close:
+                raise PatchError(page, 'events', f'a script compares a chart index with {h.group(1)} '
+                                 f'({h.group(0)!r}) outside the events')
+    form = d.group(2)
+    items = _items(t, open_pos + 1, close)
+    kept_text: list[str] = []
+    kept_pos: list[int] = []
+    dropped: list[dict] = []
+    for n, (s, e) in enumerate(items):
+        text = t[s:e]
+        if form == '[':
+            hits = list(_IDX.finditer(text)) if text.startswith('{') and text.endswith('}') else []
+            if len(hits) != 1:
+                raise PatchError(page, 'events', f'item {n} has {len(hits)} idx fields: {text[:60]!r}')
+            m = hits[0]
+        else:
+            m = _KEY.match(text)
+            if not m:
+                raise PatchError(page, 'events', f'item {n} is not keyed by an index: {text[:60]!r}')
+        old = int(m.group(1))
+        if old - k < 0:
+            dropped.append({'idx': old, 'label': _event_label(text, form, m)})
+            continue
+        kept_text.append(text[:m.start(1)] + str(old - k) + text[m.end(1):])
+        kept_pos.append(n)
+    if not items:
+        return t, 0, []
+    body: list[str] = [t[open_pos + 1:items[0][0]]]
+    for j, (n, text) in enumerate(zip(kept_pos, kept_text)):
+        body.append(text)
+        if j < len(kept_pos) - 1:
+            body.append(t[items[n][1]:items[n + 1][0]])
+    body.append(t[items[-1][1]:close])
+    return _splice(t, open_pos + 1, close, ''.join(body)), len(kept_text), dropped
 
 
 # ---------- metrics table ----------

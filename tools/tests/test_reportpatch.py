@@ -136,8 +136,8 @@ const ma3 = sma(prices, 3);
 class Chart(unittest.TestCase):
     def test_extends_keeping_the_unchanged_text(self):
         got = rp.set_chart_series(CHART, ["Jul '26", "Aug '26", "Sep '26", "Oct 1 '26"], [27.81, 24.76, 24.54, 25.07])
-        self.assertIn("const labels = ['Jul \\'26','Aug \\'26','Sep \\'26','Oct 1 \\'26'];", got)
-        self.assertIn('const prices = [27.81, 24.76, 24.54, 25.07];', got)
+        self.assertIn("const labels = ['Jul \\'26','Aug \\'26',\n  'Sep \\'26','Oct 1 \\'26'];", got)   # in place
+        self.assertIn('const prices = [27.81, 24.76,\n  24.54, 25.07];', got)
         self.assertIn("{ idx: 1, label: 'x' }", got)
         self.assertEqual(rl.chart_series(got), (["Jul '26", "Aug '26", "Sep '26", "Oct 1 '26"], [27.81, 24.76, 24.54, 25.07]))
 
@@ -161,6 +161,62 @@ class Chart(unittest.TestCase):
         with self.assertRaises(rp.PatchError) as e:
             rp.set_chart_series(dow, ['a', 'b', 'c', 'd'], [1, 2, 3, 4])
         self.assertIn("'rsi' runs parallel", str(e.exception))
+
+
+class Window(unittest.TestCase):
+    """The chart trimmed at the front: set_chart_series(drop=) and shift_events on each events form of the library."""
+    ARRAY = """<script>
+const labels = ['Sep 21','Oct 21','Nov 21',
+  'Dec 21','Jan 22'];
+const prices = [10.00,11.00,12.00,
+  13.00,14.00];
+// Annotated inflection points {index, label, color}
+const events = [
+  { idx: 0,  label: 'Sep 21: window start $10.00', color: '#22c55e' },
+  { idx: 1,  label: 'Oct 21: a {brace}, and a comma', color: '#ef4444' },
+  { idx: 3,  label: "Dec 21: it's here", color: '#f59e0b' }
+];
+const eventMap = {};
+events.forEach(e => eventMap[e.idx] = e);
+for (let i = 0; i < prices.length; i++) { if (i === 0) continue; }
+</script>"""
+
+    def test_drop_keeps_the_layout(self):
+        got = rp.set_chart_series(self.ARRAY, ['Oct 21', 'Nov 21', 'Dec 21', 'Jan 22', 'Feb 22'],
+                                  [11, 12, 13, 14, 15], drop=1)
+        self.assertIn("const labels = ['Oct 21','Nov 21',\n  'Dec 21','Jan 22','Feb 22'];", got)
+        self.assertIn('const prices = [11.00,12.00,\n  13.00,14.00,15.00];', got)
+
+    def test_array_of_objects(self):
+        got, kept, dropped = rp.shift_events(self.ARRAY, 2)
+        self.assertEqual((kept, [d['idx'] for d in dropped]), (1, [0, 1]))
+        self.assertEqual([d['label'] for d in dropped], ['Sep 21: window start $10.00', 'Oct 21: a {brace}, and a comma'])
+        self.assertIn("const events = [\n  { idx: 1,  label: \"Dec 21: it's here\", color: '#f59e0b' }\n];", got)
+        self.assertEqual(rp.shift_events(self.ARRAY, 0)[0], self.ARRAY)
+        one = rp.shift_events(self.ARRAY, 1)[0]
+        self.assertIn("{ idx: 0,  label: 'Oct 21: a {brace}, and a comma', color: '#ef4444' },\n  { idx: 2,", one)
+
+    def test_keyed_objects(self):   # HD, UNH (and DOW): events = {2: "…"}; GWW: eventIdx = {2: "…"}
+        for name in ('events', 'eventIdx'):
+            t = (f'<script>const {name} = {{1: "Oct \'21 — peak $415.01", 2: "Nov \'21 — x",\n  4: "Jan \'22 — y"}};\n'
+                 f'const eventPoints = prices.map((p,i)=> {name}[i] !== undefined ? p : null);</script>')
+            got, kept, dropped = rp.shift_events(t, 2)
+            self.assertIn(f'const {name} = {{0: "Nov \'21 — x",\n  2: "Jan \'22 — y"}};', got)
+            self.assertEqual((kept, dropped), (2, [{'idx': 1, 'label': "Oct '21 — peak $415.01"}]))
+
+    def test_no_events_is_left_alone(self):
+        t = '<script>const labels = [];</script>'
+        self.assertEqual(rp.shift_events(t, 3), (t, 0, []))
+
+    def test_refused(self):
+        fisv = self.ARRAY.replace('if (i === 0) continue;', "if (i === 51) notes.push('derived');")
+        with self.assertRaises(rp.PatchError) as e:
+            rp.shift_events(fisv, 1)
+        self.assertIn('compares a chart index with 51', str(e.exception))
+        with self.assertRaises(rp.PatchError):
+            rp.shift_events(self.ARRAY + '<script>var events = [];</script>', 1)
+        with self.assertRaises(rp.PatchError):
+            rp.shift_events(self.ARRAY.replace("{ idx: 3,", "{ at: 3,"), 1)
 
 
 class FinTable(unittest.TestCase):
