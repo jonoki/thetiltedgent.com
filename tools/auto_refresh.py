@@ -50,6 +50,7 @@ class Outcome(TypedDict):
     verdict: str            # committed / reverted / failed
     detail: str
     cost_usd: float
+    usage: list[dict]       # per agent: calls, tokens read (input + cache), cache reads, output — usage_of()
     denials: list[str]
     pitfalls: list[str]
 
@@ -79,7 +80,7 @@ def builder_prompt(i: dict, wt: str) -> str:
             f"(current as-of {i['as_of']}). This is an unattended run: no person will answer questions, so stop "
             f"and report anything that blocks you instead of guessing. {UNATTENDED}\n\n"
             f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Read and edit files only under it; run "
-            "tools from it.\n\nSpec: read claude/REPORT_PITFALLS.md, then claude/briefs/REFRESH.md and "
+            "tools from it.\n\nSpec: read claude/PITFALL_RULES.md, then claude/briefs/REFRESH.md and "
             "claude/briefs/BUILD.md, and follow them exactly.\n\n"
             f"Print: released {i['release']} ({i['timing']} per Nasdaq; confirm the time yourself), fiscal quarter "
             f"{i['fiscal_quarter']}. {surprise}{move}{why} The T+2 close ({i['t2']}) has settled; use the most "
@@ -96,7 +97,7 @@ def checker_prompt(i: dict, wt: str, builder_result: str) -> str:
             f"{i['tier']} earnings refresh (previous as-of {i['as_of']}). This is an unattended run: no person will "
             f"answer questions; fix what you can prove, cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
             f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. {ONE_COMMAND} "
-            f"Temp files only in $TEMP/ttgchk_{i['slug']}/.\n\nSpec: claude/REPORT_PITFALLS.md first, then "
+            f"Temp files only in $TEMP/ttgchk_{i['slug']}/.\n\nSpec: claude/PITFALL_RULES.md first, then "
             "claude/briefs/CHECK.md (which points to REFRESH.md and BUILD.md). Never trust the builder's "
             "\"verified\": re-confirm on pages you fetch yourself. House rules: nothing dated after the banner "
             "date; no user-facing doubt caveats (source it or remove the sentence cleanly); quotes verbatim or "
@@ -138,8 +139,10 @@ def git(wt: str, *args: str) -> str:
 def claude(agent: str, prompt: str, wt: str, log: str) -> dict:
     """One headless agent session; its JSON result (or an error record) is also written to log."""
     exe = shutil.which('claude') or 'claude'
+    # --strict-mcp-config with no --mcp-config: no MCP servers (Gmail, Drive, Playwright …); the agents use none of
+    # them and their tool listings cost ~2.4k tokens on every call (measured 30 Sep 2026). Not --bare: it drops the login.
     cmd = [exe, '-p', '--agent', agent, '--permission-mode', 'dontAsk', '--permission-prompts', 'none',
-           '--max-turns', MAX_TURNS, '--output-format', 'json', '--allowedTools', *ALLOWED_TOOLS, '--', prompt]
+           '--strict-mcp-config', '--max-turns', MAX_TURNS, '--output-format', 'json', '--allowedTools', *ALLOWED_TOOLS, '--', prompt]
     try:
         p = run(cmd, wt, AGENT_TIMEOUT_S)
         out = p.stdout
@@ -167,14 +170,16 @@ def gates(wt: str, slug: str) -> tuple[bool, str]:
 def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock) -> Outcome:
     slug = i['slug']
     out: Outcome = {'slug': slug, 'ticker': i['ticker'], 'tier': i['tier'], 'verdict': 'failed', 'detail': '',
-                    'cost_usd': 0.0, 'denials': [], 'pitfalls': []}
+                    'cost_usd': 0.0, 'denials': [], 'pitfalls': [], 'usage': []}
     b = claude('ttg-report-builder', builder_prompt(i, wt), wt, os.path.join(logs, f'{slug}.builder.json'))
     c: dict = {}
     if not b.get('is_error'):
         c = claude('ttg-report-checker', checker_prompt(i, wt, str(b.get('result', ''))), wt,
                    os.path.join(logs, f'{slug}.checker.json'))
-    for r in (b, c):
+    for who, r in (('builder', b), ('checker', c)):
         out['cost_usd'] += float(r.get('total_cost_usd') or 0)
+        if r:
+            out['usage'].append(usage_of(who, r))
         out['denials'] += [json.dumps(d)[:200] for d in r.get('permission_denials') or []]
     out['pitfalls'] = pitfall_lines(str(c.get('result', '')))
     path = f'reports/{slug}_analysis.html'
@@ -228,11 +233,32 @@ def prepare(main: str, base: str) -> str:
     return wt
 
 
+def usage_of(who: str, r: dict) -> dict:
+    """What one headless session used, from its JSON result: model calls and tokens. Cost scales with calls ×
+    context, so 'read' (input + cache writes + cache reads) is the number to watch; output includes thinking."""
+    u = r.get('usage') or {}
+    read = sum(int(u.get(k) or 0) for k in ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
+    return {'agent': who, 'calls': int(r.get('num_turns') or 0), 'read': read,
+            'cache_read': int(u.get('cache_read_input_tokens') or 0), 'output': int(u.get('output_tokens') or 0)}
+
+
+def mtok(n: float) -> str:
+    return f'{n / 1e6:.1f}M'
+
+
 def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: list[str]) -> str:
     lines = [f'# Auto refresh — {day}', '', f'Branch `{BRANCH}`; nothing is on main until Oki merges it.', '']
     for o in outcomes:
         lines.append(f"- **{o['ticker']}** {o['tier']} — {o['verdict']}: {o['detail']} · ~${o['cost_usd']:.2f} "
                      "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else ''))
+        for u in o['usage']:
+            lines.append(f"  - {u['agent']}: {u['calls']} calls · {mtok(u['read'])} tokens read "
+                         f"({mtok(u['cache_read'])} from cache) · {u['output']:,} out")
+    if outcomes:   # the number to compare run to run (baseline 2 Oct 2026: 209 calls, 16.6M read per refresh)
+        calls = sum(u['calls'] for o in outcomes for u in o['usage'])
+        read = sum(u['read'] for o in outcomes for u in o['usage'])
+        lines += ['', f"Per refresh: {calls / len(outcomes):.0f} calls · {mtok(read / len(outcomes))} tokens read "
+                      f"(baseline 2 Oct 2026: 209 calls · 16.6M)"]
     if waiting:
         lines += ['', f'Due but not run (on the other schedule, over the T2 cap, or out of attempts): {len(waiting)}',
                   *[f"- {i['ticker']} {i['tier']} released {i['release']} ({i['status']})" for i in waiting]]

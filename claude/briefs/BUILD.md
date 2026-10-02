@@ -1,6 +1,6 @@
 # Builder brief — one TTG stock report
 
-**Before anything else, read `claude/REPORT_PITFALLS.md`** — the running log of errors earlier runs made, each with the rule that prevents it. Treat every rule there as part of this brief.
+**Before anything else, read `claude/PITFALL_RULES.md`** — the prevention rule for every error class earlier runs made (the full log with examples is `claude/REPORT_PITFALLS.md`; open it only to look up an example). Treat every rule there as part of this brief.
 
 REPO: C:\Users\jon_o\Desktop\Coding projects\thetiltedgent.com (Windows, Git Bash). Write exactly ONE file: reports/<slug>_analysis.html (slug = lowercase ticker, dots removed). Touch nothing else in the repo. Do NOT git add/commit/push — the orchestrator verifies and publishes. Temp files go ONLY in a per-ticker folder $TEMP/ttg_<slug>/ (other builders run in parallel and share $TEMP — never use generic names).
 

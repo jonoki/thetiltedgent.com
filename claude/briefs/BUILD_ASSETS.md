@@ -2,7 +2,7 @@
 
 These three families share the stock reports' document design and section order. Status: pilot — Oki approves each template before any batch.
 
-**Before anything else, read `claude/REPORT_PITFALLS.md` and `claude/briefs/BUILD.md`.** Every data rule, privacy rule and "Lessons from the last checker round" rule in BUILD.md applies here unchanged. Where this brief differs from BUILD.md (template sections, verify expectations, identity step), this brief wins.
+**Before anything else, read `claude/PITFALL_RULES.md` and `claude/briefs/BUILD.md`.** Every data rule, privacy rule and "Lessons from the last checker round" rule in BUILD.md applies here unchanged. Where this brief differs from BUILD.md (template sections, verify expectations, identity step), this brief wins.
 
 REPO (worktree, branch `claude/portfolio-analyzer`): `C:\Users\jon_o\Desktop\Coding projects\Portfolio Analyzer`. Write exactly ONE file, the path you are given. Never write in `...\thetiltedgent.com` (another session works there). Do NOT git add/commit/push. Temp files only in `$TEMP/ttg_<slug>/`.
 

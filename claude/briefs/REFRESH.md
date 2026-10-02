@@ -1,6 +1,6 @@
 # Refresh brief — one TTG report, after an earnings print or material news
 
-**Before anything else, read `claude/REPORT_PITFALLS.md`** — the running log of errors earlier runs made, each with the rule that prevents it. Treat every rule there as part of this brief.
+**Before anything else, read `claude/PITFALL_RULES.md`** — the prevention rule for every error class earlier runs made (the full log with examples is `claude/REPORT_PITFALLS.md`; open it only to look up an example). Treat every rule there as part of this brief.
 
 REPO: C:\Users\jon_o\Desktop\Coding projects\thetiltedgent.com (Windows, Git Bash; Python is `py -3`). Edit exactly ONE file: reports/<slug>_analysis.html (it already exists and is live). Do NOT git add/commit/push. Temp files only in $TEMP/ttgref_<slug>/.
 

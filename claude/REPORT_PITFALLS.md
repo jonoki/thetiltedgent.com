@@ -1,6 +1,6 @@
 # Report pitfalls — what builders keep getting wrong, and the rule that prevents it
 
-Every builder and checker in a recurring report run (new builds, earnings refreshes, news updates, chart fixes) **reads this file first**; the orchestrator **appends to it last** from the checkers' `PITFALLS:` tags (retro protocol below).
+This is the full log with examples and tallies. Builders and checkers read **`claude/PITFALL_RULES.md`** first (the rules alone, kept in step with this file); the orchestrator **appends here last** from the checkers' `PITFALLS:` tags (retro protocol below).
 
 Counts are "times a checker had to correct it", tallied from checker returns. When a category gets a new hit, bump its count and add the example; when a new kind of error appears twice, give it its own entry and a prevention rule, and copy the rule into the relevant brief.
 
@@ -144,5 +144,6 @@ Brief: `claude/briefs/BUILD_ASSETS.md` (its "Rules from the pilot checker rounds
 1. Each checker returns a line `PITFALLS: <letter>:<short example>; …` for every correction it made.
 2. The orchestrator tallies them here: bump counts, add examples, date the tally line at the top.
 3. Any category hit ≥2 times in one run whose rule is not already in the relevant brief gets its rule copied into `claude/briefs/`.
+   Any new or changed rule also goes into `claude/PITFALL_RULES.md` (the short file agents read).
 4. A genuinely new error class gets a new letter.
 5. Log the tally in the vault entry for the run.
