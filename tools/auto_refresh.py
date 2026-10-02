@@ -53,6 +53,14 @@ class Outcome(TypedDict):
     usage: list[dict]       # per agent: calls, tokens read (input + cache), cache reads, output — usage_of()
     denials: list[str]
     pitfalls: list[str]
+    data_layer: str         # off / used / failed: … (--data-layer)
+
+
+class DataLayer(TypedDict):
+    """What the pre-pass of tools/refresh_data.py left for the agents (--data-layer)."""
+    facts: str              # path of facts.json
+    stale: str              # path of stale_hits.txt
+    summary: str            # the pre-pass's output: what it wrote, what it left to the builder, warnings
 
 
 # ---- choosing the work ----
@@ -69,7 +77,7 @@ def select(items: list[dict], attempts: dict[str, dict[str, int]], t2_cap: int =
     return t1 + [i for i in due if i['tier'] == 'T2'][:t2_cap]
 
 
-def builder_prompt(i: dict, wt: str) -> str:
+def builder_prompt(i: dict, wt: str, data: DataLayer | None = None) -> str:
     surprise = ('' if i['eps'] is None else
                 f"Nasdaq calendar: EPS {i['eps']} vs consensus {i['eps_forecast']} (surprise {i['surprise_pct']}%) - "
                 'calendar data, re-confirm on the company release. ')
@@ -89,10 +97,24 @@ def builder_prompt(i: dict, wt: str) -> str:
             f"WebFetch only. No git commands. {ONE_COMMAND} Temp files only in $TEMP/ttgref_{i['slug']}/. Run "
             f"`py -3 tools/chart_audit.py {i['slug']}` and `py -3 tools/verify.py reports/{i['slug']}_analysis.html` "
             "and report both outputs verbatim. Return in the format your agent file specifies, including the "
-            "REFRESH.md return lines and the flag list.")
+            "REFRESH.md return lines and the flag list." + (data_layer_brief(data) if data else ''))
 
 
-def checker_prompt(i: dict, wt: str, builder_result: str) -> str:
+def data_layer_brief(data: DataLayer) -> str:
+    """The builder's part of the data layer: what is already on the page and what is left to do."""
+    return ("\n\nDATA LAYER (tools/refresh_data.py has already run): the structured numbers are already updated from "
+            f"{data['facts']} — the header price and change, the banner date, the chart (month-ends and the as-of "
+            "close, chart_audit-clean), the 52-week range, and the trailing P/E and dividend yield where the page "
+            "allowed. Don't refetch prices or recompute them; use facts.json for every price-derived number in prose "
+            "(returns, SPY/QQQ comparisons, RSI and moving averages, distance from the 52-week high and low, short "
+            "interest with its settlement date, EPS against Nasdaq consensus); fix every line listed in "
+            f"{data['stale']} (old price, old chart values, old range, P/E, yield or as-of date still in the prose), "
+            "leaving only those about that date on purpose. Update the EPS (TTM) cell from the release: a post-pass "
+            "recomputes P/E and the yield from the page's final cells. Fields the pre-pass left to you and its "
+            f"warnings:\n<<<\n{data['summary'][:3000]}\n>>>")
+
+
+def checker_prompt(i: dict, wt: str, builder_result: str, post: str | None = None) -> str:
     return (f"Independent check of ONE refreshed report: reports/{i['slug']}_analysis.html ({i['ticker']}), "
             f"{i['tier']} earnings refresh (previous as-of {i['as_of']}). This is an unattended run: no person will "
             f"answer questions; fix what you can prove, cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
@@ -105,7 +127,20 @@ def checker_prompt(i: dict, wt: str, builder_result: str) -> str:
             f"{builder_result[:15000]}\n>>>\n\nPrivacy: never put personal data in any request or User-Agent; "
             f"sec.gov via WebFetch only. At the end run `py -3 tools/chart_audit.py {i['slug']}` and "
             f"`py -3 tools/verify.py reports/{i['slug']}_analysis.html`, report both verbatim, give a VERDICT line "
-            "(PUBLISH or HOLD with the reason) and a PITFALLS: line, in your agent file's return format.")
+            "(PUBLISH or HOLD with the reason) and a PITFALLS: line, in your agent file's return format."
+            + ('' if post is None else
+               "\n\nDATA LAYER: the header, banner date, chart, 52-week range and price-derived numbers in "
+               "facts.json were machine-fetched and are gated after you (tools/refresh_data.py --post --check): "
+               "spot-check two of them, then spend your checking on what the builder wrote (release figures, "
+               "quotes, analysts, causes, carried-over facts). The post-pass output (it re-synced P/E and the "
+               f"yield to the page's final cells; fix any MISMATCH it lists):\n<<<\n{post[:3000]}\n>>>"))
+
+
+def data_layer_cmd(slug: str, out: str, post: bool = False, check: bool = False) -> list[str]:
+    """tools/refresh_data.py: the pre-pass (as-of auto, written into the page) or the post-pass."""
+    if post:
+        return [sys.executable, 'tools/refresh_data.py', slug, '--post', '--out', out] + (['--check'] if check else [])
+    return [sys.executable, 'tools/refresh_data.py', slug, '--as-of', 'auto', '--out', out, '--write']
 
 
 def pitfall_lines(text: str) -> list[str]:
@@ -156,8 +191,9 @@ def claude(agent: str, prompt: str, wt: str, log: str, model: str | None = None)
     return res
 
 
-def gates(wt: str, slug: str) -> tuple[bool, str]:
-    """Our own re-run of the publish gates; the agents' reports of them are not trusted."""
+def gates(wt: str, slug: str, facts_out: str | None = None) -> tuple[bool, str]:
+    """Our own re-run of the publish gates; the agents' reports of them are not trusted. With the data layer, the
+    page must also still match facts.json (refresh_data.py --post --check)."""
     v = run([sys.executable, 'tools/verify.py', f'reports/{slug}_analysis.html'], wt, 600)
     a = run([sys.executable, 'tools/chart_audit.py', slug], wt, 600)
     audit = (a.stdout.splitlines() or [''])[0]
@@ -166,19 +202,40 @@ def gates(wt: str, slug: str) -> tuple[bool, str]:
         and ' errors 0 ' in audit
     with open(os.path.join(wt, 'reports', f'{slug}_analysis.html'), 'rb') as fh:
         crlf = fh.read().count(b'\r\n')
-    return ok and not crlf, f"{v.stdout.strip()} | {audit}" + (f' | {crlf} CRLF' if crlf else '')
+    facts = ''
+    if facts_out:
+        f = run(data_layer_cmd(slug, facts_out, post=True, check=True), wt, 600)
+        ok = ok and f.returncode == 0
+        facts = ' | facts ' + ('ok' if f.returncode == 0 else 'MISMATCH: ' + ' / '.join(
+            ln.strip() for ln in f.stdout.splitlines() if 'MISMATCH' in ln)[:500])
+    return ok and not crlf, f"{v.stdout.strip()} | {audit}{facts}" + (f' | {crlf} CRLF' if crlf else '')
 
 
-def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, models: dict[str, str | None] | None = None) -> Outcome:
+def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: bool = False,
+                models: dict[str, str | None] | None = None) -> Outcome:
     models = models or {}
     slug = i['slug']
     out: Outcome = {'slug': slug, 'ticker': i['ticker'], 'tier': i['tier'], 'verdict': 'failed', 'detail': '',
-                    'cost_usd': 0.0, 'denials': [], 'pitfalls': [], 'usage': []}
-    b = claude('ttg-report-builder', builder_prompt(i, wt), wt, os.path.join(logs, f'{slug}.builder.json'),
+                    'cost_usd': 0.0, 'denials': [], 'pitfalls': [], 'usage': [], 'data_layer': 'off'}
+    data: DataLayer | None = None
+    facts_out = os.path.join(logs, slug)
+    if data_layer:   # a failed pre-pass leaves the page untouched; the builder then does the numbers itself
+        pre = run(data_layer_cmd(slug, facts_out), wt, 900)
+        if pre.returncode == 0:
+            data = {'facts': os.path.join(facts_out, 'facts.json'), 'stale': os.path.join(facts_out, 'stale_hits.txt'),
+                    'summary': pre.stdout.strip()}
+            out['data_layer'] = 'used'
+        else:
+            out['data_layer'] = 'failed: ' + (pre.stdout + pre.stderr).strip()[-300:]
+    b = claude('ttg-report-builder', builder_prompt(i, wt, data), wt, os.path.join(logs, f'{slug}.builder.json'),
                models.get('builder'))
     c: dict = {}
     if not b.get('is_error'):
-        c = claude('ttg-report-checker', checker_prompt(i, wt, str(b.get('result', ''))), wt,
+        post = None
+        if data:
+            p = run(data_layer_cmd(slug, facts_out, post=True), wt, 600)
+            post = (p.stdout + p.stderr).strip()
+        c = claude('ttg-report-checker', checker_prompt(i, wt, str(b.get('result', '')), post), wt,
                    os.path.join(logs, f'{slug}.checker.json'), models.get('checker'))
     for who, r in (('builder', b), ('checker', c)):
         out['cost_usd'] += float(r.get('total_cost_usd') or 0)
@@ -196,7 +253,7 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, models: dict[
         elif not changed:
             out['detail'] = 'no change to the report'
         else:
-            ok, why = gates(wt, slug)
+            ok, why = gates(wt, slug, facts_out if data else None)
             if ok:
                 git(wt, 'add', '--', path)
                 out['tier'] = built_tier(str(b.get('result', '')), i['tier'])
@@ -255,7 +312,8 @@ def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: li
     lines = [f'# Auto refresh — {day}', '', f'Branch `{BRANCH}`; nothing is on main until Oki merges it.', '']
     for o in outcomes:
         lines.append(f"- **{o['ticker']}** {o['tier']} — {o['verdict']}: {o['detail']} · ~${o['cost_usd']:.2f} "
-                     "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else ''))
+                     "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else '')
+                     + (f" · data layer {o['data_layer']}" if o.get('data_layer', 'off') != 'off' else ''))
         for u in o['usage']:
             lines.append(f"  - {u['agent']} ({u.get('model', '?')}): {u['calls']} calls ·{mtok(u['read'])} tokens read "
                          f"({mtok(u['cache_read'])} from cache) · {u['output']:,} out")
@@ -280,6 +338,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--builder-model', help='model for the builders, e.g. sonnet (default: the agent file\'s, Opus)')
     ap.add_argument('--checker-model', help='model for the checkers (default: the agent file\'s, Opus)')
     ap.add_argument('--dry-run', action='store_true', help='show what would run; no agents, commits or push')
+    ap.add_argument('--data-layer', action='store_true', help='run tools/refresh_data.py before the builder (structured '
+                    'numbers written from facts.json) and after it (--post), and gate on --post --check (opt-in)')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]
     day = datetime.date.today().isoformat()
@@ -300,7 +360,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f'run {day}: ' + (', '.join(f"{i['ticker']} {i['tier']}" for i in work) or 'nothing due'))
     if args.dry_run:
         for i in work[:1]:
-            print('\n--- builder prompt ---\n' + builder_prompt(i, wt))
+            demo: DataLayer = {'facts': '<run>/<slug>/facts.json', 'stale': '<run>/<slug>/stale_hits.txt',
+                               'summary': '<the pre-pass output>'}
+            print('\n--- builder prompt ---\n' + builder_prompt(i, wt, demo if args.data_layer else None))
         return 0
     run_id = day if set(tiers) >= {'T1', 'T2'} else day + '-' + '-'.join(tiers)   # Mondays run T1 and T2 separately
     logs = os.path.join(qdir, 'runs', run_id)
@@ -311,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     lock = threading.Lock()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
         models = {'builder': args.builder_model, 'checker': args.checker_model}
-        outcomes = list(ex.map(lambda i: refresh_one(i, wt, logs, lock, models), work))
+        outcomes = list(ex.map(lambda i: refresh_one(i, wt, logs, lock, args.data_layer, models), work))
     notes = []
     if any(o['verdict'] == 'committed' for o in outcomes):
         for tool in ('manifest.py', 'style_tags.py', 'card_tags.py'):

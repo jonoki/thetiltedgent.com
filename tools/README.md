@@ -15,10 +15,13 @@ Each finds the repo from its own location, so the working directory only matters
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
 | `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
+| `refresh_data.py` | the number layer of a refresh: settled close, chart, 52-week range, returns, P/E, yield, short interest, EPS surprise | `facts.json`, `stale_hits.txt`; with `--write` the report's structured fields |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
-Two shared modules are not run on their own. `reportlib.py` is how a report page is read (the title, as-of
-date, header price, chart series, 52-week range, metrics table, page skeleton); `repodata.py` is where the
+Three shared modules are not run on their own. `reportlib.py` is how a report page is read (the title, as-of
+date, header price, chart series, 52-week range, metrics table, page skeleton); `reportpatch.py` is its mirror,
+the count-checked writers of those structured fields (each must find its markup exactly once or it raises, naming
+the page and the field); `repodata.py` is where the
 files are (the repo root, report paths, the index page's cards, the manifest's data files and their record types).
 A change to the report markup is made there once, including the metrics-table reader (`table_rows`) and what
 makes a page structurally sound (`structure_problems`), which `verify.py` gates on and `manifest.py` records.
@@ -143,6 +146,28 @@ did not say HOLD; anything else is reverted, with the rejected page and both age
 `tasks/queue/runs/<date>/`. After the reports: manifest, style and card tags, `run_checks.py`, push of the review
 branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines collect in
 `tasks/queue/pitfalls_pending.md` for the next retro.
+
+## `refresh_data.py` — the scripted number layer of a refresh
+
+    py -3 tools/refresh_data.py ccl --as-of auto --out DIR --write   # pre-pass (before the builder)
+    py -3 tools/refresh_data.py ccl --post --out DIR [--check]       # post-pass (after it); --check changes nothing
+
+Design and Oki's decisions: `tasks/refresh-data-design.md`. As-of `auto` = the latest session whose date's 20:00
+New York time has passed (never a session still trading). From Yahoo daily bars and SPY/QQQ it computes the header
+price and change, the chart carried to the as-of (existing points kept; the old as-of point becomes its month-end
+close; missing month-ends appended; labels in the page's own style; points rescaled and flagged if a split went ex
+between the editions), the intraday 52-week range with dates, 1-year / 5-year / chart-window price returns, RSI(14)
+and 50/200-day averages, dividends and the yield on the page's own basis (its "$X ÷ $price" formula, else TTM or
+annualised, whichever reproduces the previous edition), trailing P/E from the page's EPS cell; from Nasdaq, short
+interest (Nasdaq-listed stocks only) and EPS against Nasdaq's consensus. `facts.json` carries every value with its
+source URL, fetch time, as-of and basis; `stale_hits.txt` lists each line still showing an old price, chart value,
+range, P/E, yield or as-of date. `--write` changes structured fields only, never prose; the header price, banner
+date and chart are written together or not at all. The post-pass fails (exit 1) when the page no longer matches
+facts.json (as-of, price, the script's chart points, 52-week range, the delta box's data attributes) and
+recomputes P/E and a formula yield from the page's final cells. Analyst consensus and SEC figures stay with the
+agents. Coverage on 2 Oct 2026: header price and 52-week range on all 544 stock reports, banner 543 (FCX's date
+range), chart 540 (DOW hard-codes ma3/ma10/rsi; FDXF, HONA, SPCX are not monthly), change 537 (prose variants).
+`auto_refresh.py --data-layer` runs both passes around the builder and gates on `--post --check` (opt-in).
 
 ## `build_chips.py` — chip and card-back masters
 
