@@ -31,7 +31,11 @@ MAX_TURNS = '300'
 ALLOWED_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
                  'Bash(py -3 *)', 'Bash(python *)', 'Bash(node *)', 'Bash(curl *)', 'Bash(cd *)', 'Bash(ls *)',
                  'Bash(cat *)', 'Bash(head *)', 'Bash(tail *)', 'Bash(grep *)', 'Bash(sed -n *)', 'Bash(wc *)',
-                 'Bash(mkdir *)', 'Bash(date *)', 'Bash(echo *)', 'Bash(sort *)', 'Bash(diff *)']
+                 'Bash(mkdir *)', 'Bash(date *)', 'Bash(echo *)', 'Bash(sort *)', 'Bash(diff *)', 'Bash(wc *)',
+                 'Bash(find *)']
+# A chained command (a && b, a; b, X=… b) is denied when any part is off the list: 11 such denials on 2 Oct 2026.
+ONE_COMMAND = ('Run one command per Bash call: no &&, ; or variable assignments (a chained command is refused in '
+               'this unattended run); use absolute paths instead of cd.')
 TIER_ORDER = {'overdue': 0, 'due': 1}
 # The session is started as the agent itself, so it also reads the user's global CLAUDE.md; say which parts apply.
 UNATTENDED = ('You are running as an unattended scheduled job, not an interactive session: the plan-and-wait step, '
@@ -80,7 +84,7 @@ def builder_prompt(i: dict, wt: str) -> str:
             f"{i['fiscal_quarter']}. {surprise}{move}{why} The T+2 close ({i['t2']}) has settled; use the most "
             "recent settled close with an Adj. Close row as the new as-of.\n\n"
             "Privacy: never put personal data (names, emails) in any request or User-Agent; read sec.gov with "
-            f"WebFetch only. No git commands. Temp files only in $TEMP/ttgref_{i['slug']}/. Run "
+            f"WebFetch only. No git commands. {ONE_COMMAND} Temp files only in $TEMP/ttgref_{i['slug']}/. Run "
             f"`py -3 tools/chart_audit.py {i['slug']}` and `py -3 tools/verify.py reports/{i['slug']}_analysis.html` "
             "and report both outputs verbatim. Return in the format your agent file specifies, including the "
             "REFRESH.md return lines and the flag list.")
@@ -90,7 +94,7 @@ def checker_prompt(i: dict, wt: str, builder_result: str) -> str:
     return (f"Independent check of ONE refreshed report: reports/{i['slug']}_analysis.html ({i['ticker']}), "
             f"{i['tier']} earnings refresh (previous as-of {i['as_of']}). This is an unattended run: no person will "
             f"answer questions; fix what you can prove, cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
-            f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. "
+            f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. {ONE_COMMAND} "
             f"Temp files only in $TEMP/ttgchk_{i['slug']}/.\n\nSpec: claude/REPORT_PITFALLS.md first, then "
             "claude/briefs/CHECK.md (which points to REFRESH.md and BUILD.md). Never trust the builder's "
             "\"verified\": re-confirm on pages you fetch yourself. House rules: nothing dated after the banner "
@@ -104,6 +108,12 @@ def checker_prompt(i: dict, wt: str, builder_result: str) -> str:
 
 def pitfall_lines(text: str) -> list[str]:
     return [ln.strip() for ln in text.splitlines() if 'PITFALLS:' in ln]
+
+
+def built_tier(text: str, queued: str) -> str:
+    """The tier the builder decided (it may raise T2 to T1 on guidance or news), else the queue's."""
+    m = re.search(r'Tier\W{0,6}(T[12])\b', text)
+    return m.group(1) if m else queued
 
 
 def verdict_hold(text: str) -> bool:
@@ -179,7 +189,8 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock) -> Outcome:
             ok, why = gates(wt, slug)
             if ok:
                 git(wt, 'add', '--', path)
-                git(wt, 'commit', '-q', '-m', f"{i['ticker']} earnings refresh ({i['tier']}, print {i['release']}), "
+                out['tier'] = built_tier(str(b.get('result', '')), i['tier'])
+                git(wt, 'commit', '-q', '-m', f"{i['ticker']} earnings refresh ({out['tier']}, print {i['release']}), "
                     "unattended: builder + independent checker, verify PASS, chart_audit 0 wrong",
                     '-m', 'Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>')
                 out['verdict'], out['detail'] = 'committed', why

@@ -41,6 +41,10 @@ class Prompts(unittest.TestCase):
     def test_reading_the_checker(self):
         self.assertTrue(ar.verdict_hold('**VERDICT: HOLD** — the release is not out'))
         self.assertFalse(ar.verdict_hold('VERDICT: PUBLISH. Eleven corrections'))
+        self.assertEqual(ar.built_tier('2. **Tier T1.** The trigger is new guidance', 'T2'), 'T1')   # FDS, 2 Oct 2026
+        self.assertEqual(ar.built_tier('2. Tier: T2. None of the triggers fired', 'T1'), 'T2')
+        self.assertEqual(ar.built_tier('no tier line', 'T2'), 'T2')
+        self.assertIn('no &&', ar.ONE_COMMAND)
         self.assertEqual(ar.pitfall_lines('Result\nPITFALLS: F:x; G:y\nSources'), ['PITFALLS: F:x; G:y'])
 
 
