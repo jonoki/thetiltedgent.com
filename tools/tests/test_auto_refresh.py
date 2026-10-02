@@ -1,6 +1,10 @@
 """Unit tests for auto_refresh.py: choosing the work, the prompts, reading the checker's return.
 Run: py -3 tools/run_checks.py"""
+import os
+import subprocess
+import tempfile
 import unittest
+import unittest.mock
 
 import auto_refresh as ar
 
@@ -51,6 +55,64 @@ class Prompts(unittest.TestCase):
         self.assertEqual(ar.built_tier('no tier line', 'T2'), 'T2')
         self.assertIn('no &&', ar.ONE_COMMAND)
         self.assertEqual(ar.pitfall_lines('Result\nPITFALLS: F:x; G:y\nSources'), ['PITFALLS: F:x; G:y'])
+
+
+class DataLayer(unittest.TestCase):
+    """--data-layer (opt-in): the pre-pass before the builder, the post-pass before the checker, the facts gate."""
+    DATA: ar.DataLayer = {'facts': 'C:/runs/ctas/facts.json', 'stale': 'C:/runs/ctas/stale_hits.txt',
+                          'summary': 'ctas: as-of 2026-10-01 … left to the builder: change (prose variant)'}
+
+    def test_prompts_unchanged_without_it(self):
+        i = item('ctas', 'T1')
+        self.assertNotIn('DATA LAYER', ar.builder_prompt(i, 'C:/wt'))
+        self.assertEqual(ar.builder_prompt(i, 'C:/wt'), ar.builder_prompt(i, 'C:/wt', None))
+        self.assertNotIn('DATA LAYER', ar.checker_prompt(i, 'C:/wt', 'r'))
+
+    def test_builder_prompt(self):
+        p = ar.builder_prompt(item('ctas', 'T1'), 'C:/wt', self.DATA)
+        for s in ('already updated from C:/runs/ctas/facts.json', "Don't refetch prices", 'use facts.json for every '
+                  'price-derived number', 'fix every line listed in C:/runs/ctas/stale_hits.txt',
+                  'left to the builder: change (prose variant)', 'EPS (TTM) cell'):
+            self.assertIn(s, p)
+
+    def test_checker_prompt(self):
+        p = ar.checker_prompt(item('ctas', 'T1'), 'C:/wt', 'r', 'ctas: post-pass FAIL\n  MISMATCH header price')
+        self.assertIn('spot-check two', p)
+        self.assertIn('MISMATCH header price', p)
+
+    def test_commands(self):
+        pre = ar.data_layer_cmd('ctas', 'C:/o')
+        self.assertEqual(pre[1:], ['tools/refresh_data.py', 'ctas', '--as-of', 'auto', '--out', 'C:/o', '--write'])
+        self.assertEqual(ar.data_layer_cmd('ctas', 'C:/o', post=True)[1:],
+                         ['tools/refresh_data.py', 'ctas', '--post', '--out', 'C:/o'])
+        self.assertEqual(ar.data_layer_cmd('ctas', 'C:/o', post=True, check=True)[-1], '--check')
+
+    def test_gate_holds_the_page_to_its_facts(self):
+        calls = []
+
+        def fake_run(cmd, cwd, timeout=0):
+            calls.append(cmd)
+            if 'verify.py' in cmd[1]:
+                return subprocess.CompletedProcess(cmd, 0, 'PASS ctas_analysis.html', '')
+            if 'chart_audit.py' in cmd[1]:
+                return subprocess.CompletedProcess(cmd, 0, 'reports 1 | errors 0 | WRONG points >3% vs x: 0 | y', '')
+            return subprocess.CompletedProcess(cmd, 1, 'ctas: post-pass FAIL\n  MISMATCH header price 1 != 2\n', '')
+        with tempfile.TemporaryDirectory() as wt, unittest.mock.patch.object(ar, 'run', fake_run):
+            os.makedirs(os.path.join(wt, 'reports'))
+            with open(os.path.join(wt, 'reports', 'ctas_analysis.html'), 'wb') as fh:
+                fh.write(b'<html>\n</html>\n')
+            self.assertTrue(ar.gates(wt, 'ctas')[0])                    # without the data layer: as before
+            self.assertEqual(len(calls), 2)
+            ok, why = ar.gates(wt, 'ctas', 'C:/o')
+            self.assertFalse(ok)
+            self.assertIn('facts MISMATCH: MISMATCH header price 1 != 2', why)
+            self.assertEqual(calls[-1][-1], '--check')
+
+    def test_summary_names_it(self):
+        o: ar.Outcome = {'slug': 'ctas', 'ticker': 'CTAS', 'tier': 'T1', 'verdict': 'committed', 'detail': 'ok',
+                         'cost_usd': 1.0, 'usage': [], 'denials': [], 'pitfalls': [], 'data_layer': 'used'}
+        self.assertIn('data layer used', ar.summary_md('2026-10-02', [o], [], []))
+        self.assertNotIn('data layer', ar.summary_md('2026-10-02', [{**o, 'data_layer': 'off'}], [], []))
 
 
 if __name__ == '__main__':
