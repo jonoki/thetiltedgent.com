@@ -94,9 +94,19 @@ def year_month(as_of: str | None) -> tuple[int, int] | None:
     return (int(as_of[:4]), int(as_of[5:7])) if as_of else None
 
 
+def yahoo_symbol(slug: str, ticker: str) -> str:
+    """The Yahoo symbol of a report: BRK.B -> BRK-B, or the override in YAHOO_SYMBOL."""
+    return YAHOO_SYMBOL.get(slug, ticker.replace('.', '-'))
+
+
 def fetch(slug: str, ticker: str, path: str) -> None:
-    """Download the Yahoo series for one report into path. Network, HTTP and timeout errors -> YahooError."""
-    url = YAHOO_CHART.format(sym=YAHOO_SYMBOL.get(slug, ticker.replace('.', '-')))
+    """Download the Yahoo monthly series for one report into path. Network, HTTP and timeout errors -> YahooError."""
+    fetch_url(YAHOO_CHART.format(sym=yahoo_symbol(slug, ticker)), path)
+
+
+def fetch_url(url: str, path: str) -> None:
+    """Download one Yahoo chart response into path (also used by refresh_data.py for the daily series).
+    Network, HTTP and timeout errors -> YahooError."""
     try:
         body = urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=FETCH_TIMEOUT_S).read()  # nosec B310 - fixed https host
     except (urllib.error.URLError, HTTPException, TimeoutError, OSError) as e:   # reported per report, not fatal
