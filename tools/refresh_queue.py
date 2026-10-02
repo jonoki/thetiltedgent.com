@@ -9,6 +9,7 @@ import datetime
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -30,7 +31,9 @@ NASDAQ_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Apple
 YAHOO_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B'}   # as in chart_audit.py
 FETCH_TIMEOUT_S, FETCH_PAUSE_S = 30, 0.3
-RECHECK_DAYS = 7   # calendar days this recent are re-fetched every run: Nasdaq fills in actual EPS after the print
+# One cache per user, not per checkout: the review worktree's runs must see the release times the nightly run saw.
+CAL_CACHE = os.path.join(os.environ.get('LOCALAPPDATA') or tempfile.gettempdir(), 'ttg-refresh-queue', 'calendar')
+RECHECK_DAYS = 7  # calendar days this recent are re-fetched every run: Nasdaq fills in actual EPS after the print
 
 # NYSE full closures, from nyse.com/markets/hours-calendars (read 30 Sep 2026). Extend before 2028.
 NYSE_HOLIDAYS = frozenset(Date.fromisoformat(d) for d in (
@@ -320,11 +323,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = rd.parser('The earnings refresh queue (tasks/queue/queue.json and today.md).')
     ap.add_argument('--today', help='run as of this date, YYYY-MM-DD (default: the local date)')
     ap.add_argument('--ahead', type=int, default=14, help='calendar days of upcoming prints to list (default 14)')
+    ap.add_argument('--cache', default=CAL_CACHE, help='calendar cache folder (default: one per user, shared by every '
+                    'checkout, so a release time seen before the print is kept)')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]  # the summary line uses '·'
     today = Date.fromisoformat(args.today) if args.today else Date.today()
     out_dir = os.path.join(args.repo, 'tasks', 'queue')
-    cache = os.path.join(out_dir, 'calendar')
+    cache = args.cache
     os.makedirs(cache, exist_ok=True)
     lib = holdings(args.repo)
     start = Date.fromisoformat(min(h['as_of'] for h in lib.values()))
