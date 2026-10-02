@@ -109,7 +109,14 @@ def data_layer_brief(data: DataLayer) -> str:
             "(returns, SPY/QQQ comparisons, RSI and moving averages, distance from the 52-week high and low, short "
             "interest with its settlement date, EPS against Nasdaq consensus); fix every line listed in "
             f"{data['stale']} (old price, old chart values, old range, P/E, yield or as-of date still in the prose), "
-            "leaving only those about that date on purpose. Update the EPS (TTM) cell from the release: a post-pass "
+            "leaving only those about that date on purpose. The chart is trimmed to the five-year window (61 points; "
+            "the events re-indexed, any that fell off listed in facts.json fields.chart.trim): take the window "
+            "return, its start month and value from fields.return_chart, and rewrite prose that still starts the "
+            "window at the dropped month. Existing chart points that were off Yahoo's month-end were replaced: "
+            "facts.json fixed_points lists each (month, old, new, source). Rule A: sweep the prose, timeline, events "
+            "labels and cards for every old value (they are in stale_hits.txt) and fix each month-end use; when "
+            "fixed_points is not empty, the delta box is `tg-d--fix` and says the chart was corrected (how many "
+            "month-end closes, against Yahoo). Update the EPS (TTM) cell from the release: a post-pass "
             "recomputes P/E and the yield from the page's final cells. Fields the pre-pass left to you and its "
             f"warnings:\n<<<\n{data['summary'][:3000]}\n>>>")
 
@@ -132,15 +139,19 @@ def checker_prompt(i: dict, wt: str, builder_result: str, post: str | None = Non
                "\n\nDATA LAYER: the header, banner date, chart, 52-week range and price-derived numbers in "
                "facts.json were machine-fetched and are gated after you (tools/refresh_data.py --post --check): "
                "spot-check two of them, then spend your checking on what the builder wrote (release figures, "
-               "quotes, analysts, causes, carried-over facts). The post-pass output (it re-synced P/E and the "
+               "quotes, analysts, causes, carried-over facts). Chart points the pre-pass corrected are listed in "
+               "facts.json fixed_points (month, old, new, source): confirm no old value survives in the prose, "
+               "timeline, events labels or cards (rule A) and that the delta box is `tg-d--fix` and mentions the "
+               "chart correction when that list is not empty. The post-pass output (it re-synced P/E and the "
                f"yield to the page's final cells; fix any MISMATCH it lists):\n<<<\n{post[:3000]}\n>>>"))
 
 
 def data_layer_cmd(slug: str, out: str, post: bool = False, check: bool = False) -> list[str]:
-    """tools/refresh_data.py: the pre-pass (as-of auto, written into the page) or the post-pass."""
+    """tools/refresh_data.py: the pre-pass (as-of auto, written into the page, chart trimmed to the default window and
+    wrong existing points fixed) or the post-pass."""
     if post:
         return [sys.executable, 'tools/refresh_data.py', slug, '--post', '--out', out] + (['--check'] if check else [])
-    return [sys.executable, 'tools/refresh_data.py', slug, '--as-of', 'auto', '--out', out, '--write']
+    return [sys.executable, 'tools/refresh_data.py', slug, '--as-of', 'auto', '--out', out, '--write', '--fix-points']
 
 
 def pitfall_lines(text: str) -> list[str]:

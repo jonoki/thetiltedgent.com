@@ -72,17 +72,21 @@ class DataLayer(unittest.TestCase):
         p = ar.builder_prompt(item('ctas', 'T1'), 'C:/wt', self.DATA)
         for s in ('already updated from C:/runs/ctas/facts.json', "Don't refetch prices", 'use facts.json for every '
                   'price-derived number', 'fix every line listed in C:/runs/ctas/stale_hits.txt',
-                  'left to the builder: change (prose variant)', 'EPS (TTM) cell'):
+                  'left to the builder: change (prose variant)', 'EPS (TTM) cell', 'fixed_points',
+                  'trimmed to the five-year window', 'Rule A: sweep', '`tg-d--fix`'):
             self.assertIn(s, p)
 
     def test_checker_prompt(self):
         p = ar.checker_prompt(item('ctas', 'T1'), 'C:/wt', 'r', 'ctas: post-pass FAIL\n  MISMATCH header price')
         self.assertIn('spot-check two', p)
         self.assertIn('MISMATCH header price', p)
+        self.assertIn('facts.json fixed_points', p)
+        self.assertIn('(rule A)', p)
 
     def test_commands(self):
         pre = ar.data_layer_cmd('ctas', 'C:/o')
-        self.assertEqual(pre[1:], ['tools/refresh_data.py', 'ctas', '--as-of', 'auto', '--out', 'C:/o', '--write'])
+        self.assertEqual(pre[1:], ['tools/refresh_data.py', 'ctas', '--as-of', 'auto', '--out', 'C:/o', '--write',
+                                   '--fix-points'])
         self.assertEqual(ar.data_layer_cmd('ctas', 'C:/o', post=True)[1:],
                          ['tools/refresh_data.py', 'ctas', '--post', '--out', 'C:/o'])
         self.assertEqual(ar.data_layer_cmd('ctas', 'C:/o', post=True, check=True)[-1], '--check')
