@@ -168,6 +168,11 @@ recomputes P/E and a formula yield from the page's final cells. Analyst consensu
 agents. Coverage on 2 Oct 2026: header price and 52-week range on all 544 stock reports, banner 543 (FCX's date
 range), chart 540 (DOW hard-codes ma3/ma10/rsi; FDXF, HONA, SPCX are not monthly), change 537 (prose variants).
 `auto_refresh.py --data-layer` runs both passes around the builder and gates on `--post --check` (opt-in).
+The pre-pass trims the chart to `--window` points (default 61: five years of month-ends + the as-of point; `0` = off),
+shifting the `events` indices and dropping those that fall off (FISV, whose script hard-codes an index, is not
+trimmed); `--fix-points` (on under `--data-layer`) replaces kept points more than half a cent off Yahoo's month-end on
+the page's basis, skipping spin basis steps, missing months and post-as-of splits, and lists them in facts.json
+`fixed_points` and stale_hits (rule A).
 
 ## `build_chips.py` — chip and card-back masters
 
