@@ -18,6 +18,11 @@ class Select(unittest.TestCase):
                  item('e', 'T1', 'waiting'), item('f', 'T2', 'upcoming')]
         self.assertEqual([i['slug'] for i in ar.select(items, {}, t2_cap=2)], ['b', 'd', 'a'])   # overdue T2 first
 
+    def test_tiers(self):   # daily run: T1 only; Monday run: T2 only (Oki, 2 Oct 2026)
+        items = [item('a', 'T2', release='2026-09-20'), item('b', 'T1'), item('c', 'T2', 'overdue', '2026-09-10')]
+        self.assertEqual([i['slug'] for i in ar.select(items, {}, tiers=('T1',))], ['b'])
+        self.assertEqual([i['slug'] for i in ar.select(items, {}, t2_cap=20, tiers=('T2',))], ['c', 'a'])
+
     def test_attempts_and_only(self):
         items = [item('a', 'T1'), item('b', 'T1')]
         self.assertEqual([i['slug'] for i in ar.select(items, {'a': {'2026-09-23': 2}})], ['b'])

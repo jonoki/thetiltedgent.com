@@ -135,7 +135,7 @@ Exits 1 if any calendar day could not be fetched.
 
 Keeps its own worktree (`.claude/worktrees/auto-refresh`, branch `claude/auto-refresh`, no upstream), merges the
 base in, copies the private agent files in, runs `refresh_queue.py`, and takes the due and overdue reports: every
-T1, then up to 8 T2 (`--t2-cap`), at most 2 attempts per report and print. For each, four at a time (`--jobs`):
+T1, then up to 8 T2 (`--t2-cap`), at most 2 attempts per report and print. `--tiers T1` or `--tiers T2` limits a run to one tier: the scheduled runs are T1 daily at 06:30 and T2 on Mondays at 17:30, a few hours before the weekly usage reset (Oki, 2 Oct 2026). For each, four at a time (`--jobs`):
 a headless `claude -p --agent ttg-report-builder`, then `--agent ttg-report-checker` with the builder's return,
 both in `dontAsk` mode with the tool allow-list in the script (no git, no deletes; denials are logged). Then it
 re-runs `verify.py` and `chart_audit.py` itself and commits the report only if both pass, LF only, and the checker

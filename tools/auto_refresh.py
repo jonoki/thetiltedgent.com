@@ -57,10 +57,11 @@ class Outcome(TypedDict):
 # ---- choosing the work ----
 
 def select(items: list[dict], attempts: dict[str, dict[str, int]], t2_cap: int = T2_CAP,
-           only: list[str] | None = None) -> list[dict]:
-    """Due and overdue reports: every T1, then T2 oldest first up to the cap; a report that has used up its
-    attempts on this print is left for a person."""
-    due = [i for i in items if i['status'] in TIER_ORDER and (not only or i['slug'] in only)
+           only: list[str] | None = None, tiers: tuple[str, ...] = ('T1', 'T2')) -> list[dict]:
+    """Due and overdue reports of the given tiers: every T1, then T2 oldest first up to the cap; a report that has
+    used up its attempts on this print is left for a person. (Schedule, Oki 2 Oct 2026: T1 daily at 06:30, T2
+    weekly on Monday at 17:30, before the weekly usage reset.)"""
+    due = [i for i in items if i['status'] in TIER_ORDER and i['tier'] in tiers and (not only or i['slug'] in only)
            and attempts.get(i['slug'], {}).get(i['release'], 0) < MAX_ATTEMPTS]
     due.sort(key=lambda i: (i['tier'], TIER_ORDER[i['status']], i['release'], i['ticker']))
     t1 = [i for i in due if i['tier'] == 'T1']
@@ -233,7 +234,7 @@ def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: li
         lines.append(f"- **{o['ticker']}** {o['tier']} — {o['verdict']}: {o['detail']} · ~${o['cost_usd']:.2f} "
                      "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else ''))
     if waiting:
-        lines += ['', f'Due but not run (T2 cap or attempts used up): {len(waiting)}',
+        lines += ['', f'Due but not run (on the other schedule, over the T2 cap, or out of attempts): {len(waiting)}',
                   *[f"- {i['ticker']} {i['tier']} released {i['release']} ({i['status']})" for i in waiting]]
     return '\n'.join(lines + [''] + notes) + '\n'
 
@@ -244,6 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--t2-cap', type=int, default=T2_CAP)
     ap.add_argument('--jobs', type=int, default=JOBS)
     ap.add_argument('--only', nargs='*', help='limit the run to these slugs')
+    ap.add_argument('--tiers', default='T1,T2', help='tiers to refresh, e.g. T1 (the daily run) or T2 (the weekly run)')
     ap.add_argument('--dry-run', action='store_true', help='show what would run; no agents, commits or push')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]
@@ -259,7 +261,8 @@ def main(argv: list[str] | None = None) -> int:
     if os.path.exists(att_path):
         with open(att_path, encoding='utf-8') as fh:
             attempts = json.load(fh)
-    work = select(items, attempts, args.t2_cap, args.only)
+    tiers = tuple(t.strip().upper() for t in args.tiers.split(',') if t.strip())
+    work = select(items, attempts, args.t2_cap, args.only, tiers)
     waiting = [i for i in items if i['status'] in TIER_ORDER and i not in work and (not args.only or i['slug'] in args.only)]
     print(f'run {day}: ' + (', '.join(f"{i['ticker']} {i['tier']}" for i in work) or 'nothing due'))
     if args.dry_run:
