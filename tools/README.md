@@ -117,7 +117,7 @@ labels like `'Sep \'21'` / `"Oct '21"`, so 13 reports were never audited.
 
     py -3 tools/refresh_queue.py                     # as of today; --today YYYY-MM-DD to replay a day
 
-Crosses the Nasdaq earnings calendar (one file per day, cached once per user in `%LOCALAPPDATA%	tg-refresh-queuelendar` and shared by every checkout; the last 7 days are
+Crosses the Nasdaq earnings calendar (one file per day, cached once per user in `%LOCALAPPDATA%/ttg-refresh-queue/calendar` and shared by every checkout; the last 7 days are
 re-fetched each run) with each report's as-of date from the manifest. For every report whose company reported
 after its as-of: the release date and time, the T+2 as-of (NYSE holidays built in, `claude/briefs/REFRESH.md`),
 the status (upcoming, waiting for T+2, due, overdue after 5 sessions), the first-session move (Yahoo daily
