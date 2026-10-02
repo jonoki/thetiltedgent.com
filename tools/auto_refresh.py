@@ -269,7 +269,8 @@ def main(argv: list[str] | None = None) -> int:
         for i in work[:1]:
             print('\n--- builder prompt ---\n' + builder_prompt(i, wt))
         return 0
-    logs = os.path.join(qdir, 'runs', day)
+    run_id = day if set(tiers) >= {'T1', 'T2'} else day + '-' + '-'.join(tiers)   # Mondays run T1 and T2 separately
+    logs = os.path.join(qdir, 'runs', run_id)
     os.makedirs(logs, exist_ok=True)
     for i in work:
         attempts.setdefault(i['slug'], {})[i['release']] = attempts.get(i['slug'], {}).get(i['release'], 0) + 1
@@ -295,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         with open(os.path.join(qdir, 'pitfalls_pending.md'), 'a', encoding='utf-8', newline='\n') as fh:
             fh.write('\n'.join(pend) + '\n')
     text = summary_md(day, outcomes, waiting, notes)
-    with open(os.path.join(qdir, 'runs', f'{day}.md'), 'w', encoding='utf-8', newline='\n') as fh:
+    with open(os.path.join(qdir, 'runs', f'{run_id}.md'), 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
     print(text)
     return 0 if all(o['verdict'] == 'committed' for o in outcomes) else 1
