@@ -254,6 +254,140 @@ class PrePass(unittest.TestCase):
         self.assertFalse(any(h.startswith('L21:') for h in hits))     # and so are the chart arrays
 
 
+T_DAYS = rdt.parse_daily(load('yahoo_daily_t_monthends.json'), 'https://yahoo/t', 'now')   # T: WBD spin 2022-04-11
+
+
+def t_close(y: int, m: int) -> float:
+    return round(rdt.month_end(T_DAYS.days, y, m).close, 2)
+
+
+def t_adj(y: int, m: int) -> float:
+    return round(rdt.month_end(T_DAYS.days, y, m).adj, 2)
+
+
+class FixPoints(unittest.TestCase):
+    """--fix-points on a saved Yahoo response (T month-ends, Sep 2021 – Oct 2026, with adjclose and the spin)."""
+    MONTHS = [(2022, m) for m in range(4, 13)] + [(2023, m) for m in range(1, 4)]   # 12 months after the spin
+
+    def fix(self, labels, prices, days=None, factor=1.0, labelled=False):
+        return rdt.fix_points(labels, prices, list(range(len(labels))), days or T_DAYS.days, factor, T_DAYS.splits,
+                              '2026-10-01', labelled, 'https://yahoo/t')
+
+    def test_close_basis(self):
+        self.assertEqual(rdt.parse_daily(load('yahoo_daily_t_monthends.json')).splits, [('2022-04-11', 1.324)])
+        labels = ['Oct 21', 'Mar 22', 'Apr 22', 'May 22', 'Jun 22', 'Oct 1 26']
+        prices = [19.06,                      # spin-adjusted, 2 cents off Yahoo's 19.08: wrong (rule A)
+                  round(t_close(2022, 3) * 1.324, 2),   # the real pre-spin close: a basis step, left alone
+                  t_close(2022, 4),           # right: untouched
+                  21.60,                      # 1.5% off Yahoo's 21.29: wrong
+                  15.00,                      # June 2022 is missing from the days given: never touched
+                  24.30]
+        days = [d for d in T_DAYS.days if d.date[:7] != '2022-06']
+        got = rdt.fix_points(labels, prices, [0, 1, 2, 3, 4], days, 1.0, T_DAYS.splits, '2026-10-01', False, 'u')
+        self.assertEqual([(f['month'], f['old'], f['new'], f['date']) for f in got['fixed']],
+                         [('Oct 21', 19.06, 19.08, '2021-10-29'), ('May 22', 21.60, 21.29, '2022-05-31')])
+        self.assertEqual(got['fixed'][0]['source'], 'u')
+        self.assertEqual(prices, [19.08, 23.63, 18.86, 21.29, 15.00, 24.30])
+        self.assertEqual((got['basis'], got['compared'], got['skipped']),
+                         ('close', 3, {'no Yahoo month': ['Jun 22'], 'basis step': ['Mar 22']}))
+
+    def test_a_labelled_dividend_adjusted_series_is_compared_with_adjclose(self):
+        labels = [f'{rdt.rp.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
+        prices = [t_adj(y, m) for y, m in self.MONTHS]
+        prices[2] = t_close(2022, 6)          # one point on the close: wrong for an adjusted series
+        got = self.fix(labels, prices, labelled=True)
+        self.assertEqual(got['basis'], 'adjclose')
+        self.assertEqual([(f['month'], f['new']) for f in got['fixed']], [('Jun 22', t_adj(2022, 6))])
+        self.assertIn('adjclose', got['fixed'][0]['basis'])
+        self.assertIsNone(got['note'])
+
+    def test_an_unlabelled_adjusted_series_is_put_on_the_close(self):
+        labels = [f'{rdt.rp.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
+        prices = [t_adj(y, m) for y, m in self.MONTHS]
+        got = self.fix(labels, prices, labelled=False)
+        self.assertEqual((got['basis'], len(got['fixed'])), ('close', 12))
+        self.assertEqual(prices, [t_close(y, m) for y, m in self.MONTHS])
+        self.assertIn('rebased to the close', got['note'])
+
+    def test_a_split_after_the_as_of_leaves_every_point(self):
+        prices = [19.06, 21.60]
+        got = self.fix(['Oct 21', 'May 22'], prices, factor=2.0)
+        self.assertEqual((got['fixed'], prices, got['skipped']), ([], [19.06, 21.60],
+                                                                  {'split after the as-of': ['Oct 21', 'May 22']}))
+
+    def test_window_drop(self):
+        self.assertEqual((rdt.window_drop(62, 61), rdt.window_drop(61, 61), rdt.window_drop(40, 61),
+                          rdt.window_drop(62, 0)), (1, 0, 0, 0))
+
+
+PAGE_W = (PAGE.replace("const prices = [26.51,27.81,24.76];\n",
+                       "const prices = [26.51,27.50,24.76];\nconst events = [\n  { idx: 0, label: 'Jun 2026 start' },"
+                       "\n  { idx: 1, label: 'Jul 2026 $27.50' },\n  { idx: 2, label: 'Aug 2026 close' }\n];\n")
+          .replace('<p>The stock closed August 28 at $24.76.</p>',
+                   '<p>The stock closed August 28 at $24.76. Over five years, from $26.51 in June 2026, it fell 6.6%; '
+                   'July closed at $27.50.</p>'))
+
+
+class ChartWindow(unittest.TestCase):
+    """build() with the window trim and --fix-points: the page, facts.json, stale hits and the summary line."""
+
+    def setUp(self):
+        daily = rdt.parse_daily(load('yahoo_daily_ccl.json'), 'https://yahoo/ccl', '2026-10-02T09:45:00+00:00')
+        self.jul = round(rdt.month_end(daily.days, 2026, 7).close, 2)
+        self.facts, self.new = rdt.build('ccl', PAGE_W, daily, '2026-10-01', {'SPY': 'skipped', 'QQQ': 'skipped'},
+                                         'offline', 'offline', 'offline', window=4, fix=True)
+
+    def test_page(self):
+        self.assertEqual(rl.chart_series(self.new), (["Jul '26", "Aug '26", "Sep '26", "Oct '26"],
+                                                     [self.jul, 23.89, 24.54, 25.07]))
+        self.assertIn("const events = [\n  { idx: 0, label: 'Jul 2026 $27.50' },\n  { idx: 1, label: 'Aug 2026 close' }\n];",
+                      self.new)
+        self.assertIn('it fell 6.6%', self.new)     # prose is never written
+
+    def test_facts(self):
+        f = self.facts
+        trim = f['fields']['chart']['trim']
+        self.assertEqual((trim['dropped'], trim['events_kept'], trim['events_dropped']),
+                         (1, 2, [{'idx': 0, 'label': 'Jun 2026 start'}]))
+        self.assertEqual(trim['dropped_points'], [{'label': "Jun '26", 'value': 26.51}])
+        self.assertEqual([(p['month'], p['old'], p['new']) for p in f['fixed_points']], [("Jul '26", 27.50, self.jul)])
+        rc = f['fields']['return_chart']
+        self.assertEqual((rc['start_label'], rc['start_value'], rc['start_date'], rc['points']),
+                         ("Jul '26", self.jul, '2026-07-31', 4))
+        self.assertEqual(rc['pct_on_chart'], round((25.07 / self.jul - 1) * 100, 2))
+        self.assertEqual(f['previous_window'], {'start_label': "Jun '26", 'start_value': 26.51, 'as_of': '2026-08-28',
+                                                'price': 24.76, 'pct': -6.6, 'points': 3, 'prose_forms': ['6.6']})
+
+    def test_stale_hits_and_summary(self):
+        hits = rdt.stale_hits(self.new, rdt.stale_patterns(self.facts['page_before'], self.facts['new_values']))
+        kinds = [h.split(' | ')[0] for h in hits]
+        self.assertIn(f"L15: wrong chart value Jul '26 (fixed to {self.jul:.2f}) 27.50", kinds)   # the prose
+        self.assertIn(f"L23: wrong chart value Jul '26 (fixed to {self.jul:.2f}) 27.50", kinds)   # the events label
+        self.assertIn("L15: old chart start Jun '26 (dropped from the window) 26.51", kinds)
+        self.assertIn('L15: old chart-window return 6.6%', kinds)
+        self.assertEqual(rdt.chart_summary(self.facts), 'trimmed 1 points (window 4), events dropped: Jun 2026 start '
+                                                        '| fixed 1 chart points (close basis, 1 compared)')
+
+    def test_post_pass_holds_the_fixed_points(self):
+        with tempfile.TemporaryDirectory() as repo:
+            out = os.path.join(repo, 'out')
+            os.makedirs(out)
+            rdt.write_outputs(out, self.facts, self.new, True)
+            reverted = self.new.replace(f"const prices = [{self.jul:.2f},", 'const prices = [27.50,')
+            self.assertNotEqual(reverted, self.new)
+            rl.write_text(os.path.join(repo, 'reports', 'ccl_analysis.html'), reverted)
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                self.assertEqual(rdt.postpass('ccl', repo, out, True), 1)
+            self.assertIn(f"MISMATCH fixed chart point Jul '26 27.5 != facts {self.jul}", buf.getvalue())
+
+    def test_off_by_default(self):
+        daily = rdt.parse_daily(load('yahoo_daily_ccl.json'), 'u', 't')
+        facts, _ = rdt.build('ccl', PAGE_W, daily, '2026-10-01', {}, 'offline', 'offline', 'offline')
+        self.assertEqual((facts['fields']['chart']['trim']['dropped'], facts['fixed_points']), (0, []))
+        self.assertEqual(rdt.chart_summary(facts), 'not trimmed (--window 0) | points not checked (--fix-points off)')
+
+
 class PostPass(unittest.TestCase):
     def run_post(self, repo: str, out: str, check: bool) -> tuple[int, str]:
         buf = io.StringIO()

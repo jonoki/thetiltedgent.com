@@ -2,7 +2,8 @@
 fetches the settled close and everything that follows from it, writes the page's structured fields, and lists the
 prose that still carries the old numbers. Prose, analyst consensus and anything from SEC filings stay with the agents.
 
-usage:  py -3 tools/refresh_data.py <slug> [--as-of YYYY-MM-DD|auto] [--out DIR] [--write]     the pre-pass
+usage:  py -3 tools/refresh_data.py <slug> [--as-of YYYY-MM-DD|auto] [--out DIR] [--write]
+                                          [--window N] [--fix-points]                          the pre-pass
         py -3 tools/refresh_data.py <slug> --post [--check] [--out DIR]                       the post-pass
 
 Pre-pass. As-of = the latest settled close (auto: the latest session whose date's 20:00 New York time has passed,
@@ -18,6 +19,15 @@ source URL, fetch time, as-of and basis; <out>/stale_hits.txt lists every line o
 price, an old chart value, the old 52-week range, P/E or yield, or the old as-of date. --write puts the structured
 fields into the page in one batch (tools/reportpatch.py; header price, banner date and chart move together or not
 at all) and never touches prose.
+
+Chart window (Oki, 2 Oct 2026): after the new month-ends are appended the oldest points are dropped so the chart keeps
+at most --window points (default 61: five years of month-ends plus the as-of point; 0 = no trim); the events move
+with it (indices shifted, events that fall off the front dropped and listed). facts.json carries the new window
+return with its start month and value (return_chart) and the previous edition's (previous_window); stale_hits lists
+the dropped start value and the old window return where the prose shows it. A page whose script uses a chart index
+outside the events (FISV) is not trimmed. --fix-points: every kept existing point is compared with Yahoo's month-end
+on the page's basis and replaced when more than half a cent off (rule A; fix_points says what is skipped and why);
+the replacements are facts.json fixed_points and their old values are stale hits.
 
 Post-pass (after the builder). Re-reads the page against facts.json: as-of, header price, the script's chart points
 and the 52-week range must still match (exit 1 if not); the last chart point is re-synced to the header; P/E is
@@ -56,7 +66,8 @@ PE_LABEL = r'Trailing P/?E\b'           # verify.pe_pair's labels
 EPS_LABEL = r'(?:Diluted )?EPS \(TTM\b'
 YIELD_LABEL = r'Dividend Yield'
 OUT_ROOT = os.path.join(tempfile.gettempdir(), 'ttg_refresh_data')
-CORE = ('header_price', 'banner_date', 'chart')   # written together or not at all
+CORE = ('header_price', 'banner_date', 'chart')   # written together or not at all (the chart with its events)
+WINDOW = 61   # chart points kept: five years of month-ends plus the as-of point (--window; Oki, 2 Oct 2026)
 NET_ERRORS = (urllib.error.URLError, HTTPException, TimeoutError, OSError, ValueError)
 BASIS_PRICE = 'Yahoo daily close: split-adjusted, not dividend-adjusted (the page basis)'
 
@@ -66,6 +77,7 @@ class Day(NamedTuple):
     high: float
     low: float
     close: float
+    adj: float | None = None   # Yahoo adjclose: split- and dividend-adjusted
 
 
 class Daily(NamedTuple):
@@ -103,12 +115,14 @@ def parse_daily(body: Json, url: str = '', fetched_at: str = '') -> Daily:
             raise ca.YahooError('no result')
         offset = int(r['meta'].get('gmtoffset') or 0)
         q = r['indicators']['quote'][0]
+        stamps = r.get('timestamp') or []
+        adj = ((r['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(stamps)
         by_date: dict[str, Day] = {}
-        for ts, h, lo, c in zip(r.get('timestamp') or [], q.get('high') or [], q.get('low') or [], q.get('close') or []):
+        for ts, h, lo, c, a in zip(stamps, q.get('high') or [], q.get('low') or [], q.get('close') or [], adj):
             if h is None or lo is None or c is None:
                 continue
             d = datetime.datetime.fromtimestamp(ts + offset, datetime.UTC).date().isoformat()
-            by_date[d] = Day(d, float(h), float(lo), float(c))
+            by_date[d] = Day(d, float(h), float(lo), float(c), float(a) if a is not None else None)
         divs = sorted((datetime.datetime.fromtimestamp(int(k) + offset, datetime.UTC).date().isoformat(),
                        float(v['amount'])) for k, v in ((r.get('events') or {}).get('dividends') or {}).items())
         return Daily([by_date[k] for k in sorted(by_date)], divs, ca.split_events(r), offset, url, fetched_at)
@@ -367,6 +381,83 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
             'split_rescale': {'ratio': rescale, 'splits': real} if rescale != 1.0 else None}
 
 
+def window_drop(n_points: int, window: int) -> int:
+    """How many of the oldest points to drop so the chart has at most `window` points (0 = no trim). The default 61
+    is five years of month-ends plus the as-of point (CLAUDE.md: about 60 monthly closes, a 5-year monthly series)."""
+    return max(0, n_points - window) if window else 0
+
+
+CENT = 0.005    # rule A: a chart point is the source value to the cent; more than half a cent off is wrong
+
+
+def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: list[Day], factor: float,
+               splits: ca.Splits, as_of: str, labelled: bool, source: str) -> Json:
+    """Existing chart points (positions idxs) checked against Yahoo's month-end on the page's own basis and replaced,
+    in prices, when more than half a cent off. Returns the basis, the fixed points (month, date, old, new, source)
+    and the points left alone and why.
+
+    Basis: Yahoo's close (split-adjusted, the page basis), or its adjclose when chart_audit's test classes the series
+    as dividend-adjusted (at least ADJ_UNLABELLED_MIN points match the adjusted close and not the close) AND the page
+    labels it so (chart_audit.ADJ_LABEL) AND more points sit nearer the adjusted close than the close. A series nearer
+    the adjusted close that is not labelled is put on the close (rule A: dividends not adjusted unless labelled).
+    Left alone: labels that are not a month; months Yahoo does not have; every point when a split went ex after the
+    as-of (Yahoo's basis is then not the page's); basis steps — a point chart_audit classes 'basis step', or, in a
+    month before a spin-off booked as a fractional split, a point nearer the real pre-spin close than Yahoo's
+    spin-adjusted one (both are allowed bases; a small spin is inside chart_audit's 3%)."""
+    ym_as_of = (int(as_of[:4]), int(as_of[5:7]))
+    skipped: dict[str, list[str]] = {}
+
+    def skip(why: str, lab: str) -> None:
+        skipped.setdefault(why, []).append(lab)
+
+    cand: list[tuple[int, Day, float]] = []
+    for i in idxs:
+        p = rp.point_label(labels[i])
+        if not p or p.style.kind != 'month':
+            skip('not a month label', labels[i])
+            continue
+        if (p.year, p.month) >= ym_as_of:
+            skip('the as-of month', labels[i])
+            continue
+        me = month_end(days, p.year, p.month)
+        if not me:
+            skip('no Yahoo month', labels[i])
+            continue
+        if factor != 1.0:
+            skip('split after the as-of', labels[i])
+            continue
+        cand.append((i, me, ca.spin_factor(splits, (p.year, p.month), as_of)))
+    adj_pts = sum(ca.classify(prices[i], me.close, me.adj, spin) == 'adjusted' for i, me, spin in cand)
+    near_adj = sum(me.adj is not None and abs(prices[i] - me.adj) + CENT < abs(prices[i] - me.close) for i, me, _ in cand)
+    near_close = sum(me.adj is not None and abs(prices[i] - me.close) + CENT < abs(prices[i] - me.adj) for i, me, _ in cand)
+    adjusted = labelled and adj_pts >= ca.ADJ_UNLABELLED_MIN and near_adj > near_close
+    basis = 'adjclose' if adjusted else 'close'
+    note = None
+    if not adjusted and near_adj >= ca.ADJ_UNLABELLED_MIN and near_adj > near_close:
+        note = (f'{near_adj} points sat nearer Yahoo\'s dividend-adjusted close than its close and the series is '
+                f"{'not classed dividend-adjusted by chart_audit' if labelled else 'not labelled dividend-adjusted'}: "
+                'compared with the close (rule A), so the series is rebased to the close')
+    fixed: list[Json] = []
+    compared = 0
+    for i, me, spin in cand:
+        ref = me.adj if adjusted else me.close
+        if ref is None:
+            skip('no adjclose', labels[i])
+            continue
+        v = prices[i]
+        if ca.classify(v, me.close, me.adj, spin) == 'basis step' or (spin != 1.0 and abs(v - ref * spin) < abs(v - ref)):
+            skip('basis step', labels[i])
+            continue
+        compared += 1
+        new = round(ref, 2)
+        if abs(v - new) >= CENT:
+            fixed.append({'month': labels[i], 'date': me.date, 'old': v, 'new': new, 'source': source,
+                          'basis': 'Yahoo adjclose (dividend-adjusted)' if adjusted else 'Yahoo close (split-adjusted)'})
+            prices[i] = new
+    return {'basis': basis, 'compared': compared, 'fixed': fixed, 'skipped': skipped, 'adjusted_points_3pct': adj_pts, 'nearer_adjclose': near_adj,
+            'nearer_close': near_close, 'labelled_adjusted': labelled, 'note': note}
+
+
 # ---------- reading the page ----------
 
 def header_mcap(t: str) -> tuple[str, float] | None:
@@ -414,6 +505,10 @@ def stale_patterns(old: Json, new: Json) -> list[tuple[str, re.Pattern[str]]]:
     number('old header price', old['price'], new['price'])
     for p in new.get('replaced_points', []):
         number(f"old chart value {p['old_label']}", p['old_value'], p['value'])
+    for p in new.get('fixed_points') or []:
+        number(f"wrong chart value {p['month']} (fixed to {p['new']:.2f})", p['old'], p['new'])
+    if new.get('dropped_first'):
+        number(f"old chart start {new['dropped_first'][0]} (dropped from the window)", new['dropped_first'][1], None)
     olo, ohi = old.get('range_52w') or (None, None)
     nlo, nhi = new.get('range_52w') or (None, None)
     number('old 52-week low', olo, nlo)
@@ -427,6 +522,8 @@ def stale_patterns(old: Json, new: Json) -> list[tuple[str, re.Pattern[str]]]:
         prev = merged.get(pat.pattern)
         merged[pat.pattern] = (f'{prev[0]} = {kind}' if prev else kind, pat)
     pats = list(merged.values())
+    for form in new.get('old_window_forms') or []:
+        pats.append((f'old chart-window return {form}%', re.compile(r'(?<![\d.,])' + re.escape(form) + '%')))
     if old.get('as_of') and old['as_of'] != new.get('as_of'):
         d = datetime.date.fromisoformat(old['as_of'])
         names = [rp.FULL_MONTHS[d.month - 1], rp.MON3[d.month - 1] + r'\.?'] + (['Sept\\.?'] if d.month == 9 else [])
@@ -447,6 +544,27 @@ def _mask(t: str) -> str:
             if out[i] != '\n':
                 out[i] = ' '
     return ''.join(out)
+
+
+_WINDOW_WORDS = r'five[- ]year|5[- ]year|5-yr|\b5y\b|five years|over the (?:chart|window)'
+
+
+def window_return_forms(t: str, pct: float, first_label: str) -> list[str]:
+    """How the previous edition's chart-window return (its first point -> its as-of price) is written in the prose,
+    if it is: '34.5' and/or '35' (no sign; the % follows), each kept only where a line of the prose shows it beside
+    five-year wording or the window's first month ('since Sep 2021')."""
+    p = rp.point_label(first_label)
+    since = ''
+    if p:
+        names = [rp.FULL_MONTHS[p.month - 1], rp.MON3[p.month - 1] + r'\.?'] + (['Sept\\.?'] if p.month == 9 else [])
+        since = r'|\b(?:' + '|'.join(names) + r")\s+(?:'?" + f'{p.year % 100:02d}|{p.year})' + r'\b'
+    ctx = re.compile(_WINDOW_WORDS + since, re.I)
+    forms = []
+    for form in dict.fromkeys((f'{abs(pct):.1f}', f'{abs(pct):.0f}')):
+        num = re.compile(r'(?<![\d.,])' + re.escape(form) + '%')
+        if any(num.search(line) and ctx.search(line) for line in _mask(t).split('\n')):
+            forms.append(form)
+    return forms
 
 
 def stale_hits(t: str, pats: list[tuple[str, re.Pattern[str]]]) -> list[str]:
@@ -480,9 +598,11 @@ def page_values(t: str) -> Json:
 
 def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | str],
           short: tuple[Json, str] | str, surprise: tuple[Json, str] | str,
-          monthly: tuple[ca.Monthly, ca.Splits] | str) -> tuple[Json, str]:
+          monthly: tuple[ca.Monthly, ca.Splits] | str, window: int = 0, fix: bool = False) -> tuple[Json, str]:
     """facts.json for one page and the page with its structured fields written (not saved). Pure: every fetch is
-    an argument (a string where it failed), so the golden check and the tests run it on saved responses."""
+    an argument (a string where it failed), so the golden check and the tests run it on saved responses.
+    window: the chart keeps at most this many points (0 = no trim; the command line's default is WINDOW); fix:
+    replace existing chart points that are off Yahoo's month-end (fix_points)."""
     ticker = rl.parse_title(t)[0] or slug.upper()
     old = page_values(t)
     if not old['as_of'] or old['price'] is None:
@@ -504,6 +624,34 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     chart = extend_series(labels, prices, old['as_of'], as_of, days, factor, daily.splits)
     f: Json = {}
     warnings: list[str] = []
+    page = f'reports/{slug}_analysis.html'
+    n_exist = len(labels) - 1          # the page's points the new series keeps (its last point is replaced)
+    drop = window_drop(len(chart['labels']), window)
+    if drop > n_exist:
+        raise ChartError(f'a {window}-point window would drop points this run adds')
+    trim: Json = {'window': window, 'dropped': 0, 'dropped_points': [], 'events_kept': None, 'events_dropped': []}
+    if drop:
+        try:
+            _, kept_events, gone = rp.shift_events(t, drop, page)
+            trim.update(dropped=drop, events_kept=kept_events, events_dropped=gone,
+                        dropped_points=[{'label': lab, 'value': v} for lab, v in zip(labels[:drop], prices[:drop])])
+        except rp.PatchError as e:
+            warnings.append(f'chart not trimmed to {window} points (the events cannot move with it): {e}')
+            drop = 0
+    fixinfo: Json | None = None
+    if fix:
+        fixinfo = fix_points(chart['labels'], chart['prices'], list(range(drop, n_exist)), days, factor, daily.splits,
+                             as_of, bool(ca.ADJ_LABEL.search(t)), src)
+        if fixinfo['basis'] == 'adjclose':   # the new month-ends on the series' own basis
+            pos = {lab: i for i, lab in enumerate(chart['labels'])}
+            for pt in chart['replaced'] + chart['appended']:
+                d = on_or_before(days, pt['date'])
+                if pt['kind'] == 'month-end' and d and d.adj is not None:
+                    pt['value'] = chart['prices'][pos[pt['label']]] = round(d.adj * factor, 2)
+                    pt['basis'] = 'Yahoo adjclose (the series is labelled dividend-adjusted)'
+        if fixinfo['note']:
+            warnings.append(fixinfo['note'])
+    chart['labels'], chart['prices'] = chart['labels'][drop:], chart['prices'][drop:]
     f['close'] = field(close, src, at, as_of, BASIS_PRICE, date=as_of,
                        note=f'scaled by {factor} for splits after the as-of' if factor != 1 else None)
     f['prior_close'] = field(prior_close, src, at, as_of, BASIS_PRICE, date=prior.date)
@@ -521,7 +669,7 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     f['chart'] = field({'labels': chart['labels'], 'prices': chart['prices']}, src, at, as_of,
                        BASIS_PRICE + '; month-end = the last session of the month',
                        replaced=chart['replaced'], appended=chart['appended'], split_rescale=chart['split_rescale'],
-                       existing_points_check=check)
+                       existing_points_check=check, trim=trim, fix_points=fixinfo)
     if chart['split_rescale']:
         warnings.append(f"split between the editions: existing chart points divided by {chart['split_rescale']['ratio']}"
                         ' — say so on the page')
@@ -539,7 +687,7 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
         ma = sma(closes, n)
         f[f'ma{n}'] = field(ma, src, at, as_of, f'simple average of the last {n} daily closes',
                             close_vs_ma_pct=round((close / ma - 1) * 100, 2) if ma else None)
-    first = rp.point_label(labels[0])
+    first = rp.point_label(chart['labels'][0])
     windows = {'1y': years_before(as_of, 1), '5y': years_before(as_of, 5)}
     if first:
         me = month_end(daily.days, first.year, first.month)
@@ -558,17 +706,25 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
                  'chart': "price return from the chart's first month-end close -> as-of close"}[key]
         f[f'return_{key}'] = field(row, src, at, as_of, basis + '; dividends excluded, same dates for SPY and QQQ',
                                    bench_sources={s: (b if isinstance(b, str) else b.url) for s, b in bench.items()})
+    if 'return_chart' in f:   # the window the chart now shows: its first point -> the as-of close
+        f['return_chart'].update(start_label=chart['labels'][0], start_value=chart['prices'][0],
+                                 start_date=windows['chart'], points=len(chart['labels']),
+                                 pct_on_chart=round((close / chart['prices'][0] - 1) * 100, 2))
+    prev_pct = round((old['price'] / prices[0] - 1) * 100, 2) if prices[0] else None
+    prev_window = {'start_label': labels[0], 'start_value': prices[0], 'as_of': old['as_of'], 'price': old['price'],
+                   'pct': prev_pct, 'points': len(labels),
+                   'prose_forms': window_return_forms(t, prev_pct, labels[0]) if prev_pct is not None else []}
     div = dividend_facts(daily.dividends, as_of, close, factor)
     f['dividends'] = field(div, src, at, as_of, 'Yahoo dividend events by ex-date; TTM = ex-dates in (as-of minus '
                            'one year, as-of]; annualised = last payment x payments a year')
     written: list[str] = []
     not_written: dict[str, str] = {}
     new = t
-    page = f'reports/{slug}_analysis.html'
     try:
         new = rp.set_header_price(new, close, page)
         new, copies = rp.set_banner_date(new, old['as_of'], as_of, page)
-        new = rp.set_chart_series(new, chart['labels'], chart['prices'], page)
+        new = rp.set_chart_series(new, chart['labels'], chart['prices'], page, drop=drop)
+        new = rp.shift_events(new, drop, page)[0]
         written += ['header_price', 'banner_date', 'chart']
         f['banner_copies'] = copies
     except rp.PatchError as e:
@@ -655,13 +811,16 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
                                   'comes from the release')
     newvals = {'as_of': as_of, 'price': close, 'range_52w': [w['low'], w['high']],
                'pe': f['trailing_pe']['value'], 'yield': f['dividend_yield']['value'],
-               'replaced_points': chart['replaced']}
+               'replaced_points': chart['replaced'], 'fixed_points': fixinfo['fixed'] if fixinfo else [],
+               'dropped_first': [labels[0], prices[0]] if drop else None,
+               'old_window_forms': prev_window['prose_forms']}
     facts: Json = {
         'schema': 1, 'slug': slug, 'ticker': ticker, 'page': page, 'as_of': as_of,
         'generated_at': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
         'previous_edition': {'as_of': old['as_of'], 'price': old['price'], 'source': 'the page before this run'},
         'page_before': {k: v for k, v in old.items() if k != 'mcap'},
-        'fields': f, 'written': written, 'not_written': not_written, 'warnings': warnings, 'new_values': newvals}
+        'fields': f, 'written': written, 'not_written': not_written, 'warnings': warnings, 'new_values': newvals,
+        'fixed_points': fixinfo['fixed'] if fixinfo else [], 'previous_window': prev_window}
     return facts, new
 
 
@@ -712,7 +871,21 @@ def fetch_all(slug: str, ticker: str, as_of_arg: str, now: datetime.datetime) ->
     return daily, as_of, other
 
 
-def prepass(slug: str, repo: str, as_of_arg: str, out: str, write: bool, now: datetime.datetime) -> int:
+def chart_summary(facts: Json) -> str:
+    """The summary line's chart part: 'trimmed K points (window N)[, events dropped: …] | fixed K chart points (…)'."""
+    chart = facts['fields']['chart']
+    trim, fixinfo = chart['trim'], chart['fix_points']
+    out = f"trimmed {trim['dropped']} points (window {trim['window']})" if trim['window'] else 'not trimmed (--window 0)'
+    if trim['events_dropped']:
+        out += ', events dropped: ' + '; '.join(e['label'] for e in trim['events_dropped'])
+    if fixinfo is None:
+        return out + ' | points not checked (--fix-points off)'
+    return out + (f" | fixed {len(fixinfo['fixed'])} chart points ({fixinfo['basis']} basis, {fixinfo['compared']} "
+                  'compared' + ''.join(f", {len(v)} skipped: {k}" for k, v in fixinfo['skipped'].items()) + ')')
+
+
+def prepass(slug: str, repo: str, as_of_arg: str, out: str, write: bool, now: datetime.datetime,
+            window: int = WINDOW, fix: bool = False) -> int:
     path = rd.report_path(slug, repo=repo)
     if not os.path.isfile(path):
         print(f'no page {path}')
@@ -724,7 +897,8 @@ def prepass(slug: str, repo: str, as_of_arg: str, out: str, write: bool, now: da
         return 1
     try:
         daily, as_of, other = fetch_all(slug, ticker, as_of_arg, now)
-        facts, new = build(slug, t, daily, as_of, other['bench'], other['short'], other['surprise'], other['monthly'])
+        facts, new = build(slug, t, daily, as_of, other['bench'], other['short'], other['surprise'], other['monthly'],
+                           window, fix)
     except (ca.YahooError, ChartError, ValueError, *NET_ERRORS) as e:
         print(f'{slug}: pre-pass failed: {type(e).__name__}: {e}')
         return 1
@@ -735,11 +909,16 @@ def prepass(slug: str, repo: str, as_of_arg: str, out: str, write: bool, now: da
     hits = write_outputs(out, facts, new, write and core_ok)
     prev = facts['previous_edition']
     print(f"{slug}: as-of {as_of} close {facts['fields']['close']['value']} (previous edition {prev['as_of']} "
-          f"{prev['price']}) | {'wrote' if write and core_ok else 'would write'}: {', '.join(facts['written']) or 'nothing'}"
+          f"{prev['price']}) | {chart_summary(facts)}"
+          f" | {'wrote' if write and core_ok else 'would write'}: {', '.join(facts['written']) or 'nothing'}"
           f" | left to the builder: {', '.join(f'{k} ({v})' for k, v in facts['not_written'].items()) or 'none'}"
           f" | stale hits {len(hits)} | {os.path.join(out, 'facts.json')}")
     for wmsg in facts['warnings']:
         print('  WARNING ' + wmsg)
+    for fp in facts['fixed_points'][:12]:
+        print(f"  fixed {fp['month']}: {fp['old']} -> {fp['new']} ({fp['basis']}, {fp['date']})")
+    if len(facts['fixed_points']) > 12:
+        print(f"  … and {len(facts['fixed_points']) - 12} more in facts.json")
     return 0 if core_ok else 1
 
 
@@ -780,6 +959,10 @@ def postpass(slug: str, repo: str, out: str, check_only: bool) -> int:
             i = pos.get(pt['label'])
             if i is None or (i != len(labels) - 1 and abs(prices[i] - pt['value']) >= rl.PRICE_EXACT):
                 fails.append(f"chart point {pt['label']} {prices[i] if i is not None else 'missing'} != facts {pt['value']}")
+        for fp in facts.get('fixed_points') or []:
+            i = pos.get(fp['month'])
+            if i is not None and abs(prices[i] - fp['new']) >= rl.PRICE_EXACT:
+                fails.append(f"fixed chart point {fp['month']} {prices[i]} != facts {fp['new']} (was {fp['old']})")
     else:
         fails.append('chart arrays unreadable or of unequal length')
     w = rl.range_52w(t)
@@ -854,6 +1037,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--as-of', default='auto', help='YYYY-MM-DD or auto (the latest settled close; default)')
     ap.add_argument('--out', help=f'folder for facts.json and stale_hits.txt (default {OUT_ROOT}/<slug>)')
     ap.add_argument('--write', action='store_true', help='write the structured fields into the page')
+    ap.add_argument('--window', type=int, default=WINDOW, help=f'chart points kept, oldest dropped, events re-indexed '
+                    f'(default {WINDOW}: five years of month-ends + the as-of point; 0 = no trim)')
+    ap.add_argument('--fix-points', action='store_true', help="replace existing chart points more than half a cent "
+                    "off Yahoo's month-end on the page's basis (listed in facts.json fixed_points)")
     ap.add_argument('--post', action='store_true', help='the post-pass, after the builder (reads <out>/facts.json)')
     ap.add_argument('--check', action='store_true', help='with --post: change nothing; fail on anything it would fix')
     args = ap.parse_args(argv)
@@ -861,7 +1048,8 @@ def main(argv: list[str] | None = None) -> int:
     out = args.out or os.path.join(OUT_ROOT, args.slug)
     if args.post:
         return postpass(args.slug, args.repo, out, args.check)
-    return prepass(args.slug, args.repo, args.as_of, out, args.write, datetime.datetime.now(datetime.UTC))
+    return prepass(args.slug, args.repo, args.as_of, out, args.write, datetime.datetime.now(datetime.UTC),
+                   args.window, args.fix_points)
 
 
 if __name__ == '__main__':

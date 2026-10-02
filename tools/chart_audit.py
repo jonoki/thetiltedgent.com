@@ -32,6 +32,7 @@ TOLERANCE = 0.03          # a point is wrong beyond 3% of both Yahoo's close and
 # Spin-offs and capital returns book on Yahoo as small fractional "splits"; 3:2 and up are real splits.
 SPIN_RATIO_LO, SPIN_RATIO_HI = 0.9, 1.45
 ADJ_UNLABELLED_MIN = 10   # this many adjusted-close matches means the series is dividend-adjusted
+ADJ_LABEL = re.compile(r'(?i)dividend[- ]adjusted|adjusted (close|price)')   # the page says its series is adjusted
 MIN_COMPARABLE = 30       # fewer comparable points than this usually means the labels did not parse
 MAX_LISTED = 60
 CENTURY = 2000          # two-digit chart years ('Sep '21') are 20xx
@@ -239,7 +240,7 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
     return {**check_points(labels, prices, series, splits, as_of), 'slug': slug, 'ticker': ticker, 'as_of': as_of,
-            'adj_labelled': bool(re.search(r'(?i)dividend[- ]adjusted|adjusted (close|price)', t))}
+            'adj_labelled': bool(ADJ_LABEL.search(t))}
 
 
 def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[int, int], tuple[float, float | None]],
