@@ -177,7 +177,7 @@ class FinTable(unittest.TestCase):
         self.assertIn('<td>9.9</td>', got)                         # Forward P/E untouched
         got = rp.set_fin_number(self.T, 'Dividend Yield', 2.3933)
         self.assertIn('<span title="1.5 a year">2.39%</span>', got)   # the number in the attribute is not text
-        self.assertEqual(rp.fin_row_texts(got, 'Dividend Yield')[1], '2.39%')
+        self.assertEqual(rp.fin_row_texts(got, 'Dividend Yield'), ['Dividend Yield', '2.39%', '—', 'context'])
         self.assertIn('24.1x', rp.set_fin_number(table(row('Trailing P/E', '25.0x')), 'Trailing P/E', 24.08))
 
     def test_refused(self):
