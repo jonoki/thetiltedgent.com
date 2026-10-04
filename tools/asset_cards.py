@@ -22,7 +22,7 @@ FAMILIES = {  # folder: (heading, one-line note, sort), plain text
     'fixed': ('Bonds & cash', 'Government bonds and bills, priced by their yield. Shortest term first.', 'term'),
 }   # one per reportlib.ASSET_FAMILIES folder (a unit test checks)
 LABEL = {  # slug: category line on the card, plain text
-    'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&P 500 in Canadian dollars',
+    'arti': 'AI stocks, active, CAD-hedged', 'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&P 500 in Canadian dollars',
     'voo': 'S&P 500', 'xeqt': 'Global stocks, all in one',
     'btc': 'Cryptoasset', 'eth': 'Cryptoasset', 'bnb': 'Cryptoasset', 'xrp': 'Cryptoasset', 'sol': 'Cryptoasset',
     'ust3m': 'US Treasury bill, 3-month', 'ust10y': 'US Treasury note, 10-year', 'tips10y': 'US inflation-protected, 10-year',

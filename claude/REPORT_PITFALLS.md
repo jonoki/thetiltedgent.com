@@ -98,6 +98,7 @@ PNW said O&M rose faster than rates (it fell); AVY and TJX said the stock fell a
 - Wikipedia: add dates can be placeholders (1957/1978/1987) or weekends.
 - Yahoo v8 chart API close = split-adjusted, adjclose = + dividends.
 - Nasdaq earnings calendar: past dates show "time-not-supplied" — confirm pre/after-market on the company release.
+- Recycled tickers: Yahoo's ARTI.TO history starts Nov 2021, but Evolve's fund launched 22 Mar 2024 at a $10.00 NAV (first trade 25 Mar); the earlier rows (~$7.7) are another security (3 Oct 2026). Confirm the launch date on the issuer page and use only rows from it — any 5-year pull (refresh_data, Portfolio Analyzer) must start there.
 - Short interest (stockanalysis, MarketBeat, Nasdaq) is a twice-monthly exchange snapshot: state its settlement date (e.g. "at the Sep 15 settlement"), never "as of" the read date (30 Sep 2026: GIS, DRI, PAYX).
 - News-article dates are not action dates: an analyst call reported on Sep 16 may have been made Jul 2 (GIS J.P. Morgan, 30 Sep 2026). Date the action from the firm's note or the ratings table.
 - WebFetch summaries of long sec.gov filings misread tables: PAYX capex came back $172.2M and $315.2M against the 10-K's $234.9M (30 Sep 2026). Read cash-flow, segment and balance-sheet figures from the filing's raw text (R-pages or the .htm itself), never from a summary.
