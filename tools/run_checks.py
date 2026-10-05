@@ -27,6 +27,7 @@ CHECKS = [
     ('craps engine', ['node', 'tables/checks/craps_engine_check.js']),
     ('simulator outcome tables', ['node', 'tables/checks/games_check.js']),
     ('blackjack engine', ['node', 'tables/checks/bj_engine_check.js']),
+    ('glossary pages', [sys.executable, 'tools/glossary.py', '--check']),
     ('type check', [sys.executable, '-m', 'mypy']),
 ]
 
