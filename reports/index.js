@@ -289,7 +289,7 @@
   }
   var SP='In the S&P 500: about 500 of America’s largest companies, and the benchmark most people mean by “the market”. Index funds and many retirement plans simply own the whole list.',
       NDX='In the Nasdaq-100: the 100 biggest companies trading on the Nasdaq stock exchange, leaving out banks and other finance firms.',
-      DOW='One of just 30 companies in the Dow Jones Industrial Average (“the Dow”), the oldest US stock-market average, running since 1896.';
+      DOW='One of just 30 companies in the Dow Jones Industrial Average (“the Dow”), one of the oldest US stock-market averages, running since 1896.';
 
   function decorate(card,c,nr){
     c=c||{};
