@@ -1,6 +1,7 @@
 """Audit report 5-year monthly charts against Yahoo monthly closes. Read-only on the repo.
 
-usage: py -3 tools/chart_audit.py [slug ...]      (no args = whole library; exits 1 on any wrong point or error)
+usage: py -3 tools/chart_audit.py [slug ...]      (no args = every stock report; exits 1 on any wrong point or error)
+       an ETF or crypto report is named with its folder: etf/arti, crypto/btc
 Flags any chart point more than 3% from Yahoo's split-adjusted month-end close AND from its dividend-adjusted
 close, and lists series that are dividend-adjusted but never say so. The last point (the as-of close) is
 verify.py's job. Yahoo JSON is cached under <temp>/ttg_chart_audit/yh; a cached series that ends before the
@@ -25,7 +26,13 @@ WORK = os.path.join(tempfile.gettempdir(), 'ttg_chart_audit')   # the Yahoo cach
 YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6y&interval=1mo&events=split'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 FETCH_TIMEOUT_S, FETCH_PAUSE_S = 30, 0.3
-YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B'}   # slugs whose Yahoo symbol is not the ticker with '.' -> '-'
+YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B',   # slugs whose Yahoo symbol is not the ticker with '.' -> '-'
+                'etf/arti': 'ARTI.TO', 'etf/vfv': 'VFV.TO', 'etf/xeqt': 'XEQT.TO',   # TSX listings
+                'crypto/btc': 'BTC-USD', 'crypto/eth': 'ETH-USD', 'crypto/bnb': 'BNB-USD',
+                'crypto/sol': 'SOL-USD', 'crypto/xrp': 'XRP-USD'}
+# First month-end that belongs to the security, where Yahoo's earlier rows are another one (a recycled ticker):
+# Evolve's ARTI launched 22 Mar 2024 (first trade 25 Mar); Yahoo ARTI.TO from Nov 2021 is another security.
+LAUNCH = {'etf/arti': (2024, 3)}
 MON = {m: i + 1 for i, m in enumerate('jan feb mar apr may jun jul aug sep oct nov dec'.split())}
 
 TOLERANCE = 0.03          # a point is wrong beyond 3% of both Yahoo's close and its adjusted close
@@ -48,6 +55,7 @@ class PointCheck(TypedDict):
     adj_pts: int
     step_pts: int
     splits_after_as_of: float
+    pre_launch: list[str]                          # chart labels dated before the security existed
 
 
 class AuditResult(PointCheck):
@@ -179,13 +187,14 @@ def cached_series(path: str, as_of: str | None) -> tuple[Monthly, Splits] | None
 
 def monthly_series(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, Splits]:
     """The monthly series for a report: from the cache when it is readable and current, else fetched again (a
-    refreshed report's newest points are never skipped silently)."""
-    path = os.path.join(cache_dir(), slug + '.ev.json')
+    refreshed report's newest points are never skipped silently). Rows before the security's LAUNCH are dropped."""
+    path = os.path.join(cache_dir(), slug.replace('/', '_') + '.ev.json')
     cached = cached_series(path, as_of)
-    if cached:
-        return cached
-    fetch(slug, ticker, path)
-    return read_series(path)
+    if not cached:
+        fetch(slug, ticker, path)
+    monthly, splits = cached or read_series(path)
+    launch = LAUNCH.get(slug)
+    return ({ym: v for ym, v in monthly.items() if ym >= launch} if launch else monthly), splits
 
 
 def splits_after(splits: Splits, as_of: str | None) -> float:
@@ -239,24 +248,28 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
         series, splits = monthly_series(slug, ticker, as_of)
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
-    return {**check_points(labels, prices, series, splits, as_of), 'slug': slug, 'ticker': ticker, 'as_of': as_of,
+    return {**check_points(labels, prices, series, splits, as_of, LAUNCH.get(slug)), 'slug': slug, 'ticker': ticker, 'as_of': as_of,
             'adj_labelled': bool(ADJ_LABEL.search(t))}
 
 
 def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[int, int], tuple[float, float | None]],
-                 splits: Splits, as_of: str | None) -> PointCheck:
+                 splits: Splits, as_of: str | None, launch: tuple[int, int] | None = None) -> PointCheck:
     """Every chart point with a Yahoo month-end before the as-of month (the last point, the as-of close, is
     verify.py's job): how many were compared, and the adjusted, basis-step and wrong ones. labels and prices
     pair by position (audit() rejects a page whose arrays differ in length).
 
     Yahoo's close is adjusted for every split it knows, including ones after the report's as-of (the report
     is on its as-of share basis) and spin-offs booked as fractional "splits" (a report may show the real
-    pre-spin close). Both are a basis step, not a wrong point."""
+    pre-spin close). Both are a basis step, not a wrong point. A label before launch (a recycled ticker's earlier
+    security) is listed in pre_launch, which fails the audit like a wrong point."""
     as_of_ym = year_month(as_of)
     after = splits_after(splits, as_of)
-    row: PointCheck = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after}
+    row: PointCheck = {'checked': 0, 'bad': [], 'adj_pts': 0, 'step_pts': 0, 'splits_after_as_of': after, 'pre_launch': []}
     for lab, pr in zip(labels[:-1], prices[:-1]):
         ym = parse_label(lab)
+        if ym and launch and ym < launch:
+            row['pre_launch'].append(lab)
+            continue
         if not ym or ym not in series or (as_of_ym and ym >= as_of_ym):
             continue
         row['checked'] += 1
@@ -279,17 +292,20 @@ def main(argv: list[str] | None = None) -> int | str:
     rd.write_json(os.path.join(WORK, 'chart_audit.json'), rows, indent=0)
     errs = [r for r in rows if failed(r)]
     done = sorted((r for r in rows if succeeded(r)), key=lambda r: r['ticker'])   # the manifest's order
-    flag = [r for r in done if r['bad']]
+    flag = [r for r in done if r['bad'] or r['pre_launch']]
     unparsed = [r for r in done if r['checked'] < MIN_COMPARABLE]
     adj_unl = [r for r in done if r['adj_pts'] >= ADJ_UNLABELLED_MIN and not r['adj_labelled']]
-    print('reports', len(rows), '| errors', len(errs), '| WRONG points >3% vs both close and adjclose:', len(flag),
+    print('reports', len(rows), '| errors', len(errs), '| WRONG points >3% vs both close and adjclose, or before launch:', len(flag),
           '| dividend-adjusted but unlabelled:', len(adj_unl), '| <30 comparable', len(unparsed))
     print('ADJ-UNLABELLED', [r['slug'] for r in adj_unl])
     print('BASIS STEPS (pre-spin real closes / split after as-of; not errors)',
           [(r['slug'], r['step_pts'], r['splits_after_as_of']) for r in done if r['step_pts'] or r['splits_after_as_of'] != 1])
     for r in sorted(flag, key=lambda r: -len(r['bad']))[:MAX_LISTED]:
-        worst = max(r['bad'], key=lambda b: abs(b[3]))
-        print(f"{r['slug']:6} as-of {r['as_of']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
+        if r['pre_launch']:
+            print(f"{r['slug']:6} as-of {r['as_of']} {len(r['pre_launch'])} points before launch: {r['pre_launch'][:6]}")
+        if r['bad']:
+            worst = max(r['bad'], key=lambda b: abs(b[3]))
+            print(f"{r['slug']:6} as-of {r['as_of']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
     print('ERR', [(r['slug'], r['err']) for r in sorted(errs, key=lambda r: r['slug'])][:20])
     print('LOWCOUNT', [(r['slug'], r['checked']) for r in unparsed][:40])
     return 1 if (flag or errs) else 0
