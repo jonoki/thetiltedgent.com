@@ -28,6 +28,7 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 FETCH_TIMEOUT_S, FETCH_PAUSE_S = 30, 0.3
 YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B',   # slugs whose Yahoo symbol is not the ticker with '.' -> '-'
                 'etf/arti': 'ARTI.TO', 'etf/vfv': 'VFV.TO', 'etf/xeqt': 'XEQT.TO',   # TSX listings
+                'etf/xiu': 'XIU.TO', 'etf/zag': 'ZAG.TO', 'etf/cash': 'CASH.TO',
                 'crypto/btc': 'BTC-USD', 'crypto/eth': 'ETH-USD', 'crypto/bnb': 'BNB-USD',
                 'crypto/sol': 'SOL-USD', 'crypto/xrp': 'XRP-USD'}
 # First month-end that belongs to the security, where Yahoo's earlier rows are another one (a recycled ticker):
