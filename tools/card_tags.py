@@ -12,7 +12,15 @@ Per report slug:
   hw   ♥ what you know them for, th ♠ big themes, pp ★ key people: [label, tooltip(, since YYYY-MM)] from claude/hand_tags.json
   lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
+
+Also writes data/new_results.json from the refresh queue (tasks/queue/queue.json, tools/refresh_queue.py): per slug
+[release date, show-from date, page as-of, company name] for every print after the page's as-of, including the
+queue's next 14 days, so the "New results" tag (reports/index.js) and the viewer's line (reports/view.html) appear
+on their own once the show-from date arrives and go when the refresh is merged. Show-from is the release day for a
+pre-market release, else the next day. No queue file: new_results.json is left as it is.
 """
+import datetime
+import re
 import json
 import os
 import sys
@@ -104,6 +112,38 @@ def card_for(slug: str, *, style: rd.TagInputs, record: rd.ReportRecord | None, 
     return c
 
 
+LEGAL_SUFFIX = re.compile(r',? (Inc\.|Corporation|Corp\.|plc|N\.V\.|Ltd\.)$')
+
+
+def new_results(items: list[dict[str, Any]], records: dict[str, rd.ReportRecord]) -> dict[str, list[str]]:
+    """{slug: [release, show_from, as_of, name]} for the latest queued print after each page's as-of (as-of from
+    the manifest, so a refresh committed after the queue ran is not flagged). A release on the as-of day counts
+    unless it came before that session's open."""
+    out: dict[str, list[str]] = {}
+    for i in sorted(items, key=lambda i: i['release']):
+        rec = records.get(i['slug']) or {}
+        as_of = rec.get('as_of') or i['as_of']
+        if i['release'] < as_of or (i['release'] == as_of and i.get('timing') == 'pre'):
+            continue
+        day = datetime.date.fromisoformat(i['release'])
+        show = day if i.get('timing') == 'pre' else day + datetime.timedelta(days=1)
+        out[i['slug']] = [i['release'], show.isoformat(), as_of, LEGAL_SUFFIX.sub('', rec.get('name') or i['ticker'])]
+    return out
+
+
+def write_new_results(repo: str, records: dict[str, rd.ReportRecord]) -> str:
+    """data/new_results.json from the queue; the line to print."""
+    qpath = os.path.join(repo, 'tasks', 'queue', 'queue.json')
+    if not os.path.exists(qpath):
+        return 'new results: no tasks/queue/queue.json (run tools/refresh_queue.py); data/new_results.json left as it is'
+    with open(qpath, encoding='utf-8') as fh:
+        q = json.load(fh)
+    nr = new_results(q['items'], records)
+    rd.write_json(os.path.join(repo, 'data', 'new_results.json'),
+                  {'v': 1, 'source': 'tools/card_tags.py', 'queue_date': q.get('today'), 'cards': nr})
+    return f"new results: {len(nr)} pages predate a print (queue of {q.get('today')})"
+
+
 def main(argv: list[str] | None = None) -> int | str:
     """0 when data/card_tags.json is written, else which input is missing (run style_tags.py first)."""
     repo = rd.parser('Write data/card_tags.json, the tags on every report card.').parse_args(argv).repo
@@ -126,6 +166,7 @@ def main(argv: list[str] | None = None) -> int | str:
     print(f'{len(out)} cards -> {os.path.relpath(p, repo)} ({os.path.getsize(p) // 1024} KB)')
     print('HQ labels:', Counter(c['hq'][0] for c in out.values() if 'hq' in c).most_common())
     print('no HQ tag:', [slug for slug, c in out.items() if 'hq' not in c])
+    print(write_new_results(repo, records))
     print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()),
           ' hand tags:', sum('hw' in c for c in out.values()), ' logos:', sum('lg' in c for c in out.values()))
     return 0

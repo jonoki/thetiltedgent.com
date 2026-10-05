@@ -8,7 +8,7 @@ Each finds the repo from its own location, so the working directory only matters
 |---|---|---|
 | `manifest.py` | the machine-readable manifest of every stock report | `data/reports.json`, `data/reports/*.json` |
 | `style_tags.py` | the Value / Growth / Income … style tags | `data/style_tags.json` |
-| `card_tags.py` | everything on a report card besides the index badges | `data/card_tags.json` |
+| `card_tags.py` | everything on a report card besides the index badges; pages that predate a print, from the refresh queue | `data/card_tags.json`, `data/new_results.json` |
 | `asset_cards.py` | the ETF, crypto and bond cards on the reports index | `reports/index.html` |
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
