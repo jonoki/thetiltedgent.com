@@ -190,6 +190,19 @@ class TagPipeline(unittest.TestCase):
         self.assertEqual((card['dv'], card['ln'], card['hq']), (3.0, 'Sells widgets.', ['US-based', 'Springfield, Illinois']))
 
 
+class NewResults(unittest.TestCase):
+    def test_prints_after_the_manifest_as_of_with_their_show_from_day(self):
+        items = [{'slug': 'nke', 'ticker': 'NKE', 'as_of': '2026-08-20', 'release': '2026-10-01', 'timing': 'post'},
+                 {'slug': 'pep', 'ticker': 'PEP', 'as_of': '2026-08-18', 'release': '2026-10-08', 'timing': 'pre'},
+                 {'slug': 'mu', 'ticker': 'MU', 'as_of': '2026-08-10', 'release': '2026-09-30', 'timing': 'post'},
+                 {'slug': 'zz', 'ticker': 'ZZ', 'as_of': '2026-10-02', 'release': '2026-10-02', 'timing': 'pre'}]
+        records = {'nke': {'name': 'NIKE, Inc.', 'as_of': '2026-08-20'}, 'pep': {'name': 'PepsiCo, Inc.'},
+                   'mu': {'as_of': '2026-10-02'}}   # MU refreshed after the queue ran
+        self.assertEqual(card_tags.new_results(items, records), {
+            'nke': ['2026-10-01', '2026-10-02', '2026-08-20', 'NIKE'],          # after the close: shown the next day
+            'pep': ['2026-10-08', '2026-10-08', '2026-08-18', 'PepsiCo']})     # before the open: shown that day
+
+
 class StyleTagsNeedTheNewManifest(unittest.TestCase):
     def test_a_manifest_without_fin_table_stops_the_run(self):
         with tempfile.TemporaryDirectory() as repo:

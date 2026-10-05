@@ -86,6 +86,23 @@ class ChartAudit(unittest.TestCase):
                                        [('2026-10-01', 2.0)], '2026-09-21')
         self.assertEqual((row['checked'], row['bad'], row['splits_after_as_of']), (3, [], 2.0))
 
+    def test_points_before_launch_are_flagged_not_compared(self):
+        """A recycled ticker: Yahoo's rows before the launch are another security."""
+        series = {(2024, 2): (7.7, None), (2024, 3): (10.0, None), (2024, 4): (10.2, None)}
+        labels, prices = ["Feb '24", "Mar '24", "Apr '24", "May '24"], [7.7, 10.0, 10.2, 0]
+        row = chart_audit.check_points(labels, prices, series, [], '2024-05-31', launch=(2024, 3))
+        self.assertEqual((row['checked'], row['bad'], row['pre_launch']), (2, [], ["Feb '24"]))
+        self.assertEqual(chart_audit.check_points(labels, prices, series, [], '2024-05-31')['pre_launch'], [])
+
+    def test_asset_slugs_map_to_yahoo_symbols_and_drop_pre_launch_rows(self):
+        self.assertEqual(chart_audit.yahoo_symbol('etf/arti', 'ARTI'), 'ARTI.TO')
+        self.assertEqual(chart_audit.yahoo_symbol('crypto/btc', 'BTC'), 'BTC-USD')
+        with tempfile.TemporaryDirectory() as work, unittest.mock.patch.object(chart_audit, 'WORK', work):
+            with open(os.path.join(chart_audit.cache_dir(), 'etf_arti.ev.json'), 'w', encoding='utf-8') as fh:
+                fh.write(self.yahoo_json([(2024, 2), (2024, 3), (2024, 4)]))
+            monthly, _ = chart_audit.monthly_series('etf/arti', 'ARTI', '2024-04-30')
+        self.assertEqual(sorted(monthly), [(2024, 3), (2024, 4)])
+
     def test_a_report_is_audited_from_its_own_page_not_the_manifest(self):
         """A new build (not in data/reports.json yet) is still checked, with the page's own ticker and as-of date."""
         seen = []

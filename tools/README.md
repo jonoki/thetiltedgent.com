@@ -8,7 +8,7 @@ Each finds the repo from its own location, so the working directory only matters
 |---|---|---|
 | `manifest.py` | the machine-readable manifest of every stock report | `data/reports.json`, `data/reports/*.json` |
 | `style_tags.py` | the Value / Growth / Income … style tags | `data/style_tags.json` |
-| `card_tags.py` | everything on a report card besides the index badges | `data/card_tags.json` |
+| `card_tags.py` | everything on a report card besides the index badges; pages that predate a print, from the refresh queue | `data/card_tags.json`, `data/new_results.json` |
 | `asset_cards.py` | the ETF, crypto and bond cards on the reports index | `reports/index.html` |
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
@@ -87,15 +87,20 @@ Run it on new reports **before** pushing. Two reports (AEP, DLR) reached the
 live site with no doctype, html, head or body tags at all, because they were
 built five days before this check existed; they were repaired on 15 Sep 2026.
 
-`chart_audit.py` does not scan `reports/etf/`, `reports/crypto/` or `reports/fixed/`
-(24 Sep 2026): the ETF, crypto and bond reports were checked point by point with
-the checkers' own scripts against Yahoo (ETF/crypto) or Treasury / Bank of Canada
-daily files (bonds). Brief: `claude/briefs/BUILD_ASSETS.md`.
+`chart_audit.py` checks an ETF or crypto report when it is named with its folder
+(`etf/arti`, `crypto/btc`; since 5 Oct 2026; its Yahoo symbol is in `YAHOO_SYMBOL`,
+e.g. `ARTI.TO`, `BTC-USD`); a run with no names still covers the stock reports only.
+Bond reports (`reports/fixed/`) chart yields, not prices, and are checked against
+Treasury / Bank of Canada daily files by the checkers' own scripts. `LAUNCH` holds
+the first month-end of a security whose Yahoo ticker was recycled (ARTI: Mar 2024):
+Yahoo rows before it are dropped, and any chart point before it fails the audit.
+Brief: `claude/briefs/BUILD_ASSETS.md`.
 
 ## `chart_audit.py` — every chart point vs Yahoo month-end closes
 
     py -3 tools/chart_audit.py                 # whole library
     py -3 tools/chart_audit.py aapl intc       # named reports
+    py -3 tools/chart_audit.py etf/arti crypto/btc   # ETF and crypto reports
 
 `verify.py` only checks that the last chart point equals the header price. This
 checks all the others, reading each report's ticker and as-of date from the page
