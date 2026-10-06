@@ -30,7 +30,24 @@ YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B',   # slugs whose Yahoo symbol is 
                 'etf/arti': 'ARTI.TO', 'etf/vfv': 'VFV.TO', 'etf/xeqt': 'XEQT.TO',   # TSX listings
                 'etf/xiu': 'XIU.TO', 'etf/zag': 'ZAG.TO', 'etf/cash': 'CASH.TO',
                 'crypto/btc': 'BTC-USD', 'crypto/eth': 'ETH-USD', 'crypto/bnb': 'BNB-USD',
-                'crypto/sol': 'SOL-USD', 'crypto/xrp': 'XRP-USD'}
+                'crypto/sol': 'SOL-USD', 'crypto/xrp': 'XRP-USD',
+                'etf/vbal': 'VBAL.TO', 'etf/vgro': 'VGRO.TO',
+                # global stocks on their home market (5 Oct 2026 batch): slug -> Yahoo symbol
+                'tencent': '0700.HK', 'samsung': '005930.KS', 'skhynix': '000660.KS', 'byd': '1211.HK',
+                'catl': '300750.SZ', 'xiaomi': '1810.HK', 'foxconn': '2317.TW', 'mediatek': '2454.TW',
+                'keyence': '6861.T', 'tokyoel': '8035.T', 'softbank': '9984.T', 'nintendo': '7974.T',
+                'hitachi': '6501.T', 'lvmh': 'MC.PA', 'nestle': 'NESN.SW', 'roche': 'ROG.SW', 'siemens': 'SIE.DE',
+                'hermes': 'RMS.PA', 'loreal': 'OR.PA', 'schneidr': 'SU.PA', 'airbus': 'AIR.PA', 'allianz': 'ALV.DE',
+                'rheinmtl': 'RHM.DE', 'inditex': 'ITX.MC', 'aramco': '2222.SR', 'reliance': 'RELIANCE.NS',
+                'cba': 'CBA.AX',
+                'dtelekom': 'DTE.DE', 'sienergy': 'ENR.DE', 'mercedes': 'MBG.DE', 'bmw': 'BMW.DE', 'vw': 'VOW3.DE',
+                'infineon': 'IFX.DE', 'munichre': 'MUV2.DE', 'deutschb': 'DBK.DE', 'safran': 'SAF.PA', 'bnp': 'BNP.PA',
+                'essilor': 'EL.PA', 'iberdrol': 'IBE.MC', 'unicred': 'UCG.MI', 'abb': 'ABBN.SW', 'zurich': 'ZURN.SW',
+                'richemnt': 'CFR.SW', 'rollsroy': 'RR.L', 'lseg': 'LSEG.L', 'glencore': 'GLEN.L', 'prosus': 'PRX.AS',
+                'adyen': 'ADYEN.AS', 'atlascop': 'ATCO-A.ST', 'mitsubc': '8058.T', 'fastretl': '9983.T',
+                'shinetsu': '4063.T', 'advantst': '6857.T', 'mhi': '7011.T', 'moutai': '600519.SS', 'pingan': '2318.HK',
+                'icbc': '1398.HK', 'meituan': '3690.HK', 'tcs': 'TCS.NS', 'bharti': 'BHARTIARTL.NS', 'hyundai': '005380.KS',
+                'dbs': 'D05.SI', 'cslltd': 'CSL.AX'}
 # First month-end that belongs to the security, where Yahoo's earlier rows are another one (a recycled ticker):
 # Evolve's ARTI launched 22 Mar 2024 (first trade 25 Mar); Yahoo ARTI.TO from Nov 2021 is another security.
 LAUNCH = {'etf/arti': (2024, 3)}
