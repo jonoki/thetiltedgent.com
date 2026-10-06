@@ -16,6 +16,9 @@ REQUIRED vs CTSH: wrap the metrics table as `<div class="fin-scroll"><table clas
 .fin-scroll > .fin-table { min-width: 760px; }
 The metrics table must have a row whose label cell is exactly `EPS (TTM)` (tooltip span allowed) and a `Trailing P/E` row. Never include the string "tg-sitenav". LF line endings, UTF-8.
 
+## Depth — every new build is T1 (Oki, 5 Oct 2026)
+An initial build covers everything a T1 refresh would (`claude/briefs/REFRESH.md`, TASK B): the latest reported quarter or half, with results vs consensus where a primary source gives it; management's own words from the latest call or presentation (verbatim only from a fetched transcript or release); current guidance; analyst rating and target changes since that print (dated, from the firm or a ratings table); and material company news up to the banner date. No delta box on a new build.
+
 ## Data rules (hard — a plausible fabrication is the worst outcome)
 - Price: the most recent settled close — a stockanalysis.com/stocks/<t>/history/ row that HAS an Adj. Close value. (WebFetch needs a domain surfaced by a WebSearch first; one search per new domain.) Header .price-current == LAST value of `prices` to the cent. Banner date = that close's date.
 - Chart: ~60 MONTHLY closes: `const labels = [...]`, `const prices = [...]`, equal lengths, last point = the settled close. digrin.com/stocks/detail/<T>/price "Real price" column is the usual source (ignore its header price); cross-check the last two month-ends against stockanalysis daily rows. Yahoo finance.yahoo.com/quote/<T>/history/?frequency=1mo is the fallback. Never daily or <5y data under a 5-year heading; if <5y of history exists, say so in the heading/note.
