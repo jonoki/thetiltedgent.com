@@ -120,6 +120,12 @@ def parse_title(t: str) -> tuple[str | None, str | None]:
 CUR = r'(?:[A-Z]{0,2}\$|[€£¥₩₹]|(?:CHF|SEK|SAR|INR|EUR|JPY|KRW|TWD|CNY|HKD|GBP|GBp|GBX|AUD|SGD|USD|CAD)\s?)?'
 
 
+def bare_ticker(t: str) -> str:
+    """A ticker without its exchange suffix, spaces, dots or hyphens: '6501.T' and '6501', 'ATCO-A.ST' and 'ATCO A'
+    compare equal."""
+    return re.sub(r'[\s.\-]', '', re.sub(r'\.[A-Z]{1,2}$', '', t.strip().upper()))
+
+
 def header_price(t: str) -> float | None:
     """The price in the report header (currency marker and commas removed), or None."""
     m = (re.search(r'class="price-current"[^>]*>\s*' + CUR + r'([\d,]+\.\d+)', t)
