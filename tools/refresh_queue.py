@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 from http.client import HTTPException
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 import repodata as rd
 
@@ -47,6 +47,9 @@ NYSE_HOLIDAYS = frozenset(Date.fromisoformat(d) for d in (
 T1_SURPRISE_PCT = 10.0
 T1_MOVE_PCT = 5.0
 MEGA_CAP_USD = 200e9   # "mega-cap names default to T1": our threshold (Oki may change it)
+# A new report's first refresh is a full T1 rewrite (Oki, 5 Oct 2026: "new reports clearly need a full rewrite"):
+# reports first published on or after this date that have not been refreshed yet. The older library is not included.
+FIRST_REFRESH_T1_SINCE = '2026-09-28'
 DUE_WITHIN_SESSIONS = 5   # finish within 5 trading days of the release, or the refresh is overdue
 
 
@@ -69,6 +72,8 @@ class Holding(TypedDict):
     ndx: bool
     dow: bool
     mcap: float | None
+    first_as_of: NotRequired[str | None]   # as-of of the first published edition
+    refreshed: NotRequired[bool]           # True once the report has a second edition
 
 
 class Item(TypedDict):
@@ -200,8 +205,10 @@ def holdings(repo: str = rd.ROOT) -> dict[str, Holding]:
         mcap = {r['slug']: r.get('mcap') for r in json.load(fh)['reports']}
     out: dict[str, Holding] = {}
     for slug, r in rd.load_report_records(repo).items():
+        eds = r.get('editions') or []
         out[norm(r['ticker'])] = {'slug': slug, 'ticker': r['ticker'], 'as_of': r['as_of'], 'ndx': bool(r.get('ndx')),
-                                  'dow': bool(r.get('dow30_added')), 'mcap': mcap.get(slug)}
+                                  'dow': bool(r.get('dow30_added')), 'mcap': mcap.get(slug),
+                                  'first_as_of': str(eds[0][0]) if eds else r['as_of'], 'refreshed': len(eds) > 1}
     return out
 
 
@@ -244,6 +251,8 @@ def tier(h: Holding, p: Print, move: float | None) -> tuple[Literal['T1', 'T2'],
         triggers.append(f"EPS surprise {p['surprise_pct']:+.1f}%")
     if move is not None and abs(move) >= T1_MOVE_PCT:
         triggers.append(f'first-session move {move:+.1f}%')
+    if not h.get('refreshed', True) and (h.get('first_as_of') or '') >= FIRST_REFRESH_T1_SINCE:
+        triggers.append('first refresh after the build')
     return ('T1' if triggers else 'T2'), triggers
 
 

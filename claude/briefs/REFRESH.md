@@ -29,7 +29,7 @@ New as-of = the most recent settled close (a stockanalysis history row WITH Adj.
 - Section 02 segments, Section 05 analyst calls, Section 06 catalysts (the print moves from "upcoming" to "happened"; add the next one only if dated by the company or labelled estimated).
 
 ## TASK B — did the business change? (decide the tier honestly)
-- **T1 Rewrite** if ANY: |EPS or revenue surprise| ≥ 10%; earnings-day move ≥ 5% (close-to-close on the first session after the print); guidance changed; OR significant company news since the print (M&A, CEO/CFO change, restructuring, major contract/regulatory/legal event, guidance withdrawal, dividend/buyback policy change). Dow 30 / Nasdaq-100 / mega-cap names default to T1. T1 = rewrite the narrative sections (overview, moat/vulnerabilities, bull/bear, risks, industry commentary) wherever the quarter changed the story.
+- **T1 Rewrite** if ANY: |EPS or revenue surprise| ≥ 10%; earnings-day move ≥ 5% (close-to-close on the first session after the print); guidance changed; OR significant company news since the print (M&A, CEO/CFO change, restructuring, major contract/regulatory/legal event, guidance withdrawal, dividend/buyback policy change). Dow 30 / Nasdaq-100 / mega-cap names default to T1, and so does a new report's first refresh (reports first published on or after 28 Sep 2026; Oki, 5 Oct 2026). T1 = rewrite the narrative sections (overview, moat/vulnerabilities, bull/bear, risks, industry commentary) wherever the quarter changed the story.
 - **T2 Numbers** otherwise: TASK A plus a short factual paragraph on the quarter; narrative untouched except where now false.
 - "The business is unchanged; the multiple re-rated" is a correct and welcome finding. Do not manufacture a narrative to explain a price move.
 

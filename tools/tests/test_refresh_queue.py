@@ -64,6 +64,10 @@ class Queue(unittest.TestCase):
         self.assertEqual(q.tier(holding('x', 'X', '2026-09-01'), p, 1.0), ('T1', ['EPS surprise +10.0%']))
         p['surprise_pct'] = 2.0
         self.assertEqual(q.tier(holding('x', 'X', '2026-09-01'), p, -4.9), ('T2', []))
+        new = {**holding('x', 'X', '2026-10-02'), 'first_as_of': '2026-10-02', 'refreshed': False}
+        self.assertEqual(q.tier(new, p, -4.9), ('T1', ['first refresh after the build']))   # a new report's first refresh
+        self.assertEqual(q.tier({**new, 'refreshed': True}, p, -4.9), ('T2', []))
+        self.assertEqual(q.tier({**new, 'first_as_of': '2026-08-10'}, p, -4.9), ('T2', []))   # the older library
         self.assertEqual(q.tier(holding('x', 'X', '2026-09-01', dow=True, mcap=250e9), p, -5.0)[1],
                          ['Dow 30', 'mega-cap $250B', 'first-session move -5.0%'])
 
