@@ -107,7 +107,7 @@ def as_of(t: str) -> tuple[str | None, bool]:
 def parse_title(t: str) -> tuple[str | None, str | None]:
     """(ticker, name) from the <title>: 'AAPL — Apple Inc. | Stock Analysis' or 'Apple Inc. (AAPL) — …'.
     Either part is None when the title is in neither form."""
-    m = re.search(r'<title>\s*([A-Z][A-Z0-9.\-]*)\s*[\u2014\u2013\-]\s*(.*?)\s*(?:\|[^<]*)?</title>', t, re.S)
+    m = re.search(r'<title>\s*([A-Z0-9][A-Z0-9.\-]*)\s*[\u2014\u2013\-]\s*(.*?)\s*(?:\|[^<]*)?</title>', t, re.S)
     if m:
         return m.group(1), htmllib.unescape(m.group(2))
     m = re.search(r'<title>\s*(.*?)\s*\(([A-Z][A-Z0-9.\-]*)\)\s*[\u2014\u2013\-]\s*.*?</title>', t, re.S)
@@ -116,11 +116,15 @@ def parse_title(t: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+# A currency marker before a number: $, HK$/A$/S$/R$/C$/NT$, €, £, ¥, ₩, ₹, or a 3-letter code (non-US reports).
+CUR = r'(?:[A-Z]{0,2}\$|[€£¥₩₹]|(?:CHF|SEK|SAR|INR|EUR|JPY|KRW|TWD|CNY|HKD|GBP|GBp|GBX|AUD|SGD|USD|CAD)\s?)?'
+
+
 def header_price(t: str) -> float | None:
-    """The price in the report header ($ and commas removed), or None."""
-    m = (re.search(r'class="price-current"[^>]*>\s*\$?([\d,]+\.\d+)', t)
-         or re.search(r'class="price[ "][^>]*>\s*\$?([\d,]+\.\d+)', t)
-         or re.search(r'class="price-now[ "][^>]*>\s*\$?([\d,]+\.\d+)', t))
+    """The price in the report header (currency marker and commas removed), or None."""
+    m = (re.search(r'class="price-current"[^>]*>\s*' + CUR + r'([\d,]+\.\d+)', t)
+         or re.search(r'class="price[ "][^>]*>\s*' + CUR + r'([\d,]+\.\d+)', t)
+         or re.search(r'class="price-now[ "][^>]*>\s*' + CUR + r'([\d,]+\.\d+)', t))
     return to_number(m.group(1)) if m else None
 
 
@@ -198,7 +202,7 @@ _DASH = r'(?:&ndash;|&mdash;|&#8211;|&#x2013;|[\u2013\-\u2014])'
 
 def range_52w(t: str) -> list[float] | None:
     """[low, high] from the metrics-table 52-week row (else the first '52-week range $x – $y' in the page)."""
-    m = (re.search(r'52-Week Range[^<]*</t[dh]>\s*<td[^>]*>\s*\$?([\d,]+\.\d+)\s*' + _DASH + r'\s*\$?([\d,]+\.\d+)', t, re.S)
+    m = (re.search(r'52-Week Range[^<]*</t[dh]>\s*<td[^>]*>\s*' + CUR + r'([\d,]+\.\d+)\s*' + _DASH + r'\s*' + CUR + r'([\d,]+\.\d+)', t, re.S)
          or re.search(r'52[- ]Week Range.{0,120}?\$([\d,]+\.\d+)\s*' + _DASH + r'\s*\$([\d,]+\.\d+)', t, re.S))
     return [float(g.replace(',', '')) for g in m.groups()] if m else None   # both groups are plain numbers
 

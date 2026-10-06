@@ -42,6 +42,20 @@ class ReportPage(unittest.TestCase):
         self.assertEqual(rl.parse_title(PAGE), ('ACME', 'Acme Widgets Inc.'))
         self.assertEqual(rl.parse_title('<title>Acme Widgets (ACME) — Stock Analysis</title>'), ('ACME', 'Acme Widgets'))
         self.assertEqual(rl.parse_title('<title>No ticker here</title>'), (None, None))
+        self.assertEqual(rl.parse_title('<title>0700.HK — Tencent Holdings | Stock Analysis</title>'), ('0700.HK', 'Tencent Holdings'))
+
+    def test_non_us_currency_markers(self):
+        """Global reports quote prices in their home currency: €26.56, HK$421.20, ₩276,000.00, or '26.56 EUR'."""
+        for cell, want in (('€26.56', 26.56), ('HK$421.20', 421.2), ('₩276,000.00', 276000.0), ('26.56 EUR', 26.56), ('$9.50', 9.5)):
+            self.assertEqual(rl.header_price(f'<div class="price-current">{cell}</div>'), want, cell)
+        page = '<tr><td>52-Week Range</td><td>€23.53 – €34.36</td></tr>'
+        self.assertEqual(rl.range_52w(page), [23.53, 34.36])
+
+    def test_a_global_slug_matches_its_exchange_ticker(self):
+        import verify
+        self.assertTrue(verify.title_matches('0700.HK', os.path.join('reports', 'tencent_analysis.html')))
+        self.assertTrue(verify.title_matches('AAPL', os.path.join('reports', 'aapl_analysis.html')))
+        self.assertFalse(verify.title_matches('PCG', os.path.join('reports', 'cboe_analysis.html')))
 
     def test_price_chart_and_range(self):
         self.assertEqual(rl.header_price(PAGE), 1234.5)
