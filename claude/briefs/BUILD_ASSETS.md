@@ -90,6 +90,7 @@ Hero meta: Market cap · Circulating supply · Max supply · Launch year.
 - For a token tied to a company or exchange (e.g. BNB — Binance; XRP — Ripple): state the relationship from primary sources (the issuer's own pages, filings, court records); enforcement actions and settlements go in the regulatory table with docket/release links.
 
 ## Bond & cash family — `reports/fixed/<slug>_analysis.html`
+Only things a reader can buy: securities, savings bonds, deposits. Indicator rates and economic series (overnight/repo rates, policy, prime and mortgage rates, CPI…) are NOT built here — they wait for the economic-indicators section (Oki, 6 Oct 2026; flagged list in `tools/asset_cards.py` `INDICATORS`).
 Source hierarchy: U.S. Treasury (home.treasury.gov daily par yield curve, TreasuryDirect auction results), FRED, Federal Reserve; Bank of Canada Valet for Canadian series.
 Header `.price-current` shows the yield (e.g. `4.12%`, 2 dp) for the banner date; chart = month-end daily yields (last business day of each month — NOT FRED's monthly-average series), last point == header yield.
 Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name the agency).

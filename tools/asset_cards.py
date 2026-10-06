@@ -63,6 +63,10 @@ CARD_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" wi
 
 
 QUOTED_DEFINITION = {'ust30y'}   # its section 01 opens with the definition quoted from TreasuryDirect
+# Not securities (Oki, 6 Oct 2026): indicator rates and economic series move to their own economic-indicators section
+# when it is built. Until then they stay on the Bonds & cash tab. Never add new ones there.
+INDICATORS = {'sofr', 'effr', 'corra'}   # overnight / repo / policy-linked rates
+INDICATOR_REVIEW = {'gic5y'}   # a deposit you can buy, but the page charts the Bank of Canada's posted-rate series: Oki to decide
 
 
 def section_01(page: str) -> str:
