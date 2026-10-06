@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSEG.L — London Stock Exchange Group plc | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EC4B6;
+  --accent-dim: #2EC4B633;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 2, 2026 (Friday settled close, London Stock Exchange; prices in pence) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">LSEG.L</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> London Stock Exchange (Main Market) · prices in pence (GBp; 100p = £1)</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Financial Data &amp; Stock Exchanges</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> <span class="tip" title="482,457,344 ordinary shares in issue excluding treasury (Total Voting Rights announcement, September 30, 2026) × 8,090p close = £39.03B; × 1.3200 USD per GBP (Yahoo Finance GBPUSD=X daily close, October 2, 2026) = $51.52B. Our calculation.">$51.52B (£39.03B)</span></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">FTSE 100 constituent</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">ISIN GB00B0SWJX34 · TIDM LSEG</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">Credit: A (S&amp;P) · A3 positive (Moody's)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">London Stock Exchange Group plc</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">8,090.00 <span style="font-size:20px;color:var(--text-muted);">GBp</span></div>
+      <div class="price-change" style="color:var(--red);">−30p (−0.37%)</div>
+      <div class="price-date">Close, Friday October 2, 2026 · London Stock Exchange settled close, in pence (£80.90 a share)</div>
+      <div class="price-date">Previous close 8,120p (October 1) · source: Yahoo Finance LSEG.L daily rows</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 10 Paternoster Square, London</div>
+    <div class="meta-item"><span>Employees:</span> 28,516 (Dec 31, 2025)</div>
+    <div class="meta-item"><span>Founded:</span> roots in 1698 (Jonathan's Coffee House); LSEG formed Oct 2007</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 22, 2026 (Q3 trading statement, revenues only; LSEG financial calendar)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">London Stock Exchange Group is no longer mainly a stock exchange. It is three businesses under one roof: a <strong>financial-data company</strong> (the former Refinitiv, bought in an all-share deal completed in January 2021, which sells the Workspace terminal, real-time price feeds and analytics), an <strong>index company</strong> (FTSE Russell, whose benchmarks sit under $2.19 trillion of exchange-traded funds), and <strong>market plumbing</strong> — the London Stock Exchange itself, the LCH <span class="tip" title="A clearing house stands between the two sides of a trade and guarantees it, holding collateral (margin) from both so one default does not cascade.">clearing houses</span> and a controlling stake in the bond-trading platform Tradeweb. In the first half of 2026 it booked total income (excluding pass-through recoveries) of <strong>£4,799M, up 6.9% reported and 8.4% on an organic, constant-currency basis</strong>, an adjusted <span class="tip" title="Earnings before interest, tax, depreciation and amortisation — operating profit before the non-cash charges for wear and tear and for writing down acquired assets.">EBITDA</span> margin of 52.7%, and adjusted earnings per share of 244.9p, up 17.2%. At the October 2 close the company was worth £39.03B ($51.52B).</p>
+  <p class="prose" style="margin-top:16px;">The puzzle is that the reported numbers keep improving while the share price keeps falling. The stock's best month-end in the five-year window was <strong>12,035p in January 2025</strong>; at 8,090p it is <strong>32.8% below that</strong>. The fall came in lumps: −7.9% on the day of the H1 2025 results (July 31, 2025), −12.8% on February 3, 2026, and −6.4% on July 30, 2026 — the day LSEG reported what it called a "record first half performance" and raised guidance. The thread running through it is the question of what artificial intelligence does to a company that sells financial data, which CEO David Schwimmer described on the July 30 call as the market "having what we could call the terminal value debate." Management's answer has been to buy shares: <strong>£2.1B in the first half alone</strong>, at an average of £88.39, which the interim report says reflected "the Board's view on the dislocation between the intrinsic value of the business and the prevailing share price." The investor's question is whether LSEG's data is the raw material AI needs (management's view) or whether the human-facing terminal business, Workflows, growing just 2.7% in Q2 2026, is the part AI routes around.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">David Schwimmer</div>
+      <div class="card-note">Joined the Group as CEO in 2018 after 20 years at Goldman Sachs (LSEG executive-team page); in charge through the Refinitiv acquisition (completed January 2021) and the 2022 Microsoft partnership. On the July 30, 2026 call: "Over the past year, there has been speculation that AI would wipe out large parts of our business. In fact, it's just the opposite."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Michel-Alain Proch</div>
+      <div class="card-note">Joined in February 2024 from Publicis Groupe, where he was Group CFO (2021–2024). He owns the capital-return programme: "We pushed particularly hard on the buybacks given the dislocation we saw in our share price for much of the first half" (H1 2026 call, July 30, 2026).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Substantial Shareholders</div>
+      <div class="card-value" style="font-size:20px;">Microsoft holds 4.1%</div>
+      <div class="card-note">Notified holdings at December 31, 2025 (Annual Report 2025): <strong>Qatar Investment Authority</strong> 6.2%, <strong>BlackRock</strong> 5.7%, <strong>Capital Group</strong> 5.1%, <strong>Microsoft</strong> 4.1%, <strong>Lindsell Train</strong> 4.1%. BlackRock's latest filing (July 30, 2026) shows 7.12% including 1.91% held through instruments. Microsoft's stake came with the 2022 partnership and a board seat for Scott Guthrie, whom the board does not count as independent.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">LSEG reports four divisions. The mix below is <strong>H1 2026 total income excluding recoveries</strong> (six months to June 30, 2026, £4,799M), from the interim report; growth rates are organic and in constant currency, as the company reports them. The three data divisions together — what LSEG calls its subscription businesses — make up 59.9% of income and grew 6.3%; Markets made up the other 40.0% and grew 11.9%.</p>
+  <div class="seg-bar">
+    <div style="flex:42.9;background:#2EC4B6;">DATA &amp; ANALYTICS 42.9%</div>
+    <div style="flex:40.0;background:#f59e0b;">MARKETS 40.0%</div>
+    <div style="flex:10.5;background:#22c55e;">FTSE RUSSELL 10.5%</div>
+    <div style="flex:6.5;background:#a78bfa;">RISK 6.5%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> Data &amp; Analytics — £2,061M (H1'26), +5.1% organic</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Markets — £1,920M, +11.9%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> FTSE Russell — £504M, +9.1%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Risk Intelligence — £310M, +9.7%</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Other income of £4M completes the total. The slowest-growing division is also the biggest, and inside it the slowest line is the most visible one: the Workspace terminal.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EC4B6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Data &amp; Analytics</div>
+        <span class="biz-badge dominant">LARGEST DIVISION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">£2,061M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+5.1%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.3%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">42.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The old Refinitiv, in three lines. <strong>Workflows</strong> (£980M, +2.8%) is the Workspace desktop that traders, bankers and analysts look at all day — the business that competes head-on with the Bloomberg terminal, and the one most exposed if AI assistants replace screens. <strong>Data &amp; Feeds</strong> (£961M, +7.5%, accelerating to 7.7% in Q2) pipes real-time and historical prices straight into customers' systems — traffic on the real-time network peaked at 26 million messages per second in June 2026 — and is now almost level with Workflows as the largest line (Q2: £486M against £489M). <strong>Analytics</strong> (£120M, +6.0%) covers Yield Book and Lipper. The AI pitch lives here: Workspace already runs inside Microsoft Teams (Copilot is next), LSEG has data partnerships with Anthropic, OpenAI, Databricks, Snowflake, Google Gemini and Amazon Quick, and over 200 customers have engaged on access to its <span class="tip" title="Model Context Protocol — a standard way for AI assistants to plug into outside data sources and tools.">MCP</span> server. The CFO was explicit on timing: MCP charging has begun but "certainly it won't move the needle in 2026."</p>
+    <div class="biz-tam"><strong>Workspace AI:</strong> AI Search 17,000 active users · Deep Research 7,000 users (interim report, July 2026)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Bloomberg L.P.</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">Private</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">S&amp;P Global</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$113.86B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Intercontinental Exchange</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$84.29B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Markets</div>
+        <span class="biz-badge growth">FASTEST GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">£1,920M</div><div class="biz-stat-label">H1'26 Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+11.9%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">58.6%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">40.0%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The trading and clearing side. The largest piece is <strong>Fixed Income, Derivatives &amp; Other</strong> (£864M, +13.0%), mostly Tradeweb, where average daily volume reached $3.2 trillion, up 24.8%; LSEG holds a 50.9% economic interest and 89.9% of the votes (December 2025). <strong>OTC Derivatives</strong> (£355M, +13.6%) is LCH's SwapClear, ForexClear and CDSClear, with interest-rate swap notional cleared up 29%. Then <strong>Equities</strong> (£230M, +12.2%; UK value traded up 33.5%), <strong>FX</strong> (£145M), <strong>Securities &amp; Reporting</strong> (£124M), collateral and net treasury income. Markets earns more when markets are volatile, and H1 2026 was volatile — management called Q1 volumes "exceptionally strong" and said trading moderated in Q2. Its margin jumped from 51.9% to 58.6%, but 350 basis points of that came from a cheaper SwapClear revenue-share deal with the founding banks (their cut fell from about 30% to 15% for 2025 and 10% from 2026 to 2045), and the company says the year-on-year uplift "will largely reverse in Q4 2026" because of when the 2025 benefit was booked.</p>
+    <div class="biz-tam"><strong>Coming:</strong> LSE 24, a 24-hours-a-day, five-days-a-week venue — client testing by end-2026, exchange-traded products first in H1 2027 (subject to approval)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">CME Group</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$94.62B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Intercontinental Exchange</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$84.29B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">FTSE Russell</div>
+        <span class="biz-badge dominant">HIGHEST MARGIN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">£504M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+9.1%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">68.1%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">10.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The FTSE 100 and the Russell 2000 are both LSEG products. Fund managers pay a <strong>subscription</strong> to benchmark against the indices (£325M, +6.2%) and ETF issuers pay an <strong>asset-based</strong> fee on money tracking them (£179M, +14.9%), which makes half-year revenue rise and fall with stock markets. ETF assets linked to FTSE Russell indices were $2,193 billion at June 30, 2026, up 37.2% in a year, and 52 new ETFs launched on its indices in the half. At a 68.1% adjusted EBITDA margin this is the most profitable division: an index, once it is the benchmark a pension fund is measured against, is very hard to replace.</p>
+    <div class="biz-tam"><strong>Key KPI:</strong> ETF AUM linked to FTSE Russell indices $2,193bn period-end, $1,997bn H1 average</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">S&amp;P Global (S&amp;P DJI)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$113.86B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">MSCI</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$38.96B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Risk Intelligence</div>
+        <span class="biz-badge emerging">SMALLEST DIVISION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">£310M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+9.7%</div><div class="biz-stat-label">Organic Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">59.4%</div><div class="biz-stat-label">Adj. EBITDA Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">6.5%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Compliance tools. The core product, <strong>World-Check</strong>, is the database banks screen customers against for sanctions, politically exposed persons and money-laundering risk; <strong>Digital Identity &amp; Fraud</strong> verifies identities and payments (about 300 million transactions in H1, with Trusted Payments volumes up 31%). Demand here is driven by regulation rather than markets, which makes it the steadiest grower — 9.7% in H1 after 11.7% in 2025 — and it now carries a separate AI licence when its data is used in customers' AI systems.</p>
+    <div class="biz-tam"><strong>New in H1:</strong> World-Check Sanctioned Securities Data File · Identity Gateway</div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The subscription numbers that settle the AI argument</h3>
+  <p class="prose">If AI were eroding LSEG's data franchise, it would show up first in sales, cancellations and the share of revenue from new products. LSEG introduced these KPIs at the start of 2026; all four moved the right way in the first half.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Annual Subscription Value Growth</div>
+      <div class="card-value">+6.1%</div>
+      <div class="card-note">At June 2026, up from 5.9% at December 2025 and 5.8% a year earlier — the run-rate of contracted subscription revenue across the three data divisions and Markets data. LSEG will retire this KPI at the end of 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Revenue Retention</div>
+      <div class="card-value">92.8%</div>
+      <div class="card-note">Share of subscription revenue from 12 months ago still being received, up from 92.4% at end-2025 and 92.6% a year earlier. A falling number here would be the clearest sign of customers leaving.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Gross Sales (rolling 12 months)</div>
+      <div class="card-value">£482M</div>
+      <div class="card-note">New subscription sales, against £435M a year earlier and £481M at end-2025. Flat over six months after a strong run; this is the line to watch at the full-year results.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">New Product Vitality</div>
+      <div class="card-value">25.0%</div>
+      <div class="card-note">Share of revenue from products launched or enhanced in the last five years, up from 19.0% in H1 2025, driven mostly by customers moving onto Workspace.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Benchmark indices (FTSE, Russell)</span>
+    <span class="moat-pill">LCH clearing network</span>
+    <span class="moat-pill">Proprietary real-time data</span>
+    <span class="moat-pill">Tradeweb liquidity</span>
+    <span class="moat-pill">World-Check compliance standard</span>
+    <span class="moat-pill">Regulated status &amp; trust</span>
+    <span class="moat-pill">Microsoft partnership</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">LSEG's strongest assets are <strong>network businesses</strong>: a clearing house is valuable because everyone else clears there, an index because everyone else is measured against it, a trading venue because the liquidity is already there. None of those is easily copied by a chatbot. Management's argument for the data business is that AI raises the value of trusted, licensed data rather than replacing it — Schwimmer told analysts that "90% of our data revenues come from real-time or data that is proprietary," and that demand for financial data has decoupled from headcount, with industry spend more than doubling over 17 years while the number of people in the industry fell by a quarter. The <strong>Microsoft partnership</strong> (ten years from December 2022) is the distribution half of that bet: Workspace already runs inside Teams and is coming to Copilot, which Schwimmer said has 1.5 million users at LSEG's top 50 customers.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The terminal is the soft spot.</strong> Workflows — the human-facing Workspace desktop — grew 2.7% in Q2 2026 and 2.8% in the half, the slowest line in the group and the one AI assistants most directly compete with. LSEG's own pricing plan folds AI Search into Workspace's annual price review, so its value has to show up as price increases customers accept.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The margin story has a one-off inside it.</strong> Of the 320 basis points of H1 adjusted EBITDA margin expansion, 140 came from the new SwapClear revenue-share agreement and 60 from currency; the company says the SwapClear uplift will largely reverse in Q4 2026. The full-year guide is "around 100 bps" of constant-currency improvement.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">A dollar business reporting in pounds.</strong> 58% of H1 income was in US dollars. LSEG's own sensitivity: a 10-cent fall in the dollar against sterling cuts total income by about 4.0% and EBITDA by about 4.5%.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Fixed content and cloud costs.</strong> The 30-year Reuters news agreement (from 2018) carries a minimum, inflation-linked payment — US$398M for 2025 — and the Microsoft deal a minimum cloud spend of US$2.8B over its term, all of it still outstanding at June 30, 2026. Token and cloud costs also rise as AI usage grows; management says these are "fully factored into our midterm margin guidance."</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">All per-share figures are in pence; company figures are in pounds sterling. The home benchmark is the <strong>FTSE 100</strong>, of which LSEG is a constituent; its dividend yield is from FTSE Russell's own factsheet (data as at August 28, 2026). LSEG reports results twice a year, so trailing-twelve-month (TTM) figures are FY2025 minus H1 2025 plus H1 2026. LSEG carries a large non-cash charge for amortising the intangible assets it bought with Refinitiv (£568M in H1 2026 alone), so its statutory earnings sit far below the adjusted earnings the market usually quotes; both are shown.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>LSEG.L</th><th>Industry Avg</th><th>FTSE 100</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many pence you pay for one penny of past-year profit.">Trailing P/E</span></td><td>28.9</td><td>—</td><td>—</td><td>8,090p ÷ 279.5p statutory basic EPS (TTM) = 28.94. Inflated by Refinitiv amortisation; on adjusted earnings the figure is 17.7 (next row).</td></tr>
+      <tr><td><span class="tip" title="Share price divided by adjusted earnings per share, which exclude amortisation of acquired intangibles and other non-underlying items.">Adjusted P/E (TTM)</span></td><td>17.7</td><td>—</td><td>—</td><td>8,090p ÷ 456.6p adjusted EPS (TTM: 420.6p − 208.9p + 244.9p) = 17.72.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by analysts' consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>16.8</td><td>—</td><td>—</td><td>8,090p ÷ 480.3p, the FY2026 adjusted EPS consensus compiled by LSEG from 10 analysts' models (August 13, 2026). On the FY2027 consensus of 548.4p: 14.8.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — statutory basic EPS for the last two reported half-years.">EPS (TTM)</span></td><td>279.5 pence</td><td>—</td><td>—</td><td>Statutory basic: FY2025 238.4p − H1 2025 122.7p + H1 2026 163.8p. H1 2026 alone rose 33.5%.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — income in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+6.9%</td><td>—</td><td>—</td><td>H1 2026 total income excl. recoveries, reported. <strong>+8.4% organic constant currency</strong>; FY2026 guidance raised to 7.0–7.5% from 6.5–7.5%.</td></tr>
+      <tr><td><span class="tip" title="Adjusted EBITDA as a share of total income excluding recoveries — the company's headline profitability measure.">Adj. EBITDA Margin</span></td><td>52.7%</td><td>—</td><td>—</td><td>H1 2026, up 320 bps from 49.5%; 140 bps of that from the SwapClear agreement, which largely reverses in Q4 2026.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: income minus the direct cost of purchased content, royalties and revenue shares, as a percentage of income.">Gross Margin</span></td><td>88.4%</td><td>—</td><td>—</td><td>H1 2026 gross profit £4,409M ÷ total income £4,985M.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: profit attributable to shareholders as a percentage of total income.">Net Profit Margin</span></td><td>14.6%</td><td>—</td><td>—</td><td>TTM statutory profit to equity holders £1,414M ÷ TTM total income £9,659M. Low for a 52%-EBITDA business because of the amortisation charge and Tradeweb's minority holders.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: dividends per share over the last twelve months divided by the share price.">Dividend Yield</span></td><td>1.95%</td><td>—</td><td>3.05%</td><td>2025 final 103.0p (paid May 2026) + 2026 interim 55.0p (paid September 16) = 158.0p on 8,090p. Interim up 17.0%; policy pays out about 33–40% of adjusted EPS.</td></tr>
+      <tr><td><span class="tip" title="Equity free cash flow: cash generated after capex, interest, tax and leases, before acquisitions and shareholder returns.">Equity Free Cash Flow</span></td><td>£2.72B</td><td>—</td><td>—</td><td>TTM: FY2025 £2,445M − H1 2025 £935M + H1 2026 £1,205M = £2,715M, a 7.0% yield on the £39.03B market cap. FY2026 guidance: at least £2.7B.</td></tr>
+      <tr><td><span class="tip" title="Operating net debt divided by adjusted EBITDA — how many years of earnings the debt represents. LSEG targets 1.5–2.5x.">Leverage</span></td><td>2.1x</td><td>—</td><td>—</td><td>Operating net debt £9,982M at June 30, 2026, up from 1.8x at December 2025 because of the accelerated buyback; target range 1.5–2.5x.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.64</td><td>—</td><td>—</td><td>Gross borrowings and leases £13,511M ÷ total equity £21,071M (June 30, 2026). Cash £4,056M.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful: LCH holds £856.6B of clearing-member assets against £856.7B of matching liabilities, which swamp the operating balance sheet.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: profit attributable to shareholders divided by shareholders' equity.">ROE</span></td><td>7.6%</td><td>—</td><td>—</td><td>TTM statutory profit £1,414M ÷ equity attributable to shareholders £18,701M. Depressed by the £30.97B of intangible assets on the balance sheet, most of it from Refinitiv.</td></tr>
+      <tr><td>52-Week Range (closing)</td><td>7,170.00 – 9,992.00 p</td><td>—</td><td>—</td><td>Closing prices, October 3, 2025 to October 2, 2026 (low February 4, 2026; high April 24, 2026). 8,090p sits 19.0% below the high and 12.8% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the comparisons. First, the <strong>SwapClear revenue-share change</strong>: struck in October 2025, it cut what LSEG pays the swap market's founding banks and lowered Markets' cost of sales 38% in H1; the 2025 benefit was all booked in H2 2025, so the year-on-year margin gain unwinds in Q4 2026. It also added about £80M to H1 cash flow. Second, the <strong>buyback</strong>: LSEG bought 23.4 million shares for £2.1B in H1 and the share count excluding treasury fell from 510 million at December 2025 to 482.46 million at September 30, 2026, so per-share growth runs well ahead of profit growth (equity free cash flow per share +37.0% against equity free cash flow +28.9%). Third, <strong>finance costs</strong>: adjusted net finance expense more than doubled to £149M (from £66M) on refinanced debt, the higher borrowing that funds the buyback, and £35M of one-off gains in H1 2025.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <p class="prose" style="margin-bottom:20px;">LSEG publishes its own compilation of analyst forecasts. The edition after the H1 results (August 13, 2026) is compared below with the May 8, 2026 edition, so the post-print revisions are visible.</p>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">14 Buy, 1 Hold, 1 Sell in LSEG's August 13, 2026 compilation, against 16 Buy, 0 Hold, 0 Sell on May 8. The Hold and the Sell appeared between the May and August editions.</div></div>
+    <div class="card"><div class="card-label">Consensus Target</div><div class="card-value">11,835p</div><div class="card-note"><span style="color:var(--green);">+46.3% upside</span> from 8,090p. Down 2.4% from 12,131p on May 8, while the share price fell 4.7% between the reference closes printed on the two sheets (9,186p for May 7, 8,752p for August 12).</div></div>
+    <div class="card"><div class="card-label">FY2026 Adjusted EPS</div><div class="card-value" style="font-size:20px;">480.3p</div><div class="card-note">Up from 476.9p on May 8; FY2026 total income (excl. recoveries) consensus £9,614M, up from £9,590M, implying 7.8% organic growth — above the raised 7.0–7.5% guide. FY2027: 548.4p. Adjusted basis, company-compiled from 10 analysts' models (15 in the May edition).</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">14 / 1 / 1</div><div class="card-note">87.5% Buy. A 46% gap between the price and the average target says the sell side's models and the market's discount rate disagree, not the earnings forecasts — the FY2026 EPS consensus rose after the print, on a smaller pool of models (10 against 15).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:87.5;background:#22c55e;"></div>
+    <div style="flex:6.25;background:#f59e0b;"></div>
+    <div style="flex:6.25;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy — 14 (87.5%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 1 (6.25%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 1 (6.25%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS (MARKETBEAT RATINGS TABLE)</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Citigroup</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">£129 → £127</span> (Aug 7, 2026). A trim of under 2% a week after the print, rating unchanged. Citi's Andrew Lowe opened the July 30 Q&amp;A by asking what had changed in the year since "the AI disruption narrative really took hold."</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Royal Bank of Canada</strong> · Outperform · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">£136</span> reiterated (Jul 31, 2026). The day after the results, with the shares at 8,606p — a target 58% above that close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Deutsche Bank</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">£110</span> reiterated (Jul 31, 2026). The lowest of the post-print targets on the table, still 36% above the October 2 close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">JPMorgan</strong> · Overweight · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">£136 → £137</span> (Apr 10, 2026). The highest target on the table, set before the Q1 trading update.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 trading statement (revenue only)</div>
+        <div class="tl-desc">Date from LSEG's investor-relations financial calendar. The numbers to watch: whether Workflows stays below 3% while Data &amp; Feeds keeps accelerating, whether Markets holds up after an exceptional first quarter, and whether subscription growth keeps accelerating from 6.3%.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">By Nov 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">£700M buyback tranche completes</div>
+        <div class="tl-desc">Started July 30 and run by BNP Paribas, this tranche must end by November 6; it is part of up to £1.35B planned by February 2027, which would take buybacks since 2022 above £8B. Weekly filings show steady purchases — 603,185 shares at a volume-weighted average of about 8,290p in the week to September 25.</div>
+        <div class="tl-impact up">Ongoing support</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">SwapClear margin benefit unwinds</div>
+        <div class="tl-desc">Flagged by the company: because the 2025 benefit of the new revenue-share agreement was booked in H2 2025, the year-on-year margin uplift will largely reverse in Q4 2026. It is already in the "around 100 bps" full-year margin guide, but it will make the second-half margin comparison look weak.</div>
+        <div class="tl-impact neutral">Known headwind</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">ServiceNow's COO joins the board</div>
+        <div class="tl-desc">Announced October 1: Amit Zavery, President, COO and Chief Product Officer of ServiceNow and formerly head of platform at Google Cloud, joins as a non-executive director. Chair Don Robert tied the appointment to executing "our LSEG Everywhere AI strategy."</div>
+        <div class="tl-impact neutral">Governance</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">End-2026 → H1 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">LSE 24 and digital gilts</div>
+        <div class="tl-desc">LSE 24, announced July 21, opens for client testing by end-2026, with exchange-traded products the first asset class in H1 2027, subject to regulatory approval. Separately, LSEG and HSBC signed a memorandum to link to the UK's pilot Digital Gilt Instrument (DIGIT), due to be issued by Q1 2027.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">H1 2026 results — "record first half," guidance raised, shares fell</div>
+        <div class="tl-desc">Total income excl. recoveries £4,799M (+8.4% organic), adjusted EPS 244.9p (+17.2%), equity free cash flow £1.2B, interim dividend +17.0% to 55.0p; revenue guidance raised to 7.0–7.5% and margin guidance to around 100 bps. The shares closed 6.4% lower that day (9,198p → 8,606p) and another 2.4% lower the next (8,398p). The release itself carried two caveats: Workflows growth slowed to 2.7% in Q2, and the SwapClear margin uplift reverses in Q4.</div>
+        <div class="tl-impact down">Reaction already happened: −8.7% over two sessions</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 26, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2025 results and a £3B buyback plan</div>
+        <div class="tl-desc">FY2025 adjusted EPS 420.6p (+15.7%), statutory EPS 238.4p, equity free cash flow £2,445M; LSEG announced a further £3B of buybacks to February 2027. The shares rose 9.1% that day (7,794p → 8,500p), three weeks after their 12.8% one-day fall on February 3 (8,234p → 7,180p), the largest daily decline in the five-year window.</div>
+        <div class="tl-impact up">Reaction already happened: +9.1%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">LSEG.L — Monthly Closes (pence), Oct 2021 → Oct 2, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 month-end closes + Oct 2, 2026 settled close · pence, not dividend-adjusted · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4B6;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the October 2021 month-end close of <strong>7,100p</strong> to the October 2, 2026 close of <strong>8,090p</strong>, LSEG gained <strong>13.9% in price</strong>. The FTSE 100 rose <strong>44.5%</strong> over the same window (7,237.6 → 10,462.0, Yahoo Finance ^FTSE), so LSEG lagged its home index by about 30 points. The path was two trips: a steady climb from the November 2021 low of 6,502p to a peak of <strong>12,035p in January 2025</strong> (+85%), then a slide that has left the stock just 13.9% above where the window began. Over the last twelve months the stock is down 6.0% (8,610p on October 2, 2025) and in 2026 to date it is down 9.6% from 8,952p, while the FTSE 100 is up 5.3% year to date.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows the two halves of the story clearly. It reached <strong>90.6 in January 2025</strong>, the most overbought reading in the series, then fell to <strong>18.8 in September 2025</strong>, the most oversold. It has not reached 60 since, and stands at <strong>37.7</strong> — weak but not oversold. The 10-month moving average is about 8,623p, above the current price: the downtrend that began in early 2025 has not been broken, even after a record half-year.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Nov 2021</div><div class="tl-content"><div class="tl-title">Window low — 6,502p</div><div class="tl-desc">Ten months after the Refinitiv deal closed. The lowest month-end of the five years.</div><div class="tl-impact down">5-year low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2022</div><div class="tl-content"><div class="tl-title">Microsoft partnership — 7,136p</div><div class="tl-desc">On December 12, 2022 LSEG and Microsoft announced a ten-year partnership to move LSEG's data platform onto Azure and build products together, with Microsoft buying about 4% of LSEG. The shares rose 3.0% that day (7,406p → 7,626p), though December as a whole was the window's worst month at the time, −13.5%.</div><div class="tl-impact up">+3.0% on the day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2025</div><div class="tl-content"><div class="tl-title">Peak — 12,035p, RSI 90.6</div><div class="tl-desc">The top of a run from 8,846p in April 2024 (+36% in nine months). The highest daily close in the window was 12,095p on February 5, 2025.</div><div class="tl-impact up">Peak of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2025</div><div class="tl-content"><div class="tl-title">H1 2025 results day — 9,260p (−7.9% on the day)</div><div class="tl-desc">The shares fell from 10,055p to 9,260p on July 31, 2025. A year later Schwimmer dated "the first wave of perceived AI disruption" to that summer. The month closed down 12.9%.</div><div class="tl-impact down">−12.9% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2025</div><div class="tl-content"><div class="tl-title">Most oversold — 8,516p, RSI 18.8</div><div class="tl-desc">The end of a three-month, 20% slide from June. October then brought a 7.2% one-day rise on the Q3 2025 trading update (8,720p → 9,346p, October 23).</div><div class="tl-impact neutral">RSI low of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 2026</div><div class="tl-content"><div class="tl-title">−12.8% in a day, then +9.1% — month-end 8,860p</div><div class="tl-desc">February 3 was the worst day in the five-year window (8,234p → 7,180p), and the 7,170p close the next day is the 52-week low. FY2025 results and the £3B buyback plan on February 26 brought the largest daily gain since March 2022.</div><div class="tl-impact neutral">+9.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2026</div><div class="tl-content"><div class="tl-title">Record Q1 — 9,550p</div><div class="tl-desc">The Q1 trading update (April 23) reported 9.8% organic growth and Markets up 15.5%; the shares rose 0.7% on the day and the month 7.7%. The 9,992p close on April 24 is the 52-week high.</div><div class="tl-impact up">+7.7% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 2026</div><div class="tl-content"><div class="tl-title">Record half, guidance raised — shares down 6.4% on the day</div><div class="tl-desc">The July 30 print beat on every headline measure management guides to and the stock still fell, closing the month at 8,398p after a 9,198p close the day before results.</div><div class="tl-impact down">−8.7% over two sessions</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2, 2026</div><div class="tl-content"><div class="tl-title">Settled close — 8,090p</div><div class="tl-desc">September fell 9.3% (9,000p → 8,160p) with the company buying back about 600,000 shares a week. The price is 32.8% below the January 2025 peak and 13.9% above where the window began.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Against the <strong>FTSE 100</strong>, LSEG has underperformed by about 30 percentage points in price over five years (+13.9% against +44.5%) and by about 15 points in 2026 to date (−9.6% against +5.3%). FTSE Russell's own factsheet puts the FTSE 100's five-year <em>total</em> return, with dividends reinvested, at 85.5% to August 28, 2026. Among the global listed peers, the October 2 market values are S&amp;P Global $113.86B, CME Group $94.62B, Intercontinental Exchange $84.29B and MSCI $38.96B, against LSEG's $51.52B — a company with H1 2026 adjusted EBITDA of £2,527M is valued at less than half of S&amp;P Global.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 17.7x trailing adjusted earnings and 16.8x this year's consensus for a business that has just raised its revenue and margin guidance, grows subscriptions at 6.3% with retention improving to 92.8%, converts profit into cash (£2.7B of equity free cash flow, a 7.0% yield on the market cap) and is retiring shares fast — 510 million to 482 million in nine months. Its clearing, index and trading-venue businesses are network businesses that AI does not obviously touch, and together with FTSE Russell they are about half of income. If the AI fear turns out to be about the terminal alone, the market is pricing a whole-company problem for a problem in one line of one division, and the buyback is buying the gap at around 8,240–8,330p (daily averages in the week to September 25).</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The bear case does not dispute the half-year; it disputes the terminal value. Workflows, the desktop that justified the Refinitiv price, grew 2.7% in Q2, and its future depends on customers paying for AI features through price increases. The H1 margin leap was flattered by a SwapClear agreement that reverses in Q4 and by volatility-driven trading that management already says moderated in Q2. Leverage rose to 2.1x to fund buybacks, statutory ROE is 7.6% on a balance sheet carrying £31B of intangibles, and a Hold and a Sell appeared between the May and August editions of the company's own consensus. A stock that falls 6.4% on a record result and raised guidance is telling you the market wants evidence the next leg of growth is not just volatility.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">AI pressure on the Workspace business.</strong> Workflows is £980M a half and growing under 3%. If AI assistants reduce the number of people who need a terminal, or customers refuse to pay more for AI Search through the annual price review, the largest line in the largest division stalls — the outcome the bear case rests on.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Markets normalising.</strong> Markets grew 11.9% on volatile trading conditions management called exceptional, and its margin includes a SwapClear benefit that largely reverses in Q4 2026. Calmer markets would slow the 40% of income that has been doing the most to lift the group's growth rate.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Sterling strength and leverage.</strong> 58% of income is in dollars, and a 10-cent fall in the dollar against the pound cuts income by about 4% and EBITDA by about 4.5%. At 2.1x leverage after £2.1B of buybacks in six months, the room to keep buying back stock while absorbing a currency or volume shock is narrower than it was at 1.8x.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">AI and the "terminal value debate" for data vendors</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">CRITICAL QUESTION</span></div>
+    <p class="biz-desc">Schwimmer framed it himself on July 30: the market "has been debating these topics in great detail for the last 12 months." The bear argument is that AI models will let customers get what they used to pay a terminal for more cheaply. LSEG's counter has three parts: its data is real-time or proprietary and AI models need licensed, auditable inputs; it is selling that data through every AI platform rather than defending one screen; and it has a price list for AI use — a recurring licence to use data sets with AI models, a recurring MCP access charge with usage bands to come, and fair-use limits on Workspace AI with charges above them. The evidence so far supports the data side (Data &amp; Feeds accelerating to 7.7%, API usage of Tick History up 48%) and leaves the terminal side open (Workflows 2.7%). MCP revenue, by the CFO's own account, "won't move the needle in 2026."</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">A volatility dividend for exchanges and clearers</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">CYCLICAL TAILWIND</span></div>
+    <p class="biz-desc">Volatile markets in 2026 lifted every venue LSEG runs: Tradeweb volume up 24.8%, UK equities value traded up 33.5%, SwapClear client trades up 23.8%, ForexClear notional up 45.2%, and higher cash collateral balances pushed net treasury income up 12.6%. It is also the part of LSEG's growth least under management's control, and the half-year report already describes Q2 volumes as moderating from an exceptional Q1. Structural projects — LSE 24, the Private Securities Market (first transactions in H1), digital settlement through LSEG DiSH and the DIGIT gilt pilot — are LSEG's attempt to add volume that does not depend on volatility.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Buybacks at a discount — the bull and bear framing</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">CAPITAL RETURN</span></div>
+    <p class="biz-desc">LSEG's buybacks have stepped up: £2.1B of buybacks in 2025, £2.1B more in H1 2026 at an average £88.39, and up to £1.35B to come by February 2027, funded partly by taking leverage from 1.8x to 2.1x. <strong>The bull framing:</strong> management knows the order book, retention and cash flow better than anyone, called the share price a "dislocation," and is now buying at about 17.7x trailing adjusted earnings — 5.4% of the share count gone since end-2025 (510M → 482.46M), with each pound of future cash flow spread across fewer shares. <strong>The bear framing:</strong> the H1 buyback averaged £88.39 and the shares now trade at £80.90, so the first £2.1B was bought about 9% above today's price; a company confident about AI could also have spent that money on proving it. The deciding evidence will not be the buyback but the next four quarters of Workflows growth and gross sales.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, October 2, 2026 (London Stock Exchange close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>Yahoo Finance LSEG.L daily rows</strong> (query1.finance.yahoo.com chart API) — the October 2, 2026 settled close of 8,090p (open 8,114p, high 8,164p, low 8,020p, volume 1,009,232), −0.37% on the prior close of 8,120p. Prices are in pence sterling (GBp). The USD market value uses the Yahoo Finance GBPUSD=X daily close for October 2, 2026 (1.3200) and the 482,457,344 voting shares in LSEG's Total Voting Rights announcement for September 30, 2026; it is our calculation.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: LSEG Interim Report H1 2026 and results presentation (July 30, 2026) and the H1 2026 analyst call transcript for results, segments, KPIs, guidance, balance sheet, cash flow, buybacks, the Microsoft and Reuters commitments and all quotations; LSEG Preliminary Results 2025 (February 26, 2026) and Q1 2026 Trading Update (April 23, 2026); LSEG Annual Report 2025 for employees, substantial shareholders, Tradeweb ownership and FTSE 100 membership; LSEG's investor-relations financial calendar for the Q3 trading statement date; LSEG's executive-team and history pages for management biographies and company history; LSEG's December 12, 2022 Microsoft partnership announcement; LSEG regulatory announcements via Investegate (Total Voting Rights, buyback commencement and transactions in own shares, LSE 24, board appointment, BlackRock TR-1); LSEG's company-compiled analyst consensus of May 8 and August 13, 2026 for ratings, targets and estimates; MarketBeat's LSEG ratings table (read October 5, 2026; actions shown are dated July 31 – August 7, 2026 and April 10, 2026) for individual broker actions; FTSE Russell's FTSE 100 factsheet (data as at August 28, 2026) for the index dividend yield and total return; Yahoo Finance for LSEG, FTSE 100 and peer closing prices; stockanalysis.com for peer shares outstanding.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from October 2021 through September 2026 (Yahoo Finance LSEG.L, each checked against the last daily close of its month), plus the October 2, 2026 settled close. Closes are in pence and are not adjusted for dividends; LSEG had no share splits in the window. Peer market values are each company's October 2, 2026 close × shares outstanding per stockanalysis.com, in US dollars — our calculation. TTM figures combine FY2025 and the two half-years as stated in each row. Growth rates labelled organic are LSEG's organic constant-currency measures; adjusted figures are LSEG's non-IFRS measures, which exclude amortisation of acquired intangibles and other non-underlying items.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and consensus figures are third-party analysts' estimates compiled by the company, not the company's own forecasts. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Oct 2021 → Sep 2026 (Yahoo Finance LSEG.L, pence, not dividend-adjusted) + Oct 2, 2026 settled close =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26','Oct 2 26'];
+const prices = [7100,6502,6930,7220,6574,7966,7916,7402,7632,7998,8102,7628,7566,8248,7136,7406,7432,7868,8346,8550,8366,8462,8178,8234,8280,8906,9274,8942,8876,9490,8846,9162,9400,9470,10250,10220,10515,11270,11285,12035,11845,11460,11625,11275,10635,9260,9168,8516,9486,8908,8952,8122,8860,8864,9550,9022,8162,8398,9000,8160,8090];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 1,  label: 'Nov 2021 — window low 6,502p',                                 color: '#ef4444' },
+  { idx: 14, label: 'Dec 2022 — Microsoft 10-year partnership (Dec 12); 7,136p',    color: '#3b82f6' },
+  { idx: 39, label: 'Jan 2025 — peak month-end 12,035p, RSI 90.6',                  color: '#22c55e' },
+  { idx: 45, label: 'Jul 2025 — H1 2025 results day −7.9%; 9,260p',                 color: '#ef4444' },
+  { idx: 47, label: 'Sep 2025 — most oversold, RSI 18.8; 8,516p',                   color: '#f59e0b' },
+  { idx: 52, label: 'Feb 2026 — −12.8% on Feb 3; FY25 results +9.1% on Feb 26',     color: '#f59e0b' },
+  { idx: 54, label: 'Apr 2026 — record Q1; 9,550p',                                  color: '#22c55e' },
+  { idx: 57, label: 'Jul 2026 — record H1, guidance raised; −6.4% on Jul 30',        color: '#ef4444' },
+  { idx: 60, label: 'Oct 2, 2026 — settled close 8,090p',                            color: '#2EC4B6' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,196,182,0.22)');
+grad.addColorStop(1, 'rgba(46,196,182,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EC4B6', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EC4B6'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(0) + 'p'); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return v + 'p'; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

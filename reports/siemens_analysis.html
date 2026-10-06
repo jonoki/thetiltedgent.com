@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIE.DE — Siemens AG | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #00B3B3;
+  --accent-dim: #00B3B333;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 2, 2026 (Friday Xetra settled close) — prices, metrics, and analyst targets will not update automatically. Price, chart and per-share figures are in euros (EUR); market cap is also shown in USD.
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SIE.DE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> Xetra / Frankfurt · quoted in EUR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Industrials / Conglomerates</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> <span title="767.99M shares outstanding (StockAnalysis, read October 5, 2026) × €276.10 close = €212.04B; × $1.1225 per € (ECB euro reference rate, October 2, 2026) = $238.02B. Our calculation.">$238.02B</span> <span style="color:var(--text-dim);">(€212.04B)</span></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index membership:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">DAX 40</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">EURO STOXX 50</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">US ADR: SIEGY (2 ADRs = 1 share)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Siemens AG</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">276.10 <span style="font-size:20px;color:var(--text-muted);">EUR</span></div>
+      <div class="price-change" style="color:var(--green);">+€4.20 (+1.54%)</div>
+      <div class="price-date">Close, Friday October 2, 2026 · Xetra settled close</div>
+      <div class="price-date">Previous close €271.90 (October 1, 2026)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Werner-von-Siemens-Strasse 1, Munich, Germany</div>
+    <div class="meta-item"><span>Employees:</span> ~317,000 (Jun 30, 2026)</div>
+    <div class="meta-item"><span>Founded:</span> 1847, Berlin (listed since 1899)</div>
+    <div class="meta-item"><span>Fiscal year:</span> Oct 1 – Sep 30</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 12, 2026 (Q4 FY2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Siemens is Europe's industrial technology heavyweight: factory automation and the software that designs and runs factories, the electrical gear inside buildings, power grids and data centers, trains and rail signalling, and — through its listed subsidiary Siemens Healthineers — medical imaging and diagnostics. Founded by Werner von Siemens in Berlin in 1847, it is a DAX 40 and EURO STOXX 50 member. In fiscal 2025 (year to September 30, 2025) the group booked <strong>€78.9B of revenue</strong> and <strong>€10.4B of net income</strong>, with basic <span class="tip" title="Earnings Per Share — net income attributable to shareholders divided by the average number of shares outstanding.">EPS</span> of <strong>€12.25</strong>. Over the last twelve months to June 30, 2026, revenue was <strong>€81.1B</strong>; the U.S. supplied 28% of nine-month fiscal 2026 revenue, Germany 15% and China 9%.</p>
+  <p class="prose" style="margin-top:16px;">The story right now has two halves. The operating half is strong: the quarter to June 30, 2026 brought <strong>record orders of €27.9B</strong> (+14% on a <span class="tip" title="Comparable growth strips out currency moves and acquisitions or disposals, so it measures the underlying business.">comparable basis</span>), a <span class="tip" title="Book-to-bill: new orders divided by revenue in the period. Above 1.0 means the order book is growing.">book-to-bill</span> of 1.34, a record €132B order backlog and a raised full-year EPS outlook. Data-center customers are the hottest pocket: Smart Infrastructure's data-center orders more than doubled to about €6B in the first nine months. The structural half is a break-up in slow motion. Siemens spun off Siemens Energy in 2020 and has since sold down to a <strong>4.98% stake</strong> (September 8, 2026); it owns about <strong>67% of Siemens Healthineers</strong> and plans to hand 30% of Healthineers' shares directly to its own shareholders, subject to a vote at the February 2027 annual meeting. What is left is meant to be a focused automation, software and electrification company. The stock has re-rated accordingly — up <strong>96.8%</strong> from the October 2021 month-end close to <strong>€276.10</strong> — and now trades at <strong>27.0x trailing earnings</strong>, so the question is how much of that focus is already in the price.</p>
+  <p class="prose" style="margin-top:16px;"><strong>Since the August print.</strong> The record quarter still sent the shares down <strong>4.5%</strong> on results day (€285.95 → €273.10, Xetra closes); they recovered 2.5% the next session. Brokers read the numbers as a beat — BofA raised its price objective on August 7, citing a fiscal Q3 beat and the upgraded outlook (MT Newswires) — but the research house Alphavalue headlined its results-day note "Order beat largely discounted, raised outlook not enough to sustain current valuations". In a Börsen-Zeitung interview reported by Reuters on September 29, CFO Veronika Bienert said Siemens was seeing a slight improvement in its operating conditions, with semiconductors, aviation and defence growing above average while car makers stayed subdued and energy-intensive industries such as chemicals held back on investment, and said she was confident of meeting the targets given to the market. Mobility added two large rail awards on September 22, and the share buyback launched on July 1 had bought back 3,931,057 shares by September 27.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">President &amp; Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Roland Busch</div>
+      <div class="card-note">Named as President and CEO in the Q3 FY2026 release (August 6, 2026). His framing of the quarter: "Our technological leadership in all businesses, clear focus on industrial AI, and strong positioning in attractive markets are driving our profitable growth." The company calls its current programme "ONE Tech Company".</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Veronika Bienert</div>
+      <div class="card-note">CFO per the August 6, 2026 release; Ralf P. Thomas was CFO for the fiscal 2025 results release in November 2025. Bienert owns the cash story — "we once again aim to achieve a double-digit free-cash-flow return on revenue" — and the Healthineers spin-off mechanics: binding tax rulings received, so "we can proceed with the spin-off of Siemens Healthineers as planned."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">The two listed relatives</div>
+      <div class="card-value" style="font-size:20px;">~67% / 4.98%</div>
+      <div class="card-note"><strong>Siemens Healthineers:</strong> about 67% owned (Siemens release, November 12, 2025) and fully consolidated as a reporting segment. <strong>Siemens Energy:</strong> spun off in 2020; Siemens AG's voting stake fell to 14.96% in January 2025 (Dow Jones) and to 4.98% on September 8, 2026, per Siemens Energy's voting-rights notice, below the 5% reporting threshold.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Siemens reports four industrial segments — <strong>Digital Industries, Smart Infrastructure, Mobility and Siemens Healthineers</strong> — plus a financing arm, Siemens Financial Services. The mix below is <strong>revenue for the first nine months of fiscal 2026</strong> (October 1, 2025 to June 30, 2026), from the Q3 FY2026 earnings release; the four segments total €58.2B of the group's €59.7B (the rest is financial services and eliminations). Growth figures are comparable (excluding currency and portfolio effects); margins are segment profit over revenue.</p>
+  <div class="seg-bar">
+    <div style="flex:30.7;background:#00B3B3;">SMART INFRA 30.7%</div>
+    <div style="flex:28.9;background:#a78bfa;">HEALTHINEERS 28.9%</div>
+    <div style="flex:24.2;background:#22c55e;">DIGITAL IND. 24.2%</div>
+    <div style="flex:16.2;background:#f59e0b;">MOBILITY 16.2%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#00B3B3;"></span> Smart Infrastructure — €17,849M (9M FY26), +11% comp.</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Siemens Healthineers — €16,846M, +3% comp.</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Digital Industries — €14,083M, +9% comp.</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Mobility — €9,454M, +4% comp.</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Note what the bar implies for 2027: if the Healthineers spin-off goes ahead and Siemens drops to a minority stake, the purple slice — 29% of segment revenue — leaves the consolidated accounts, and Smart Infrastructure's share of the remaining segment revenue rises to about 43%, against about 34% for Digital Industries.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #00B3B3;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Smart Infrastructure</div>
+        <span class="biz-badge growth">FASTEST ORDER GROWTH</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€17,849M</div><div class="biz-stat-label">9M Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+11%</div><div class="biz-stat-label">Comp. Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">19.2%</div><div class="biz-stat-label">9M Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Electrification (switchgear and grid equipment), electrical products and building technology. This is where the AI build-out shows up in Siemens' numbers: in Q3 FY2026 orders jumped <strong>42% comparable to €8.0B</strong>, a quarterly record, as the electrification and electrical-products businesses won large contracts from data-center customers in the U.S. and Europe; revenue rose 13% to €6.4B and the margin reached <strong>20.0%</strong>. Management raised the segment's fiscal 2026 guidance to 10–11% comparable revenue growth and an 18.5–19.5% margin. U.S. tariff refunds also helped the quarter's profit, partly offset by an impairment in the electric-vehicle charging business.</p>
+    <div class="biz-tam"><strong>Key figure:</strong> data-center orders of about €6B in 9M FY2026, triple-digit growth (Q3 FY2026 release)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Schneider Electric</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+21.0%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">Paris</div><div class="comp-bubble-label">Listing</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">ABB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+40.4%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">SIX Swiss</div><div class="comp-bubble-label">Listing</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Eaton</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+15.8%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">NYSE</div><div class="comp-bubble-label">Listing</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Siemens Healthineers</div>
+        <span class="biz-badge emerging">SPIN-OFF PLANNED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€16,846M</div><div class="biz-stat-label">9M Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+3%</div><div class="biz-stat-label">Comp. Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.5%</div><div class="biz-stat-label">9M Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">28.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Medical imaging, diagnostics and precision therapy, listed separately since March 2018 and about 67% owned by Siemens. In Q3 FY2026 orders rose 15% comparable to €6.9B and revenue 3% to €5.8B; imaging and precision therapy grew while diagnostics shrank, partly because of what the release calls a structural change in the Chinese market. Profit jumped 28% to €1,047M, helped mainly by U.S. tariff refunds — a one-off, not a run-rate. In November 2025 Siemens said it would give up control by spinning off 30% of Healthineers' shares to Siemens shareholders, keeping a significant minority that it aims, over the medium term, to reduce to a financial asset; on April 17, 2026 it set the shareholder vote for the February 2027 annual meeting, with Siemens shareholders receiving Healthineers shares directly under the German Transformation Act.</p>
+    <div class="biz-tam"><strong>Key figure:</strong> Q3 FY2026 segment profit €1,047M, margin 18.2% (Q3 FY2025: €821M, 14.5%)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">GE HealthCare</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">−16.3%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">Nasdaq</div><div class="comp-bubble-label">Listing</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Philips</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">−13.9%</div><div class="comp-bubble-label">1Y Price (NYSE)</div></div><div><div class="comp-bubble-val">NYSE / Amsterdam</div><div class="comp-bubble-label">Listing</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Digital Industries</div>
+        <span class="biz-badge dominant">AUTOMATION + SOFTWARE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€14,083M</div><div class="biz-stat-label">9M Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+9%</div><div class="biz-stat-label">Comp. Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">18.3%</div><div class="biz-stat-label">9M Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">24.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Factory automation hardware plus industrial software — the tools engineers use to design chips, products and plants, and the controllers that run the production lines. It is also the most cyclical piece: revenue fell 4% in fiscal 2025 (€17.8B versus €18.5B), then recovered. In Q3 FY2026 revenue rose 10% comparable to €4.9B, the software business grew 15% to €1.8B (36% of the segment), organic <span class="tip" title="Annual recurring revenue — the yearly value of subscription and recurring software contracts.">ARR</span> grew 11% to €5.7B, and profit jumped 44% to €923M for an 18.7% margin, even after €35M of integration costs for the Altair and Dotmatics software acquisitions. Fiscal 2026 guidance: 7–10% comparable growth and a 17–19% margin.</p>
+    <div class="biz-tam"><strong>Key figure:</strong> Siemens' digital business grew 18% in 9M FY2026, versus a 15% target set in November 2025</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Rockwell Automation</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+30.3%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">NYSE</div><div class="comp-bubble-label">Listing</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Schneider Electric</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+21.0%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">Paris</div><div class="comp-bubble-label">Listing</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">ABB</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">+40.4%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">SIX Swiss</div><div class="comp-bubble-label">Listing</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Mobility</div>
+        <span class="biz-badge emerging">LOW MARGIN, BIG BACKLOG</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€9,454M</div><div class="biz-stat-label">9M Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">+4%</div><div class="biz-stat-label">Comp. Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">8.2%</div><div class="biz-stat-label">9M Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">16.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Trains, rail signalling and rail infrastructure, plus long-term maintenance contracts. Orders come in large, lumpy awards: Q3 FY2026 brought €7.6B, including €2.2B for double-deck trains in Switzerland, €2.0B for extended maintenance in the U.K. and €0.6B for servicing battery-powered trains in Germany — more than twice the quarter's €3.2B of revenue. Profitability is the weak point at 8.6% in the quarter, roughly half the group's industrial margin. In May 2026 Mobility agreed to buy several businesses from Italy's MERMEC Group to strengthen diagnostics and signalling, with closing expected by the end of calendar 2026. Fiscal 2026 guidance: 5–7% comparable growth, 8–10% margin. After the quarter, on September 22, Siemens Mobility took about €1.3B as its share of a €2.6B framework agreement from Austrian Federal Railways (ÖBB) for digital interlockings, split with Hitachi Rail, with a first pilot due in 2030, and signed a contract worth up to €1B with VinSpeed to supply trains for two high-speed lines in Vietnam (Reuters).</p>
+    <div class="biz-tam"><strong>Key figure:</strong> Q3 FY2026 orders €7.6B against revenue of €3.2B</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Alstom</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">−33.1%</div><div class="comp-bubble-label">1Y Price</div></div><div><div class="comp-bubble-val">Paris</div><div class="comp-bubble-label">Listing</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:8px;font-size:13px;">Peer bubbles show each stock's price change from its October 2, 2025 close to its October 2, 2026 close in its own trading currency (Yahoo Finance daily rows). Siemens over the same window: <strong>+14.5%</strong>.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that matter</h3>
+  <p class="prose">For a business that builds to order, the order book leads revenue by quarters or years. Judge Siemens on <strong>orders</strong>, on the <strong>industrial margin</strong>, and on <strong>cash</strong>.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Order Backlog</div>
+      <div class="card-value">€132B</div>
+      <div class="card-note">A record at June 30, 2026 — about 1.6 years of trailing revenue (€81.1B). Q3 book-to-bill was <strong>1.34</strong> and nine-month orders reached €73.4B, up 14% comparable.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Industrial Business Margin</div>
+      <div class="card-value">17.3%</div>
+      <div class="card-note">Q3 FY2026, up from 14.9% a year earlier, on record profit of €3.52B (+25%). Nine-month margin 16.1% versus 15.4%. Part of the jump came from U.S. tariff refunds, mostly at Healthineers.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow (TTM)</div>
+      <div class="card-value">€11.85B</div>
+      <div class="card-note">Q4 FY2025 €5.31B plus 9M FY2026 €6.54B (continuing and discontinued operations, company definition: operating cash flow minus capital spending). Q3 alone was €4.15B, up 42%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Headcount</div>
+      <div class="card-value">~317,000</div>
+      <div class="card-note">At June 30, 2026, against about 318,000 at September 30, 2025 — 86,000 in Germany. Revenue grew while headcount held flat.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">€132B order backlog</span>
+    <span class="moat-pill">Automation + design software in one stack</span>
+    <span class="moat-pill">€5.7B recurring software revenue</span>
+    <span class="moat-pill">Grid &amp; data-center electrification</span>
+    <span class="moat-pill">Long-term rail service contracts</span>
+    <span class="moat-pill">Global installed base</span>
+    <span class="moat-pill">Industrial net debt 0.6x EBITDA</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>breadth plus lock-in</strong>. A factory that is designed in Siemens software, controlled by Siemens automation and powered through Siemens switchgear has a single vendor at three layers, and replacing any of them means re-engineering and downtime. The software piece is the newest and most valuable layer: €5.7B of recurring revenue growing 11% organically, extended by the Altair and Dotmatics acquisitions (net cash spent on acquisitions was €9.97B in the first nine months of fiscal 2025). The backlog quantifies the rest — €132B of signed work, much of it multi-year rail and grid projects. The weakness of breadth is that it is also a conglomerate, and the market has historically priced conglomerates below the sum of their parts; the Siemens Energy exit and the Healthineers spin-off are management's answer to that.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Automation is cyclical.</strong> Digital Industries revenue fell 4% in fiscal 2025 and segment profit dropped from €3.50B to €2.64B. The recovery in fiscal 2026 is real (+9% comparable over nine months) but it is a cycle, and the short-cycle automation business drove much of Q3's order growth.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Data-center concentration.</strong> Smart Infrastructure's 42% comparable order jump in Q3 was driven by large data-center contracts in the U.S. and Europe. That is the strongest growth engine in the group, and it depends on a capital-spending cycle that Siemens does not control.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Mobility's margin.</strong> At 8.2% for nine months, rail earns roughly half the margin of the rest of the industrial business. Its large multi-year orders lock in revenue but also lock in execution risk on long projects.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Currency and trade.</strong> The U.S. supplied 28% of nine-month revenue. Currency translation took one percentage point from both order and revenue growth in Q3, and U.S. tariff refunds flattered profit in the same quarter — trade policy moves the numbers in both directions.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">All figures in euros under IFRS. TTM means the four quarters to June 30, 2026 (Q4 FY2025 plus the first nine months of FY2026), built from Siemens' Q4 FY2025 and Q3 FY2026 earnings releases. The benchmark is Siemens' home index, the <strong>DAX 40</strong> (Yahoo Finance ^GDAXI daily closes); the DAX is a performance index, so its returns include reinvested dividends. Price-return comparisons use the same October 2, 2025 → October 2, 2026 window. Industry-average and DAX valuation ratios are shown as "—".</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SIE</th><th>Industry Avg</th><th>DAX 40</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many euros you pay for one euro of past-year profit.">Trailing P/E</span></td><td>27.0</td><td>—</td><td>—</td><td>€276.10 ÷ €10.21 TTM basic EPS = 27.04. On diluted EPS (€10.11) it is 27.3.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by expected earnings per share for the next fiscal year.">Forward P/E</span></td><td>21.3</td><td>—</td><td>—</td><td>€276.10 ÷ €12.94 consensus EPS for FY2027 (year to Sep 2027), StockAnalysis, read October 5, 2026; the estimates are on Siemens' EPS pre PPA basis (StockAnalysis sets FY2026's €11.45 against FY2025's €12.95, which is EPS pre PPA). On management's FY2026 guidance midpoint (€11.35 EPS pre PPA, which excludes acquisition-accounting amortisation) it is 24.3.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>10.21 EUR</td><td>—</td><td>—</td><td>Basic, net income attributable to shareholders: Q4 FY2025 €2.07 + 9M FY2026 €8.14. Lower than fiscal 2025's €12.25 because that year included the gain on the Innomotics sale.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+3.6%</td><td>—</td><td>—</td><td>TTM €81.1B vs €78.3B. Reported growth is held back by currency; Q3 FY2026 was +7% nominal and <strong>+8% comparable</strong>. FY2026 guidance: 6–8% comparable.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of producing it, as a percentage of revenue.">Gross Margin</span></td><td>39.4%</td><td>—</td><td>—</td><td>TTM gross profit €31.9B on €81.1B revenue. Q3 FY2026 alone: 40.9%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income attributable to shareholders as a percentage of revenue.">Net Profit Margin</span></td><td>9.8%</td><td>—</td><td>—</td><td>TTM net income attributable to Siemens shareholders €7.95B. Industrial Business profit margin, the company's own yardstick: 16.1% for nine months, 17.3% in Q3.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>1.94%</td><td>—</td><td>—</td><td>€5.35 per share for fiscal 2025, paid in February 2026, on €276.10. That is 44% of fiscal 2025 basic EPS. The dividend has risen every year from €4.00 for fiscal 2021.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by total shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.66</td><td>—</td><td>—</td><td>€49.9B total debt against €75.2B equity at June 30, 2026. That debt includes funding for the Siemens Financial Services lending book; the company's own measure, industrial net debt, was €9.34B, 0.6x EBITDA.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>1.44</td><td>—</td><td>—</td><td>€65.1B current assets over €45.1B current liabilities, June 30, 2026.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash available for dividends, buybacks and debt repayment.">Free Cash Flow</span></td><td>€11.85B</td><td>—</td><td>—</td><td>TTM, company definition. A 5.6% free-cash-flow yield on the €212.0B market cap. Cash from operations €14.34B less €2.49B of capital spending.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — profit generated per euro of owner capital.">ROE</span></td><td>12.2%</td><td>—</td><td>—</td><td>Our calculation: TTM attributable net income €7.95B over average shareholders' equity of €65.3B (Sep 30, 2025 and Jun 30, 2026).</td></tr>
+      <tr><td><span class="tip" title="Return on Capital Employed — Siemens' own measure of profit relative to the capital tied up in the business.">ROCE</span></td><td>13.9%</td><td>—</td><td>—</td><td>Company figure for 9M FY2026 (19.9% a year earlier, which included the Innomotics gain); 14.8% in Q3.</td></tr>
+      <tr><td>1-Year Price Change</td><td>+14.5%</td><td>—</td><td>+3.3%</td><td>€241.20 on October 2, 2025 → €276.10. The DAX went from 24,422.56 to 25,231.20 over the same window, with dividends reinvested.</td></tr>
+      <tr><td>5-Year Change</td><td>+96.8%</td><td>—</td><td>+60.8%</td><td>From the October 29, 2021 close (€140.28). With dividends (Yahoo's dividend-adjusted close) Siemens returned about <strong>+124%</strong>, against the DAX's +60.8% total return (15,688.77 → 25,231.20).</td></tr>
+      <tr><td>52-Week Range</td><td>198.00 – 291.70 EUR</td><td>—</td><td>—</td><td>Intraday low on March 23, 2026 and high on August 28, 2026 (Yahoo Finance daily rows, Oct 3, 2025 – Oct 2, 2026). The close sits 5.3% below the high and 39.4% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three things distort the year-on-year comparisons. First, <strong>Innomotics</strong>: the sale of that business accounts for most of the €2.09B of discontinued-operations income in the first nine months of fiscal 2025, which is why nine-month net income fell 18% this year (€7.04B versus €8.55B) even as income from continuing operations rose 7%. Siemens says the Innomotics gain plus Altair and Dotmatics effects were worth €2.23 per share in fiscal 2025. Second, <strong>Q3 FY2026 gains</strong>: U.S. tariff refunds lifted profit, primarily at Healthineers; Siemens Financial Services booked a €156M gain on selling a stake in a U.K. equity investment; and divestment gains outside the industrial business were about €0.2B. Third, <strong>buybacks</strong>: Siemens spent €2.66B on its own shares in the first nine months of fiscal 2026 and cut its share count from 800 million to 782 million issued shares (as of March 3, 2026), so per-share figures grow faster than profit.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">24 analysts on StockAnalysis (read October 5, 2026; latest action October 2, 2026). MarketBeat's smaller panel for the U.S. ADR reads <strong>Hold</strong> (1 Strong Buy, 4 Buy, 5 Hold, 1 Sell, as of October 2, 2026).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">€305.69</div><div class="card-note"><span style="color:var(--green);">+10.7% upside</span> from €276.10. Median €310.00 (+12.3%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">€235 – €345</div><div class="card-note">−14.9% to +25.0% from the October 2 close.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">17 / 5 / 2</div><div class="card-note">14 Strong Buy + 3 Buy, 5 Hold, 2 Sell, 0 Strong Sell (StockAnalysis tally for September 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:70.8;background:#22c55e;"></div>
+    <div style="flex:20.8;background:#f59e0b;"></div>
+    <div style="flex:8.3;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 17 (70.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 5 (20.8%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (8.3%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Evercore ISI — Alexander Virgo</strong> · Downgrade to Hold from Outperform · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">€315</span> (Oct 2, 2026; StockAnalysis and MarketBeat ratings tables). The stock rose 1.5% that day.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Deutsche Bank — Gael De-Bray</strong> · Hold (maintained) · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">€270</span> (Oct 1, 2026). The only target in this list below the October 2 close (−2.2%).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">J.P. Morgan — Phil Buller</strong> · Buy (maintained) · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€345</span> (Sep 29, 2026; also reiterated Sep 24). The highest target on the StockAnalysis board.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS — Andre Kukhnin</strong> · Buy (reiterated) · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€330</span> (Sep 29, 2026).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Goldman Sachs — Daniela Costa</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€292 → €319</span> (Aug 20, 2026). Updated estimates for the third quarter and gave fiscal 2028 more weight in the valuation (dpa-AFX).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Berenberg — Richard Dawson</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€320 → €330</span> (Aug 18, 2026). Credited Smart Infrastructure's strong quarter for the raised guidance, and noted the market's disappointment that Digital Industries' targets were not raised as well (dpa-AFX).</div></div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Other moves since the August 6 print: RBC kept its Hold-equivalent rating with a €280 target (Aug 20), Erste Group upgraded Siemens to Strong Buy from Hold (Aug 27, per MarketBeat's ratings table), Bernstein reiterated Buy at €330 (Sep 14), and BofA raised its price objective on August 7 and again on September 8, citing a more constructive Smart Infrastructure outlook (MT Newswires).</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 FY2026 results and the fiscal 2027 outlook</div>
+        <div class="tl-desc">The full-year print against the raised guide (EPS pre PPA €11.20–11.50, 6–8% comparable revenue growth, book-to-bill above 1) — and, more important, the first fiscal 2027 targets. Brokers go in split: in notes on September 30, Metzler expected a strong fiscal fourth quarter and BofA a strong fiscal 2027 outlook (MT Newswires), while Evercore downgraded to Hold on October 2 and Deutsche Bank's €270 target sits below the price. Watch Digital Industries orders and whether the data-center wave keeps Smart Infrastructure's book-to-bill above 1.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 11, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Annual General Meeting (to be confirmed) — Healthineers spin-off vote</div>
+        <div class="tl-desc">Siemens' financial calendar lists Q1 FY2027 results and the AGM for this date, marked "tbc". The April 17, 2026 release set the February 2027 meeting for the vote on spinning off Healthineers shares directly to Siemens shareholders; Healthineers' own shareholders must also approve. In August the CFO said binding tax rulings had been received.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">By end-2026</div>
+      <div class="tl-content">
+        <div class="tl-title">MERMEC acquisition closing</div>
+        <div class="tl-desc">Mobility's purchase of several MERMEC Group businesses (rail diagnostics, measurement and signalling, with wider access to the Italian market) is expected to close by the end of calendar 2026, subject to customary conditions.</div>
+        <div class="tl-impact neutral">Portfolio</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Share buyback</div>
+        <div class="tl-desc">Siemens repurchased €2.66B of its own shares in the first nine months of fiscal 2026, and in August the CFO referred to the "newly launched share-buyback program". That programme started on July 1, 2026 and had bought back 3,931,057 shares on Xetra by September 27 (Siemens buyback notice of September 28). Issued shares fell from 800 million at fiscal 2025 year-end to 782 million.</div>
+        <div class="tl-impact up">Per-share tailwind</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 22, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Two large rail awards: Austria and Vietnam</div>
+        <div class="tl-desc">About €1.3B for Siemens Mobility as its share of a €2.6B ÖBB framework agreement for digital interlockings, shared with Hitachi Rail, with a pilot due in 2030; and a contract worth up to €1B with VinSpeed, the rail company founded by Vingroup's chairman, to supply trains for two high-speed lines in Vietnam (Reuters).</div>
+        <div class="tl-impact up">Mobility backlog</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Siemens Energy stake drops below 5%</div>
+        <div class="tl-desc">Siemens AG's voting stake in Siemens Energy (held via Siemens Beteiligungen Inland GmbH) fell from 5.54% to 4.98% — 42,896,843 voting rights — completing most of the exit from the business it spun off in 2020. With the stake under 5%, Siemens lost its entitlement to a supervisory-board seat; Reuters reported on September 24 that Matthias Rebellius, the last Siemens representative on that board, was leaving at the end of September.</div>
+        <div class="tl-impact neutral">Portfolio simplification</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 FY2026: record quarter, outlook raised — stock fell</div>
+        <div class="tl-desc">Record orders (€27.9B) and Industrial Business profit (€3.52B), EPS pre PPA guide raised to €11.20–11.50 from €10.70–11.10. The shares closed <strong>−4.5%</strong> that day (€285.95 → €273.10) while the DAX was flat (+0.05%), then recovered 2.5% the next session (€279.80). Berenberg later cited the market's disappointment that Digital Industries' targets were not raised alongside Smart Infrastructure's.</div>
+        <div class="tl-impact down">Reaction already happened: −4.5% on the day</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SIE.DE — Monthly Closes (EUR), Oct 2021 → Oct 2, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 Xetra month-end closes (Yahoo Finance, not dividend-adjusted) + Oct 2, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#00B3B3;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the October 2021 month-end close of <strong>€140.28</strong> to the October 2, 2026 close of <strong>€276.10</strong>, Siemens gained <strong>96.8% on price</strong>, and about <strong>124% with dividends</strong>. The path had three legs: a 2022 slide to the window's lowest month-end close, <strong>€97.09 in June 2022</strong> (−36.4% from the December 2021 close of €152.68); a long climb through 2023–2025, including the best month of the window (+23.2% in November 2023) and a +26.8% calendar 2025; and a violent 2026 — down 19.7% from January to a <strong>€205.70 close in March</strong>, then up 38.8% to the window's highest month-end, <strong>€285.60 in August</strong>.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI sits at <strong>61.7</strong>: positive momentum, not stretched. The extremes in the window were <strong>20.1 at the June 2022 low</strong> and <strong>88.5 in February 2025</strong>, during a 2025 in which seven of the first ten month-ends read above 70. The 10-month moving average is about <strong>€263.27</strong>, below the price, so the longer trend still points up even after September's 3.5% slip.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Jun 2022</div><div class="tl-content"><div class="tl-title">Lowest month-end — €97.09, RSI 20.1</div><div class="tl-desc">The worst month of the window (−20.7%) and the bottom of a 36% fall from December 2021. The DAX lost 11.2% the same month; Siemens fell almost twice as far.</div><div class="tl-impact down">−20.7% month · lowest month-end close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul–Oct 2023</div><div class="tl-content"><div class="tl-title">Second drawdown — €154.98 → €124.96</div><div class="tl-desc">A 19.4% slide over three months against a 10.0% fall in the DAX.</div><div class="tl-impact down">−19.4% in three months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 2023</div><div class="tl-content"><div class="tl-title">Best month of the window — €154.00 (+23.2%)</div><div class="tl-desc">The DAX rose 9.5% that month; Siemens more than doubled it and kept going to €169.92 by December.</div><div class="tl-impact up">+23.2% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Nov 13, 2025</div><div class="tl-content"><div class="tl-title">Fiscal 2025 results and the Healthineers plan — −9.3% on the day</div><div class="tl-desc">Record fiscal 2025 net income of €10.4B and a fiscal 2026 EPS pre PPA guide of €10.40–11.00, a day after Siemens announced plans to deconsolidate Healthineers. The stock closed at €227.00 from €250.40 while the DAX fell 1.4%.</div><div class="tl-impact down">−9.3% on the day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">2026 drawdown — €205.70 (−16.9% in a month)</div><div class="tl-desc">Down 19.7% from the January 2026 close of €256.30; the DAX lost 10.3% in March. The intraday 52-week low, €198.00, came on March 23.</div><div class="tl-impact down">−16.9% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2026</div><div class="tl-content"><div class="tl-title">Snap-back — €252.55 (+22.8%)</div><div class="tl-desc">Including a +10.2% session on April 8 (€210.00 → €231.50) when the DAX rose 5.1%. The stock gained in each of the next four months, to its window high in August.</div><div class="tl-impact up">+22.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Window high — €285.60 month-end</div><div class="tl-desc">The highest month-end close in the five years, despite the 4.5% drop on Q3 results day. The intraday 52-week high of €291.70 came on August 28.</div><div class="tl-impact up">Highest month-end</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2, 2026</div><div class="tl-content"><div class="tl-title">Settled close — €276.10</div><div class="tl-desc">+1.5% on the day of the Evercore downgrade; 3.3% below the August month-end and up 15.5% since the last close of 2025 (€239.15, December 30).</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Against its home market Siemens has been a clear outperformer. Over the year to October 2, 2026 the stock rose <strong>14.5%</strong> on price against <strong>3.3%</strong> for the DAX (which includes dividends) and 10.5% for the EURO STOXX 50 price index. Since the October 2021 month-end it has returned about <strong>124% with dividends</strong> against the DAX's <strong>60.8%</strong>. Year to date (from the December 30, 2025 close) it is up <strong>15.5%</strong> against the DAX's 3.0%. Among industrial peers the picture is more mixed: over the same twelve months ABB (+40.4%), Rockwell Automation (+30.3%) and Schneider Electric (+21.0%) all did better on price, Eaton (+15.8%) roughly matched it, and the rail and medtech comparisons — Alstom (−33.1%), GE HealthCare (−16.3%), Philips (−13.9%) — were far weaker. The market is paying up for automation and electrification and marking down rail and medtech, the two businesses Siemens is least focused on.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>Siemens is turning from a conglomerate into a focused industrial-tech company just as its best markets are booming. Smart Infrastructure's orders rose 42% comparable in Q3 on data-center demand, Digital Industries is recovering from its fiscal 2025 trough with software growing 15% and €5.7B of recurring revenue, the Industrial Business margin hit a record 17.3%, and the order backlog stands at €132B — 1.6 years of revenue. Free cash flow of €11.85B over twelve months funds a rising dividend and a buyback that has already cut the share count to 782 million issued shares. The Healthineers spin-off, with tax rulings now in hand, hands shareholders the medtech asset directly and leaves a cleaner, higher-margin core that peers such as Schneider and ABB suggest the market will reward.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>At 27x trailing earnings and 21x consensus fiscal 2027 EPS, the good news is in the price, and Evercore downgraded to Hold on October 2. The stock has nearly doubled in five years, the average target is only about 11% above the close, and the market's own verdict on Q3 — a record quarter with a raised outlook — was a 4.5% fall. Digital Industries is a cyclical business that shrank in fiscal 2025, the data-center order surge depends on other companies' capital budgets, Mobility earns half the group's industrial margin, and Q3 profit was flattered by tariff refunds and disposal gains. The spin-off still needs two shareholder votes, and removing Healthineers takes nearly 29% of segment revenue out of the consolidated group.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Valuation leaves little room for a soft fiscal 2027 guide.</strong> A 27.0x trailing P/E and Evercore's October 2 downgrade to Hold set up the November 12 outlook as the key test; Q3 showed the stock can fall on a record quarter.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Cycle exposure in automation and data centers.</strong> Digital Industries revenue fell 4% in fiscal 2025 and its profit by about a quarter; Smart Infrastructure's fastest growth comes from a concentrated set of data-center customers. A pause in either cycle hits the two highest-margin businesses at once.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Spin-off execution.</strong> The Healthineers separation is, in Siemens' own word, an "unprecedented" transaction structure, and it still needs approval by both companies' shareholders; in April final regulatory confirmation was outstanding, and in August the CFO said binding tax rulings had arrived. A delay would prolong the conglomerate structure the market is trying to price out.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Electrification for AI data centers</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">STRONG TAILWIND</span></div>
+    <p class="biz-desc">The AI build-out needs power before it needs chips: switchgear, transformers, busways and grid connections. Siemens' numbers show it directly. Smart Infrastructure's Q3 FY2026 orders rose 42% comparable to a record €8.0B on large data-center contracts in the U.S. and Europe, nine-month data-center orders more than doubled to about €6B, and management lifted the segment's growth and margin guidance. The same demand has re-rated the whole electrical-equipment group — ABB is up 40.4% and Schneider 21.0% over the year to October 2. The open question for every supplier is duration: orders this large are a capital-spending wave, and waves end.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Industrial software and the automation cycle</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">RECOVERING</span></div>
+    <p class="biz-desc">Factory automation had a downturn: Siemens' Digital Industries revenue fell 4% in fiscal 2025 and profit fell from €3.50B to €2.64B. Fiscal 2026 has brought a recovery, with nine-month comparable revenue growth of 9% and a Q3 margin of 18.7%, and Siemens has used the trough to buy more software — Altair and Dotmatics — so that a larger share of the segment earns recurring revenue (€5.7B ARR, +11% organic). Siemens says its digital business grew 18% in the first nine months, ahead of a 15% target. After Q3, Berenberg noted the market's disappointment that Digital Industries' targets were not raised alongside Smart Infrastructure's, and in late September the CFO still described car makers as subdued while semiconductors grew above average, so this is the line to watch in November.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #00B3B3;">
+    <div class="biz-header"><div class="biz-name">The European conglomerate break-up</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">STRUCTURAL SHIFT</span></div>
+    <p class="biz-desc">Siemens is the clearest case of a European industrial group simplifying itself: Healthineers listed in 2018, Siemens Energy spun off in 2020 and now below a 5% stake, Innomotics sold in fiscal 2025, and a Healthineers spin-off planned for 2027. <strong>The bull framing:</strong> each step removes a business the market valued poorly inside the group and leaves automation, software and electrification — the businesses with the highest margins — to be valued on their own. <strong>The bear framing:</strong> the re-rating has already happened. The stock has nearly doubled since 2021 and trades at 27x trailing earnings, and once Healthineers is gone the group gets smaller and more cyclical, not just more focused. The November 12 fiscal 2027 outlook is the first chance to see what the focused company is guided to earn.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, October 2, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: Yahoo Finance chart data for SIE.DE (Xetra, EUR) — the October 2, 2026 close of €276.10 (open 271.90, high 277.85, low 271.05, volume 1,298,968), +1.54% on the October 1 close of €271.90. Monthly closes: Yahoo Finance SIE.DE monthly series, cross-checked against the daily rows for the August and September 2026 month-ends (€285.60 and €275.50). Market cap: 767.99M shares outstanding (StockAnalysis ETR:SIE statistics) × €276.10, converted at the ECB euro reference rate for October 2, 2026 ($1.1225 per euro); Siemens had 782,000,000 shares in issue (Siemens investor relations, as of March 3, 2026), the difference being treasury shares.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Siemens Q3 FY2026 earnings release and press release (August 6, 2026) for quarterly and nine-month results, segment figures, balance sheet, cash flow, guidance, headcount and executive quotes; Siemens Q4 FY2025 earnings release (November 13, 2025) for fiscal 2025 and Q4 FY2025 figures; Siemens press releases of November 12, 2025 and April 17, 2026 on the Healthineers deconsolidation and spin-off timeline; Siemens investor relations (basic data and key share figures; financial calendar) for share count, index membership, ADR ratio, dividend history and event dates; Siemens company history page for the founding; Dow Jones via MarketScreener (January 30, 2025) and Siemens Energy's WpHG voting-rights notice for the September 8, 2026 threshold crossing (PTA, via finanznachrichten.de) for the Siemens Energy stake; Siemens Q1 FY2025 earnings release for the Innomotics gain; Siemens Healthineers (March 16, 2018) for its listing; StockAnalysis (ETR:SIE forecast and statistics, read October 5, 2026) for consensus rating, targets, estimates and the share count; MarketBeat (October 2, 2026) for the ADR analyst panel; StockAnalysis ratings table (ETR:SIE, read October 6, 2026) and MarketBeat (SIEGY) for the Evercore ISI, Deutsche Bank, J.P. Morgan, UBS, RBC, Bernstein and Erste Group actions; dpa-AFX and MT Newswires via MarketScreener for the Goldman Sachs and Berenberg target changes (August 20 and 18, 2026) and the BofA and Metzler notes; Alphavalue via MarketScreener (August 6, 2026) for its results-day headline; Reuters via MarketScreener (September 22, 24 and 29, 2026) for the ÖBB and VinSpeed rail awards, the Siemens Energy board exit and the CFO's Börsen-Zeitung interview; Siemens' share-buyback notice of September 28, 2026 (via MarketScreener) for the buyback count; Yahoo Finance daily data for the DAX (^GDAXI), EURO STOXX 50 and peer price changes; Wikipedia for the DAX's performance-index method.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 Xetra month-end closes from October 2021 through September 2026 (Yahoo Finance, split-adjusted closes, not dividend-adjusted; no splits in the window), plus a final point at the October 2, 2026 settled close of €276.10, two trading days into October. The "with dividends" returns use Yahoo's dividend-adjusted close. TTM figures are our sums of Q4 FY2025 and 9M FY2026 as reported. Peer price changes are in each stock's own trading currency and are not converted to euros.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and orders are contract value signed rather than revenue recognised. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 Xetra month-end closes Oct 2021 → Sep 2026 (Yahoo Finance SIE.DE close, EUR, not dividend-adjusted) + Oct 2, 2026 settled close =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26','Oct 2 26'];
+const prices = [140.28,141.28,152.68,139.88,126.66,125.66,117.78,122.44,97.09,108.54,101.08,101.20,110.64,131.22,129.64,142.90,144.70,149.26,148.90,153.34,152.54,154.98,138.88,135.66,124.96,154.00,169.92,166.68,182.94,176.96,175.90,176.26,173.72,169.42,169.92,181.34,178.40,183.16,188.56,207.45,221.20,211.90,201.95,211.80,217.65,224.90,236.60,229.20,245.55,228.30,239.15,256.30,247.40,205.70,252.55,269.80,281.15,282.65,285.60,275.50,276.10];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 2,  label: 'Dec 2021 — early high €152.68',                              color: '#22c55e' },
+  { idx: 8,  label: 'Jun 2022 — lowest month-end €97.09 (−20.7% month), RSI 20.1',   color: '#ef4444' },
+  { idx: 24, label: 'Oct 2023 — €124.96 after a 19.4% three-month slide',         color: '#ef4444' },
+  { idx: 25, label: 'Nov 2023 — best month of the window, +23.2% to €154.00',     color: '#22c55e' },
+  { idx: 49, label: 'Nov 2025 — FY2025 results, Healthineers plan; −9.3% on Nov 13', color: '#f59e0b' },
+  { idx: 53, label: 'Mar 2026 — €205.70 (−16.9% month)',                          color: '#ef4444' },
+  { idx: 54, label: 'Apr 2026 — snap-back to €252.55 (+22.8% month)',             color: '#22c55e' },
+  { idx: 58, label: 'Aug 2026 — Q3 record, outlook raised; window-high month-end €285.60', color: '#3b82f6' },
+  { idx: 60, label: 'Oct 2, 2026 — settled close €276.10',                        color: '#00B3B3' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(0,179,179,0.22)');
+grad.addColorStop(1, 'rgba(0,179,179,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#00B3B3', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#00B3B3'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': €' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '€' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

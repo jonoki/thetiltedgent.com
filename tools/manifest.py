@@ -66,7 +66,8 @@ def title_fields(t: str, warn: list[str]) -> tuple[str | None, str | None]:
         warn.append('title_unparsed')
     badge = re.search(r'<span class="ticker-badge">([^<]+)</span>', t)
     badge_ticker = badge.group(1).strip().split(':')[-1].strip() if badge else None
-    if badge_ticker and ticker and badge_ticker != ticker:
+    same = lambda a, b: rl.bare_ticker(a) == rl.bare_ticker(b)   # 'DTE' badge vs 'DTE.DE' title (non-US listings)
+    if badge_ticker and ticker and not same(badge_ticker, ticker):
         warn.append(f'ticker_badge_mismatch:{badge_ticker}')
     return ticker or badge_ticker, name
 
