@@ -36,7 +36,7 @@ YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B',   # slugs whose Yahoo symbol is 
                 'tencent': '0700.HK', 'samsung': '005930.KS', 'skhynix': '000660.KS', 'byd': '1211.HK',
                 'catl': '300750.SZ', 'xiaomi': '1810.HK', 'foxconn': '2317.TW', 'mediatek': '2454.TW',
                 'keyence': '6861.T', 'tokyoel': '8035.T', 'softbank': '9984.T', 'nintendo': '7974.T',
-                'hitachi': '6501.T', 'lvmh': 'MC.PA', 'nestle': 'NESN.SW', 'roche': 'ROG.SW', 'siemens': 'SIE.DE',
+                'hitachi': '6501.T', 'lvmh': 'MC.PA', 'nestle': 'NESN.SW', 'roche': 'ROP.SW', 'siemens': 'SIE.DE',
                 'hermes': 'RMS.PA', 'loreal': 'OR.PA', 'schneidr': 'SU.PA', 'airbus': 'AIR.PA', 'allianz': 'ALV.DE',
                 'rheinmtl': 'RHM.DE', 'inditex': 'ITX.MC', 'aramco': '2222.SR', 'reliance': 'RELIANCE.NS',
                 'cba': 'CBA.AX',
