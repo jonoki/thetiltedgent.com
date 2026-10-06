@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DBK.DE — Deutsche Bank AG | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 2, 2026 (Friday settled close, Xetra, in euros) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">DBK.DE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> Xetra (Frankfurt) · prices in EUR · also listed on the NYSE as DB</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Banks - Diversified</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> <span class="tip" title="1,911 million shares issued (Financial Data Supplement Q2 2026, June 30, 2026) × €30.94 close = €59.13B; × 1.1250 USD per EUR (Yahoo Finance EURUSD=X daily close, October 2, 2026) = $66.52B. Our calculation.">$66.52B (€59.13B)</span></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">DAX 40 constituent</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">ISIN DE0005140008</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">NYSE: DB $34.97 (Oct 2 close)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Deutsche Bank AG</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">30.94 <span style="font-size:20px;color:var(--text-muted);">EUR</span></div>
+      <div class="price-change" style="color:var(--red);">−€0.09 (−0.29%)</div>
+      <div class="price-date">Close, Friday October 2, 2026 · Xetra settled close, in euros</div>
+      <div class="price-date">Previous close €31.03 (October 1) · source: Yahoo Finance DBK.DE daily rows</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Frankfurt am Main, Germany</div>
+    <div class="meta-item"><span>Employees:</span> 89,742 full-time equivalent (Jun 30, 2026)</div>
+    <div class="meta-item"><span>Founded:</span> March 10, 1870, Berlin</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 28, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Deutsche Bank describes itself as "the leading bank in Germany with strong European roots and a global network". It runs four businesses: an <strong>Investment Bank</strong> (bond, currency and credit trading plus deal advice), a <strong>Private Bank</strong> (19 million Private Bank customers in Germany, per CEO Christian Sewing, plus wealth management), a <strong>Corporate Bank</strong> (payments, cash management and trade finance for companies) and <strong>Asset Management</strong> (DWS). In 2025 it earned net revenues of <strong>€32.1B, up 7%</strong>, and a record pre-tax profit of <strong>€9.7B, up 84%</strong>, and hit both 2025 targets it had set the market: a <span class="tip" title="Return on tangible equity: profit after tax (and after coupons on AT1 bonds) divided by shareholders' equity minus goodwill and other intangibles. The standard way to judge how hard a bank's capital is working.">RoTE</span> of 10.3% (target: above 10%) and a <span class="tip" title="Cost/income ratio: operating costs divided by revenue. Lower is better; 60% means 60 cents of every euro of revenue goes on costs before loan losses and tax.">cost/income ratio</span> of 64% (target: below 65%).</p>
+  <p class="prose" style="margin-top:16px;">The latest print kept that going. On <strong>July 29, 2026</strong> the bank reported a record second-quarter profit after tax of <strong>€1.9B (+10%)</strong>, net revenues of <strong>€8.5B (+9%)</strong> with growth in all four businesses, and diluted <span class="tip" title="Earnings per share: profit attributable to shareholders divided by the number of shares.">EPS</span> of <strong>€0.57 (+19%)</strong>. Reuters reported net profit attributable to shareholders of €1.64B against analysts' expectations of €1.38B, about 19% better, led by an Investment Bank whose revenue rose 19% against an expected 7.6%. First-half RoTE was <strong>11.9%</strong> and the <span class="tip" title="Common Equity Tier 1 ratio: the bank's highest-quality capital (mostly shareholders' equity) as a percentage of its risk-weighted assets. Regulators set minimums; the bank targets 13.5–14.0%.">CET1 ratio</span> 13.9%. The new plan, "Scaling the Global Hausbank" (November 2025), targets a RoTE above 13% and a cost/income ratio below 60% in 2028, and raised the share of profit paid out to shareholders from 50% to 60% from 2026. In the CEO's words on results day: "Looking ahead, the rapid evolution of AI gives us added scope to deliver value to clients and make additional cost savings, while positive trends are becoming clearer across our policy and regulatory landscape."</p>
+  <p class="prose" style="margin-top:16px;">The stock tells a two-part story. It rose from €11.146 at the end of October 2021 to a five-year-high month-end close of <strong>€34.66 in August 2026</strong>, nearly doubling in 2025 alone (+99.0%). Then September cost it 8.1%: on <strong>September 23</strong> CFO Raja Akram told a Bank of America conference that the Investment Bank's third-quarter revenue would probably be "flat to maybe slightly down", against what he called a record quarter a year earlier for fixed-income trading, and the shares fell 3.0% that day and 2.3% the next. At €30.94 the market values the bank at <strong>0.99x its tangible book value</strong> (€31.20 a share at June 30) and <strong>9.5x trailing earnings</strong>. The debate is whether a bank earning 11–12% on tangible equity, with management claiming "upside to our 2028 targets", deserves to trade above book — or whether a business that still leans on trading revenue deserves the discount.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Christian Sewing</div>
+      <div class="card-note">CEO since April 2018 and a Management Board member since January 1, 2015, per the bank's board page. He joined Deutsche Bank as an apprentice in 1989 and rose through Risk (Chief Credit Officer 2010–2012, Deputy Chief Risk Officer 2012–2013) and Group Audit. On the Q2 call he said of the new €500M buyback: "This is the first time we are executing a buyback from the current year's earnings - a clear sign of the earnings momentum and confidence we have built in the first half".</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Raja Akram</div>
+      <div class="card-note">Joined October 1, 2025 as CFO designate, joined the Management Board January 1, 2026 and took over as CFO on March 15, 2026, succeeding James von Moltke, CFO at the 2025 results. Previously Deputy CFO of Morgan Stanley and, before that, Controller and Chief Accounting Officer at Citigroup. He owns the capital message: "once we are sustainably above 14%, we would like to put excess distributions right at the top of the list" (Bank of America conference, September 23, 2026); the bank's September 30 key-updates note says he expects that to be beyond 2026.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Major Shareholders</div>
+      <div class="card-value" style="font-size:20px;">BlackRock 7.92%</div>
+      <div class="card-note">Voting-rights notifications listed on the bank's investor-relations site: <strong>BlackRock</strong> 7.92% of shares plus 0.23% through other instruments (8.14% of voting rights; threshold date January 19, 2026), <strong>Paramount Service Holding</strong> 4.91% (June 22, 2026) and <strong>Amundi</strong> 3.02% (June 8, 2026). 1,910.6 million shares at year-end 2025. No controlling shareholder.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">The mix below uses <strong>first-half 2026 net revenues</strong> (six months to June 30, 2026) from the bank's Q2 2026 results release and Financial Data Supplement. The four businesses total €16,971M of the group's €17,150M; the remaining €179M is Corporate &amp; Other (group total minus the four segments, our calculation). Growth figures are year on year against the first half of 2025.</p>
+  <div class="seg-bar">
+    <div style="flex:38.2;background:#22D3EE;">INVESTMENT BANK 38.2%</div>
+    <div style="flex:29.9;background:#22c55e;">PRIVATE BANK 29.9%</div>
+    <div style="flex:21.7;background:#f59e0b;">CORPORATE BANK 21.7%</div>
+    <div style="flex:9.1;background:#a78bfa;">AM 9.1%</div>
+    <div style="flex:1.0;background:#64748b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Investment Bank — €6,558M (H1'26), +8% <span class="tip" title="Year over year — versus the same period one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Private Bank — €5,133M, +7% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Corporate Bank — €3,722M, −1% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Asset Management — €1,558M, +7% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Corporate &amp; Other — €179M (1.0%)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Three of the four businesses earn more on their capital than the group's 2028 target of above 13%, and every one of them earned at least 12% RoTE in the first half. The swing factor is the Investment Bank: it is the biggest slice and the one whose revenue moves most from quarter to quarter.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Investment Bank</div>
+        <span class="biz-badge dominant">LARGEST SEGMENT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€6,558M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+8%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">14.5%</div><div class="biz-stat-label">H1 RoTE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">38.2%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Trading of bonds, currencies, rates and credit (<span class="tip" title="Fixed Income &amp; Currencies: trading and financing in bonds, interest rates, currencies, credit and emerging markets — Deutsche Bank's core markets franchise.">FIC</span>) plus advice on mergers and on raising equity and debt (<span class="tip" title="Investment Banking &amp; Capital Markets: fees for advising on deals and for underwriting share and bond issues.">IBCM</span>). Q2 2026 was the division's highest-ever second quarter: revenue €3,185M (+19%), record FIC revenue of €2.6B (+16%, with FIC Markets +27% on rates and credit) and IBCM revenue of €559M (+36%), with an EMEA IBCM market share of 4.1% (Dealogic, per the bank). Q2 RoTE rose to 13.4% and cost/income fell to 53.3%. The comparison turns harder now: the bank's September 30 key-updates note says Q3 2026 Investment Bank revenue is expected to be "flat to slightly down" year on year, with FIC flat or slightly down against a record Q3 2025 and IBCM broadly flat.</p>
+    <div class="biz-tam"><strong>Peers below:</strong> Oct 2, 2026 close and 2026 year-to-date price change, Yahoo Finance daily closes (our calculation).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Goldman Sachs</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$902.56</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+2.7%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Chase</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$332.38</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+3.2%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Barclays</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">443.65p</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">−6.8%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Private Bank</div>
+        <span class="biz-badge growth">TURNAROUND</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€5,133M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">12.0%</div><div class="biz-stat-label">H1 RoTE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">29.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">German retail banking (Personal Banking, including the Postbank brand) and Wealth Management. This was the problem division: RoTE was 4.8% in 2024. It reached 10.5% in 2025 and 12.0% in the first half of 2026, with H1 profit before tax up 17% to €1,286M and cost/income down 2.2 points to 68.0%. In Q2, revenue rose 8% to €2,566M (Wealth Management +11%), client assets reached €846B and the bank agreed to sell its Indian private-banking franchise, which it says will add to CET1 on closing. The group's branch count fell 12% in a year to 1,079, and the division has completed all branch closures planned for 2026.</p>
+    <div class="biz-tam"><strong>Peers below:</strong> Oct 2, 2026 close and 2026 year-to-date price change, Yahoo Finance daily closes (our calculation).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Commerzbank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€39.15</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+8.4%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">ING Groep</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€30.685</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+27.8%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">UniCredit</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€78.85</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+11.2%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Corporate Bank</div>
+        <span class="biz-badge dominant">HIGHEST-RETURN LENDER</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€3,722M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">−1%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">15.6%</div><div class="biz-stat-label">H1 RoTE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">21.7%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Cash management, payments, trade finance and lending for multinationals, German mid-sized companies and institutions — the "Hausbank" (house bank) at the centre of the strategy's name. Revenue has been held back by lower interest rates and the currency translation of dollar earnings: Q2 revenue was €1,906M (+1%), against expectations of a decline of about 1.2% (Reuters). Volumes are growing: loans +€8B (+7%) and deposits +€26B (+9%) year on year. Q2 RoTE was 16.4% at a 61.8% cost/income ratio. Management expects revenue to rise sequentially in Q3 and Q4 and the division to exit 2026 growing at a mid- to high-single-digit rate (key-updates note, September 30, 2026).</p>
+    <div class="biz-tam"><strong>Peers below:</strong> Oct 2, 2026 close and 2026 year-to-date price change, Yahoo Finance daily closes (our calculation).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">BNP Paribas</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€92.06</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+13.9%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Commerzbank</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€39.15</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+8.4%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">JPMorgan Chase</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$332.38</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+3.2%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Asset Management (DWS)</div>
+        <span class="biz-badge growth">RECORD INFLOWS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€1,558M</div><div class="biz-stat-label">H1'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+7%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">44.4%</div><div class="biz-stat-label">H1 RoTE</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.1%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Funds, ETFs (exchange-traded funds) and cash products sold under the DWS name; its CEO Stefan Hoops also sits on Deutsche Bank's Management Board as head of the segment. Assets under management reached €1,190B at June 30 (+18% year on year) after record quarterly net inflows of €25B, mostly into cash and passive products. Management fees rose 13% in Q2. The 44.4% RoTE is high because a fund manager needs little capital; the segment is small in revenue but cheap to run on the balance sheet.</p>
+    <div class="biz-tam"><strong>Peers below:</strong> Oct 2, 2026 close and 2026 year-to-date price change, Yahoo Finance daily closes (our calculation).</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Amundi</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€88.95</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+26.0%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">UBS Group</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">CHF 39.53</div><div class="comp-bubble-label">Oct 2 Close</div></div><div><div class="comp-bubble-val">+7.0%</div><div class="comp-bubble-label">YTD</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The balance-sheet numbers that actually matter</h3>
+  <p class="prose">A bank's income statement is the output; its capital and funding are the engine. All figures at June 30, 2026, from the Q2 2026 Financial Data Supplement.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">CET1 Ratio</div>
+      <div class="card-value">13.9%</div>
+      <div class="card-note">Inside the 13.5–14.0% operating range, after deducting capital for a 60% payout. Up 11 <span class="tip" title="Basis points — one basis point is 0.01 percentage points.">bps</span> in the quarter: earnings added 45bps, distributions took 27bps. Risk-weighted assets €367B (+8% YoY).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Tangible Book / Share</div>
+      <div class="card-value">€31.20</div>
+      <div class="card-note">Up 6% from €29.50 a year earlier. The share price of €30.94 is 0.99x this figure: the market pays roughly what the bank's tangible net assets are worth on paper.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Deposits / Loans</div>
+      <div class="card-value">€698B / €491B</div>
+      <div class="card-note">Loan-to-deposit ratio 70.3%. Deposits +7% YoY, loans +4%. Liquidity coverage ratio 140% and net stable funding ratio 118%, both above the 100% regulatory minimum.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Assets Under Management</div>
+      <div class="card-value">€1.92T</div>
+      <div class="card-note">Across Private Bank and Asset Management, +16.1% YoY, with €56B of net inflows in the first half (Q2 presentation). Fee income on these assets is the capital-light earnings stream the strategy is built to grow.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Germany's corporate house bank</span>
+    <span class="moat-pill">€698B deposit base</span>
+    <span class="moat-pill">19M German Private Bank customers</span>
+    <span class="moat-pill">European FIC trading scale</span>
+    <span class="moat-pill">€1.92T assets under management</span>
+    <span class="moat-pill">Euro cash-management network</span>
+    <span class="moat-pill">A1 / A / A+ credit ratings</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>being the one global bank Germany has</strong>. A German exporter that needs dollar cash management, trade finance in Asia and a bond issue in the same year has few domestic alternatives with that reach; the deposits those clients leave with the Corporate Bank (up 9% in a year) are cheap, sticky funding. On top sits a trading franchise that, in Q2, produced the highest second-quarter revenue in the Investment Bank's history. The credit agencies' view: Moody's A1 for deposits (outlook positive since February 19, 2026), S&amp;P A (outlook positive since December 4, 2025) and Fitch A+ (last changed May 12, 2026), per the bank's ratings page. The weakness is the return on all that franchise: group RoTE was 4.7% as recently as 2024, and the shares traded at €7.646 at the September 2022 month-end.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Trading revenue does not repeat on command.</strong> The Investment Bank was 38% of first-half revenue. When the CFO guided Q3 Investment Bank revenue to "flat to maybe slightly down" at a conference on September 23, 2026, the stock fell 3.0% that day and 5.2% over two sessions. A strong quarter for trading lifts the comparison bar for the next year.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Commercial real estate is still costing money.</strong> Provisions for credit losses were €460M in Q2 (38 bps of average loans) after €519M in Q1. On the Q2 call the CFO described a targeted decision of around €100M to de-risk the commercial real estate portfolio, and the September 30 note guides Q3 provisions to between the Q1 and Q2 levels, citing continued CRE de-risking and "an idiosyncratic charge related to a single-name exposure in the Corporate Bank in Asia".</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capital is adequate, not abundant.</strong> CET1 of 13.9% sits inside the 13.5–14.0% range. Payouts beyond the 60% ratio need the ratio to be "sustainably" above 14%, which the CFO said is likely to be beyond 2026. Growth in risk-weighted assets (+8% YoY) competes directly with buybacks for the same capital.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Accounting swings in reported profit.</strong> The bank applies the EU "carve out" version of hedge accounting for its deposit and mortgage interest-rate hedges. In Q2 2026 this reduced profit before tax by €688M (Q2 2025: €535M); over the first half it added €166M. Reported quarterly profit therefore moves with interest-rate markets in ways that say little about the underlying business.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Bank metrics replace the usual industrial ones: RoTE, CET1, cost/income and net interest margin instead of gross margin and current ratio. All per-share figures are in <strong>euros</strong> at the October 2, 2026 Xetra close of €30.94. The home benchmark is the <strong>DAX</strong> (Germany's 40 largest listed companies); the DAX is a performance index that reinvests dividends, so the price-only DBK.DE return is compared with a total-return index. Company figures come from the Q2 2026 Financial Data Supplement unless stated. Industry Avg is the aggregate for the euro area's significant banks in the ECB's Supervisory Banking Statistics for Q2 2026 (published September 2026). Dashes mark comparisons with no like-for-like published figure.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>DBK.DE (EUR)</th><th>Industry Avg</th><th>DAX</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many euros you pay for one euro of past-year profit.">Trailing P/E</span></td><td>9.5</td><td>—</td><td>—</td><td>€30.94 ÷ €3.26 diluted TTM EPS = 9.49. An earnings yield of about 10.5%.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the analysts' consensus estimate of earnings per share for a future year.">Forward P/E</span></td><td>9.3</td><td>—</td><td>—</td><td>€30.94 ÷ €3.34, the average FY2026 diluted EPS estimate of 12 analysts in the bank's own compiled consensus (August 20, 2026). On the FY2027 average of €3.90: 7.9x.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of diluted profit per share.">EPS (TTM)</span></td><td>3.26</td><td>—</td><td>—</td><td>Diluted, IFRS: Q3 2025 €0.89 + Q4 2025 €0.74 + Q1 2026 €1.06 + Q2 2026 €0.57. Equivalently FY2025 €3.09 − H1 2025 €1.46 + H1 2026 €1.63. H1 2026 diluted EPS was up 11% YoY.</td></tr>
+      <tr><td><span class="tip" title="Price to tangible book: share price divided by tangible book value per share (shareholders' equity minus goodwill and intangibles, per share).">Price / Tangible Book</span></td><td>0.99x</td><td>—</td><td>—</td><td>€30.94 ÷ €31.20 tangible book value per basic share (June 30, 2026). Price / book value (€34.93) is 0.89x.</td></tr>
+      <tr><td><span class="tip" title="Post-tax return on average tangible shareholders' equity — the bank's headline profitability measure.">RoTE (post-tax)</span></td><td>11.9%</td><td>—</td><td>—</td><td>First half 2026; Q2 alone 11.0%, up from 10.1%. FY2025 10.3%. Target above 13% in 2028; the company-compiled consensus averages 10.6% for FY2026 and 12.2% for FY2028.</td></tr>
+      <tr><td><span class="tip" title="Common Equity Tier 1 capital as a percentage of risk-weighted assets — the core measure of a bank's loss-absorbing capital.">CET1 Ratio</span></td><td>13.9%</td><td>16.0%</td><td>—</td><td>June 30, 2026; operating range 13.5–14.0%. Leverage ratio 4.5%. Industry Avg: all euro-area significant banks, Q2 2026 (ECB).</td></tr>
+      <tr><td><span class="tip" title="Operating costs divided by revenue. Lower is better.">Cost/Income Ratio</span></td><td>60.9%</td><td>53.1%</td><td>—</td><td>First half 2026, down from 62.3%; Q2 alone 63.0%. 2028 target: below 60%. FY2026 cost guidance: around €21.3B. Industry Avg: euro-area significant banks, Q2 2026 (ECB).</td></tr>
+      <tr><td><span class="tip" title="Net interest margin: net interest income divided by average interest-earning assets — the spread the bank earns on its lending and deposit book.">Net Interest Margin</span></td><td>1.7%</td><td>—</td><td>—</td><td>Q2 2026, up from 1.5% a year earlier. Net interest income across the key banking-book segments is now expected to "slightly exceed" the earlier guide of around €14B for 2026.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year growth in net revenues.">Revenue Growth (YoY)</span></td><td>+8.7%</td><td>—</td><td>—</td><td>Q2 2026 net revenues €8,479M vs €7,804M. First half +5.0% to €17,150M; FY2026 ambition around €33B.</td></tr>
+      <tr><td><span class="tip" title="Provision for credit losses as basis points of average loans: how much of the loan book the bank sets aside for expected losses, annualised.">Credit Loss Provisions</span></td><td>38 bps</td><td>—</td><td>—</td><td>Q2 2026: €460M, −11% quarter on quarter. Q1 2026 was 43 bps.</td></tr>
+      <tr><td><span class="tip" title="Profit after tax divided by net revenues over the last four quarters.">Net Profit Margin (TTM)</span></td><td>22.7%</td><td>—</td><td>—</td><td>Profit after tax €7,472M ÷ net revenues €32,919M, Q3 2025–Q2 2026 (our calculation from the Financial Data Supplement).</td></tr>
+      <tr><td><span class="tip" title="Annual dividend per share divided by the share price.">Dividend Yield</span></td><td>3.23%</td><td>—</td><td>—</td><td>€1.00 paid for FY2025 (up from €0.68) ÷ €30.94. The consensus FY2026 dividend of €1.15 gives 3.72%. The bank also bought back €1.5B of shares in 2026 through September.</td></tr>
+      <tr><td>Gross Margin / Current Ratio</td><td>n/m</td><td>—</td><td>—</td><td>Not meaningful for a bank: revenue is mostly interest and fees, and the balance sheet is not split into current and non-current items.</td></tr>
+      <tr><td>Price Return, 2026 YTD</td><td>−6.55%</td><td>—</td><td>+3.02%</td><td>December 30, 2025 close €33.11 → €30.94. DAX from 24,490.41 to 25,231.20 (Yahoo Finance month-end and October 2 closes).</td></tr>
+      <tr><td>Price Return, 5 Years</td><td>+177.6%</td><td>—</td><td>+60.8%</td><td>October 2021 month-end close €11.146 → €30.94. DAX from 15,688.77 to 25,231.20; the DAX figure includes reinvested dividends, DBK.DE's does not.</td></tr>
+      <tr><td>52-Week Range</td><td>23.815 – 35.845</td><td>—</td><td>—</td><td>Intraday, October 3, 2025 to October 2, 2026 (Yahoo Finance daily rows): low on March 23, 2026, high on September 8, 2026. The close is 13.7% below the high and 29.9% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the latest quarter. First, the <strong>EU carve-out hedge accounting</strong> cut Q2 2026 profit before tax by €688M (profit by €496M); over the first half it was a €166M positive, so the quarter flatters nothing and understates the run-rate. Second, Q2 costs of €5,340M (+8%) include about <strong>€0.2B</strong> from the exit of the Indian private-banking franchise and the absence of a litigation release booked a year earlier; excluding it, costs rose 4%. Third, provisions include the planned, capital-accretive <strong>exit of certain non-performing exposures</strong>, partly offset by releases of earlier overlays. On the other side of the ledger, buybacks reduce the share count: the €1.0B programme bought 35.7M shares at an average €28.00 (February 26 – August 21, 2026) and the €500M programme 15.1M shares at €33.19 (completed in late September), together about 2.7% of share capital.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Rating Balance</div><div class="card-value" style="color:var(--green);">6 Buy / 2 Hold</div><div class="card-note">Latest stance of the eight houses with a rating action reported by dpa-AFX between April 29 and October 2, 2026 (finanznachrichten.de list, read October 5; latest action in the window September 7, dated by the broker's own publication date). No Sell rating among them.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">€37.41</div><div class="card-note"><span style="color:var(--green);">+20.9% upside</span> from €30.94. Median €36.50 (+18.0%). Our calculation from the eight latest targets (DZ Bank's "fair value" included).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">€32 – €43.75</div><div class="card-note">+3.4% to +41.4%. Even the lowest target (Barclays, Equal Weight) sits above the October 2 close.</div></div>
+    <div class="card"><div class="card-label">Consensus FY2026 EPS</div><div class="card-value" style="font-size:20px;">€3.34</div><div class="card-note">Diluted, average of 12 estimates in Deutsche Bank's own compiled consensus (August 20, 2026; range €3.21–€3.51). FY2027 €3.90, FY2028 €4.55. Q3 2026: €0.83 on revenue of €8,229M.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:75;background:#22c55e;"></div>
+    <div style="flex:25;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Overweight / Outperform — 6 (75%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold / Equal Weight — 2 (25%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY ANALYST CALLS SINCE THE Q2 PRINT (dpa-AFX Analyser, via finanznachrichten.de; dates are the brokers' publication dates)</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Goldman Sachs</strong> · Upgrade Neutral → Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€37.00 → €43.75</span> (Sep 1, 2026). The highest target on the list, and a second raise after analyst Chris Hallam lifted the target from €35 to €37 while staying Neutral on Aug 6.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Warburg Research — Andreas Pläsier</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€39.00 → €41.50</span> (Sep 7, 2026). Warburg had upgraded the stock from Hold to Buy after the Q2 report on Aug 5, raising its target from €34.60 to €39.00.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">UBS</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€34 → €37</span> (Jul 29, 2026), after the second-quarter numbers. <strong>DZ Bank</strong> raised its fair value from €33 to €36 and kept "Kaufen" (Buy) on Jul 29.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">JPMorgan — Kian Abouhossein</strong> · Overweight · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">€41</span> kept (Jul 29 and Sep 7, 2026). JPMorgan's analysts called the quarter "strong across the board", as quoted by Reuters. <strong>RBC</strong> kept Outperform with a €35 target on Jul 29.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Jefferies — Joseph Dickerson</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">€33</span> kept (Jul 29, 2026). <strong>Barclays — Flora Bocahut</strong> kept Equal Weight with a €32 target on May 5, 2026, its latest action on the list and the most cautious stance.</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 28, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results</div>
+        <div class="tl-desc">The bank's compiled consensus (August 20) expects revenue of €8,229M, profit before tax of €2,516M and diluted EPS of €0.83. Management has already guided Investment Bank revenue flat to slightly down year on year, provisions between the Q1 (€519M) and Q2 (€460M) levels and sequential growth in the Corporate Bank. Watch whether full-year revenue of around €33B is reaffirmed and whether the CET1 ratio moves above 14%.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">H2 2026 – H1 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Next buyback application</div>
+        <div class="tl-desc">The €500M buyback from 2026 earnings is done. On the Q2 call the CFO said a "six-month cadence is a pretty good one" and that the bank would consider another buyback "towards the latter half of the year" if the second half is as strong as the first. Consensus has €1,475M of buybacks for FY2026 and €2,070M for FY2027.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027</div>
+      <div class="tl-content">
+        <div class="tl-title">EU regulatory relief and rate tailwinds</div>
+        <div class="tl-desc">Sewing pointed on the Q2 call to temporary relief on <span class="tip" title="Fundamental Review of the Trading Book: stricter capital rules for banks' trading positions, part of the final Basel III package.">FRTB</span> "as soon as January 2027" and a broader EU legislative package expected in early 2027. Separately, the bank says benefits from recent rate decisions on its hedge portfolio become "more pronounced" from 2027. Both would feed straight into capital and the 2028 RoTE target.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">UniCredit and Commerzbank</div>
+        <div class="tl-desc">UniCredit's tender offer for Commerzbank, Deutsche Bank's main German rival, closed its additional acceptance period on July 3, 2026 with 17.60% of shares tendered; the transfer was still subject to regulatory approval at that date (Commerzbank release, July 8, 2026). At the September 23 conference the CFO said "I won't comment on the live transaction" but called the situation "a great opportunity to Deutsche Bank to take share" in German mid-sized corporate and business banking.</div>
+        <div class="tl-impact up">Potential share-gain opportunity</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">CFO guides Q3 Investment Bank revenue lower</div>
+        <div class="tl-desc">At the Bank of America Financials CEO Conference, Raja Akram said the Investment Bank "could come out overall Investment Bank probably flat to maybe slightly down" for Q3, with FIC "flattish or slightly down" against a record quarter a year earlier (bank transcript). Close-to-close: −3.0% on September 23 (€32.64 → €31.66) and −2.3% on September 24 to €30.93.</div>
+        <div class="tl-impact down">Reaction already happened: −5.2% in two sessions</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 21, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">€1.25B AT1 issue at 7.000%</div>
+        <div class="tl-desc">Deutsche Bank placed €1.25B of <span class="tip" title="Additional Tier 1: perpetual bonds that count as bank capital and can be written down or converted if capital falls too low; they pay high coupons to compensate.">AT1</span> capital instruments with a 7.000% fixed coupon to April 30, 2034, first callable from October 30, 2033; on the same day it called an existing €1.25B AT1 instrument. Year-to-date funding issuance reached about €13B against a 2026 plan of €10–15B.</div>
+        <div class="tl-impact neutral">Capital refinancing</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat on profit, new buyback</div>
+        <div class="tl-desc">Net revenues €8,479M (+9%), profit before tax €2,680M (+11%), diluted EPS €0.57 (+19%), RoTE 11.0%, CET1 13.9%; net profit attributable €1.64B against expected €1.38B (Reuters). A €500M buyback from 2026 earnings was announced. Reuters reported the shares opened 4% higher; the close-to-close gain was 1.07% (€30.935 → €31.265), followed by +1.90% the next session.</div>
+        <div class="tl-impact up">Reaction already happened: +1.1% day 1, +1.9% day 2</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">DBK.DE — Monthly Closes in EUR (Xetra), Oct 2021 → Oct 2, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 month-end closes Oct 2021 – Sep 2026 + Oct 2, 2026 settled close · Yahoo Finance close (split-adjusted, not dividend-adjusted) · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the October 2021 month-end close of <strong>€11.146</strong> to the October 2, 2026 close of <strong>€30.94</strong>, DBK.DE gained <strong>177.6% on price</strong>. Adding the €2.63 of dividends paid over the period (€0.20, €0.30, €0.45, €0.68 and €1.00, one per year from 2022 to 2026) without reinvestment lifts that to about 201%. The DAX performance index, which reinvests dividends, rose 60.8% over the same window. Almost all of the gain came in one stretch: from August 2024 to August 2025 the stock closed higher for <strong>13 consecutive months</strong>, and calendar 2025 alone added 99.0% (€16.64 → €33.11) as the bank hit its 2025 targets.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows how stretched that run became: it peaked at <strong>98.8 in August 2025</strong>, the highest reading in the series, after a low of 26.9 at the September 2022 trough. It now reads <strong>53.6</strong>, neutral, after the September 2026 drop pulled it back from 74.1. The 10-month moving average is about €30.20, just under the price: the long-term trend is flat, not broken. The stock is 6.55% down in 2026 while the DAX is up 3.02%.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Five-year low — €7.646 month-end close</div><div class="tl-desc">The lowest month-end close of the window and the lowest RSI reading (26.9). The stock had lost 37.6% from its January 2022 month-end close of €12.254.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2023</div><div class="tl-content"><div class="tl-title">Banking-crisis scare — €9.356 (−20.7% in a month)</div><div class="tl-desc">UBS took over Credit Suisse in a government-brokered rescue on March 19, 2023, and on March 24 the cost of insuring Deutsche Bank's debt against default jumped, with its five-year CDS up 70% (Wikipedia, "2023 United States banking crisis"). The stock's worst month of the five years.</div><div class="tl-impact down">−20.7% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">€675M buyback starts — €14.582 (+18.0% in a month)</div><div class="tl-desc">A €675M buyback started on March 4, 2024 and ran to July 11 (46.4M shares at an average €14.53, per the bank's buyback page). No month-end close since has been below €14.</div><div class="tl-impact up">+18.0% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Dec 2025</div><div class="tl-content"><div class="tl-title">€33.11 — targets delivered</div><div class="tl-desc">Calendar 2025 closed up 99.0%. The January 29, 2026 results confirmed the 2025 RoTE target (10.3%) and cost/income target (64%) were met, with a €1.00 dividend proposed, up about 50%.</div><div class="tl-impact up">2025: +99.0%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">War-driven sell-off — €25.115 (−17.1% in a month)</div><div class="tl-desc">The DAX fell 10.3% the same month. At a Morgan Stanley conference on March 17 the moderator referred to "a war in Iran", and Sewing said "the last two weeks added volatility and also, to a certain extent, uncertainty", adding that he had no reason to adjust revenue or investment plans. Private-credit exposure was also in focus; of more than ten years in that business Sewing said "we haven't lost one cent in Private Credit". Intraday low €23.815 on March 23.</div><div class="tl-impact down">−17.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Five-year high — €34.66</div><div class="tl-desc">The fifth consecutive monthly gain (April–August), after the Q2 beat, the new buyback and Warburg's August 5 upgrade. Goldman Sachs upgraded on September 1. The intraday 52-week high of €35.845 followed on September 8.</div><div class="tl-impact up">Highest month-end close of the window</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2026</div><div class="tl-content"><div class="tl-title">€31.865 (−8.1% in a month)</div><div class="tl-desc">The CFO's September 23 guidance of a flat-to-lower Q3 in the Investment Bank cost 5.2% over two sessions. The DAX fell 4.0% in September (26,258.11 → 25,199.19).</div><div class="tl-impact down">−8.1% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2, 2026</div><div class="tl-content"><div class="tl-title">Settled close — €30.94</div><div class="tl-desc">10.7% below the August month-end and 0.99x tangible book value, four weeks before the Q3 results.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Over five years DBK.DE has nearly tripled while the DAX gained 60.8% including dividends. In 2026, though, it has lagged: <strong>−6.55% year to date</strong> against the DAX's +3.02% and against most European bank peers — ING +27.8%, BNP Paribas +13.9%, UniCredit +11.2%, Commerzbank +8.4% (Yahoo Finance closes, December 30/31, 2025 to October 2, 2026; our calculation). The large European peer that has done slightly worse, Barclays (−6.8%), also runs a large investment bank. A reading of these numbers: in 2026 the market has preferred deposit-funded retail and commercial banks over trading-heavy ones, and Deutsche Bank's own Q3 guidance on the Investment Bank fits that preference. In US dollars, the NYSE line (DB) closed at $34.97 on October 2.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are buying a bank at 0.99x tangible book and 9.5x trailing earnings that earned an 11.9% RoTE in the first half, beat second-quarter profit expectations by roughly 19%, and pays out 60% of its profit — a 3.2% dividend plus €1.5B of buybacks this year so far. Every division earned at least 12% RoTE in the first half. Net interest income is guided above €14B, with hedge benefits growing into 2027 and 2028; costs are guided to around €21.3B, about 3% above 2025's €20.7B; EU capital relief could free more room. If the bank reaches its "above 13%" RoTE target in 2028 — management says it has "upside" to it, while consensus sits at 12.2% — a stock at book value has room to re-rate, and the eight latest broker targets average €37.41, 20.9% above the price.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The profit beat came from the Investment Bank, the least repeatable revenue a bank has, and management has already guided Q3 Investment Bank revenue flat to down. The company-compiled consensus has FY2026 RoTE at 10.6%, below the first-half 11.9%, and the 2028 average at 12.2%, short of the target. Capital sits inside a 13.5–14.0% range rather than above it, so the CFO expects extra distributions to wait until after 2026. Commercial real estate still needs de-risking, a single-name loan in Asia is adding to Q3 provisions, and accounting hedges can swing quarterly profit by hundreds of millions. In 2026 the market has rewarded deposit-rich peers such as ING (+27.8%) and BNP Paribas (+13.9%) while DBK.DE is down 6.55%.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Investment Bank revenue normalising.</strong> At 38% of first-half revenue, a flat-to-lower Investment Bank turns group growth into low single digits. The CFO has said Q3 will be flat to slightly down, with fixed-income trading compared against a record 2025 quarter; the October 28 print tests whether that is one quarter or a trend.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Credit costs.</strong> Provisions were €979M in the first half (+9% YoY), driven by commercial real estate clean-up and the exit of non-performing exposures, and Q3 adds a single-name charge in the Corporate Bank in Asia. A recession in Germany, where energy prices and geopolitics were the CEO's own named concerns in March, would hit the Corporate and Private Bank loan books together.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Capital return slower than hoped.</strong> Distributions are capped at the 60% payout until CET1 is sustainably above 14%. Risk-weighted assets grew 8% in a year; if growth keeps absorbing capital, or regulatory relief stalls in the EU process, the buyback cadence stays at one modest programme every six months.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">European banks: from book-value discount to earning their capital</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">STRUCTURAL TAILWIND</span></div>
+    <p class="biz-desc">Deutsche Bank's shares closed September 2022 at €7.646; they now trade at 0.99x tangible book value. Over the same years the group's net interest margin went from 1.3% in 2024 to 1.7% in Q2 2026, and the bank's hedging strategy spreads the rate effect over several years: management says the benefit from recent rate decisions will become "more pronounced" in 2027 and 2028 as hedges roll. Peers have re-rated too — ING +27.8% and BNP Paribas +13.9% in 2026 alone — and the question for 2027 is which banks keep their returns as rates settle. Deutsche Bank's answer is volume: deposits +7% and loans +4% in a year.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">German consolidation: UniCredit and Commerzbank</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">COMPETITIVE SHIFT</span></div>
+    <p class="biz-desc">UniCredit's offer for Commerzbank closed its additional acceptance period on July 3, 2026 with 17.60% of shares tendered, and Commerzbank said on July 8 that the transfer of those shares remained subject to regulatory approval. For Deutsche Bank the deal is an opportunity rather than a threat, by its own account. Sewing said on the Q2 call that the bank studied a combination in 2019 and therefore knows "exactly what is possible on revenue synergies and revenue dis-synergies", and that it has hired senior staff in Germany to capture clients. The CFO said in September that, asked for new client names in the space where the merger might happen, his team produced "a dozen names of clients which are new to us" within ten minutes — "a small sample" against an aspiration of hundreds.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22D3EE;">
+    <div class="biz-header"><div class="biz-name">Regulation turning from headwind to tailwind</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">The last stage of the Basel III rules (CRR 3 in the EU) raised capital requirements for trading books and some lending. On the Q2 call Sewing listed the European Commission's moves on CRR 3, FRTB, capital buffers and software amortisation and said they "can have a meaningful impact", while declining to quantify it: "we should not front-run this process". The bank's CET1 ratio is already 13.9%; any relief would mostly flow to shareholders, because the bank has said excess capital above a sustained 14% goes first to buybacks. The timing is political, though: the legislative package is expected in early 2027, and Sewing expects the tailwind "in the latter year of 2027 and in particular in 2028".</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, October 2, 2026 (Xetra close). This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: Yahoo Finance DBK.DE daily rows (query1.finance.yahoo.com/v8/finance/chart/DBK.DE) — October 2, 2026 close €30.94 (open 31.10, high 31.36, low 30.41, volume 4,851,710) against the October 1 close of €31.03. Prices are in euros on Xetra. The NYSE line DB closed at $34.97 the same day. Market cap: 1,911M shares issued at June 30, 2026 × €30.94, converted at the Yahoo Finance EURUSD=X close of 1.1250 for October 2, 2026 (our calculation).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Deutsche Bank Q2 2026 media release (db.com, July 29, 2026) including its results tables; Q2 2026 Financial Data Supplement, Q2 2026 results presentation and Q2 2026 analyst call transcript (investor-relations.db.com); "Key updates communicated during Q3 2026" (September 30, 2026, also filed with the SEC on Form 6-K October 1, 2026); transcripts of the Bank of America Financials CEO Conference (September 23, 2026) and Morgan Stanley European Financials Conference (March 17, 2026); the bank's company-compiled Consensus Report (August 20, 2026); full-year 2025 results release (January 29, 2026); AT1 release (September 21, 2026); share-buyback, shareholder-structure, ratings, financial-calendar and Management Board pages; the bank's history page for the founding date. Reuters (via globalbankingandfinance.com, July 29, 2026) for results versus expectations and the share-price open; Reuters (via AOL, September 23, 2026) on the CFO's conference guidance. ECB Supervisory Banking Statistics, second quarter 2026 (September 2026), for the Industry Avg column. dpa-AFX Analyser items on finanznachrichten.de for analyst actions, dated by the original study's publication date given in each item. Commerzbank press release (July 8, 2026) for the UniCredit offer result. Wikipedia ("2023 United States banking crisis"; "DAX") for the March 2023 events, DAX membership and the DAX's total-return construction. Yahoo Finance for DAX, EUR/USD and peer closes.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from October 2021 through September 2026 from Yahoo Finance's monthly DBK.DE series (close, split-adjusted, not dividend-adjusted; Yahoo records no split in the window), plus the October 2, 2026 settled close. The final point is a settled close two trading days into October, not a month-end. Trailing EPS is diluted IFRS EPS from the Financial Data Supplement; the bank reports under IFRS as endorsed by the EU, including the EU carve-out for hedge accounting. Peer returns, price targets' average and median, market capitalisation and the TTM profit margin are our calculations from the sources named. The €500M buyback completion is dated September 25, 2026 on the bank's buyback page and September 28, 2026 in its September 30 key-updates note.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results, and consensus figures are analysts' estimates. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Oct 2021 → Sep 2026 (Yahoo Finance DBK.DE monthly close, EUR, split-adjusted, not dividend-adjusted) + Oct 2, 2026 settled close =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26','Oct 2 26'];
+const prices = [11.146,10.66,11.018,12.254,11.26,11.51,9.626,10.374,8.318,8.526,8.323,7.646,9.66,10.122,10.588,12.208,11.8,9.356,9.943,9.476,9.618,10.08,10.052,10.45,10.356,11.426,12.364,12.034,12.362,14.582,15.01,15.226,14.908,14.436,14.748,15.498,15.624,16.074,16.64,18.94,20.725,21.82,22.98,24.36,25.17,28.985,30.03,29.95,30.93,30.61,33.11,33.3,30.295,25.115,26.5,27.86,29.625,31.875,34.66,31.865,30.94];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 11, label: 'Sep 2022 — five-year low close €7.646',                     color: '#ef4444' },
+  { idx: 17, label: 'Mar 2023 — Credit Suisse rescue, CDS spike; €9.356 (−20.7%)', color: '#ef4444' },
+  { idx: 29, label: 'Mar 2024 — €675M buyback starts; €14.582 (+18.0%)',         color: '#22c55e' },
+  { idx: 50, label: 'Dec 2025 — €33.11; 2025 +99.0%, targets met',               color: '#3b82f6' },
+  { idx: 53, label: 'Mar 2026 — war-driven sell-off; €25.115 (−17.1%)',          color: '#f59e0b' },
+  { idx: 58, label: 'Aug 2026 — five-year high close €34.66',                    color: '#22c55e' },
+  { idx: 59, label: 'Sep 2026 — CFO guides Q3 IB flat to down; €31.865 (−8.1%)', color: '#ef4444' },
+  { idx: 60, label: 'Oct 2, 2026 — settled close €30.94',                        color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': €' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '€' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

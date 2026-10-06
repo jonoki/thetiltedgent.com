@@ -4,7 +4,7 @@ These three families share the stock reports' document design and section order.
 
 **Before anything else, read `claude/PITFALL_RULES.md` and `claude/briefs/BUILD.md`.** Every data rule, privacy rule and "Lessons from the last checker round" rule in BUILD.md applies here unchanged. Where this brief differs from BUILD.md (template sections, verify expectations, identity step), this brief wins.
 
-REPO (worktree, branch `claude/portfolio-analyzer`): `C:\Users\jon_o\Desktop\Coding projects\Portfolio Analyzer`. Write exactly ONE file, the path you are given. Never write in `...\thetiltedgent.com` (another session works there). Do NOT git add/commit/push. Temp files only in `$TEMP/ttg_<slug>/`.
+REPO: the worktree path your prompt gives (batches run in their own worktree and branch). Write exactly ONE file, the path you are given. Do NOT git add/commit/push. Temp files only in `$TEMP/ttg_<slug>/`.
 
 ## Template (all families)
 Read `reports/ctsh_analysis.html` in full and copy its CSS, components (static-data banner, hero with price-block and 4 meta-items, `.section` + `.section-title` "0N Title", seg-bar + seg-legend, biz-card, moat-list, risk-list/risk-item, fin-table inside `.fin-scroll`, analyst-bar, chart-container, case-card bull/bear, disclaimer), Chart.js 4.4.1 from cdnjs, and the price-chart script pattern (1/3/10-month MAs). Pick one per-report `--accent`, never red/red-orange, distinct from green/red/amber/blue/purple chart lines.
@@ -36,6 +36,10 @@ Never put the owner's name, email or any personal data in any request: not in Us
 - **Price series gaps:** Yahoo can drop the latest settled bar (and ^GSPC rows); use the latest non-null bar, `range=` queries over `period1/period2`, Coinbase as fallback for crypto, and matched month-ends only for cross-asset stats.
 - **Crypto hero/metrics for proof of stake:** "Max supply: none" convention; security measure = amount staked (not hash rate).
 - **Gambling-linked holders:** superseded 24 Sep — any company is fair game for analysis (see Template rules).
+- **Process caveats come in many words (5 Oct batch, 43 corrections):** "our inference from past dates", "our application of the rule", "not an issuer schedule" are caveats too. A date inferred from a pattern is shown as the month ("Dec 2026") with no commentary, or removed.
+- **Issuer price APIs can lag a day (5 Oct batch):** Vanguard's price/profile API showed the prior day's market price (VTI, VWO). Take every close and day change from Nasdaq or Yahoo daily rows; use the issuer only for NAV and fund data.
+- **Fund renames:** confirm the current fund and index names in the latest 497/prospectus supplement (Vanguard's CRSP funds became "Vanguard Morningstar …" on Jul 28–29, 2026); show "formerly …" in the hero.
+- **Data licensing (5 Oct batch):** before building on a third-party index series, read its licence note (on FRED, the series notes). If reproduction needs the owner's consent (Moody's DAAA/DBAA), BLOCK and suggest a public-domain series instead.
 
 ## ETF family — `reports/etf/<slug>_analysis.html`
 Identity: confirm on the issuer's page the fund name, ticker, exchange, currency, inception, index.

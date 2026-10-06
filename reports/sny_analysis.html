@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNY — Sanofi | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #D946EF;
+  --accent-dim: #D946EF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 2, 2026 (Friday settled close; Nasdaq and Euronext Paris both traded that day) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">SNY</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> Nasdaq (ADS, USD) · home Euronext Paris (SAN, EUR)</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Healthcare / Drug Manufacturers - General</span>
+        <span style="font-size:13px;color:var(--text-muted);" title="1,207,773,393 issued shares (Sanofi declaration of shares and voting rights, August 31, 2026) × €70.81 Euronext Paris close on October 2, 2026 = €85.52B; × 1.1225 USD per EUR (ECB euro reference rate, October 2, 2026) = $96.00B. Our calculation."><span style="color:var(--text-dim);">Mkt Cap:</span> $96.00B (€85.52B)</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Home index:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="Sanofi is listed in the CAC 40 composition table on Wikipedia's CAC 40 page (Healthcare / Pharmaceuticals, SAN.PA).">CAC 40 · France</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;" title="Market caps at the October 2, 2026 close from StockAnalysis's market-cap history pages: Eli Lilly $1,075.83B, AbbVie $464.43B, Merck $356.01B, Novartis $268.00B, AstraZeneca $243.20B, Pfizer $158.45B, Sanofi $97.36B, GSK $94.22B, Regeneron $75.69B.">#7 of the 9 drugmakers on this page</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);background:var(--amber-dim);border:1px solid #f59e0b44;padding:3px 10px;border-radius:4px;">NOT IN S&amp;P 500 / NASDAQ-100 — GLOBAL COVERAGE</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Sanofi</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px;font-family:'JetBrains Mono',monospace;">Nasdaq American Depositary Shares · 2 ADS = 1 ordinary share · Paris, France · IFRS · Reports in EUR · prices on this page in USD per ADS</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$39.92</div>
+      <div class="price-change">−$0.75 (−1.84%)</div>
+      <div class="price-date">Close, Friday October 2, 2026 · settled Nasdaq close, USD per ADS (prior close $40.67)</div>
+      <div class="price-date">Euronext Paris the same day: €70.81 per share (−3.13%) · ECB reference rate €1 = $1.1225</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 46 avenue de la Grande Armée, Paris, France</div>
+    <div class="meta-item"><span>Employees:</span> 74,846</div>
+    <div class="meta-item"><span>ADS:</span> 2 ADS = 1 ordinary share (depositary: JPMorgan Chase Bank)</div>
+    <div class="meta-item"><span>Founded:</span> 1973 (as a subsidiary of Elf Aquitaine)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 30, 2026 (Q3 2026, company calendar)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Sanofi is a Paris-based maker of prescription medicines and vaccines, and a member of France's CAC 40 index. Since April 30, 2025, when its consumer-health arm Opella moved into a joint venture with the private-equity firm CD&amp;R (Sanofi kept a 48.2% stake and received €10.4B in net cash), it reports a single <strong>Biopharma</strong> segment. FY2025 net sales were <strong>€43.63B, up 9.9% at <span class="tip" title="Constant exchange rates: growth with currency movements stripped out, so you see volume and price rather than currency translation.">CER</span></strong>. <span class="tip" title="Business EPS is Sanofi's adjusted earnings per share. It leaves out amortisation and impairment of acquired intangibles, restructuring costs and other items management treats as non-recurring. IFRS figures are the audited statutory numbers.">Business EPS</span> was <strong>€7.83 (+15.0% at CER)</strong> and IFRS EPS €6.40. One drug sits at the centre of the story: <strong>Dupixent</strong>, the antibody for eczema, asthma and other allergic-type inflammation that Sanofi shares with Regeneron. It sold <strong>€5.15B in Q2 2026 alone, 44% of group sales</strong>.</p>
+  <p class="prose" style="margin-top:16px;">The latest quarter shows the gap between the numbers and the share price. Q2 2026, reported on July 30, beat on every headline line. Sales rose <strong>17.8% at CER to €11.60B</strong>, business EPS rose <strong>33.3% at CER to €2.09</strong>, and the 2026 guide went up to sales growth of <strong>around 10% at CER</strong> (from high single digits), with business EPS growing slightly faster. Zacks's consensus for the ADS was $1.10 of adjusted EPS and $12.73B of revenue; Sanofi delivered $1.22 and $13.48B. Paris still fell <strong>8.95%</strong> that day and the Nasdaq ADS <strong>4.37%</strong>. The same release cut the pipeline: <strong>amlitelimab</strong>, the eczema antibody that was meant to follow Dupixent, will not be filed for approval (a €952M impairment), and two other programmes (itepekimab and balinatunfib) were stopped. IFRS net income fell 91% to €343M. The CEO's own summary credited the EPS jump partly to one-offs. That CEO is new. The board declined to renew Paul Hudson's mandate in February, and <strong>Belén Garijo</strong>, who ran Germany's Merck KGaA, took over on April 29, 2026. Since the print she has announced plans to hand 20 older medicines to Cheplapharm (September 14) and expanded the Regeneron alliance with a <strong>$1B upfront payment</strong> for next-generation immunology antibodies (October 1). The ADS closed at <strong>$39.92</strong>, its 52-week closing low and 23.7% below the 52-week closing high of $52.34 (November 13, 2025).</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Belén Garijo</div>
+      <div class="card-note">CEO since the end of the AGM on April 29, 2026 (Sanofi release, February 12, 2026). A physician who spent 15 years at Sanofi, where she led the Genzyme integration, then joined Merck KGaA in 2011 and became its CEO in 2021. The board said her priority would be the productivity, governance and innovation capacity of R&amp;D. Her Q2 line: "My first months as CEO have focused on assessing the challenges facing Sanofi and working on an accelerated transformation roadmap that leverages our commercial strengths and focuses on the need for R&amp;D and pipeline improvements."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">François Roger</div>
+      <div class="card-note">Executive Vice President and CFO, per Sanofi's Executive Committee page. He owns the upgraded 2026 guide (sales up around 10% at CER, business EPS slightly faster), a net debt of €15.5B at June 30, 2026 and the dividend record: €4.12 per share for 2025, the 31st consecutive annual increase. The Executive Committee was reshaped after Garijo arrived; Paulo Fontoura now heads R&amp;D.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Holders — anchor then institutional</div>
+      <div class="card-value" style="font-size:20px;">L'Oréal · 7.4%</div>
+      <div class="card-note">The cosmetics group is Sanofi's long-standing anchor shareholder. In February 2025 it sold about 29.6M Sanofi shares back to Sanofi at €101.50 each (€3B), leaving it with 7.2% of the share capital (L'Oréal release, February 3, 2025). At June 30, 2026 Sanofi's shareholding page shows L'Oréal with <strong>7.4% of the share capital and 13% of the voting rights</strong>; French double voting rights explain the gap. Non-French institutions hold 63.5% of the capital and French institutions 10%. That buyback price is 43% above the October 2 Paris close of €70.81. The chairman is Frédéric Oudéa.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Sanofi reports one segment, Biopharma, and breaks sales down by franchise. The mix below uses <strong>Q2 2026 (quarter ended June 30, 2026) net sales of €11,597M</strong>, up 16.0% in euros and 17.8% at CER. Growth rates are at CER, as the company reports them. All figures are in <strong>EUR (reporting currency)</strong>. By region, US sales were €6,344M (+33.5%), Europe €2,141M (+1.3%) and the rest of the world €3,112M (+3.7%), with China down 4.9%. Other revenues of €703M (mostly VaxServe's sales of other companies' vaccines) come on top of net sales and are left out of the mix.</p>
+  <div class="seg-bar">
+    <div style="flex:44.4;background:#D946EF;">DUPIXENT 44.4%</div>
+    <div style="flex:11.3;background:#22c55e;">LAUNCHES</div>
+    <div style="flex:9.9;background:#3b82f6;">VACCINES</div>
+    <div style="flex:34.4;background:#64748b;">EVERYTHING ELSE 34.4%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#D946EF;"></span> Dupixent — €5,154M (Q2'26), 44.4%, +37.6% CER <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Pharma launches — €1,305M, 11.3%, +48.3%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Vaccines — €1,150M, 9.9%, −4.7%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#64748b;"></span> Everything else — €3,988M, 34.4% (established rare-disease medicines, diabetes, cardiovascular and other mature brands, Kevzara)</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">The concentration in one line: in FY2025 Dupixent sold €15,714M of Sanofi's €43,626M, 36% of the year. In Q2 2026 it was 44%. Management now expects Dupixent to reach <strong>around €25B in 2030</strong>, and the launch portfolio about €10B, both at CER. Those two numbers carry the company's medium-term case.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #D946EF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Immunology — Dupixent and Kevzara</div>
+        <span class="biz-badge dominant">LARGEST FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€5,154M</div><div class="biz-stat-label">Q2'26 Dupixent</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+37.6%</div><div class="biz-stat-label">CER growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">75.6%</div><div class="biz-stat-label">US share of sales</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">44.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc"><strong>Dupixent</strong> blocks two signalling proteins (IL-4 and IL-13) that drive what doctors call type 2 inflammation. It is approved in nine diseases, from eczema and asthma to COPD and hives, and more than 1.5 million people take it, per the October 1 release. Q2 2026 sales passed €5B in a quarter for the first time. US sales were €3,899M (+42.8%), helped by demand, operational improvements and what the release calls "a favourable adjustment of gross-to-net deductions" (a change in the rebates and discounts the company books against list price). Europe was €583M (+19.4%) and the rest of the world €672M (+26.9%). The growth is not free of setbacks: two phase 3 studies in lichen simplex chronicus (an itchy skin condition) missed their endpoints, and Sanofi withdrew its EU filing in bullous pemphigoid. <strong>Kevzara</strong>, for rheumatoid arthritis, added €177M (+35.1%). Sanofi shares Dupixent's profits with Regeneron, which invented it; the profit-sharing line took €1,972M out of Q2 operating income.</p>
+    <div class="biz-tam"><strong>FY2025:</strong> Dupixent €15,714M (+25.2% CER) · 2030 company target ≈ €25B at CER</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">AbbVie</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$464.43B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Eli Lilly</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.076T</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Regeneron (partner)</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$75.69B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Pharma launches — the medicines that have to follow Dupixent</div>
+        <span class="biz-badge growth">FASTEST GROWING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€1,305M</div><div class="biz-stat-label">Q2'26 (11 brands)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+48.3%</div><div class="biz-stat-label">CER growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">€349M</div><div class="biz-stat-label">Largest: ALTUVIIIO</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">11.3%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Sanofi groups eleven recently launched medicines here. The biggest are <strong>ALTUVIIIO</strong> for haemophilia A (€349M, +23.7%, 87% of it in the US), <strong>Nexviazyme</strong> for Pompe disease (€218M, +15.6%), <strong>Ayvakit</strong> for systemic mastocytosis (€190M, which came with the Blueprint acquisition in July 2025), the myeloma drug <strong>Sarclisa</strong> (€187M, +35.7%) and <strong>Rezurock</strong> (€163M, +25.0%). Smaller ones include Tzield, which delays type 1 diabetes and has now treated more than 1,000 patients. H1 2026 launch sales were €2,476M (+48.9%). Several of these are bought rather than home-grown (Ayvakit via Blueprint, Rezurock and Tzield through earlier deals), which is why amortisation of acquired intangibles keeps IFRS profit far below business profit.</p>
+    <div class="biz-tam"><strong>Company target:</strong> about €10B of launch sales in 2030, at CER</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Novartis</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$268.00B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">AstraZeneca</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$243.20B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Vaccines — flu, paediatric shots, Beyfortus</div>
+        <span class="biz-badge emerging">SEASONAL · SOFT IN 2026</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€1,150M</div><div class="biz-stat-label">Q2'26</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−4.7%</div><div class="biz-stat-label">CER growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">€7,936M</div><div class="biz-stat-label">FY2025</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">9.9%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Vaccines are seasonal: flu shots ship in the second half, so Q2 is a small quarter (€1,150M, against €2,039M in Q4 2025 and €7,936M for FY2025). Polio, pertussis and Hib shots plus <strong>Heplisav-B</strong>, which came with the Dynavax purchase in February 2026, sold €700M (+1.4%). US sales of that group rose 77.2%, while the rest of the world fell 21.2% on fewer births, mainly in China. Meningitis, travel and endemic vaccines fell 5.9% to €287M. <strong>Beyfortus</strong>, an antibody shot for babies, grew 54.2% to €108M and now protects babies in more than 45 countries. Flu and COVID sales fell 61.7% to €54M against one-off late-season sales a year earlier. In August the EU extended MenQuadfi, the meningitis vaccine, to infants from six weeks.</p>
+    <div class="biz-tam"><strong>FY2025:</strong> vaccine sales €7,936M (−1.2% CER); Q4 2025 €2,039M (−2.5% CER)</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">GSK</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$94.22B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Pfizer</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$158.45B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Merck</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$356.01B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #64748b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Established medicines and the rare-disease base</div>
+        <span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">BEING SLIMMED DOWN</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€3,988M</div><div class="biz-stat-label">Q2'26 (residual)</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--red);">−7.0% / −15.8%</div><div class="biz-stat-label">Lantus / Lovenox</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">20</div><div class="biz-stat-label">Brands to Cheplapharm</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">34.4%</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Everything that is not Dupixent, a launch or a vaccine: <strong>Lantus</strong> (€394M, −7.0%) and <strong>Toujeo</strong> (€354M, +4.4%) in diabetes, <strong>Plavix</strong> (€216M, −5.7%), <strong>Lovenox</strong> (€180M, −15.8% as biosimilars bite), Praluent (€164M, +19.0%), older Genzyme rare-disease enzymes such as Fabrazyme for Fabry disease (€258M) and Cerezyme for Gaucher disease (€166M), and many smaller brands. This is the part Sanofi is shrinking on purpose. On September 14 it announced plans to transfer <strong>20 mature medicines, including Lovenox/Clexane outside the US, and three plants</strong> (in Hungary, Singapore and France) to Cheplapharm in return for a <strong>26.4% stake in Cheplapharm</strong>. The transfer is planned to start in Q1 2027 and finish by Q3 2027, and Sanofi says it does not expect the deal to affect its 2026 guidance. Gains on such divestments (€192M in Q2) run through business operating income.</p>
+    <div class="biz-tam"><strong>Cheplapharm deal:</strong> the release gives no sales figure for the 20 brands; "Additional financial details are expected to be provided at a later stage."</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Pfizer</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$158.45B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Novartis</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$268.00B</div><div class="comp-bubble-label">Mkt Cap</div></div></div></div>
+    </div>
+  </div>
+  <p class="prose" style="margin-top:8px;font-size:13px;">Competitor market caps are at the October 2, 2026 close, from StockAnalysis's market-cap history pages.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating numbers that matter</h3>
+  <p class="prose">For a company whose biggest drug is still growing fast, the questions are how much of each euro of sales survives (margin), how much is handed to the partner (Regeneron), and how much is being spent to find the next Dupixent (R&amp;D).</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Business operating margin — Q2 2026</div>
+      <div class="card-value">28.4%</div>
+      <div class="card-note"><span style="color:var(--green);">+3.8pp</span> on business operating income of €3,291M. Helped by a business gross margin of 81.2% (+3.7pp), which included the reversal of more than €200M of past Sarclisa manufacturing provisions. FY2025 was 27.8% (€12,149M ÷ €43,626M).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Regeneron profit share — Q2 2026</div>
+      <div class="card-value" style="color:var(--amber);">€1,972M</div>
+      <div class="card-note">Up from €1,360M a year earlier. Every extra euro of Dupixent sales is shared, which is why "higher Regeneron profit sharing" is the main offset the release names against margin gains. The October 1 deal leaves the Dupixent split unchanged.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">R&amp;D — Q2 2026</div>
+      <div class="card-value">€2,233M</div>
+      <div class="card-note">+17.9% at CER, 19.3% of sales. The figure includes more than €200M of wind-down costs from the programmes stopped in the quarter.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Net debt</div>
+      <div class="card-value">€15.5B</div>
+      <div class="card-note">€15,513M at June 30, 2026, up from €10,988M on January 1 after the Dynavax purchase (€1,635M), a €1B buyback and €4,923M of dividends. That is about 1.2x trailing business operating income of €13,044M (our calculation).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Dupixent, 9 indications</span>
+    <span class="moat-pill">Regeneron antibody alliance</span>
+    <span class="moat-pill">Vaccine manufacturing scale</span>
+    <span class="moat-pill">Rare-disease franchises (Genzyme)</span>
+    <span class="moat-pill">~€9.4B trailing free cash flow</span>
+    <span class="moat-pill">31 years of dividend increases</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">Sanofi's moat is mostly one drug and one partnership. Dupixent works across a long list of allergic-type diseases, has more than 1.5 million patients and is still adding indications, and it was built with Regeneron, whose antibody technology produced it. Vaccines add a second, harder-to-copy asset: making flu and paediatric vaccines at global scale takes specialised plants and regulatory approvals. The Genzyme rare-disease enzymes serve small, specialised markets. The weak side is the one the market has been pricing for a year: <strong>what comes after Dupixent</strong>. In September 2025 the stock fell 9.1% on the day amlitelimab's first phase 3 data came out, even though the trial met its goals; Barclays analyst Emily Field, quoted by Pharmaceutical Executive, said the stock was increasingly seen as a "cliff stock". In July 2026 the new management stopped amlitelimab altogether.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">One drug is 44% of sales.</strong> Dupixent was €5,154M of €11,597M in Q2 2026, and three-quarters of it is sold in the US. RBC's initiation on September 9 named Dupixent's coming patent cliff among its reasons for a Sector Perform rating.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The pipeline keeps losing its lead assets.</strong> In the past twelve months: tolebrutinib missed its phase 3 in primary progressive MS and got an FDA complete response letter in the secondary progressive form (a €1,663M impairment in FY2025); amlitelimab will not be filed (€952M impairment); itepekimab (COPD) and balinatunfib (Crohn's and colitis) were discontinued; Dupixent failed in lichen simplex chronicus. RBC also cited scepticism that the pipeline can deliver more than €10B of sales.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">The partner takes a growing cut.</strong> Regeneron profit sharing rose 45% year on year in Q2 (€1,972M vs €1,360M). The October 1 expansion adds four early-stage antibodies on 50:50 terms, for $1B upfront and up to $7B in milestones.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Vaccines are shrinking in some markets.</strong> Paediatric vaccine sales outside the US and Europe fell 21.2% in Q2, mainly on fewer births in China, and China sales overall fell 4.9%. In the US, Sanofi reached an agreement with the government to lower medicine costs (FY2025 release), and the 2025 Dupixent price adjustment in China shows that pricing can move against the company.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">The comparison index is the <strong>CAC 40</strong>, Sanofi's home index; its column compares price returns, computed from Yahoo Finance index closes. <strong>Per-share figures:</strong> Sanofi reports in euros under IFRS, and <strong>one Nasdaq ADS represents one-half of one ordinary share</strong> (20-F exhibit 2.2). So the ADS EPS is the reported EPS × 0.5 × the dollar rate: €3.29 × 0.5 × 1.1225 USD/EUR (ECB reference rate, October 2, 2026) = <strong>$1.85 per ADS</strong>. Ratios are computed at the October 2 close of $39.92.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>SNY</th><th>Industry Avg</th><th>CAC 40</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>21.6</td><td>—</td><td>—</td><td>$39.92 ÷ $1.85 IFRS TTM EPS = 21.6. On <strong>business</strong> EPS (TTM €8.41 = $4.72 per ADS) the multiple is <strong>8.5</strong>. The IFRS figure is inflated by impairments (tolebrutinib, amlitelimab) and acquisition amortisation.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of next-year earnings per share.">Forward P/E</span></td><td>8.3</td><td>—</td><td>—</td><td>$39.92 ÷ $4.83 = 8.3. The $4.83 is the Vara consensus for FY2026 business EPS, €8.60 (13 estimates, as of September 28, 2026), × 0.5 × 1.1225. On the Paris line: €70.81 ÷ €8.60 = 8.2.</td></tr>
+      <tr><td><span class="tip" title="Price/Earnings-to-Growth: the forward P/E divided by the expected earnings growth rate in percent.">PEG Ratio</span></td><td>0.84</td><td>—</td><td>—</td><td>8.27 forward P/E ÷ 9.8% expected FY2026 business EPS growth (€7.83 → €8.60, Vara consensus). FY2027 consensus is €9.25 (+7.6%).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share. IFRS, basic, converted to USD per ADS.">EPS (TTM)</span></td><td>$1.85</td><td>—</td><td>—</td><td>IFRS basic EPS, twelve months to June 30, 2026: FY2025 €6.40 − H1 2025 €4.74 + H1 2026 €1.63 = €3.29 per share (the H1 2025 figure carried €2.34 from the Opella deal, which drops out). × 0.5 share per ADS × 1.1225 = $1.85. Business EPS on the same basis: €7.83 − €3.39 + €3.97 = €8.41, or $4.72 per ADS.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+16.0%</td><td>—</td><td>—</td><td>Q2 2026 net sales, in euros; +17.8% at CER. H1 2026: +11.1% in euros, +15.7% at CER. Upgraded FY2026 guide: around +10% at CER, with currency estimated at about −1% on sales.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the cost of making the product, as a percentage of revenue.">Gross Margin</span></td><td>81.2%</td><td>—</td><td>—</td><td>Business gross margin, Q2 2026 (+3.7pp), including the Sarclisa provision reversal (more than €200M). H1 2026: 79.6%.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: operating profit as a share of revenue. Sanofi's 'business operating income' leaves out amortisation, impairments and restructuring.">Operating Margin</span></td><td>28.4%</td><td>—</td><td>—</td><td>Business operating income ÷ net sales, Q2 2026. Trailing twelve months: €13,044M ÷ €45,843M = 28.5% (our calculation from the FY2025 and H1 releases).</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>8.6%</td><td>—</td><td>—</td><td>IFRS net income attributable to shareholders, TTM: €7,813M − €5,812M + €1,957M = €3,958M, on TTM net sales of €45,843M. Business net income was 21.6% of sales in Q2.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>5.8%</td><td>—</td><td>—</td><td>€4.12 per share for 2025 ÷ €70.81 = 5.8%. ADS holders received $2.422 per ADS in May 2026 (Yahoo Finance dividend record), 6.1% on $39.92; the dollar amount moves with EUR/USD. Payout: 53% of FY2025 business EPS.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Higher means more financial leverage.">Debt-to-Equity</span></td><td>0.34</td><td>—</td><td>—</td><td>StockAnalysis, latest balance sheet. Company-reported net debt €15,513M at June 30, 2026, after €6,350M of cash. In April Sanofi issued €2.3B of bonds at 3.00%–3.75%.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.99</td><td>—</td><td>—</td><td>StockAnalysis. Around 1.0, normal for a large drugmaker with steady cash generation.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure. Sanofi's definition also deducts restructuring payments and small deals (under €500M each).">Free Cash Flow</span></td><td>€9.36B</td><td>—</td><td>—</td><td>TTM, company definition: FY2025 €8,089M − H1 2025 €2,458M + H1 2026 €3,724M = €9,355M. FCF yield 10.9% on the €85.52B market cap (our calculation).</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity.">ROE</span></td><td>5.7%</td><td>—</td><td>—</td><td>StockAnalysis, TTM, on IFRS net income, which the impairments hold down.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.28</td><td>—</td><td>—</td><td>5-year, StockAnalysis. Low sensitivity to the market; the big moves in this stock come from pipeline and guidance news, not the market.</td></tr>
+      <tr><td>1-Year Price Return</td><td>−20.4%</td><td>—</td><td>−2.0%</td><td>ADS $50.14 (October 2, 2025) → $39.92. CAC 40 8,056.63 → 7,897.19 over the same dates. The S&amp;P 500 ETF (SPY) rose 15.0%.</td></tr>
+      <tr><td>5-Year Price Return</td><td>−20.8%</td><td>—</td><td>+15.6%</td><td>From the October 2021 month-end close ($50.43) to $39.92. CAC 40 6,830.34 → 7,897.19; SPY +67.6% over the same window. Price only, before dividends.</td></tr>
+      <tr><td>52-Week Range</td><td>$39.92 – $52.34</td><td>—</td><td>—</td><td>Daily closes, October 3, 2025 to October 2, 2026. The price sits at the low; the high was November 13, 2025.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="prose" style="margin-top:14px;font-size:13px;"><strong>FX exposure:</strong> two currencies sit between Sanofi's accounts and the ADS price. Earnings are reported in euros, so a stronger dollar lowers the dollar value of each euro of EPS. And more than half of sales are made in the US (€6,344M of €11,597M in Q2) and translated back into euros: in Q2, currency took 1.8 points off reported sales growth. Sanofi estimates currency at about −1% on 2026 sales and −2% on business EPS at July 2026 rates. The ADS also trades a few hours after Paris closes, so it can drift from parity: on October 2 the ADS closed at $39.92 against a parity value of $39.74 at the ECB fix (€70.81 × 1.1225 ÷ 2).</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Four items distort the reported figures. First, <strong>impairments</strong>: €1,663M on tolebrutinib in FY2025 (which turned Q4 2025 into an IFRS loss of €801M) and €952M on amlitelimab in Q2 2026. Second, the <strong>Opella transaction</strong>: H1 2025 IFRS EPS of €4.74 included €2.34 from discontinued operations, so year-on-year IFRS comparisons look much worse than the business. Third, <strong>Q2 2026 items on the good side</strong>: the Sarclisa provision reversal (more than €200M), the favourable Dupixent gross-to-net adjustment and €192M of divestment gains, partly offset by more than €200M of R&amp;D wind-down costs. The CEO said business EPS growth was "supported by disciplined cost management and one-offs." Fourth, <strong>buybacks</strong>: €5B in 2025 and €1B completed in April 2026, which cut the average share count to 1,196.6M in Q2 from 1,217.1M a year earlier.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Outperform</div><div class="card-note"><strong>25 analysts</strong> on the Paris line (MarketScreener consensus page, read October 6, 2026; latest listed rating action October 1). The US-line panel at StockAnalysis reads "Buy" from 10 analysts (last updated August 31); MarketBeat's reads "Hold" from 16 (read October 5).</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">€94.06</div><div class="card-note"><span style="color:var(--green);">+32.8% upside</span> from the €70.81 Paris close. The ADS equivalent is $52.79 (× 1.1225 ÷ 2). StockAnalysis's US-line average is $53.72 (+34.6% from $39.92).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">€78 – €112</div><div class="card-note">+10.2% to +58.2% from €70.81. Even the lowest target in the panel sits above the price.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">5 / 5 / 0</div><div class="card-note">US-line panel, September 2026 (StockAnalysis): 5 Strong Buy, 5 Hold, 0 Sell.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:50;background:#22c55e;"></div>
+    <div style="flex:50;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 5 (50%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 5 (50%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 0 (0%)</div>
+  </div>
+  <p class="prose" style="margin-top:18px;font-size:13px;"><strong>Estimates (Vara Research consensus, hosted by Sanofi, as of September 28, 2026; business basis, EUR):</strong> FY2026 net sales €47,806M and business EPS €8.60; FY2027 €50,841M and €9.25. For Q3 2026 the consensus is net sales of €13,190M and business EPS of €2.80, against €12,434M and €2.91 in Q3 2025, so analysts expect business EPS to dip about 4% year on year in the coming quarter.</p>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">ANALYST CALLS SINCE THE Q2 PRINT (JULY 30, 2026)</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">HSBC</strong> · Buy reiterated (Sep 10, 2026, MarketBeat ratings table).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">RBC Capital Markets</strong> · Initiated at Sector Perform · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">€80</span> (Sep 9, 2026, per Investing.com; MarketBeat's table dates it Sep 8). Reasons given: limited catalysts, Dupixent's patent cliff, and scepticism about more than €10B of pipeline sales; portfolio-reshaping M&amp;A, aggressive Dupixent lifecycle management and a wider Regeneron alliance were named as possible support. The Regeneron expansion arrived three weeks later.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">TD Cowen — Steve Scala</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$57</span> maintained (Aug 31, 2026, StockAnalysis ratings table).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Berenberg</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$62</span> maintained (Aug 24, 2026, StockAnalysis ratings table).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 results (company calendar)</div>
+        <div class="tl-desc">The first full quarter of the slowdown management flagged: the July release raised guidance while "anticipating normalisation of growth in the second half". Consensus looks for business EPS of €2.80, below last year's €2.91. Things to watch: Dupixent growth without the Q2 gross-to-net adjustment, vaccine sales as the flu season starts, any guidance effect of the $1B Regeneron upfront payment, and whether the "around 10%" sales guide holds.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027</div>
+      <div class="tl-content">
+        <div class="tl-title">New Regeneron antibodies enter the clinic</div>
+        <div class="tl-desc">Of the four long-acting antibodies added on October 1, REGN20423 (IL-13) is in a phase 1 study in eczema and the other three are expected to enter clinical studies in 2027. Regeneron also holds an option on Sanofi's lunsekimig, exercisable after its COPD phase 3 studies. Regeneron leads R&amp;D; Sanofi leads global sales.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Q1–Q3 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Cheplapharm transfer</div>
+        <div class="tl-desc">The commercial handover of 20 mature medicines is planned to start in Q1 2027, with the three plants following and completion expected by Q3 2027, subject to consultation with employee representatives and regulatory approval. Sanofi has promised more financial detail later.</div>
+        <div class="tl-impact neutral">Portfolio reshaping</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jan 28, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">Q4 2026 results and 2027 guidance (company calendar)</div>
+        <div class="tl-desc">The first full-year guide set by Garijo's team, and the first chance to see the R&amp;D and pipeline plan she described on taking over.</div>
+        <div class="tl-impact neutral">Guidance reset</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Regeneron alliance expanded — $1B upfront, up to $7B in milestones</div>
+        <div class="tl-desc">Garijo called it "a deliberate first step in igniting Sanofi's innovation engine." Costs and profits on the new antibodies are split 50:50, and the two companies settled their earlier collaboration litigation. Over the two sessions after the announcement the ADS fell 3.2% ($41.23 on September 30 → $39.92) and the Paris shares 2.5% (€72.64 → €70.81).</div>
+        <div class="tl-impact down">Reaction already happened: −3.2% (ADS, 2 sessions)</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat, guidance raised, pipeline cut</div>
+        <div class="tl-desc">Sales +17.8% at CER, business EPS +33.3% at CER, guidance raised to around 10% sales growth. Amlitelimab dropped (€952M impairment), itepekimab and balinatunfib discontinued. Paris closed down 8.95% (€79.92 → €72.77) and the ADS 4.37% ($44.85 → $42.89); the next session the ADS was still 3.9% below its pre-results close.</div>
+        <div class="tl-impact down">Reaction already happened: −4.37% (ADS)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">SNY (Nasdaq ADS, USD) — Monthly Closes, Oct 2021 → Oct 2, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 month-end closes (Oct 2021 – Sep 2026) + Oct 2, 2026 settled close · Yahoo Finance closes, not adjusted for dividends · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#D946EF;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been, on a 0–100 scale. Above 70 means the stock has risen hard and fast relative to its own recent history ("overbought"). Below 30 means it has fallen hard and fast ("oversold"). It measures momentum, not value.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;"><strong>What the series is:</strong> Nasdaq ADS closes in US dollars, so the line mixes the Paris share price with the euro-dollar rate. The closes are not adjusted for dividends, and Sanofi pays a large one each May: the ADS went ex-dividend on May 4, 2026 ($2.422 per ADS) and fell 5.9% that day, most of it the dividend leaving the price. Over five years the dividends are a large part of the return that this chart does not show.</p>
+  <p class="prose" style="margin-top:14px;">On price alone, SNY went from <strong>$50.43</strong> (October 2021 close) to <strong>$39.92</strong> (October 2, 2026), <strong>−20.8%</strong>. Over the same window the CAC 40 rose 15.6% and SPY 67.6%. The path is a range: a fall to the window low of <strong>$38.02 in September 2022</strong> (6-month RSI 16.8), a recovery to the low-to-mid $50s, a one-day 19% collapse in October 2023, a peak month-end close of <strong>$57.63 in September 2024</strong> (RSI 78.6, the highest reading in the window), and, after a last high of $55.46 in March 2025, a steady decline. The 6-month RSI is now <strong>24.1</strong>, oversold, and the 10-month moving average about <strong>$44.54</strong>. Today's $39.92 is the lowest point on the chart since that September 2022 month-end and 30.7% below the September 2024 peak.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Window low — $38.02, RSI 16.8</div><div class="tl-desc">The lowest month-end close of the five years, after a two-month fall from $49.70 at the end of July 2022. The August 10 session alone was −7.1%.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 27, 2023</div><div class="tl-content"><div class="tl-title">2025 margin target dropped — $53.33 → $43.13 (−19.1%)</div><div class="tl-desc">Sanofi abandoned its 32% operating-margin target for 2025, guided to a low-single-digit fall in 2024 adjusted EPS to fund more R&amp;D, and announced plans to separate consumer health. Reuters reported about €20B ($21B) of market value lost. That separation became the Opella deal of April 2025. The largest one-day fall in the window.</div><div class="tl-impact down">−19.1% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2024</div><div class="tl-content"><div class="tl-title">Peak — $57.63, RSI 78.6</div><div class="tl-desc">The highest month-end close of the window, up from $48.52 at the end of June 2024.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 4, 2025</div><div class="tl-content"><div class="tl-title">Amlitelimab phase 3 — $49.89 → $45.33 (−9.1%)</div><div class="tl-desc">The trial met all its main goals, yet the shares fell. Barclays' Emily Field told Reuters that investors had viewed amlitelimab as the lead asset to follow Dupixent and worried the pipeline could not replace it; UBS noted efficacy that looked weaker than Dupixent's (both as reported by Pharmaceutical Executive). Ten months later the new management stopped it.</div><div class="tl-impact down">−9.1% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb 12, 2026</div><div class="tl-content"><div class="tl-title">CEO change — $49.25 → $47.03 (−4.5%)</div><div class="tl-desc">The board declined to renew Paul Hudson's mandate and named Belén Garijo, with Olivier Charmeil as interim CEO until April 29. Paris fell 4.2% the same day.</div><div class="tl-impact down">−4.5% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jul 30, 2026</div><div class="tl-content"><div class="tl-title">Q2 beat and pipeline cuts — $44.85 → $42.89 (−4.4%)</div><div class="tl-desc">Results and guidance were ahead of expectations; the cuts to amlitelimab, itepekimab and balinatunfib dominated the reaction. Paris fell 8.95%.</div><div class="tl-impact down">−4.4% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $39.92</div><div class="tl-desc">−7.1% in September ($44.36 → $41.23) and a further −3.2% in the first two sessions of October, after the Regeneron deal. A 52-week closing low.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Over the five years on the chart, the ADS returned <strong>−20.8%</strong> on price while the <strong>CAC 40</strong> (home index) rose <strong>15.6%</strong> and the <strong>S&amp;P 500</strong> (SPY) rose <strong>67.6%</strong>. Over the past year: SNY −20.4%, CAC 40 −2.0%, SPY +15.0%. Sanofi's market value of about $96B sits just above GSK ($94.22B) and Regeneron ($75.69B), and far below Novartis ($268.00B) and AstraZeneca ($243.20B). It trades at about 8x forward business earnings with a 5.8% dividend yield. RBC's September initiation gives the reasons the multiple is low: Dupixent's patent cliff and doubts that the pipeline can replace it.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The business is growing fast and the share price is not. Q2 sales rose 17.8% at CER, business EPS 33.3%, and guidance went up. Dupixent is still compounding (+37.6% in Q2) toward management's ~€25B in 2030, with ~€10B more from launches. At $39.92 the ADS trades at about 8x forward business EPS, with a 5.8% dividend yield that has risen for 31 straight years and a free-cash-flow yield near 11%. Every target in both analyst panels sits above the price; the Paris-line average is 33% higher. A new CEO is cutting weak programmes early instead of spending on them for years, and she has already locked in the next generation of long-acting Dupixent-type antibodies with the partner that invented Dupixent. If even one of those works, the cliff is smaller than the price implies.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>Sanofi is a one-drug company with a weak pipeline, and the numbers prove it. Dupixent was 44% of Q2 sales; tolebrutinib, amlitelimab, itepekimab and balinatunfib have all been written down or stopped in about a year. The CEO said Q2 business EPS growth was "supported by disciplined cost management and one-offs", and the release names a favourable Dupixent gross-to-net adjustment and a Sarclisa provision reversal, management expects growth to slow in H2, and consensus has Q3 business EPS below last year. The Regeneron deal buys antibodies that are mostly not yet in human trials, for $1B upfront and up to $7B more, and RBC already doubts the pipeline's €10B target. The stock is down 21% in five years while the CAC 40 is up 16%: a low P/E has not been enough to stop the slide.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Dupixent concentration.</strong> 44% of sales from one drug, three-quarters of it in the US. Any pricing, competitive or patent event on Dupixent moves the whole company.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Pipeline attrition.</strong> Four lead programmes impaired or stopped since late 2025. The replacement plan now rests on the launch portfolio, early-stage Regeneron antibodies and the "external growth opportunities" the CEO pointed to in the Q2 release.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Second-half slowdown.</strong> Management has guided to a normalisation of growth after a 15.7% first half, and the Q2 margin had one-offs in it. A soft Q3 on October 30 would land on a stock already at its 52-week low.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Europe's drugmakers ask for better prices at home</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING HEADWIND</span></div>
+    <p class="biz-desc">On September 22 the chairs of nine European drugmakers, Sanofi among them, published an open letter titled "Europe Is Losing the Pharma Investment Race — But the Comeback Is Within Reach." They wrote that Europe's share of global pharma R&amp;D has fallen from 43% in 1990 to 31%, that its share of commercial clinical trials has halved in a decade to 9%, and that more than $600B of pharmaceutical investment was announced in the US and China in two years. For Sanofi, with only €2,141M of Q2 sales in Europe growing 1.3%, the letter describes the market where it earns the least growth.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #D946EF;">
+    <div class="biz-header"><div class="biz-name">Immunology's next round: longer-acting antibodies</div><span class="biz-badge" style="background:var(--accent-dim);color:var(--accent);">STRATEGIC SHIFT</span></div>
+    <p class="biz-desc">The October 1 deal is a bet that the next generation of these drugs will be <strong>long-acting</strong>, with fewer injections. The same idea was behind amlitelimab: in 2025 UBS noted that its less frequent dosing could appeal to patients who dislike injections (Pharmaceutical Executive). Sanofi and Regeneron will co-develop long-acting antibodies against IL-13, IL-4, the IL-4 receptor and a bispecific hitting IL-4 and IL-13 together, the same pathways Dupixent blocks. <strong>The bull framing:</strong> Sanofi keeps the commercial lead in the class it built. <strong>The bear framing:</strong> the class gets crowded and the new drugs could take sales from Dupixent before they add to it.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Big Pharma sheds its mature brands</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">PORTFOLIO FOCUS</span></div>
+    <p class="biz-desc">Sanofi has spent three years separating businesses that do not fit an innovation-led drugmaker: consumer health went into Opella with CD&amp;R in 2025, and 20 mature medicines are planned to go to Cheplapharm in 2027 in exchange for equity. Thomas Grenier, who runs General Medicines, described it in the Cheplapharm release as "Our multi-year journey to simplify our mature portfolio". The trade-off: each carve-out lifts growth and margin on paper but also removes steady cash generators, which raises the share of profit that depends on Dupixent and the pipeline.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, October 2, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/sny/history/</strong> — the October 2, 2026 settled Nasdaq close of $39.92 (open 39.58, high 40.07, low 39.50, Adj. Close 39.92, −1.84%). Prior close $40.67 on October 1; 39.92 − 40.67 = −0.75. Matches the Yahoo Finance daily row for SNY. Euronext Paris close €70.81 (Yahoo Finance, SAN.PA). EUR/USD: ECB euro reference rate of 1.1225 for October 2, 2026 (ECB data portal).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">ADS and currency: per Sanofi's 20-F exhibit 2.2 (Description of Securities, December 31, 2025), "Each Sanofi ADS represents one-half of one Sanofi ordinary share"; JPMorgan Chase Bank is the depositary. EPS (TTM) $1.85 = IFRS basic EPS €3.29 per share × 0.5 × 1.1225. Trailing P/E = $39.92 ÷ $1.85 = 21.6. Market cap = 1,207,773,393 issued shares (Sanofi declaration, August 31, 2026) × €70.81 = €85.52B, × 1.1225 = $96.00B.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Sanofi Q2 2026 press release (July 30, 2026, sanofi.com, also filed on Form 6-K) for sales, brand and regional figures, margins, R&amp;D, Regeneron profit sharing, impairments, cash flow, net debt, dividend, buyback, guidance, pipeline decisions, the CEO quote and the financial calendar; Sanofi Q4/FY2025 press release (January 29, 2026) for FY2025 figures, the tolebrutinib impairment and CRL and the US pricing agreement; Sanofi releases of February 12 (CEO appointment), September 14 (Cheplapharm), September 22 (chairs' open letter), October 1 (Regeneron alliance) and August 4, 2026 (MenQuadfi); Sanofi Executive Committee, shares-and-voting-rights and analyst-coverage pages; Vara Research consensus for Sanofi (vara-services.com/sanofi, as of September 28, 2026); L'Oréal release of February 3, 2025 and Sanofi's shareholding structure at June 30, 2026; Yahoo Finance (Zacks Equity Research, July 30, 2026) for Q2 consensus and actuals per ADS; Investing.com for the RBC initiation (September 9, 2026); Pharmaceutical Executive (September 4, 2025) for the amlitelimab reaction and the Barclays comment; Reuters via Yahoo Finance (October 27, 2023) for the dropped margin target; StockAnalysis for the price history, statistics (beta, debt/equity, current ratio, ROE, employees), the US-line analyst panel and ratings table, and peer market caps at the October 2 close; MarketScreener (read October 6, 2026; latest listed action October 1) for the Paris-line consensus; MarketBeat (read October 5, 2026) for the HSBC and RBC table entries; Yahoo Finance chart data for SNY, SAN.PA, the CAC 40 (^FCHI) and SPY; Wikipedia for the founding year and CAC 40 membership.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points. 60 month-end closes from October 2021 through September 2026 from Yahoo Finance's monthly SNY series (close, not dividend-adjusted), plus a final point at the October 2, 2026 settled close of $39.92. Business EPS, business operating income and free cash flow are Sanofi's non-IFRS measures as defined in its releases. Trailing-twelve-month figures are our calculation: FY2025 minus H1 2025 plus H1 2026. Competitor figures are market caps, not revenues.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. "Business" figures are company-defined non-IFRS measures. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Oct 2021 → Sep 2026 (Yahoo Finance monthly SNY close, not dividend-adjusted) + Oct 2, 2026 settled close =====
+const labels = ['Oct 21', 'Nov 21', 'Dec 21', 'Jan 22', 'Feb 22', 'Mar 22', 'Apr 22', 'May 22', 'Jun 22', 'Jul 22', 'Aug 22', 'Sep 22', 'Oct 22', 'Nov 22', 'Dec 22', 'Jan 23', 'Feb 23', 'Mar 23', 'Apr 23', 'May 23', 'Jun 23', 'Jul 23', 'Aug 23', 'Sep 23', 'Oct 23', 'Nov 23', 'Dec 23', 'Jan 24', 'Feb 24', 'Mar 24', 'Apr 24', 'May 24', 'Jun 24', 'Jul 24', 'Aug 24', 'Sep 24', 'Oct 24', 'Nov 24', 'Dec 24', 'Jan 25', 'Feb 25', 'Mar 25', 'Apr 25', 'May 25', 'Jun 25', 'Jul 25', 'Aug 25', 'Sep 25', 'Oct 25', 'Nov 25', 'Dec 25', 'Jan 26', 'Feb 26', 'Mar 26', 'Apr 26', 'May 26', 'Jun 26', 'Jul 26', 'Aug 26', 'Sep 26', 'Oct 2 26'];
+const prices = [50.43,47.57,50.1,52.0,52.45,51.34,52.25,53.25,50.03,49.7,41.03,38.02,43.23,45.35,48.43,49.14,46.85,54.42,53.65,51.02,53.9,53.37,53.18,53.64,45.25,46.75,49.73,49.9,47.85,48.6,49.23,49.03,48.52,51.81,56.26,57.63,52.88,48.49,48.23,54.34,54.47,55.46,54.95,49.37,48.31,45.64,49.48,47.2,50.58,49.88,48.46,47.04,48.66,48.18,46.58,43.67,42.66,43.08,44.36,41.23,39.92];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 11, label: 'Sep 2022 — window low $38.02, RSI 16.8',                          color: '#ef4444' },
+  { idx: 24, label: 'Oct 2023 — 2025 margin target dropped; Oct 27: −19.1%',             color: '#ef4444' },
+  { idx: 35, label: 'Sep 2024 — 5-yr high close $57.63, RSI 78.6',                       color: '#22c55e' },
+  { idx: 47, label: 'Sep 2025 — amlitelimab phase 3 day: −9.1% (Sep 4)',                 color: '#f59e0b' },
+  { idx: 52, label: 'Feb 2026 — CEO change announced Feb 12 (−4.5%)',                    color: '#f59e0b' },
+  { idx: 57, label: 'Jul 2026 — Q2 beat, guidance up, pipeline cut; Jul 30: −4.4%',     color: '#3b82f6' },
+  { idx: 60, label: 'Oct 2, 2026 — settled close $39.92 (52-week closing low)',          color: '#D946EF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(217,70,239,0.22)');
+grad.addColorStop(1, 'rgba(217,70,239,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#D946EF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#D946EF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
