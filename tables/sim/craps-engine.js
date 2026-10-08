@@ -7,7 +7,20 @@
      luck = (net of bets that settled) + (V of bets still up) - (V of all bets before the roll)
    has mean exactly zero, and  actual result + value still on the felt = expected result + luck.
    Table rules sources: Wizard of Odds craps basics (working/off on the come-out, 3-4-5x lays 6x,
-   commission conventions), fetched 25 Sep 2026. */
+   commission conventions), fetched 25 Sep 2026.
+   Put bets (Oki, 8 Oct 2026: "Allow, priced"). Wizard of Odds craps basics, "Put Bets" (fetched 8 Oct 2026):
+   "the player may skip the come out roll on a pass or come bet. Such a late bet on the pass and come is known
+   as a put bet"; house edge 33.33% on the 4 and 10, 20.00% on the 5 and 9, 9.09% on the 6 and 8, per bet
+   resolved, and odds may be taken behind it. With w = ways(n) and 6 ways to roll a 7, an even-money put on n
+   settles with P(win) = w/(w+6), P(lose) = 6/(w+6), so
+     edge(put n) = P(lose) - P(win) = (6 - w)/(w + 6)      4/10: 3/9 = 1/3   5/9: 2/10 = 1/5   6/8: 1/11
+   and with m times odds behind it (true odds, value 0) the expected loss is unchanged while the money is 1 + m:
+     combined edge = edge(put n) / (1 + m)
+   (Wizard's break-evens follow exactly: 6 with 5x = 1/66 = place 6; 5 with 4x = 1/25 = place 5;
+   4 with 19x = 1/60 = buy 4 with commission on the win; 4 with 6x = 1/21 = buy 4 with commission up front.)
+   This table books a put on the pass line only, on the current point, when the player has no pass line bet
+   (one line bet per spot; chips added to a line bet with a point go behind it as odds). A put directly on a
+   come number, which Wizard also describes, is not offered here. A put is a contract bet like pass. */
 (function (root) {
   'use strict';
 
@@ -77,6 +90,7 @@
     function step(b, c, comeOut) {
       var t = c.t, n = b.num;
       switch (b.type) {
+        case 'put':                                    // a pass line bet made after the point: no come-out roll
         case 'pass': case 'come':
           if (n == null) { if (t === 7 || t === 11) return W(ONE); if (t === 2 || t === 3 || t === 12) return LOSE; return MOVE(t); }
           return t === n ? W(ONE) : t === 7 ? LOSE : null;
@@ -172,7 +186,7 @@
     }
     function minBet(type, n) {
       var u = unit(type, n);
-      if (type === 'pass' || type === 'dontpass' || type === 'come' || type === 'dontcome' || type === 'field' || type === 'big') return R.min;
+      if (type === 'pass' || type === 'dontpass' || type === 'come' || type === 'dontcome' || type === 'put' || type === 'field' || type === 'big') return R.min;
       if (type === 'place') return Math.ceil(R.min / u) * u;
       return u;
     }
@@ -199,10 +213,17 @@
       });
       return { lineEdge: edge(line), avgWager: avg, edge: div(edge(line), avg) };
     }
+    /* Put bet on n with m times odds behind it (m defaults to the table's full odds on n):
+       combined edge = edge(put n) / (1 + m); the odds add money at no edge. */
+    function putCombo(n, m) {
+      if (m == null) m = oddsMult(n);
+      var w = add(ONE, Q(m));
+      return { putEdge: edge('put', n), mult: m, avgWager: w, edge: div(edge('put', n), w) };
+    }
 
     /* ---------- the bet catalogue (fresh bets, as offered on the felt) ---------- */
     function band(e) { var x = num(e); return x < 0.02 ? 'up' : x < 0.05 ? 'au' : 'dn'; }
-    var NAMES = { pass: 'Pass line', dontpass: 'Don’t pass', come: 'Come', dontcome: 'Don’t come',
+    var NAMES = { pass: 'Pass line', dontpass: 'Don’t pass', come: 'Come', dontcome: 'Don’t come', put: 'Put bet on',
                   odds: 'Odds on', layodds: 'Lay odds on', place: 'Place', buy: 'Buy', lay: 'Lay', hard: 'Hard',
                   big: 'Big', field: 'Field', any7: 'Any seven', anycraps: 'Any craps', two: 'Two (aces)',
                   three: 'Three (ace-deuce)', eleven: 'Eleven (yo)', twelve: 'Twelve (boxcars)',
@@ -210,7 +231,7 @@
     function name(type, n) { return NAMES[type] + (n != null ? ' ' + n : ''); }
     function paysLabel(type, n) {
       switch (type) {
-        case 'pass': case 'dontpass': case 'come': case 'dontcome': case 'big': return '1:1';
+        case 'pass': case 'dontpass': case 'come': case 'dontcome': case 'put': case 'big': return '1:1';
         case 'odds': return ratio(TRUE[n].n, TRUE[n].d);
         case 'layodds': return ratio(TRUE[n].d, TRUE[n].n);
         case 'place': return ratio(PLACE[n].n, PLACE[n].d);
@@ -241,6 +262,7 @@
                        unit: unit(type, n), min: minBet(type, n) });
     }
     ['pass', 'dontpass', 'come', 'dontcome'].forEach(function (t) { entry(t); });
+    POINTS.forEach(function (n) { entry('put', n); });
     POINTS.forEach(function (n) { entry('odds', n); });
     POINTS.forEach(function (n) { entry('layodds', n); });
     ['place', 'buy', 'lay'].forEach(function (t) { POINTS.forEach(function (n) { entry(t, n); }); });
@@ -250,7 +272,7 @@
     var byKey = {}; catalogue.forEach(function (c) { byKey[c.key] = c; });
 
     return { rules: R, step: step, value: value, rolls: rolls, edge: edge, vigRate: vigRate, unit: unit, minBet: minBet, maxBet: maxBet,
-             oddsMult: oddsMult, maxOdds: maxOdds, combo: combo, catalogue: catalogue, byKey: byKey, band: band, name: name,
+             oddsMult: oddsMult, maxOdds: maxOdds, combo: combo, putCombo: putCombo, catalogue: catalogue, byKey: byKey, band: band, name: name,
              Table: function (opts) { return new Table(this, opts || {}); } };
   }
 
@@ -283,7 +305,7 @@
 
   /* ---------- a table: bankroll, bets on the felt, rolls, and the ledger ---------- */
   var LINE = { pass: 1, dontpass: 1, come: 1, dontcome: 1 };
-  var NUMBERED = { odds: 1, layodds: 1, place: 1, buy: 1, lay: 1, hard: 1, big: 1 };
+  var NUMBERED = { put: 1, odds: 1, layodds: 1, place: 1, buy: 1, lay: 1, hard: 1, big: 1 };
   function Table(g, opts) {
     this.g = g; this.rng = opts.rng || (opts.seed ? seeded(opts.seed) : cryptoRng());
     this.point = null; this.bets = []; this.nextId = 1;
@@ -303,13 +325,19 @@
   Table.prototype.check = function (spec) {
     var g = this.g, t = spec.type, n = spec.num, a = spec.amount, cur = this.find(spec), have = cur ? cur.amount : 0;
     if (!(a > 0) || a !== Math.floor(a)) return 'Bets are in whole dollars.';
-    if ((t === 'pass' || t === 'dontpass') && this.point != null) return 'Line bets go down on the come-out roll, before a point is set.';
+    if (t === 'dontpass' && this.point != null) return 'Don’t pass goes down on the come-out roll, before a point is set.';
+    if (t === 'pass' && this.point != null) return 'With the point on, a new pass line bet is a put bet on the ' + this.point + '.';
+    if (t === 'put') {
+      if (this.point == null) return 'On the come-out roll, use the pass line; a put bet goes down once a point is set.';
+      if (n !== this.point) return 'A put bet goes on the pass line, on the point (' + this.point + ').';
+      for (var i = 0; i < this.bets.length; i++) if (this.bets[i].type === 'pass') return 'You already have a pass line bet on the ' + this.point + '; more chips go behind it as odds.';
+    }
     if ((t === 'come' || t === 'dontcome') && this.point == null) return 'Come bets go down once a point is set; on the come-out, use the line.';
     var nt = n;
     if (t === 'odds' || t === 'layodds') {
       var p = spec.parent != null ? this.get(spec.parent) : null;
       if (!p || p.num == null) return 'Odds go behind a line or come bet that already has a point.';
-      if ((t === 'odds') !== (p.type === 'pass' || p.type === 'come')) return t === 'odds' ? 'Take odds behind pass or come; lay odds behind don’t.' : 'Lay odds go behind don’t pass or don’t come.';
+      if ((t === 'odds') !== (p.type === 'pass' || p.type === 'come' || p.type === 'put')) return t === 'odds' ? 'Take odds behind pass or come; lay odds behind don’t.' : 'Lay odds go behind don’t pass or don’t come.';
       nt = p.num;
       var mx = g.maxOdds(t, nt, p.amount);
       if (have + a > mx) return 'At ' + ODDS_LABEL[g.rules.odds] + ' the most you can ' + (t === 'odds' ? 'take' : 'lay') + ' behind $' + p.amount + ' on the ' + nt + ' is $' + mx + '.';
@@ -348,13 +376,13 @@
     T.bets++; T.wagered += a + vig; T.expected += ev; T.actual -= vig;
     return { ok: true, bet: b };
   };
-  /* Contract bets (pass and come once they have a point) stay up until they settle. */
+  /* Contract bets (pass and come once they have a point, and put bets) stay up until they settle. */
   Table.prototype.removable = function (b) {
-    if ((b.type === 'pass' || b.type === 'come') && b.num != null) return false;
+    if ((b.type === 'pass' || b.type === 'come' || b.type === 'put') && b.num != null) return false;
     return true;
   };
   Table.prototype.remove = function (id) {
-    var b = this.get(id); if (!b || !this.removable(b)) return { ok: false, reason: 'Pass and come bets with a point are contract bets: they stay until they win or lose.' };
+    var b = this.get(id); if (!b || !this.removable(b)) return { ok: false, reason: 'Pass, come and put bets with a point are contract bets: they stay until they win or lose.' };
     var self = this, out = [b];
     this.bets.forEach(function (x) { if (x.parent === id) out.push(x); });   // taking down a don't takes its lay odds too
     out.forEach(function (x) {
