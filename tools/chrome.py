@@ -59,7 +59,7 @@ NAV: list[NavLink | NavMenu] = [
 ]
 FOOT_LINKS = [('Learn', '/#learn'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
               ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
-CTA = ('Take a Seat', '/#learn')
+CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tables index, not Learn (Soon)
 
 # The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
