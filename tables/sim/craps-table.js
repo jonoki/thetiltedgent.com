@@ -12,7 +12,7 @@ window.CrapsTable = (function () {
   var CHIPS = [1, 5, 25, 100, 500];
   var WORD = { 4: 'FOUR', 5: 'FIVE', 6: 'SIX', 8: 'EIGHT', 9: 'NINE', 10: 'TEN' };
   var PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-  var STAY = { pass: 1, dontpass: 1, place: 1, buy: 1, lay: 1, hard: 1, big: 1, field: 1, any7: 1, anycraps: 1, two: 1, three: 1, eleven: 1, twelve: 1 };
+  var STAY = { pass: 1, put: 1, dontpass: 1, place: 1, buy: 1, lay: 1, hard: 1, big: 1, field: 1, any7: 1, anycraps: 1, two: 1, three: 1, eleven: 1, twelve: 1 };
 
   function usd(x) {
     var a = Math.round(Math.abs(x) * 100) / 100;
@@ -39,9 +39,11 @@ window.CrapsTable = (function () {
   function dieHTML(v) { var h = ''; for (var i = 0; i < 9; i++) h += '<i' + (PIPS[v].indexOf(i) >= 0 ? ' class="p"' : '') + '></i>'; return h; }
 
   /* ---------- teaching copy: how each bet works ---------- */
-  function how(t, R) {
+  function how(t, R, n, G) {
     var lim = CE.ODDS_LABEL[R.odds];
     switch (t) {
+      case 'put': return putWhy(G, n) + ' Once down it is a contract bet: it stays until it wins or loses' +
+        ', and if it wins with “Winning bets stay up” on, it goes back up as a pass line bet for the next come-out.';
       case 'pass': return 'Bet with the shooter. On the come-out, 7 or 11 wins and 2, 3 or 12 loses; any other number becomes the point, and the bet then wins if the point rolls again before a 7. Once there is a point it is a contract bet: it stays until it settles.';
       case 'dontpass': return 'Bet against the shooter. On the come-out, 2 or 3 wins, 12 pushes (the “bar 12”) and 7 or 11 loses; once a point is set it wins if a 7 comes before the point. You may take it down after the point is set, but by then it is a bet in your favour.';
       case 'come': return 'A pass bet made while the point is on. The next roll is its own come-out: 7 or 11 wins, 2, 3 or 12 loses, and any other number moves the bet to that number, where it wins if the number repeats before a 7.';
@@ -66,6 +68,16 @@ window.CrapsTable = (function () {
       case 'hilo': return 'The 2 and the 12, split in half. Whichever rolls pays its half at 30 to 1 and the other half loses. Goes down in multiples of $2.';
     }
     return '';
+  }
+
+  /* Why a put bet costs so much without big odds behind it. Every figure is read from the engine:
+     its edge (6 - w)/(w + 6) and the combined edge with full odds, edge / (1 + m) (craps-engine.js, putCombo). */
+  function putWhy(G, n) {
+    var w = CE.ways(n), c = G.byKey['put' + n], pc = G.putCombo(n), lim = CE.ODDS_LABEL[G.rules.odds];
+    return 'A pass line bet made after the point is set. It skips the come-out roll, where the pass line wins 8 ways (7 or 11) and loses only 4 (2, 3 or 12). ' +
+      'From here it wins only if the ' + n + ' rolls before a 7: ' + w + ' ways against 6, paid even money, so on its own it costs ' + pct(c.edgePct) + ' of the bet. ' +
+      'Odds behind it pay the true odds and cost nothing, so they spread that cost over more money: with full ' + lim + ' odds (' + pc.mult + 'x on the ' + n + ') the two together cost ' +
+      pct(100 * CE.num(pc.edge)) + ' of what you put up.';
   }
 
   /* ---------- the felt ---------- */
@@ -189,7 +201,7 @@ window.CrapsTable = (function () {
       var of = el.dataset.of, n = el.dataset.n ? +el.dataset.n : null;
       for (var i = 0; i < T.bets.length; i++) {
         var b = T.bets[i];
-        if (b.type === of && b.num != null && (n == null || b.num === n)) return b;
+        if ((b.type === of || (of === 'pass' && b.type === 'put')) && b.num != null && (n == null || b.num === n)) return b;
       }
       return null;
     }
@@ -197,7 +209,7 @@ window.CrapsTable = (function () {
       var t = el.dataset.t, n = el.dataset.n ? +el.dataset.n : null;
       if (t === 'odds' || t === 'layodds') { var p = parentFor(el); if (!p) return null; for (var i = 0; i < T.bets.length; i++) if (T.bets[i].parent === p.id) return T.bets[i]; return null; }
       for (var j = 0; j < T.bets.length; j++) {
-        var b = T.bets[j]; if (b.type !== t) continue;
+        var b = T.bets[j]; if ((b.type === 'put' && t === 'pass' ? 'pass' : b.type) !== t) continue;   // a put bet sits on the pass line
         if (t === 'pass' || t === 'dontpass') return b;
         if (t === 'come' || t === 'dontcome') { if (b.num == null) return b; continue; }
         if (n == null || b.num === n) return b;
@@ -207,15 +219,17 @@ window.CrapsTable = (function () {
     function keyFor(el) {
       var t = el.dataset.t, n = el.dataset.n ? +el.dataset.n : null;
       if (t === 'odds' || t === 'layodds') { var p = parentFor(el); n = p ? p.num : (el.dataset.of === 'pass' || el.dataset.of === 'dontpass') ? T.point : n; return n ? t + n : null; }
+      if (t === 'pass' && T.point != null) { var lb = betFor(el); if (!lb) return 'put' + T.point; if (lb.type === 'put') return 'put' + lb.num; }   // the pass line after the point: a put bet
       return t + (n != null ? n : '');
     }
 
     /* ---------- placing and taking down ---------- */
-    function lineBet(type) { for (var i = 0; i < T.bets.length; i++) if (T.bets[i].type === type) return T.bets[i]; return null; }
+    function lineBet(type) { for (var i = 0; i < T.bets.length; i++) if (T.bets[i].type === type || (type === 'pass' && T.bets[i].type === 'put')) return T.bets[i]; return null; }
     function act(el) {
       if (rolling) return;
       var redirected = '';
       // Once the point is set a line bet can't be added to, so chips put behind it are odds, as at a real table.
+      // With the point on and no pass line bet, a chip on the pass line is a put bet on the point.
       if (S.chip !== 'take' && (el.dataset.t === 'pass' || el.dataset.t === 'dontpass') && T.point != null) {
         var lb = lineBet(el.dataset.t);
         if (lb && lb.num != null) {
@@ -224,6 +238,7 @@ window.CrapsTable = (function () {
         }
       }
       var t = el.dataset.t, spec, p = null;
+      if (S.chip !== 'take' && t === 'pass' && T.point != null) t = 'put';
       showCard(el);
       if (S.chip === 'take') {
         var b = betFor(el);
@@ -239,7 +254,7 @@ window.CrapsTable = (function () {
         p = parentFor(el);
         if (!p) { say(t === 'odds' ? 'Odds go behind a pass or come bet once it has a number.' : 'Lay odds go behind a don’t pass or don’t come bet once it has a number.', 'info'); return; }
         spec = { type: t, parent: p.id };
-      } else spec = { type: t, num: el.dataset.n ? +el.dataset.n : null };
+      } else spec = { type: t, num: t === 'put' ? T.point : el.dataset.n ? +el.dataset.n : null };
       var n = p ? p.num : spec.num, u = G.unit(t, n), mn = G.minBet(t, n), cur = T.find(spec), have = cur ? cur.amount : 0;
       var a = Math.max(1, Math.round(S.chip / u)) * u, note = '';
       if (a !== S.chip) note = G.name(t, n) + ' goes down in $' + u + ' units so it pays in whole dollars.';
@@ -257,10 +272,16 @@ window.CrapsTable = (function () {
       var res = T.place({ type: t, num: spec.num, parent: spec.parent, amount: a });
       if (!res.ok) { say(res.reason, 'info'); return; }
       var vig = res.bet.vig && G.vigRate(t, n).n ? ' (plus ' + usd(CE.num(G.vigRate(t, n)) * a) + ' commission)' : '';
+      if (t === 'put') {
+        var pc = G.putCombo(n);
+        note = (note ? note + ' ' : '') + 'On its own it costs ' + pct(G.byKey['put' + n].edgePct) + ' (it skips the come-out roll); full ' + CE.ODDS_LABEL[G.rules.odds] +
+          ' odds behind it (' + pc.mult + 'x) bring the two together to ' + pct(100 * CE.num(pc.edge)) + '. Tap the pass line again to add odds.';
+        say(usd(a) + ' put bet on the ' + n + ': a pass line bet made after the point.' + ' <span class="dimn">' + note + '</span>', 'info');
+      } else
       say(redirected + usd(a) + ' on ' + G.name(t, n) + vig + '.' + (note ? ' <span class="dimn">' + note + '</span>' : ''), 'info');
       persist(); render(); renderSession();
     }
-    function label(el) { var k = keyFor(el); return k && G.byKey[k] ? G.byKey[k].name : el.dataset.t === 'odds' ? 'the odds' : 'that spot'; }
+    function label(el) { if (el.dataset.t === 'pass' && T.point != null && !betFor(el)) return 'the pass line'; var k = keyFor(el); return k && G.byKey[k] ? G.byKey[k].name : el.dataset.t === 'odds' ? 'the odds' : 'that spot'; }
     function clearAll() {
       if (rolling) return;
       var back = 0, stuck = [];
@@ -384,8 +405,9 @@ window.CrapsTable = (function () {
         var b = e.bet, el = zoneEl(b, e.r === 'move' ? e.num : b.num);
         if (el) el.classList.add(e.r === 'win' ? 'win' : e.r === 'lose' ? 'lose' : 'move');
         if (S.stayUp && e.r === 'win' && STAY[b.type]) {
-          var r = T.place({ type: b.type, num: b.type === 'pass' || b.type === 'dontpass' ? null : b.num, amount: b.amount });
-          if (r.ok) up.push(G.name(b.type, r.bet.num == null ? null : b.num)); else fail.push(G.name(b.type, b.type === 'pass' || b.type === 'dontpass' ? null : b.num));
+          var rt = b.type === 'put' ? 'pass' : b.type, line = rt === 'pass' || rt === 'dontpass';
+          var r = T.place({ type: rt, num: line ? null : b.num, amount: b.amount });
+          if (r.ok) up.push(G.name(rt, line ? null : b.num)); else fail.push(G.name(rt, line ? null : b.num));
         }
       });
       narrate(res, hadPlaceOff, up, fail);
@@ -396,9 +418,11 @@ window.CrapsTable = (function () {
       if (b.type === 'come' || b.type === 'dontcome') return n != null ? felt.querySelector('.cpt-num[data-num="' + n + '"]') : felt.querySelector('.z-' + b.type);
       if (b.type === 'odds' || b.type === 'layodds') return b.come ? felt.querySelector('.cpt-num[data-num="' + b.num + '"]') : felt.querySelector('.z-' + (b.type === 'odds' ? 'pass' : 'dontpass'));
       if (b.type === 'pass' || b.type === 'dontpass') return felt.querySelector('.z-' + b.type);
+      if (b.type === 'put') return felt.querySelector('.z-pass');
       return felt.querySelector('.z-' + b.type + (b.num != null ? '[data-n="' + b.num + '"]' : ''));
     }
     function short(b) {
+      if (b.type === 'put') return 'Put bet on the ' + b.num;
       if (b.type === 'odds') return (b.come ? 'Come odds on the ' : 'Pass odds on the ') + b.num;
       if (b.type === 'layodds') return (b.come ? 'Don’t come lay odds on the ' : 'Don’t pass lay odds on the ') + b.num;
       if (b.type === 'come' || b.type === 'dontcome') return G.name(b.type) + (b.num != null ? ' on the ' + b.num : '');
@@ -440,7 +464,7 @@ window.CrapsTable = (function () {
         if (t === 'odds' || t === 'layodds') el.hidden = noParent;          // an odds spot exists only behind a bet with a number
         if (s) s.innerHTML = b ? stack(b.amount) : '';
         el.classList.toggle('has', !!b);
-        var closed = ((t === 'pass' || t === 'dontpass') && point != null && !b) || ((t === 'come' || t === 'dontcome') && point == null);
+        var closed = (t === 'dontpass' && point != null && !b) || ((t === 'come' || t === 'dontcome') && point == null);
         el.classList.toggle('closed', closed);
         var k = keyFor(el), c = k && G.byKey[k];
         el.setAttribute('aria-label', (c ? c.name + ', pays ' + c.pays + ', house edge ' + pct(c.edgePct) : label(el)) + (b ? ', your bet ' + usd(b.amount) : ''));
@@ -484,10 +508,10 @@ window.CrapsTable = (function () {
          cost per roll   = sum(edge x money put up / average rolls to settle a fresh bet) = sum(perRollPct/100 x money put up),
                            the cost of keeping this spread up, re-betting each bet as it settles; per hour = x 100 rolls (an estimate)
          rolls to settle = G.rolls() of the bet in its current state, counting every roll as working */
-    var ORDER = ['pass', 'dontpass', 'come', 'dontcome', 'place', 'buy', 'lay', 'big', 'hard', 'field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'];
+    var ORDER = ['pass', 'put', 'dontpass', 'come', 'dontcome', 'place', 'buy', 'lay', 'big', 'hard', 'field', 'any7', 'anycraps', 'two', 'three', 'eleven', 'twelve', 'horn', 'world', 'ce', 'hilo'];
     function catKey(b) { return b.type === 'pass' || b.type === 'dontpass' || b.type === 'come' || b.type === 'dontcome' ? b.type : b.type + (b.num != null ? b.num : ''); }
     function rowName(b) {
-      if (b.type === 'odds' || b.type === 'layodds') return short(b);
+      if (b.type === 'odds' || b.type === 'layodds' || b.type === 'put') return short(b);
       if (b.type === 'pass' || b.type === 'dontpass') return G.name(b.type) + (b.num != null ? ', point ' + b.num : '');
       if (b.type === 'come' || b.type === 'dontcome') return G.name(b.type) + (b.num != null ? ' on the ' + b.num : ' (in the box)');
       return G.name(b.type, b.num);
@@ -509,6 +533,7 @@ window.CrapsTable = (function () {
       if (b.type === 'odds') return b.come ? felt.querySelector('.cs-come[data-n="' + b.num + '"]') : felt.querySelector('.z-odds[data-of="pass"]');
       if (b.type === 'layodds') return b.come ? felt.querySelector('.cs-dc[data-n="' + b.num + '"]') : felt.querySelector('.z-layodds[data-of="dontpass"]');
       if (b.type === 'pass' || b.type === 'dontpass' || b.type === 'come' || b.type === 'dontcome') return felt.querySelector('.z-' + b.type);
+      if (b.type === 'put') return felt.querySelector('.z-pass');
       return felt.querySelector('.z-' + b.type + (b.num != null ? '[data-n="' + b.num + '"]' : ''));
     }
     function renderFelt() {
@@ -526,6 +551,7 @@ window.CrapsTable = (function () {
         var r = CE.num(G.rolls({ type: b.type, num: b.num }));
         sumAmt += b.amount; sumV += v; sumPut += put; sumBooked += e * put; sumRoll += pr * put;
         var sub = (isOff(b) ? 'off on the come-out · ' : '') + (r === 1 ? 'settles next roll' : '~' + r.toFixed(1) + ' rolls to settle');
+        if (b.type === 'put') { var pc = G.putCombo(b.num); sub = 'skips the come-out, so it costs more; ' + pct(100 * CE.num(pc.edge)) + ' with full ' + pc.mult + 'x odds · ' + sub; }
         h += '<tr' + (b.parent != null ? ' class="kid"' : '') + '><td><button type="button" class="cpt-fl-b" data-id="' + b.id + '">' + esc(rowName(b)) + '</button><small>' + sub + '</small></td>' +
           '<td>' + usd(b.amount) + '</td><td><span class="band ' + band + '">' + pct(100 * e) + '</span></td><td class="' + cls(v) + '">' + signed2(v) + '</td></tr>';
       });
@@ -562,7 +588,7 @@ window.CrapsTable = (function () {
         '<dt>Edge per roll</dt><dd>' + pct(c.perRollPct, 3) + '</dd>' +
         '<dt>Bet size</dt><dd>' + (u > 1 ? 'multiples of ' + usd(u) + ', ' : '') + 'minimum ' + usd(mn) + (c.type === 'odds' || c.type === 'layodds' ? ', up to ' + CE.ODDS_LABEL[R.odds] + ' (the table maximum doesn’t apply to odds)' : ', maximum ' + usd(G.maxBet(c.type, c.num))) + '</dd>' +
         (b ? '<dt>Your bet</dt><dd>' + usd(b.amount) + ', worth ' + signed(T.v(b)) + ' on average from here</dd>' : '') + '</dl>' +
-        '<p class="cpt-help">' + how(c.type, R) + '</p>' +
+        '<p class="cpt-help">' + how(c.type, R, c.num, G) + '</p>' +
         (c.type === 'pass' || c.type === 'come' ? '<p class="cpt-help">With full ' + CE.ODDS_LABEL[R.odds] + ' odds behind it, the expected loss is still ' + pct(c.edgePct) + ' of the line bet, but only <b>' + pct(100 * CE.num(G.combo('pass').edge), 3) + '</b> of all the money you put up.</p>' : '') +
         (c.type === 'dontpass' || c.type === 'dontcome' ? '<p class="cpt-help">With full lay odds behind it, the expected loss is ' + pct(c.edgePct) + ' of the flat bet, <b>' + pct(100 * CE.num(G.combo('dontpass').edge), 3) + '</b> of all the money put up.</p>' : '');
       pane.innerHTML = h;
@@ -596,16 +622,20 @@ window.CrapsTable = (function () {
         if (!groups[gk]) { groups[gk] = { c: c, nums: [] }; order.push(gk); }
         if (c.num != null) groups[gk].nums.push(c.num);
       });
-      var NM = { pass: 'Pass line or come', dontpass: 'Don’t pass or don’t come', place: 'Place', buy: 'Buy', lay: 'Lay', hard: 'Hard', big: 'Big' };
+      var NM = { pass: 'Pass line or come', put: 'Put bet',  dontpass: 'Don’t pass or don’t come', place: 'Place', buy: 'Buy', lay: 'Lay', hard: 'Hard', big: 'Big' };
       var rows = order.map(function (gk) { var g = groups[gk], c = g.c; return { name: g.nums.length ? NM[c.type] + ' ' + g.nums.join(' or ') : NM[c.type] || c.name, edge: c.edge, band: c.band, pays: c.pays }; });
       var lim = CE.ODDS_LABEL[G.rules.odds], cp = G.combo('pass'), cd = G.combo('dontpass');
       rows.push({ name: 'Odds or lay odds, any number', edge: CE.Q(0), band: 'up', pays: 'true odds' });
       rows.push({ name: 'Pass or come + ' + lim + ' odds (combined)', edge: cp.edge, band: G.band(cp.edge), pays: '' });
       rows.push({ name: 'Don’t + ' + lim + ' lay odds (combined)', edge: cd.edge, band: G.band(cd.edge), pays: '' });
+      [[6, 8], [5, 9], [4, 10]].forEach(function (pr) {
+        var pc = G.putCombo(pr[0]);
+        rows.push({ name: 'Put bet ' + pr[0] + ' or ' + pr[1] + ' + ' + pc.mult + 'x odds (combined)', edge: pc.edge, band: G.band(pc.edge), pays: '' });
+      });
       rows.sort(function (a, b) { return CE.num(a.edge) - CE.num(b.edge); });
       var h = '<div class="tw"><table class="cpt-t price"><thead><tr><th>Bet</th><th>Pays</th><th>House edge</th></tr></thead><tbody>';
       rows.forEach(function (r) { h += '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.pays) + '</td><td><span class="band ' + r.band + '">' + pct(100 * CE.num(r.edge)) + '</span></td></tr>'; });
-      return h + '</tbody></table></div><p class="cpt-fine">“Combined” divides the line bet’s expected loss by all the money a player with full odds puts up. The loss per line bet doesn’t change; the odds only add money the house has no edge on.</p>';
+      return h + '</tbody></table></div><p class="cpt-fine">“Combined” divides the line or put bet’s expected loss by all the money a player with full odds puts up. The loss per line bet doesn’t change; the odds only add money the house has no edge on. A put bet is a pass line bet made after the point, so it misses the come-out roll.</p>';
     }
     function renderOddsPoint() { $$('.cpt-t.pts tr[data-n]').forEach(function (r) { r.classList.toggle('on', +r.dataset.n === T.point); }); }
 
