@@ -24,7 +24,7 @@ Treat the previous edition as a claim to check, not a source. Executive bios, co
 ## TASK A — numbers (always)
 New as-of = the most recent settled close (a stockanalysis history row WITH Adj. Close; do not use a row without it). Update:
 - header price/change, banner date ("Static data as of <Month D, YYYY> …"), market cap and every price-derived ratio (recompute at the new close);
-- chart: keep existing month-ends, add the missing month-end closes (digrin "Real price" / stockanalysis daily), end with the new close; labels/prices equal length; if a split/spin happened since, make the series consistent and label it;
+- chart: keep existing month-ends, add the missing month-end closes (digrin "Real price" / stockanalysis daily), end with the new close; labels/prices equal length; if a split/spin happened since, make the series consistent and label it; if `chart_audit.py <slug>` lists the page under ADJ-UNLABELLED, or the series is dividend-adjusted, rebase every point to the plain month-end close (Yahoo close / digrin "Real price") and sweep the prose for the old values (Oki, 8 Oct 2026);
 - metrics table from the new quarter (EPS TTM, margins, FCF, debt, etc.), 52-week range as of the new date, consensus/targets as of the new date (drop anything dated after it);
 - Section 02 segments, Section 05 analyst calls, Section 06 catalysts (the print moves from "upcoming" to "happened"; add the next one only if dated by the company or labelled estimated).
 

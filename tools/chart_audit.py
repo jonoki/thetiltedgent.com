@@ -1,9 +1,11 @@
 """Audit report 5-year monthly charts against Yahoo monthly closes. Read-only on the repo.
 
-usage: py -3 tools/chart_audit.py [slug ...]      (no args = every stock report; exits 1 on any wrong point or error)
+usage: py -3 tools/chart_audit.py [slug ...]      (no args = every stock report; exits 1 on any wrong point or error,
+       and on a named slug's unlabelled dividend-adjusted series)
        an ETF or crypto report is named with its folder: etf/arti, crypto/btc
 Flags any chart point more than 3% from Yahoo's split-adjusted month-end close AND from its dividend-adjusted
-close, and lists series that are dividend-adjusted but never say so. The last point (the as-of close) is
+close, and lists series that are dividend-adjusted but never say so (a named slug with such a series fails:
+every report moves to plain closes at its next refresh). The last point (the as-of close) is
 verify.py's job. Yahoo JSON is cached under <temp>/ttg_chart_audit/yh; a cached series that ends before the
 report's as-of month is fetched again, so a refreshed report's newest points are never skipped silently.
 """
@@ -58,6 +60,8 @@ TOLERANCE = 0.03          # a point is wrong beyond 3% of both Yahoo's close and
 SPIN_RATIO_LO, SPIN_RATIO_HI = 0.9, 1.45
 ADJ_UNLABELLED_MIN = 10   # this many adjusted-close matches means the series is dividend-adjusted
 ADJ_LABEL = re.compile(r'(?i)dividend[- ]adjusted|adjusted (close|price)')   # the page says its series is adjusted
+# ...unless the phrase is negated ("not dividend-adjusted", "rather than adjusted closes"), which says the opposite
+ADJ_NEGATED = re.compile(r'(?i)(\bnot|\bnever|\bnor|\bno|\brather than|\binstead of|\bun)[\s,;:(-]*(\w+[\s,]+){0,2}$')
 MIN_COMPARABLE = 30       # fewer comparable points than this usually means the labels did not parse
 MAX_LISTED = 60
 CENTURY = 2000          # two-digit chart years ('Sep '21') are 20xx
@@ -234,6 +238,11 @@ def spin_factor(splits: Splits, ym: tuple[int, int], as_of: str | None) -> float
     return f
 
 
+def adj_labelled(text: str) -> bool:
+    """True when the page says somewhere, without negating it, that its series is dividend-adjusted."""
+    return any(not ADJ_NEGATED.search(text[max(0, m.start() - 40):m.start()]) for m in ADJ_LABEL.finditer(text))
+
+
 def classify(point: float, close: float, adjclose: float | None, spin: float) -> Verdict:
     """'ok' within 3% of the close; else 'adjusted' when it matches the dividend-adjusted close, 'basis step'
     when it matches a real pre-spin close, otherwise 'wrong'."""
@@ -267,7 +276,7 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
     return {**check_points(labels, prices, series, splits, as_of, LAUNCH.get(slug)), 'slug': slug, 'ticker': ticker, 'as_of': as_of,
-            'adj_labelled': bool(ADJ_LABEL.search(t))}
+            'adj_labelled': adj_labelled(t)}
 
 
 def check_points(labels: list[str], prices: list[float], series: Mapping[tuple[int, int], tuple[float, float | None]],
@@ -326,7 +335,8 @@ def main(argv: list[str] | None = None) -> int | str:
             print(f"{r['slug']:6} as-of {r['as_of']} bad {len(r['bad']):2}/{r['checked']:2}  worst {worst}")
     print('ERR', [(r['slug'], r['err']) for r in sorted(errs, key=lambda r: r['slug'])][:20])
     print('LOWCOUNT', [(r['slug'], r['checked']) for r in unparsed][:40])
-    return 1 if (flag or errs) else 0
+    named = [r for r in adj_unl if args.slugs]   # a build or refresh gate names its slug: an unlabelled adjusted series
+    return 1 if (flag or errs or named) else 0   # fails it (rebased to plain closes at refresh; Oki, 8 Oct 2026)
 
 
 if __name__ == '__main__':

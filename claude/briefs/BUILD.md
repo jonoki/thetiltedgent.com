@@ -38,7 +38,7 @@ For a company whose report uses its home-market listing (no S&P 500 requirement;
 - Check history (splits, spin-offs, mergers, bankruptcies) before trusting long-run per-share series.
 
 ## Verify
-`py -3 tools/chart_audit.py <slug>` must report 0 wrong points (every chart point within 3% of Yahoo's month-end close, or of its dividend-adjusted close if the chart says it is dividend-adjusted).
+`py -3 tools/chart_audit.py <slug>` must report 0 wrong points (every chart point within 3% of Yahoo's month-end close, or of its dividend-adjusted close if the chart says it is dividend-adjusted). Chart plain closes, not dividend-adjusted ones: a named slug whose series is dividend-adjusted without saying so fails the audit (Oki, 8 Oct 2026).
 `py -3 tools/verify.py reports/<slug>_analysis.html` must print PASS and its pe=stated/calc pair must agree (±0.1). Extract the <script> body to $TEMP and `node --check` it. Fix until clean.
 
 ## Return (short, no file contents)

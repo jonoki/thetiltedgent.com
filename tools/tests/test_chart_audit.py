@@ -25,6 +25,12 @@ class ChartAudit(unittest.TestCase):
         self.assertEqual(chart_audit.classify(120, 100, None, 1.2), 'basis step')    # a real pre-spin close
         self.assertEqual(chart_audit.classify(120, 100, 101, 1.0), 'wrong')
 
+    def test_adjusted_label_ignores_negations(self):
+        self.assertTrue(chart_audit.adj_labelled('Chart: dividend-adjusted month-end closes'))
+        self.assertFalse(chart_audit.adj_labelled('actual month-end closes, split-adjusted not dividend-adjusted'))
+        self.assertFalse(chart_audit.adj_labelled('Real price, i.e. unadjusted closes'))
+        self.assertFalse(chart_audit.adj_labelled('closes rather than adjusted closes'))
+
     def test_spin_factor_counts_only_small_splits_between_the_month_and_the_as_of(self):
         splits = [('2024-06-03', 1.1), ('2025-01-10', 2.0), ('2026-12-01', 1.05)]
         self.assertAlmostEqual(chart_audit.spin_factor(splits, (2024, 5), '2026-09-21'), 1.1)   # 2:1 is a real split
