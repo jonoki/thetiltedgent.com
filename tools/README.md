@@ -13,7 +13,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
-| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch | branch `claude/auto-refresh`, `tasks/queue/runs/` |
+| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
 | `refresh_data.py` | the number layer of a refresh: settled close, chart, 52-week range, returns, P/E, yield, short interest, EPS surprise | `facts.json`, `stale_hits.txt`; with `--write` the report's structured fields |
@@ -176,7 +176,32 @@ re-runs `verify.py` and `chart_audit.py` itself and commits the report only if b
 did not say HOLD; anything else is reverted, with the rejected page and both agents' JSON results kept in
 `tasks/queue/runs/<date>/`. After the reports: manifest, style and card tags, `run_checks.py`, push of the review
 branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines collect in
-`tasks/queue/pitfalls_pending.md` for the next retro.
+`tasks/queue/pitfalls_pending.md` for the next retro. One run at a time: every run except a dry run takes an OS lock
+on `tasks/queue/run.lock` in the main checkout, and a run that finds it held waits (polling each minute, up to 12
+hours, then ALERT); the OS drops the lock when a run's process ends, so a crash never leaves it held.
+
+### `--assets` — the monthly numbers-only refresh of the ETF, crypto and bond & cash reports
+
+    py -3 tools/auto_refresh.py --assets --dry-run                     # what would refresh today, and one builder prompt
+    py -3 tools/auto_refresh.py --assets --dry-run --today 2026-11-02  # what a later run would take
+    py -3 tools/auto_refresh.py --assets --builder-model sonnet        # the scheduled run
+
+These reports have no earnings print, so they would freeze at their build date (Oki, 8 Oct 2026). The asset run
+takes every report under `reports/etf/`, `reports/crypto/` and `reports/fixed/` whose banner as-of is 28 days old or
+more (`--min-age`; `--families etf,crypto,fixed`; `--only etf/voo` or `voo`), oldest first, and gives each to a
+headless builder and then a checker with `claude/briefs/REFRESH_ASSETS.md` (new as-of = the last settled close or
+the latest official daily value on or before the run date; header, banner, chart month-ends, 52-week range, metrics,
+holdings, distributions, events and every sentence whose number changed; a `tg-d--price` "Monthly update" delta
+box). The indicator-rate pages (`INDICATORS` in `asset_cards.py`: SOFR, EFFR, CORRA) are refreshed like the others
+for now. Same worktree, branch, allow-list, parallelism and commit-or-revert as the earnings run; the gates are
+`verify.py`, `chart_audit.py` for ETF and crypto pages (bond pages chart yields, which the agents check against the
+official daily file), `node --check` on every inline script, exactly one delta box, LF only. A builder that finds no
+newer data changes nothing (`unchanged`, no checker). Attempts count per report and run month (2 a month). After the
+reports: `asset_cards.py`, the manifest and the tags, `run_checks.py`, push; the summary is
+`tasks/queue/runs/<date>-assets.md`, and any report not committed raises an ALERT. 28 days is the shortest gap
+between two first Mondays, so every page refreshed at one monthly run is due at the next. The dry run reads the pages
+of the checkout it runs from (`--repo`) and touches no worktree. Scheduled by
+`%LOCALAPPDATA%\ttg-refresh-queue\ttg-assets.cmd` (first Monday, 17:30).
 
 ## `refresh_data.py` — the scripted number layer of a refresh
 
