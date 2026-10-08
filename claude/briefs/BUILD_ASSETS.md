@@ -109,7 +109,7 @@ Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name t
 - **T-bill**: no coupon — show the auction's discount rate and investment rate (bond-equivalent) from TreasuryDirect, and the par yield from the daily curve (header); duration ≈ time to maturity, convexity negligible — say so; sensChart still drawn.
 - **TIPS**: header = the par REAL yield (Treasury daily par real yield curve); also nominal and breakeven for the banner date; CPI indexation and the deflation floor from TreasuryDirect's own pages; on-the-run TIPS from TreasuryDirect.
 - **Government of Canada**: Bank of Canada Valet benchmark bond yields (name the series id), GoC auction results from the Bank of Canada, currency CAD; policy expectations = the latest Monetary Policy Report (no dot plot); ratings n/v unless the agency's own page is readable; Canadian tax facts only if sourced (CRA).
-- Ratings: n/v unless the agency's own page is readable (Moody's usually is). No press-report ratings.
+- Ratings: n/v unless the agency's own page is readable (Moody's usually is). No press-report ratings. U.S. Treasury and savings-bond pages all show "Aa1, stable (Moody's)", since May 16, 2025, sourced to Moody's U.S. rating page (Oki, 8 Oct 2026); S&P and Fitch n/v unless read.
 - verify.py accepts 3 canvases for files under `reports/fixed/`.
 
 ## Verify
