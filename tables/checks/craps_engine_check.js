@@ -8,9 +8,13 @@
    5. A 1,000,000-roll session with a random bettor: actual + value on the felt = expected + luck,
       the bankroll balances to the cent, luck per roll averages zero, and after every roll every bet on the felt
       is one a dealer would book (audit).
-   6. The table refuses every illegal bet on a list (put bets, come bets on the come-out, odds over the limit or
-      in the wrong units or on the wrong side, bets under the minimum or over the $500 maximum, …) and books
-      the legal ones at their limits (incl. place and buy on one number, and odds past the table maximum).
+   6. The table refuses every illegal bet on a list (come bets on the come-out, a put bet off the point or beside a
+      pass line bet, odds over the limit or in the wrong units or on the wrong side, bets under the minimum or over
+      the $500 maximum, …) and books the legal ones at their limits (incl. place and buy on one number, odds past the
+      table maximum, and a put bet with full odds behind it).
+   7. Put bets (Oki, 8 Oct 2026): edge = P(lose) - P(win) = (6 - w)/(w + 6) exactly (1/3, 1/5, 1/11; Wizard of Odds
+      33.33% / 20.00% / 9.09%), combined with m-times odds = edge / (1 + m), falling as m grows, Wizard's break-evens
+      against place and buy, and a booked put + odds whose ledger expected loss / money put up is the combined edge.
    Exits 1 on any failure. */
 'use strict';
 var fs = require('fs'), path = require('path'), vm = require('vm');
@@ -107,6 +111,7 @@ function allBets() {
   var out = [];
   ['pass', 'dontpass', 'come', 'dontcome'].forEach(function (t) { out.push({ type: t, num: null }); CE.POINTS.forEach(function (n) { out.push({ type: t, num: n }); }); });
   CE.POINTS.forEach(function (n) {
+    out.push({ type: 'put', num: n });
     [false, true].forEach(function (cm) { out.push({ type: 'odds', num: n, come: cm }); out.push({ type: 'layodds', num: n, come: cm }); });
     ['place', 'buy', 'lay'].forEach(function (t) { out.push({ type: t, num: n }); });
   });
@@ -182,32 +187,34 @@ function audit(T) {
     if (b.amount !== Math.floor(b.amount) || b.amount <= 0) bad.push(tag + ': not whole dollars');
     if (odds) {
       if (!p || p.num == null) { bad.push(tag + ': odds with no point behind them'); return; }
-      if ((b.type === 'odds') !== (p.type === 'pass' || p.type === 'come')) bad.push(tag + ': odds on the wrong side');
+      if ((b.type === 'odds') !== (p.type === 'pass' || p.type === 'come' || p.type === 'put')) bad.push(tag + ': odds on the wrong side');
       if (b.amount > g.maxOdds(b.type, p.num, p.amount) + 1e-9) bad.push(tag + ': over the ' + g.rules.odds + ' limit behind $' + p.amount);
     }
     if (b.amount % g.unit(b.type, n)) bad.push(tag + ': not a multiple of $' + g.unit(b.type, n));
     if (b.amount < g.minBet(b.type, n)) bad.push(tag + ': under the $' + g.minBet(b.type, n) + ' minimum');
     if (!odds && b.amount > g.maxBet(b.type, n)) bad.push(tag + ': over the $' + g.rules.max + ' table maximum');
-    if ((b.type === 'pass' || b.type === 'dontpass') && (lines[b.type] = (lines[b.type] || 0) + 1) > 1) bad.push(tag + ': two line bets');
+    var side = b.type === 'put' ? 'pass' : b.type;    // a put bet sits on the pass line: one bet per line
+    if ((side === 'pass' || side === 'dontpass') && (lines[side] = (lines[side] || 0) + 1) > 1) bad.push(tag + ': two line bets');
     if ((b.type === 'pass' || b.type === 'dontpass') && (b.num == null) !== (T.point == null)) bad.push(tag + ': line bet out of step with the point');
+    if (b.type === 'put' && (T.point == null || b.num !== T.point)) bad.push(tag + ': put bet off the point (' + T.point + ')');
     if ((b.type === 'come' || b.type === 'dontcome') && b.num == null) bad.push(tag + ': still in the come box after the roll');
   });
   return bad;
 }
 var srng = CE.seeded(7), T = g.Table({ seed: 11, bankroll: 1e9 }), ROLLS = 1000000, ls = 0, ls2 = 0, placed = 0, removed = 0,
-    audits = 0, illegal = [];
+    audits = 0, illegal = [], puts = 0, putOdds = 0;
 function pick(a) { return a[Math.floor(srng() * a.length)]; }
 for (var r = 0; r < ROLLS; r++) {
   for (var tries = 0; tries < 2; tries++) {
     var c = pick(g.catalogue), spec;
     if (c.type === 'odds' || c.type === 'layodds') {
-      var want = c.type === 'odds' ? ['pass', 'come'] : ['dontpass', 'dontcome'];
+      var want = c.type === 'odds' ? ['pass', 'come', 'put'] : ['dontpass', 'dontcome'];
       var parents = T.bets.filter(function (b) { return want.indexOf(b.type) >= 0 && b.num != null; });
       if (!parents.length) continue;
       var p = pick(parents), u = g.unit(c.type, p.num);
       spec = { type: c.type, parent: p.id, amount: u * (1 + Math.floor(srng() * 6)) };
     } else spec = { type: c.type, num: c.num, amount: c.min + c.unit * Math.floor(srng() * 4) };
-    if (T.place(spec).ok) placed++;
+    if (T.place(spec).ok) { placed++; if (spec.type === 'put') puts++; if (spec.type === 'odds' && T.get(spec.parent).type === 'put') putOdds++; }
   }
   if (srng() < 0.05 && T.bets.length) { var b = pick(T.bets); if (T.removable(b) && T.remove(b.id).ok) removed++; }
   var res = T.roll(); ls += res.luck; ls2 += res.luck * res.luck;
@@ -218,7 +225,9 @@ var L = T.ledger, luck = L.luckComeOut + L.luckPoint, open = T.openValue();
 var ident = L.actual + open - (L.expected + luck), bal = T.bank + T.onFelt() - (1e9 + L.actual);
 var mean = ls / ROLLS, sd = Math.sqrt(ls2 / ROLLS - mean * mean), zl = mean / (sd / Math.sqrt(ROLLS));
 var sumExp = 0, sumAct = 0; Object.keys(L.byKey).forEach(function (k) { sumExp += L.byKey[k].expected; sumAct += L.byKey[k].actual; });
-console.log('\n5. Session: ' + ROLLS.toLocaleString('en-US') + ' rolls, ' + placed.toLocaleString('en-US') + ' bets placed or pressed, ' + removed.toLocaleString('en-US') + ' taken down');
+console.log('\n5. Session: ' + ROLLS.toLocaleString('en-US') + ' rolls, ' + placed.toLocaleString('en-US') + ' bets placed or pressed (' + puts.toLocaleString('en-US') +
+            ' put bets, ' + putOdds.toLocaleString('en-US') + ' odds behind puts), ' + removed.toLocaleString('en-US') + ' taken down');
+ok(puts > 1000 && putOdds > 1000, 'put bets and their odds are in the random mix: ' + puts + ' / ' + putOdds);
 console.log('   wagered $' + Math.round(L.wagered).toLocaleString('en-US') + ' · expected $' + L.expected.toFixed(2) + ' · actual $' + L.actual.toFixed(2) +
             ' · luck $' + luck.toFixed(2) + ' (come-out $' + L.luckComeOut.toFixed(2) + ', point $' + L.luckPoint.toFixed(2) + ') · still on felt: value $' + open.toFixed(2));
 console.log('   actual + open value - (expected + luck) = ' + ident.toExponential(2));
@@ -242,12 +251,21 @@ function withPoint(X, n) { X.place({ type: 'pass', amount: 10 }); X.place({ type
 var pass = function (X) { return X.bets.filter(function (b) { return b.type === 'pass'; })[0]; };
 var dont = function (X) { return X.bets.filter(function (b) { return b.type === 'dontpass'; })[0]; };
 var none = function () {}, pt6 = function (X) { withPoint(X, 6); }, pt5 = function (X) { withPoint(X, 5); };
+/* A point of n with only a don't pass bet up (bet id 1), so the pass line is free for a put. */
+function dontPoint(X, n) { X.place({ type: 'dontpass', amount: 10 }); X.roll(n === 4 ? 1 : 2, n - (n === 4 ? 1 : 2)); }
+var dpt6 = function (X) { dontPoint(X, 6); };
 var CASES = [
   [none, { type: 'pass', amount: 5 }, 'a line bet under the $10 minimum'],
   [none, { type: 'pass', amount: 10.5 }, 'a bet in part-dollars'],
   [none, { type: 'come', amount: 10 }, 'a come bet on the come-out'],
   [none, { type: 'dontcome', amount: 10 }, 'a don’t come bet on the come-out'],
-  [pt6, { type: 'pass', amount: 10 }, 'a pass line bet after the point is set (a put bet)'],
+  [none, { type: 'put', num: 6, amount: 10 }, 'a put bet on the come-out (that is a pass line bet)'],
+  [dpt6, { type: 'put', num: 8, amount: 10 }, 'a put bet on a number that is not the point (no come-box puts at this table)'],
+  [pt6, { type: 'put', num: 6, amount: 10 }, 'a put bet beside a pass line bet already on the point'],
+  [dpt6, { type: 'put', num: 6, amount: 5 }, 'a put bet under the $10 minimum'],
+  [dpt6, { type: 'put', num: 6, amount: 510 }, 'a put bet over the $500 table maximum'],
+  [function (X) { dpt6(X); X.place({ type: 'put', num: 6, amount: 10 }); }, { type: 'odds', parent: 2, amount: 55 }, 'odds over 5x on the 6 behind a $10 put'],
+  [function (X) { dpt6(X); X.place({ type: 'put', num: 6, amount: 10 }); }, { type: 'layodds', parent: 2, amount: 12 }, 'lay odds behind a put bet'],
   [pt6, { type: 'dontpass', amount: 10 }, 'adding to don’t pass after the point is set'],
   [none, { type: 'odds', parent: 1, amount: 10 }, 'odds with no point'],
   [pt6, { type: 'odds', parent: 1, amount: 55 }, 'odds over 5x on the 6 behind $10'],
@@ -273,15 +291,63 @@ var X = g.Table({ seed: 3, bankroll: 1e6 }); withPoint(X, 6);
 var contract = !X.remove(pass(X).id).ok, dontOff = X.remove(dont(X).id).ok;
 ok(contract, 'should refuse: taking down a pass line bet with a point');
 ok(dontOff, 'a don’t pass bet may be taken down');
+var Xp = g.Table({ seed: 3, bankroll: 1e6 }); dpt6(Xp); var putB = Xp.place({ type: 'put', num: 6, amount: 10 }).bet;
+var putContract = !Xp.remove(putB.id).ok;
+ok(putContract, 'should refuse: taking down a put bet');
 var legal = [[pt6, { type: 'odds', parent: 1, amount: 50 }], [pt6, { type: 'layodds', parent: 2, amount: 60 }], [pt5, { type: 'odds', parent: 1, amount: 40 }],
              [pt6, { type: 'come', amount: 10 }], [none, { type: 'place', num: 6, amount: 12 }], [none, { type: 'buy', num: 4, amount: 20 }],
              [none, { type: 'lay', num: 4, amount: 40 }], [none, { type: 'hard', num: 8, amount: 1 }], [none, { type: 'horn', amount: 4 }],
              [function (X) { X.place({ type: 'place', num: 8, amount: 12 }); }, { type: 'buy', num: 8, amount: 20 }],   // placed and bought (Oki: allowed)
              [none, { type: 'place', num: 6, amount: 498 }],
-             [function (X) { X.place({ type: 'pass', amount: 500 }); X.roll(2, 4); }, { type: 'odds', parent: 1, amount: 2500 }]];   // odds past the table max
+             [function (X) { X.place({ type: 'pass', amount: 500 }); X.roll(2, 4); }, { type: 'odds', parent: 1, amount: 2500 }],   // odds past the table max
+             [dpt6, { type: 'put', num: 6, amount: 10 }], [dpt6, { type: 'put', num: 6, amount: 500 }],                          // put bets (Oki, 8 Oct 2026)
+             [function (X) { dontPoint(X, 4); }, { type: 'put', num: 4, amount: 25 }],
+             [function (X) { dpt6(X); X.place({ type: 'put', num: 6, amount: 10 }); }, { type: 'put', num: 6, amount: 15 }],     // pressing a put
+             [function (X) { dpt6(X); X.place({ type: 'put', num: 6, amount: 10 }); }, { type: 'odds', parent: 2, amount: 50 }], // full 5x behind a put
+             [function (X) { dontPoint(X, 5); X.place({ type: 'put', num: 5, amount: 10 }); }, { type: 'odds', parent: 2, amount: 40 }]];
 var booked = 0; legal.forEach(function (c) { var Y = g.Table({ seed: 3, bankroll: 1e6 }); c[0](Y); if (ok(Y.place(c[1]).ok, 'should book: ' + JSON.stringify(c[1]))) booked++; });
 console.log('\n6. Table rules: ' + refused + ' of ' + CASES.length + ' illegal bets refused, pass line with a point stays up: ' + (contract ? 'yes' : 'NO') +
-            '; ' + booked + ' of ' + legal.length + ' legal bets booked (full 3-4-5x odds, lay to 6x, $12 place 6, $20 buy, $40 lay, $1 hard 8, $4 horn, place and buy on one number, $498 place 6, $2,500 odds behind a $500 pass)');
+            ', put bet stays up: ' + (putContract ? 'yes' : 'NO') +
+            '; ' + booked + ' of ' + legal.length + ' legal bets booked (full 3-4-5x odds, lay to 6x, $12 place 6, $20 buy, $40 lay, $1 hard 8, $4 horn, place and buy on one number, $498 place 6, $2,500 odds behind a $500 pass, ' +
+            '$10 / $500 / $25 put bets, a pressed put, 5x behind a put on the 6, 4x behind a put on the 5)');
+
+/* ---------- 7. put bets ---------- */
+console.log('\n7. Put bets: edge = P(lose) - P(win) = (6 - w)/(w + 6); with m-times odds, edge / (1 + m)');
+var PUT_EDGE = { 4: Q(1, 3), 5: Q(1, 5), 6: Q(1, 11), 8: Q(1, 11), 9: Q(1, 5), 10: Q(1, 3) };   // Wizard of Odds craps basics: 33.33%, 20.00%, 9.09%
+CE.POINTS.forEach(function (n) {
+  var w = CE.ways(n), formula = Q(6 - w, w + 6), c = g.byKey['put' + n];
+  ok(CE.eq(formula, PUT_EDGE[n]), 'put ' + n + ' formula ' + fq(formula) + ' vs ' + fq(PUT_EDGE[n]));
+  if (!ok(c && CE.eq(c.edge, PUT_EDGE[n]), 'put ' + n + ' engine ' + (c && fq(c.edge)) + ' vs ' + fq(PUT_EDGE[n]))) return;
+  ok(c.min === 10 && c.unit === 1 && g.maxBet('put', n) === 500, 'put ' + n + ' $10 minimum, $1 unit, $500 maximum');
+  var line = '   put ' + pad(n, 3) + pad(fq(c.edge), 5) + lpad(c.edgePct.toFixed(2) + '%', 8) + '   with odds:', prev = c.edge;
+  [1, 2, 3, 4, 5, 6, 10, 19, 20].forEach(function (m) {
+    var pc = g.putCombo(n, m), want = CE.div(PUT_EDGE[n], Q(1 + m));
+    ok(CE.eq(pc.edge, want), 'put ' + n + ' + ' + m + 'x: engine ' + fq(pc.edge) + ' vs ' + fq(want));
+    ok(num(pc.edge) < num(prev), 'put ' + n + ' combined edge falls at ' + m + 'x');
+    prev = pc.edge;
+    if (m <= 5 || m === 10) line += '  ' + m + 'x ' + (100 * num(pc.edge)).toFixed(2) + '%';
+  });
+  console.log(line);
+});
+/* Wizard of Odds break-evens: put + odds matches the place or buy bet on that number exactly. */
+var gUp = CE.create({ buyVig: 'upfront' });
+[[6, 5, g.byKey.place6.edge, 'place 6'], [8, 5, g.byKey.place8.edge, 'place 8'], [5, 4, g.byKey.place5.edge, 'place 5'], [9, 4, g.byKey.place9.edge, 'place 9'],
+ [4, 19, g.byKey.buy4.edge, 'buy 4, commission on the win'], [10, 19, g.byKey.buy10.edge, 'buy 10, commission on the win'],
+ [4, 6, gUp.byKey.buy4.edge, 'buy 4, commission up front']].forEach(function (x) {
+  var pc = g.putCombo(x[0], x[1]);
+  if (ok(CE.eq(pc.edge, x[2]), 'break-even put ' + x[0] + ' + ' + x[1] + 'x ' + fq(pc.edge) + ' vs ' + x[3] + ' ' + fq(x[2])))
+    console.log('   ok   put ' + pad(x[0], 3) + '+ ' + pad(x[1] + 'x', 4) + pad(fq(pc.edge), 6) + lpad((100 * num(pc.edge)).toFixed(2) + '%', 7) + ' = ' + x[3]);
+});
+/* At this table's full odds (3-4-5x by default), as booked: the ledger's expected loss over the money put up. */
+CE.POINTS.forEach(function (n) {
+  var pc = g.putCombo(n), Y = g.Table({ seed: 3, bankroll: 1e6 }); dontPoint(Y, n);
+  var e0 = Y.ledger.expected, w0 = Y.ledger.wagered, pb = Y.place({ type: 'put', num: n, amount: 10 }).bet;
+  var od = Y.place({ type: 'odds', parent: pb.id, amount: g.maxOdds('odds', n, 10) });
+  var asBooked = -(Y.ledger.expected - e0) / (Y.ledger.wagered - w0);
+  if (ok(od.ok && Math.abs(asBooked - num(pc.edge)) < 1e-12, 'put ' + n + ' + full odds as booked ' + asBooked + ' vs ' + num(pc.edge)))
+    console.log('   ok   $10 put on the ' + pad(n, 3) + '+ $' + pad(g.maxOdds('odds', n, 10), 4) + 'odds (' + pc.mult + 'x): booked ' + (100 * asBooked).toFixed(3) + '% = ' + fq(pc.edge));
+  ok(Math.abs(Y.v(pb) + 10 * num(PUT_EDGE[n])) < 1e-12, 'put ' + n + ' value ' + Y.v(pb));
+});
 
 console.log('\n' + (fails ? 'FAILED: ' + fails + ' check(s)' : 'ALL CHECKS PASS'));
 process.exit(fails ? 1 : 0);
