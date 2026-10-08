@@ -21,8 +21,9 @@ import repodata as rd
 
 BRANCH = 'claude/auto-refresh'
 WORKTREE = os.path.join('.claude', 'worktrees', 'auto-refresh')   # under the main checkout; .claude/ is git-ignored
-T2_CAP = 8           # T2 refreshes started per run; every due T1 always runs (Oki, 30 Sep 2026: "T1 + capped T2")
-JOBS = 4             # builder/checker pairs run at once
+T2_CAP = 0           # T2 refreshes started per run, 0 = no cap; every due T1 always runs (Oki, 8 Oct 2026: no T2 cap)
+JOBS = 4             # builder/checker pairs run at once; more when there is a backlog (jobs_for)
+MAX_JOBS = 8         # Oki, 8 Oct 2026: "can do more in parallel if required"
 MAX_ATTEMPTS = 2     # per report and print; after that it waits in the summary for a person
 AGENT_TIMEOUT_S = 90 * 60
 MAX_TURNS = '300'
@@ -74,7 +75,15 @@ def select(items: list[dict], attempts: dict[str, dict[str, int]], t2_cap: int =
            and attempts.get(i['slug'], {}).get(i['release'], 0) < MAX_ATTEMPTS]
     due.sort(key=lambda i: (i['tier'], TIER_ORDER[i['status']], i['release'], i['ticker']))
     t1 = [i for i in due if i['tier'] == 'T1']
-    return t1 + [i for i in due if i['tier'] == 'T2'][:t2_cap]
+    t2 = [i for i in due if i['tier'] == 'T2']
+    return t1 + (t2[:t2_cap] if t2_cap else t2)
+
+
+def jobs_for(n: int, asked: int | None = None) -> int:
+    """Pairs to run at once: what was asked for, else JOBS, rising to MAX_JOBS when more than 2 x JOBS reports are due."""
+    if asked:
+        return asked
+    return max(1, min(n, MAX_JOBS if n > 2 * JOBS else JOBS))
 
 
 def builder_prompt(i: dict, wt: str, data: DataLayer | None = None) -> str:
@@ -289,6 +298,42 @@ def main_checkout() -> str:
     return os.path.dirname(common)
 
 
+GENERATED = ('data/',)   # files the tools write; a conflict in them is healed by regenerating
+
+
+def merge_base(wt: str, base: str) -> None:
+    """Merge base into the review branch. A conflict only in generated data (both sides rebuilt data/card_tags.json,
+    say) is healed: take base's copy and regenerate from the merged reports. Any other conflict aborts the merge so
+    the worktree is never left half-merged (7-8 Oct 2026: a half-merge stopped two morning runs), then raises."""
+    if run(['git', 'merge', '-q', '--no-edit', base], wt).returncode == 0:
+        return
+    conflicted = git(wt, 'diff', '--name-only', '--diff-filter=U').split()
+    if not conflicted or not all(f.startswith(GENERATED) for f in conflicted):
+        run(['git', 'merge', '--abort'], wt)
+        raise RuntimeError(f'merging {base} conflicts outside generated data: {conflicted}; merge aborted, branch unchanged')
+    git(wt, 'checkout', '--theirs', '--', *conflicted)
+    for tool in ('manifest.py', 'style_tags.py', 'card_tags.py'):
+        r = run([sys.executable, f'tools/{tool}'], wt)
+        if r.returncode:
+            run(['git', 'merge', '--abort'], wt)
+            raise RuntimeError(f'regenerating after a data conflict: {tool} exit {r.returncode}; merge aborted')
+    git(wt, 'add', '--', 'data')
+    git(wt, 'commit', '-q', '-m', f'Merge {base}: generated data conflict ({", ".join(conflicted)}) healed by regenerating',
+        '-m', 'Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>')
+
+
+def alert(main: str, text: str) -> None:
+    """Make a failed run impossible to miss: tasks/queue/ALERT.txt (refresh_queue.py puts it at the top of today.md)
+    and a Windows message to the logged-on user."""
+    path = os.path.join(main, 'tasks', 'queue', 'ALERT.txt')
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'a', encoding='utf-8', newline='\n') as fh:
+        fh.write(f"{datetime.datetime.now().isoformat(timespec='minutes')} auto_refresh failed: {text}\n")
+    if os.name == 'nt':
+        subprocess.run(['msg', os.environ.get('USERNAME', '*'), '/TIME:0', f'TTG auto refresh failed: {text[:200]}'],
+                       capture_output=True)
+
+
 def prepare(main: str, base: str) -> str:
     """The review worktree, up to date with base, clean, with the private agent files copied in."""
     wt = os.path.join(main, WORKTREE)
@@ -299,7 +344,7 @@ def prepare(main: str, base: str) -> str:
     if git(wt, 'status', '--porcelain', '--untracked-files=no').strip():
         raise RuntimeError(f'{wt} has uncommitted changes (a crashed run?); look before running again')
     if run(['git', 'merge-base', '--is-ancestor', base, 'HEAD'], wt).returncode:
-        git(wt, 'merge', '-q', '--no-edit', base)
+        merge_base(wt, base)
     shutil.copytree(os.path.join(main, '.claude', 'agents'), os.path.join(wt, '.claude', 'agents'),
                     dirs_exist_ok=True)
     return wt
@@ -343,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = rd.parser('Unattended earnings refreshes onto the review branch.')
     ap.add_argument('--base', default='origin/main', help='what the review branch builds on (default origin/main)')
     ap.add_argument('--t2-cap', type=int, default=T2_CAP)
-    ap.add_argument('--jobs', type=int, default=JOBS)
+    ap.add_argument('--jobs', type=int, default=None, help=f'pairs at once (default {JOBS}, up to {MAX_JOBS} with a backlog)')
     ap.add_argument('--only', nargs='*', help='limit the run to these slugs')
     ap.add_argument('--tiers', default='T1,T2', help='tiers to refresh, e.g. T1 (the daily run) or T2 (the weekly run)')
     ap.add_argument('--builder-model', help='model for the builders, e.g. sonnet (default: the agent file\'s, Opus)')
@@ -382,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         attempts.setdefault(i['slug'], {})[i['release']] = attempts.get(i['slug'], {}).get(i['release'], 0) + 1
     rd.write_json(att_path, attempts, indent=1)
     lock = threading.Lock()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs_for(len(work), args.jobs)) as ex:
         models = {'builder': args.builder_model, 'checker': args.checker_model}
         outcomes = list(ex.map(lambda i: refresh_one(i, wt, logs, lock, args.data_layer, models), work))
     notes = []
@@ -410,4 +455,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:   # noqa: BLE001 - any failure of an unattended run must reach a person
+        alert(main_checkout(), f'{type(e).__name__}: {e}')
+        raise

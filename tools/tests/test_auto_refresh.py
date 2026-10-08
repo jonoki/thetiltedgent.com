@@ -26,6 +26,8 @@ class Select(unittest.TestCase):
         items = [item('a', 'T2', release='2026-09-20'), item('b', 'T1'), item('c', 'T2', 'overdue', '2026-09-10')]
         self.assertEqual([i['slug'] for i in ar.select(items, {}, tiers=('T1',))], ['b'])
         self.assertEqual([i['slug'] for i in ar.select(items, {}, t2_cap=20, tiers=('T2',))], ['c', 'a'])
+        self.assertEqual([i['slug'] for i in ar.select(items, {}, t2_cap=0, tiers=('T2',))], ['c', 'a'])   # 0 = no cap
+        self.assertEqual((ar.jobs_for(3), ar.jobs_for(9), ar.jobs_for(30), ar.jobs_for(30, 2)), (3, 8, 8, 2))
 
     def test_attempts_and_only(self):
         items = [item('a', 'T1'), item('b', 'T1')]
@@ -117,6 +119,47 @@ class DataLayer(unittest.TestCase):
                          'cost_usd': 1.0, 'usage': [], 'denials': [], 'pitfalls': [], 'data_layer': 'used'}
         self.assertIn('data layer used', ar.summary_md('2026-10-02', [o], [], []))
         self.assertNotIn('data layer', ar.summary_md('2026-10-02', [{**o, 'data_layer': 'off'}], [], []))
+
+
+class MergeBase(unittest.TestCase):
+    """A conflict only in generated data/ is healed by regenerating; any other conflict aborts cleanly (7-8 Oct 2026)."""
+    def repo(self, d, path, ours, theirs):
+        import subprocess
+        g = lambda *a: subprocess.run(['git', *a], cwd=d, capture_output=True, text=True, check=True)
+        g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't')
+        os.makedirs(os.path.join(d, 'tools'), exist_ok=True)
+        for tool in ('manifest.py', 'style_tags.py', 'card_tags.py'):   # stand-ins for the real generators
+            open(os.path.join(d, 'tools', tool), 'w').write('pass\n')
+        os.makedirs(os.path.dirname(os.path.join(d, path)), exist_ok=True)
+        open(os.path.join(d, path), 'w').write('base\n'); g('add', '-A'); g('commit', '-q', '-m', 'base')
+        g('checkout', '-q', '-b', 'review'); open(os.path.join(d, path), 'w').write(ours + '\n'); g('commit', '-qam', 'ours')
+        g('checkout', '-q', 'main'); open(os.path.join(d, path), 'w').write(theirs + '\n'); g('commit', '-qam', 'theirs')
+        g('checkout', '-q', 'review')
+        return g
+
+    def test_generated_data_conflict_is_healed(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = self.repo(d, 'data/card_tags.json', 'ours', 'theirs')
+            ar.merge_base(d, 'main')
+            self.assertEqual(open(os.path.join(d, 'data', 'card_tags.json')).read(), 'theirs\n')
+            self.assertEqual(g('status', '--porcelain').stdout, '')
+            self.assertIn('healed by regenerating', g('log', '-1', '--format=%s').stdout)
+
+    def test_an_open_alert_heads_the_morning_list(self):
+        import datetime
+        import refresh_queue as rq
+        md = rq.today_md([], datetime.date(2026, 10, 8), '2026-10-08T18:30', '2026-10-08T06:30 auto_refresh failed: boom\n')
+        self.assertIn('**ALERT', md.splitlines()[2])
+        self.assertIn('boom', md)
+        self.assertNotIn('ALERT', rq.today_md([], datetime.date(2026, 10, 8), 'x'))
+
+    def test_other_conflicts_abort_and_raise(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = self.repo(d, 'reports/x_analysis.html', 'ours', 'theirs')
+            with self.assertRaisesRegex(RuntimeError, 'merge aborted'):
+                ar.merge_base(d, 'main')
+            self.assertEqual(g('status', '--porcelain').stdout, '')   # not left half-merged
+            self.assertEqual(open(os.path.join(d, 'reports', 'x_analysis.html')).read(), 'ours\n')
 
 
 if __name__ == '__main__':

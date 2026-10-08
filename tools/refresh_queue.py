@@ -46,7 +46,6 @@ NYSE_HOLIDAYS = frozenset(Date.fromisoformat(d) for d in (
 # membership; guidance changes and company news are judged by the builder, who may still raise a T2 to T1.
 T1_SURPRISE_PCT = 10.0
 T1_MOVE_PCT = 5.0
-MEGA_CAP_USD = 200e9   # "mega-cap names default to T1": our threshold (Oki may change it)
 DUE_WITHIN_SESSIONS = 5   # finish within 5 trading days of the release, or the refresh is overdue
 
 
@@ -238,8 +237,7 @@ def tier(h: Holding, p: Print, move: float | None) -> tuple[Literal['T1', 'T2'],
         triggers.append('Dow 30')
     if h['ndx']:
         triggers.append('Nasdaq-100')
-    if h['mcap'] and h['mcap'] >= MEGA_CAP_USD:
-        triggers.append(f"mega-cap ${h['mcap'] / 1e9:,.0f}B")
+    # market cap alone does not make a print T1 (Oki, 8 Oct 2026)
     if p['surprise_pct'] is not None and abs(p['surprise_pct']) >= T1_SURPRISE_PCT:
         triggers.append(f"EPS surprise {p['surprise_pct']:+.1f}%")
     if move is not None and abs(move) >= T1_MOVE_PCT:
@@ -299,10 +297,13 @@ def build_items(prints: list[Print], lib: dict[str, Holding], today: Date,
     return items, covered
 
 
-def today_md(items: list[Item], today: Date, generated: str) -> str:
+def today_md(items: list[Item], today: Date, generated: str, alert_text: str = '') -> str:
     """The short list read in the morning."""
     lines = [f'# Refresh queue — {today.isoformat()}', '', f'_Generated {generated} by tools/refresh_queue.py. '
              'Due = the T+2 close has settled; overdue = more than 5 trading days since the release._', '']
+    if alert_text:
+        lines[1:1] = ['', '> **ALERT — a refresh run failed** (tasks/queue/ALERT.txt; delete it once handled):', '>',
+                      *[f'> {ln}' for ln in alert_text.strip().splitlines()[-5:]], '']
     for st, title in (('overdue', 'Overdue'), ('due', 'Due now'), ('waiting', 'Reported, waiting for T+2'),
                       ('upcoming', 'Next 14 days')):
         rows = [i for i in items if i['status'] == st]
@@ -348,11 +349,13 @@ def main(argv: list[str] | None = None) -> int:
     counts = {st: sum(i['status'] == st for i in items) for st in ('overdue', 'due', 'waiting', 'upcoming')}
     rd.write_json(os.path.join(out_dir, 'queue.json'), {
         'generated_at': generated, 'today': today.isoformat(), 'calendar_from': start.isoformat(),
-        'rules': {'t1_surprise_pct': T1_SURPRISE_PCT, 't1_move_pct': T1_MOVE_PCT, 'mega_cap_usd': MEGA_CAP_USD,
+        'rules': {'t1_surprise_pct': T1_SURPRISE_PCT, 't1_move_pct': T1_MOVE_PCT,
                   'due_within_sessions': DUE_WITHIN_SESSIONS},
         'counts': counts, 'prints_already_covered': covered, 'calendar_failures': failed, 'items': items}, indent=1)
     with open(os.path.join(out_dir, 'today.md'), 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(today_md(items, today, generated))
+        alert_path = os.path.join(out_dir, 'ALERT.txt')   # written by auto_refresh.py when a run fails
+        alert_text = open(alert_path, encoding='utf-8').read() if os.path.exists(alert_path) else ''
+        fh.write(today_md(items, today, generated, alert_text))
     print(f"queue {today}: " + ' · '.join(f'{k} {v}' for k, v in counts.items())
           + f" · covered {covered}" + (f" · CALENDAR FAILURES {len(failed)}" if failed else ''))
     return 1 if failed else 0
