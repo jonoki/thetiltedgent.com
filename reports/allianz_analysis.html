@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALV.DE — Allianz SE | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2EC4C9;
+  --accent-dim: #2EC4C933;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 2, 2026 (Friday settled close, Xetra) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">ALV.DE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> Xetra (Frankfurt) · prices in EUR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Financials / Insurance - Diversified</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> <span class="tip" title="373,994,237 shares (380,242,198 outstanding at Dec 31, 2025 per the FY2025 financial supplement, less 6,247,961 shares bought back Mar 13 – Sep 22, 2026 per Allianz's Sep 29, 2026 buy-back disclosure) × €416.20 close = €155.66B; × $1.1225 per € (ECB euro reference rate, October 2, 2026) = $174.72B. Our calculation.">$174.72B</span> <span style="color:var(--text-dim);">(€155.66B)</span></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Index membership:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">DAX</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">Euro Stoxx 50</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);background:var(--surface2);padding:3px 10px;border-radius:4px;">ISIN DE0008404005</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Allianz SE</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">416.20 <span style="font-size:20px;color:var(--text-muted);">EUR</span></div>
+      <div class="price-change" style="color:var(--green);">+€4.20 (+1.02%)</div>
+      <div class="price-date">Close, Friday October 2, 2026 · Xetra settled close</div>
+      <div class="price-date">Previous close €412.00 (October 1, 2026)</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> Königinstrasse 28, Munich, Germany</div>
+    <div class="meta-item"><span>Employees:</span> about 156,000 (2025)</div>
+    <div class="meta-item"><span>Founded:</span> 1890 (Berlin)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 12, 2026 (3Q 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Allianz is Europe's insurance heavyweight: a Munich company that sells car, home, business, life and health cover in almost 70 countries to around 97 million customers, and that also owns two of the world's big money managers, <strong>PIMCO</strong> and <strong>Allianz Global Investors</strong>, which together run about €2.2 trillion for outside clients. In 2025 it booked <strong>€186.9B of total business volume</strong> (premiums plus fund fees), a record <strong>€17.4B of operating profit</strong> (up 8.4%) and <strong>€10.8B of net income</strong> for shareholders. The board paid out <strong>€17.10 a share</strong> for 2025, 11% more than the year before.</p>
+  <p class="prose" style="margin-top:16px;">The way to think about Allianz is as a house that sits on three tables at once. In <strong>property-casualty</strong> it is the bookmaker: it takes premiums up front and wins if claims plus costs come in under 100 cents per premium euro — the <span class="tip" title="Combined ratio: claims plus expenses as a percentage of premiums earned. Under 100% means the insurance itself is profitable before any investment income.">combined ratio</span> ran at 91.4% in the first half of 2026. In <strong>life and health</strong> it holds savings for decades and earns a margin on them. In <strong>asset management</strong> it charges fees on other people's money. The first half of 2026 was the best half-year in the company's history on operating profit (€9.4B, +8.6%), the capital buffer rose to a <span class="tip" title="Solvency II ratio: eligible own funds divided by the capital the EU's Solvency II rules require. 100% is the regulatory minimum.">Solvency II ratio</span> of 225%, and the shares closed August at a five-year month-end high of €450.80. Then September took 7.7% off, including a two-day 7.2% slide on September 22–23 while the DAX barely moved. At €416.20 the stock trades at <strong>13.6× trailing earnings</strong> with a <strong>4.1% dividend yield</strong>. The question for 2027: can a business already earning a core return on equity near 20% keep growing earnings per share at its 7–9% target while the commercial insurance cycle softens?</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Oliver Bäte</div>
+      <div class="card-note">Chief Executive Officer of Allianz SE, named as such on the 2Q 2026 earnings release (August 7, 2026). His results message: "Insurance costs are rising faster than disposable income, and we take that challenge seriously." His answer is investment in AI, risk prevention and smarter service to hold prices within customers' reach. On the results call he put the 2025–2027 plan at its halfway mark: "We are exactly 18 months, i.e., 50% into the three-year cycle. As we can say nicely, so far, so good."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Claire-Marie Coste-Lepoutre</div>
+      <div class="card-note">CFO of Allianz SE, per the same release. On the half-year: "All segments are ahead of the midpoints of their full-year operating profit outlook, demonstrating the successful execution of our strategic priorities." She owns the 2025–2027 plan's core EPS growth target of 7–9% a year.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Shareholders &amp; Capital Return</div>
+      <div class="card-value" style="font-size:20px;">€2.5B buy-back</div>
+      <div class="card-note">Announced February 25, 2026, to finish by year-end. Allianz had bought <strong>6,247,961 shares</strong> under it from March 13 through September 22, 2026 — about 1.6% of the shares outstanding at the end of 2025. Yahoo Finance puts institutional ownership at 43% (read October 5, 2026).</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Allianz reports three operating segments — <strong>Property-Casualty, Life/Health and Asset Management</strong> — plus a Corporate and Other cost centre. The bar below splits <strong>first-half 2026 operating profit</strong> (six months to June 30, 2026) across the three segments: €9,559M combined, before the Corporate and Other segment's −€168M, which brings the group to its reported €9,390M.</p>
+  <div class="seg-bar">
+    <div style="flex:51.0;background:#2EC4C9;">P&amp;C 51.0%</div>
+    <div style="flex:30.3;background:#22c55e;">LIFE/HEALTH 30.3%</div>
+    <div style="flex:18.7;background:#f59e0b;">ASSET MGMT 18.7%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4C9;"></span> Property-Casualty — €4,871M operating profit (6M 2026), +9.1% <span class="tip" title="Year over year — versus the same period one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Life/Health — €2,898M, +2.4% YoY</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Asset Management — €1,790M, +12.6% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">By sales the picture is different: of €98.6B in first-half business volume, Property-Casualty brought €49.6B, Life/Health €44.8B and Asset Management €4.5B. The fund business is the smallest by revenue and the fastest-growing by profit.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2EC4C9;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Property-Casualty</div>
+        <span class="biz-badge dominant">LARGEST PROFIT POOL</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€49.6B</div><div class="biz-stat-label">6M'26 Volume</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+5.6%</div><div class="biz-stat-label">Internal Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">91.4%</div><div class="biz-stat-label">Combined Ratio</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">51.0%</div><div class="biz-stat-label">Op. Profit Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Motor, home, travel and assistance cover for households (retail) and property, liability and specialty cover for companies (commercial, including Allianz Commercial). The first half of 2026 produced <strong>€4.87B of operating profit, up 9.1%</strong>, and the second quarter alone was the segment's best quarter ever at €2.46B. The combined ratio of <strong>91.4%</strong> beat management's full-year range of 92–93%: the loss ratio was 67.7% and the expense ratio 23.7%. Natural catastrophes cost 1.5 points of combined ratio, 0.3 points less than a year earlier. The split matters: retail grew 7% internally with a 91.7% combined ratio, while commercial grew only 4% (1% in the second quarter alone) as management said it continued to "carefully manage the market environment" — in plain terms, holding prices rather than chasing volume. Allianz Partners, the travel-and-assistance arm, grew volume 10.0% internally to €6.2B.</p>
+    <div class="biz-tam"><strong>Peers:</strong> market values below are our calculation at the October 2, 2026 close × Yahoo Finance share counts.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">AXA</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€87.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">11.3×</div><div class="comp-bubble-label">Trailing P/E</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Zurich Insurance</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">CHF 85.50B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">5.2%</div><div class="comp-bubble-label">Div. Yield</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Generali</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€62.46B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">14.1×</div><div class="comp-bubble-label">Trailing P/E</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Life/Health</div>
+        <span class="biz-badge dominant">LONG-DATED SAVINGS</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€44.8B</div><div class="biz-stat-label">6M'26 Volume</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--amber);">−5.9%</div><div class="biz-stat-label">Reported Volume</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">5.4%</div><div class="biz-stat-label">New Bus. Margin</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">30.3%</div><div class="biz-stat-label">Op. Profit Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Pensions, savings, unit-linked policies (where the customer carries the market risk) and protection and health cover. Reported volume fell 5.9% in the half; the <span class="tip" title="Present value of new business premiums: the discounted value of all future premiums expected from policies sold in the period.">PVNBP</span> of new sales was €43.4B, up 3% after adjusting for currency and the sale of the stake in UniCredit Allianz Vita. The <span class="tip" title="New business margin: the value of new business divided by PVNBP — how much profit each euro of new long-term sales is expected to earn.">new business margin</span> held at 5.4%, above the 5% floor management targets, and 91% of new sales came in the capital-light product lines it prefers. Operating profit rose 2.4% to €2.90B, helped by first-time dividends from its holdings in Viridium and Sconset Re. The <span class="tip" title="Contractual service margin: under IFRS 17, the profit already locked into existing life policies that will be released into earnings over their lifetime.">contractual service margin</span> — profit already locked into the book and still to be released — rose to €57.3B (gross), with normalised growth of 2.7% against a full-year aim of about 5%.</p>
+    <div class="biz-tam"><strong>Deal pending:</strong> HSBC Life Singapore plus a 15-year HSBC distribution deal, €2.0B combined consideration, closing expected in the first half of 2027.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Generali</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€62.46B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">4.0%</div><div class="comp-bubble-label">Div. Yield</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">AXA</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€87.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">5.5%</div><div class="comp-bubble-label">Div. Yield</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Munich Re</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€63.99B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">9.5×</div><div class="comp-bubble-label">Trailing P/E</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Asset Management (PIMCO &amp; Allianz Global Investors)</div>
+        <span class="biz-badge growth">FASTEST-GROWING PROFIT</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">€4.5B</div><div class="biz-stat-label">6M'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+15.8%</div><div class="biz-stat-label">Internal Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">60.3%</div><div class="biz-stat-label">Cost-Income</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">18.7%</div><div class="biz-stat-label">Op. Profit Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">PIMCO, the bond specialist, and Allianz Global Investors manage money for pension funds, insurers and retail savers. Outside clients' assets reached a record <strong>€2,161B</strong> at June 30, 2026, after <strong>€84B of net inflows</strong> in six months — a record — and €68B of market gains in the second quarter. Operating profit rose 12.6% to €1.79B (19% at constant exchange rates) and the <span class="tip" title="Cost-income ratio: operating costs divided by operating revenues. Lower is better; 60% means 40 cents of every revenue euro is operating profit.">cost-income ratio</span> improved to 60.3%. Two deals reshape it: on July 30, 2026 Allianz said it will buy out PIMCO's legacy employee equity plan (M-units representing 9.4% of PIMCO, at least €1.4B in cash for the 4.4% held by former staff), and on August 5 AllianzGI agreed to buy UOB Asset Management in Singapore for SGD 555M (€376M), closing expected in 2027.</p>
+    <div class="biz-tam"><strong>Sensitivity:</strong> fees track asset levels, so bond and equity markets feed straight into this segment's revenue.</div>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">AXA</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€87.97B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">AuM</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Generali</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">€62.46B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">AuM</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The four numbers that run an insurer</h3>
+  <p class="prose">An insurer's income statement is the end of a long chain. Underwriting discipline, capital strength, profit per euro of equity and the payout are what the market prices.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">P&amp;C Combined Ratio (6M'26)</div>
+      <div class="card-value">91.4%</div>
+      <div class="card-note">Down 0.1 points from 91.5% a year earlier; FY2025 was 92.2%. Management's 2026 range is 92–93%, so the first half ran ahead of plan.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Solvency II Ratio (Jun 30, 2026)</div>
+      <div class="card-value" style="color:var(--green);">225%</div>
+      <div class="card-note">Up 7 points from 218% at end-2025 (209% at end-2024). Allianz notes that accruing the full-year dividend, rather than a quarterly share of it, would take 7 points off — about 218% on that basis.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Core Return on Equity</div>
+      <div class="card-value">20.7%</div>
+      <div class="card-note">Annualised for 6M 2026, flattered by one-offs; Allianz puts the underlying level at 19%. FY2025 was 18.1%, FY2024 16.9%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Core EPS (6M'26)</div>
+      <div class="card-value">€16.44</div>
+      <div class="card-note"><span style="color:var(--green);">+17.5% YoY</span>; +10% underlying after stripping out the Indian joint-venture sale and last year's UniCredit gain — above the top of the 7–9% annual growth target for 2025–2027.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Scale: ~97M customers, ~70 countries</span>
+    <span class="moat-pill">Three uncorrelated profit engines</span>
+    <span class="moat-pill">Capital strength (Solvency II 225%)</span>
+    <span class="moat-pill">PIMCO fixed-income franchise</span>
+    <span class="moat-pill">German retail distribution</span>
+    <span class="moat-pill">€57.3B locked-in life profit (CSM)</span>
+    <span class="moat-pill">Underwriting data across lines</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The real edge is <strong>diversification you can't buy quickly</strong>. A bad catastrophe year hits property-casualty; a bond-market rout hits asset management and the life book's balance sheet; a recession hits new life sales. These rarely all go wrong in the same quarter, so Allianz's operating profit has stepped up steadily (€16.0B in 2024, €17.4B in 2025, €9.4B in the first half of 2026). A 225% Solvency II ratio means it holds well over twice the capital the regulator requires, which is why it can pay a 4%-plus dividend, buy back €2.5B of stock and still sign deals such as HSBC Life Singapore. The weakness of a giant is the same thing seen from the other side: growth has to come from many mature markets at once, and the group is big enough that a single lost unit, such as a stalled acquisition, barely moves the total.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The commercial pricing cycle is turning.</strong> Commercial internal growth slowed to 1% in the second quarter of 2026 and the commercial combined ratio for that quarter worsened to 91.8% from 90.3%. In its interim report Allianz expects property-casualty premium growth across the industry to slow in 2026, and on the August 7 call CFO Claire-Marie Coste-Lepoutre said that in AGCS, its large-corporate book, "we have observed a rapid softening in the second quarter, in particular around property, around natural resources and construction". When prices soften, an insurer either gives up volume or margin.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Catastrophes are a fat tail.</strong> Natural catastrophes cost only 1.5 points of combined ratio in the first half of 2026, a light period by the company's own account. Allianz's results releases carry a standing warning that catastrophes and capital-market shocks "may severely affect" operating profit; the full-year outlook of €17.4B ± €1B has that range for a reason.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Asset management is market-dependent.</strong> PIMCO and AllianzGI earn fees on asset levels; €68B of the second quarter's AuM growth was market gains. A bond or equity sell-off reverses that, and the segment produced 18.7% of first-half operating profit.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Conduct risk has a price tag.</strong> In May 2022 Allianz agreed to pay about $6 billion in the US over the collapse of AllianzGI's Structured Alpha funds in 2020; the shares fell 7.8% on August 2, 2021, the first session after it disclosed a US Justice Department probe. In its half-year report Allianz SE says it is not aware of any threatened or pending proceedings with significant effects on the group's financial position or profitability, but the episode showed what one fund unit's conduct can cost the group.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark column: the <strong>DAX</strong>, Allianz's home index (Yahoo Finance closes, our calculation). The DAX is a performance index — its level includes reinvested dividends — so it is set against Allianz's total return, not its price return. DAX valuation multiples were not available and show "—". The Industry Avg column is the simple average of three euro-listed insurers, <strong>Munich Re, AXA and Generali</strong>, at their October 2, 2026 closes (Yahoo Finance trailing EPS and dividend rate read October 5, 2026, our calculation); Zurich is left out because its earnings are reported in US dollars and its shares trade in Swiss francs. Gross margin and current ratio do not apply to an insurer.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>ALV</th><th>Industry Avg</th><th>DAX</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many euros you pay for one euro of past-year profit.">Trailing P/E</span></td><td>13.6</td><td>11.6</td><td>—</td><td>€416.20 ÷ €30.56 TTM IFRS basic EPS = 13.62. On Allianz's own core EPS of €31.06 the multiple is 13.4. Peers: Munich Re 9.5, AXA 11.3, Generali 14.1.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by analysts' estimate of next-year earnings per share.">Forward P/E</span></td><td>12.5</td><td>—</td><td>—</td><td>€416.20 ÷ €33.36 forward EPS estimate (Yahoo Finance consensus forward EPS, read October 5, 2026).</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last reported twelve months of profit per share, on IFRS accounts, basic.">EPS (TTM)</span></td><td>30.56 EUR</td><td>—</td><td>—</td><td>IFRS basic: FY2025 €27.69 − 6M 2025 €13.31 + 6M 2026 €16.18. Core EPS (Allianz's headline measure, before non-operating market moves and acquisition amortisation) on the same arithmetic: €28.61 − €13.99 + €16.44 = €31.06.</td></tr>
+      <tr><td><span class="tip" title="Operating profit: Allianz's main performance measure — profit from insurance, investment and fee businesses before non-operating items such as realised gains and acquisition amortisation.">Operating Profit Growth</span></td><td>+8.6%</td><td>—</td><td>—</td><td>6M 2026 €9,390M vs €8,644M. FY2025 €17,374M (+8.4%). FY2026 outlook €17.4B ± €1B; the first half reached 54% of the midpoint.</td></tr>
+      <tr><td><span class="tip" title="Combined ratio: property-casualty claims plus expenses as a percentage of premiums. Under 100% means underwriting is profitable.">Combined Ratio (P&amp;C)</span></td><td>91.4%</td><td>—</td><td>—</td><td>6M 2026; loss ratio 67.7%, expense ratio 23.7%. FY2025 92.2%, FY2024 93.4%. 2026 outlook range 92–93%.</td></tr>
+      <tr><td><span class="tip" title="Solvency II capitalisation ratio: eligible own funds divided by the solvency capital requirement under EU rules. 100% is the minimum.">Solvency II Ratio</span></td><td>225%</td><td>—</td><td>—</td><td>June 30, 2026, quarterly dividend accrual. Full-year dividend accrual would cut it by 7 points. End-2025: 218%.</td></tr>
+      <tr><td><span class="tip" title="Core return on equity: shareholders' core net income divided by average shareholders' equity, excluding unrealised gains and losses.">Core RoE</span></td><td>20.7%</td><td>—</td><td>—</td><td>6M 2026 annualised (underlying 19%, per Allianz). FY2025 18.1%.</td></tr>
+      <tr><td><span class="tip" title="Price-to-book: market value divided by shareholders' equity — what the market pays for each euro of net assets on the balance sheet.">Price / Book</span></td><td>2.47×</td><td>—</td><td>—</td><td>€155.66B market value ÷ €62.9B shareholders' equity at June 30, 2026 (excluding minority interests). Our calculation.</td></tr>
+      <tr><td><span class="tip" title="Net income attributable to shareholders over the last twelve months.">Net Income (TTM)</span></td><td>€11.80B</td><td>—</td><td>—</td><td>€10,775M (FY2025) − €5,264M (6M 2025) + €6,285M (6M 2026). Includes about €1.1B of net-income effect from the sale of the Indian joint ventures in the first quarter of 2026.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: the latest annual dividend per share divided by the share price.">Dividend Yield</span></td><td>4.11%</td><td>4.73%</td><td>—</td><td>€17.10 for FY2025 (ex-dividend May 8, 2026) on €416.20. Five annual raises in a row: €9.60 → €10.80 → €11.40 → €13.80 → €15.40 → €17.10 (ex-dates 2021–2026).</td></tr>
+      <tr><td><span class="tip" title="New business margin: value of new life and health business divided by the present value of new business premiums.">New Business Margin (L/H)</span></td><td>5.4%</td><td>—</td><td>—</td><td>6M 2026 (5.6% a year earlier). Ambition: at least 5%.</td></tr>
+      <tr><td><span class="tip" title="Cost-income ratio: asset-management operating costs divided by operating revenues.">Cost-Income Ratio (AM)</span></td><td>60.3%</td><td>—</td><td>—</td><td>6M 2026, from 61.3% a year earlier; second quarter 60.2%, ahead of the full-year aim of under 61%.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Below 1.0 means historically less volatile than the index.">Beta</span></td><td>0.69</td><td>—</td><td>—</td><td>Yahoo Finance, read October 5, 2026. Insurers usually move less than the market; September 2026's 7.7% fall was an exception.</td></tr>
+      <tr><td>1-Year Price Return</td><td>+14.9%</td><td>+7.2%</td><td>—</td><td>€362.30 (October 2, 2025) → €416.20. Peers: Generali +25.8%, AXA +3.7%, Munich Re −8.0%.</td></tr>
+      <tr><td>1-Year Total Return</td><td>+20.2%</td><td>—</td><td>+3.3%</td><td>Allianz with the May 2026 dividend reinvested (Yahoo adjusted close €346.36 → €416.20) against the DAX, 24,422.56 → 25,231.20.</td></tr>
+      <tr><td>5-Year Total Return</td><td>+172.7%</td><td>—</td><td>+65.3%</td><td>September 30, 2021 → October 2, 2026. Price alone: €194.84 → €416.20, +113.6%; the €68.50 of dividends paid along the way, reinvested, make up the rest. DAX 15,260.69 → 25,231.20.</td></tr>
+      <tr><td>Gross Margin / Current Ratio</td><td>n/m</td><td>n/m</td><td>—</td><td>Not meaningful for an insurer: there is no cost of goods, and the balance sheet is not split into current and non-current items.</td></tr>
+      <tr><td>52-Week Range</td><td>338.80 – 454.60 EUR</td><td>—</td><td>—</td><td>Intraday low March 9, 2026, high September 3, 2026 (Yahoo Finance daily rows, October 3, 2025 – October 2, 2026). The close sits 8.4% below the high and 22.8% above the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Three items distort the 2025–2026 comparisons. First, the <strong>sale of Allianz's 26% stakes in its Indian joint ventures</strong> with Bajaj (closed in two tranches on January 8 and March 12, 2026, for about €2.3B) produced a pre-tax gain of about €1.3B and lifted first-quarter 2026 net income by about €1.1B. Second, the second quarter of 2025 contained a <strong>divestment gain on the UniCredit joint venture</strong>, which is why second-quarter 2026 core net income fell 12.7% (to €2.60B) even though operating profit rose 10.6%; Allianz puts underlying core net income growth at 10% for the quarter and 9% for the half. Third, the <strong>buy-back</strong> shrinks the share count: the weighted average was 379.0M shares in the first half of 2026 versus 385.0M a year earlier, so per-share growth outruns profit growth by roughly 1.6 points.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--amber);">Hold</div><div class="card-note">Yahoo Finance's panel of 17 ratings averages 2.71 on a 1 (Strong Buy) to 5 (Strong Sell) scale. Read October 5, 2026; the September panel shows the same 17 ratings.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">€446.02</div><div class="card-note"><span style="color:var(--green);">+7.2% upside</span> from €416.20, across 16 targets (Yahoo Finance, read October 5, 2026). Median €438.38 (+5.3%).</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">€353 – €684</div><div class="card-note">−15.2% to +64.3%. The €684 top target is 50% above the 52-week high of €454.60; the median is the better guide.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">6 / 7 / 4</div><div class="card-note">2 Strong Buy + 4 Buy, 7 Hold, 1 Sell + 3 Strong Sell. Yahoo's August snapshot showed 2 Strong Sell and no Sell; by September the bearish camp had grown to 4.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:35.3;background:#22c55e;"></div>
+    <div style="flex:41.2;background:#f59e0b;"></div>
+    <div style="flex:23.5;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 6 (35.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 7 (41.2%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 4 (23.5%)</div>
+  </div>
+  <p class="prose" style="margin-top:20px;">A 23.5% sell share is high for a company that just printed a record half-year. On this page's numbers the debate is about price rather than quality: 13.6× earnings and nearly 2.5× book on one side; on the other, 10% underlying growth in first-half core EPS plus a 4.1% dividend yield, which together come to about 14% a year if both held and the multiple stayed where it is.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">The second quarter against the forecasts</h3>
+  <p class="prose">Allianz collects the published forecasts of the analysts who cover it (14 brokers for this quarter), posts the averages two business days before each print and sets the actual results beside them afterwards. Against that consensus the second quarter was an operating beat and a net-income miss. Operating profit came in at <strong>€4,874M against a mean forecast of €4,604M (+6%)</strong>, with Life/Health (€1,544M vs €1,411M) and Asset Management (€933M vs €871M) doing the beating. Property-Casualty was a shade under (€2,459M vs €2,474M), and its 91.9% combined ratio was 0.8 points worse than the 91.1% expected; Allianz's own comment puts that down to smaller releases from prior-year reserves, a choice it calls prudent in light of inflation uncertainty. Below the operating line it went the other way: non-operating items of −€1,040M against −€678M forecast (about half of it offsetting measures tied to the Indian joint-venture sale) left shareholders' core net income at <strong>€2,600M, 8% under the €2,817M consensus</strong>. The Solvency II ratio (225%) matched the forecast, and third-party net inflows of €39B beat the €35B expected.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Rating moves since the print</h3>
+  <p class="prose">From MarketScreener's broker-research feed, August 7 – October 2, 2026. <strong>Raised or kept positive:</strong> DZ Bank (Thorsten Wenzel) kept Buy and lifted its fair value to €486 on August 7 and to €495 on September 18, pointing to the mix of high payouts and profit growth; Berenberg kept Buy on August 10 and again on September 29, when Michael Huttner held his €684 target, the top of the range; Goldman Sachs (Andrew Baker) rated it Buy and lifted its target from €450 to €465 on August 13; RBC raised its target after the beat on August 10 while keeping a neutral rating. <strong>Turned or stayed negative:</strong> Morningstar cut Allianz to Sell on August 27; Barclays (Claudia Gaspari) kept Sell and moved its target from €350 to €353, the bottom of the range, on September 4; Intesa Sanpaolo downgraded to Underperform on September 9 while lifting its target. Jefferies, JP Morgan and UBS reiterated neutral ratings in August.</p>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 12, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">3Q 2026 results (Munich)</div>
+        <div class="tl-desc">The first print after September's slide. Watch three things: whether the property-casualty combined ratio stays inside the 92–93% range through the hurricane quarter, whether commercial volume growth recovers from 1%, and how far nine-month operating profit runs past three-quarters of the €17.4B midpoint.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Dec 8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Inside Allianz Series #16 (London)</div>
+        <div class="tl-desc">An investor event listed on Allianz's investor-relations page, between the third-quarter and full-year results.</div>
+        <div class="tl-impact neutral">Investor event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Feb 24, 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">FY2026 results — dividend and next buy-back</div>
+        <div class="tl-desc">The FY2026 dividend proposal and any new buy-back. A year earlier the release raised the dividend 11.0% to €17.10, and the board had announced a €2.5B buy-back the day before. It also gives the second-year read on the 2025–2027 plan's 7–9% core EPS growth target.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">1H 2027</div>
+      <div class="tl-content">
+        <div class="tl-title">HSBC Life Singapore closing</div>
+        <div class="tl-desc">Announced July 24, 2026: Allianz buys HSBC's Singapore life and health insurer and signs a 15-year exclusive distribution deal with HSBC Singapore, €2.0B combined consideration, subject to regulatory approval. CNA reported HSBC valued the unit at S$2.7B (US$2.09B). In 2024 Singapore's government intervened to stop Allianz's proposed deal for Income Insurance, so the approval path is worth watching.</div>
+        <div class="tl-impact neutral">Execution milestone</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Jul 24 &amp; Oct 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Management reshuffle</div>
+        <div class="tl-desc">On July 24 Allianz said Günther Thallinger will leave the Board of Management at the end of 2026 after ten years on it and that the board will shrink from nine members to eight. Andreas Wimmer adds Allianz Investment Management, which runs the group's own investments, and Tomas Kunzmann, head of the Allianz Partners travel-and-assistance arm, adds global health and sustainability to his previously announced brief when he joins the board on January 1, 2027. On October 1 it named Allianz Direct's chief, Philipp Kroetz, to succeed Kunzmann at Allianz Partners and Laurent Floquet, Allianz Partners' chief operating officer, to run Allianz Direct, both from November 1.</div>
+        <div class="tl-impact neutral">Leadership change</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Reported talks over the AA</div>
+        <div class="tl-desc">The Telegraph, following a Sky News report, said Allianz had held talks about buying the AA, the UK motoring organisation, for about £5B, and that EQT was also reported to be considering a bid. Neither the AA nor Allianz commented in that report. Allianz already owns LV='s general insurance business and Petplan in the UK.</div>
+        <div class="tl-impact neutral">Press report; no company comment</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 22–23, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Two-day 7.2% slide</div>
+        <div class="tl-desc">Allianz closed at €445.10 on September 21, €430.20 on the 22nd (−3.4%) and €413.10 on the 23rd (−4.0%), while the DAX went from 25,575 to 25,411 (−0.6%) over the same two sessions. Other European insurers fell too, by less: Generali −5.5%, AXA −3.6%, Zurich −2.9% and Munich Re −1.2% (Yahoo Finance closes, September 21–23). Allianz's buy-back disclosure of September 29 shows no purchases after September 22. The stock ended the month at €416.30.</div>
+        <div class="tl-impact down">Reaction already happened: −7.7% in September</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 7, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">2Q 2026 results — record half, muted reaction</div>
+        <div class="tl-desc">Record quarterly operating profit of €4.87B (+10.6%), Solvency II 225%, full-year outlook confirmed. Operating profit beat the analyst consensus Allianz compiles by 6%; shareholders' core net income missed it by 8%. The stock closed at €433.50, down 1.6% from €440.70 the day before, as headline core net income fell 12.7% on last year's one-off gain. It still finished August at a five-year month-end high of €450.80.</div>
+        <div class="tl-impact neutral">Reaction already happened: −1.6% on the day</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">ALV.DE — Monthly Closes (EUR), Sep 2021 → Oct 2, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">62 points · 61 month-end closes Sep 2021 – Sep 2026 + Oct 2, 2026 settled close · Xetra, euros, not dividend-adjusted · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2EC4C9;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 2, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the September 2021 month-end close of <strong>€194.84</strong> to the October 2, 2026 settled close of <strong>€416.20</strong>, Allianz shares gained <strong>113.6%</strong> on price alone. Add back the €68.50 per share of dividends paid from 2022 to 2026 and the total return is <strong>+172.7%</strong>, against +65.3% for the DAX (which includes dividends) over the same window. The shape is a slow-then-fast climb. Allianz spent 2022 falling to a five-year low of <strong>€161.80</strong> (September 2022), a year in which rates rose and the Structured Alpha settlement landed, chopped between roughly €200 and €230 through most of 2023, and then re-rated almost without pause from early 2024 to a five-year month-end high of <strong>€450.80</strong> in August 2026.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI shows how stretched that run became: it stayed above 70 for most of 2024 and 2025 and peaked at <strong>92.7 in April 2025</strong>, the highest reading in the series. September's fall brought it down to <strong>58.1</strong> — neutral. The price is still above its 10-month average (about €401) but below its 3-month average (about €428): the long uptrend is intact, the short-term momentum has cooled. Note that May closes include the dividend going ex: the 12.1% fall in May 2023, the worst month in the window, includes the €11.40 dividend that went ex on May 5, 2023.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Aug 2021</div><div class="tl-content"><div class="tl-title">Structured Alpha probe — €198.98</div><div class="tl-desc">After Allianz disclosed on August 1, 2021 that the US Justice Department was investigating losses at AllianzGI's Structured Alpha funds, the shares fell 7.8% on August 2 (€210.00 → €193.70, close to close). August closed down 5.2% at €198.98.</div><div class="tl-impact down">−7.8% day</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2022</div><div class="tl-content"><div class="tl-title">$6 billion settlement — €195.02</div><div class="tl-desc">On May 17, 2022 Allianz agreed to pay about $6 billion in the US over the Structured Alpha collapse. May closed down 9.8%, which also includes the €10.80 dividend going ex on May 5.</div><div class="tl-impact down">−9.8% month (incl. ex-dividend)</div></div></div>
+    <div class="tl-item"><div class="tl-date">Sep 2022</div><div class="tl-content"><div class="tl-title">Five-year low — €161.80, RSI 28.3</div><div class="tl-desc">The bottom of the rate-shock year, with the DAX at its own low for the window (12,114). The RSI's only dip below 30 in the series. What followed were the two best months of the five years: October +12.6% and November +12.2%.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2024</div><div class="tl-content"><div class="tl-title">Breakout — €277.80 (+9.4% in a month)</div><div class="tl-desc">The stock cleared its 2022–2023 range for good. From here it closed every December higher than the one before: €295.90 (2024), €390.50 (2025).</div><div class="tl-impact up">+9.4% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Apr 2025</div><div class="tl-content"><div class="tl-title">Overbought peak — €364.10, RSI 92.7</div><div class="tl-desc">Six straight monthly gains from November 2024 to April 2025 took RSI to the series high. The stock then went sideways for six months, with May–October 2025 month-ends between €344.10 and €361.20.</div><div class="tl-impact neutral">RSI 92.7</div></div></div>
+    <div class="tl-item"><div class="tl-date">Mar 2026</div><div class="tl-content"><div class="tl-title">Market sell-off — €359.30</div><div class="tl-desc">Allianz fell 6.0% in March as the DAX fell 10.3%, and hit its 52-week intraday low of €338.80 on March 9. From the March month-end to the August month-end it gained 25.5%.</div><div class="tl-impact down">−6.0% month (DAX −10.3%)</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug 2026</div><div class="tl-content"><div class="tl-title">Five-year high — €450.80</div><div class="tl-desc">The record first half (operating profit €9.4B, Solvency II 225%) carried the stock to its highest month-end close in the window and a 52-week intraday high of €454.60 on September 3.</div><div class="tl-impact up">5-yr high close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2, 2026</div><div class="tl-content"><div class="tl-title">Settled close — €416.20</div><div class="tl-desc">7.7% below the August close after September's slide, 6.6% above the end of 2025 (€390.50), and up 14.9% on the year.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">Against its home index Allianz has been a clear winner: <strong>+172.7% total return over five years versus +65.3% for the DAX</strong>, and <strong>+20.2% versus +3.3%</strong> over the last year. Against fellow euro-listed insurers the one-year price picture is mixed: Allianz's +14.9% trails Generali (+25.8%) but beats AXA (+3.7%) and Munich Re (−8.0%). On valuation Allianz sits between them: 13.6× trailing earnings against 9.5× for Munich Re, 11.3× for AXA and 14.1× for Generali, with a dividend yield (4.1%) a little under the 4.7% peer average. On these numbers the market pays a premium over AXA and Munich Re, not a growth multiple.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>You are paying 13.6× trailing earnings for a company that just posted a record half-year, runs a 91.4% combined ratio, earns about a 19% underlying core return on equity and holds 225% of the capital its regulator demands. Underlying core EPS grew 10% in the first half, above the 7–9% plan, second-quarter operating profit beat the analysts' consensus by 6%, and the share count is shrinking. On top of that comes a 4.1% dividend that has risen in each of the last five years. PIMCO and AllianzGI took in a record €84B of net new money in six months, so the fee engine is accelerating just as rates stay high. September's 7.7% fall came between results dates; the November 12 print is the next chance to show the numbers.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The record is already in the price: the stock more than doubled in five years, trades at nearly 2.5× book and carries a consensus Hold with four Sell or Strong Sell ratings out of 17. Commercial insurance growth slowed to 1% in the second quarter and its combined ratio worsened, while the first half had a light catastrophe load (1.5 points). A normal or heavy storm season would push the ratio toward or above the 92–93% range. Headline core net income already fell 12.7% in the second quarter on one-offs, 8% below the analysts' consensus, and Morningstar and Intesa Sanpaolo both turned negative after the print. The M&amp;A pipeline (HSBC Life Singapore, the PIMCO M-unit buy-out, UOBAM, reported talks over the AA) adds execution and capital risk. The two-day 7.2% drop on September 22–23, steeper than Generali's or AXA's over the same sessions, shows how fast a stock near its high can de-rate.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Catastrophe and pricing cycle.</strong> A heavy natural-catastrophe year combined with softening commercial prices would hit the segment that produced 51% of first-half operating profit. The combined-ratio range of 92–93% is the line to watch.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Capital markets.</strong> A sharp fall in bond or equity markets cuts asset-management fees (€68B of second-quarter AuM growth was market gains) and dents the Solvency II ratio, which in turn limits buy-backs.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Deal execution and valuation.</strong> Several acquisitions are in flight at once while the stock trades near the top of its five-year range. A misstep, or a large deal priced richly, would meet a market with little patience: four of 17 analysts already rate the shares a Sell or Strong Sell.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">The commercial insurance cycle is softening</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">KEY CONSTRAINT</span></div>
+    <p class="biz-desc">In its half-year report Allianz expects premium growth in property-casualty insurance to slow in 2026 and says the sector remains exposed to natural catastrophes, cyberattacks and political and military crises. Its own numbers show the split: retail grew 7% internally in the first half with a flat 91.7% combined ratio, while commercial grew 4% — just 1% in the second quarter — and its quarterly combined ratio rose 1.5 points to 91.8%. Allianz chose margin over volume. That protects the combined ratio, but it caps the growth of the business that now earns half the group's operating profit. The UK was the largest drag on the accident-year loss ratio (0.3 points), in what the company calls an increasingly challenging market.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Higher-for-longer rates: a tailwind with a sting</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">MIXED</span></div>
+    <p class="biz-desc">Allianz's interim report notes that inflation turned up again in the first half of 2026 on energy prices, that the European Central Bank raised its policy rate by 25 basis points in June, and that long-term rates stayed high in both Europe and the US. For an insurer that is mostly good news: reinvested premiums and life savings earn more, and the report itself cites higher long-term rates as a driver of demand for savings products. The sting is twofold. Rising claims inflation feeds straight into motor and property repair costs — the CEO's point that insurance costs are outrunning incomes. And bond-heavy asset managers like PIMCO live with mark-to-market swings on the assets they manage.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Capital to spare: buy-backs and bolt-ons</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">TAILWIND</span></div>
+    <p class="biz-desc">A 225% Solvency II ratio funds three uses of capital at once. Allianz is buying back up to €2.5B of its own stock in 2026 (€1.4B, or 3.8 million shares, by June 30). It is paying a dividend that rose 11% to €17.10. And it is buying growth in Asia and in asset management: HSBC Life Singapore (€2.0B with the distribution deal), UOB Asset Management (€376M) and the PIMCO M-units (at least €1.4B), while selling out of India for about €2.3B. Allianz is recycling capital from minority stakes into businesses it controls. <strong>The bull reading:</strong> disciplined capital allocation that compounds per-share value. <strong>The bear reading:</strong> deals pile up at a time when the shares already trade at a premium to AXA and Munich Re.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Friday, October 2, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: Yahoo Finance daily rows for ALV.DE (Xetra, EUR) — the October 2, 2026 close of €416.20 (open 413.10, high 416.20, low 409.90) against €412.00 on October 1. The session of Monday October 5, 2026 was in progress when the data were read and is not used. Market value: 373,994,237 shares (380,242,198 outstanding at December 31, 2025, per Allianz's FY2025 financial supplement, less 6,247,961 shares bought back from March 13 to September 22, 2026, per Allianz's September 29, 2026 disclosure) × €416.20 = €155.66B, converted at the ECB euro reference rate of $1.1225 per euro for October 2, 2026 = $174.72B (our calculation).</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Allianz 2Q 2026 earnings release and key-figures table (August 7, 2026) and FY2025 earnings release (February 26, 2026), as published via EQS News and on allianz.com, for segment results, combined, solvency, return and margin ratios, outlook, dividend, buy-back and executive quotes; Allianz Group Interim Report for the first half-year of 2026 for IFRS earnings per share, weighted share counts, natural-catastrophe impact, the Bajaj sale, the HSBC Life Singapore, PIMCO M-unit and UOBAM transactions and the market outlook; Allianz FY2025 financial supplement for FY2025 IFRS EPS and shares outstanding; Allianz buy-back disclosures of September 1–29, 2026 (EQS News); allianz.com "at a glance" for employees, customers and countries, and the IR page for the financial calendar; Yahoo Finance for prices, the DAX and peer closes, dividend history and ex-dates, beta, institutional ownership, peer EPS and share counts, and the analyst consensus (read October 5, 2026); ECB data portal for the EUR/USD reference rate; Allianz's 2Q 2026 analyst consensus and actuals sheet (allianz.com investor relations) for results against forecasts; Investing.com's transcript of the August 7, 2026 results call for the CEO's and CFO's call remarks; Allianz IR release of July 24, 2026 and media release of October 1, 2026 for the Board of Management and subsidiary CEO changes; MarketScreener's broker-research feed (August 7 – October 2, 2026) for dated rating and target moves; CNA (July 24, 2026) for the HSBC valuation and the 2024 Income Insurance episode; The Telegraph via Yahoo Finance (August 30, 2026) for the reported AA talks; allianz.com (history and share-information pages) for the founding date, ISIN and index membership; Reuters (via Insurance Journal, May 2022) and the SEC's May 17, 2022 release for the Structured Alpha probe and settlement; the interim report's imprint for the head-office address.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 62 points — 61 month-end closes from September 2021 through September 2026 and the October 2, 2026 settled close, all from Yahoo Finance's ALV.DE monthly series (close, not dividend-adjusted; no splits in the window). The final point is a settled close two sessions into October, labelled accordingly. Total returns use Yahoo's dividend-adjusted closes. Peer valuation figures (Munich Re, AXA, Generali, Zurich) are our calculations from Yahoo Finance closes, trailing EPS, dividend rates and share counts; Zurich is excluded from the averages because its EPS is reported in US dollars. Segment market shares and asset-management peer AuM are shown as "n/v".</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as outlook or targets are management or analyst forecasts, not results. Core figures are Allianz's own non-IFRS measures, defined in its releases. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 61 month-end closes Sep 2021 → Sep 2026 (Yahoo Finance ALV.DE monthly close, EUR, not dividend-adjusted) + Oct 2, 2026 settled close =====
+const labels = ['Sep 21','Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26','Oct 2 26'];
+const prices = [194.84,201.15,192.44,207.65,227.35,203.3,216.55,216.2,195.02,182.12,177.32,168.58,161.8,182.2,204.35,200.9,219.2,222.15,212.8,227.45,199.98,213.2,217.4,224.35,225.7,220.9,230.6,241.95,247.8,253.85,277.8,266.6,268.3,259.5,260.8,280.9,295.0,289.4,292.2,295.9,314.4,330.3,352.1,364.1,348.7,344.1,347.2,361.2,357.4,348.2,372.3,390.5,371.8,382.2,359.3,389.0,381.6,414.1,432.5,450.8,416.3,416.2];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+const events = [
+  { idx: 8,  label: 'May 2022 — $6bn US settlement; €195.02',                    color: '#ef4444' },
+  { idx: 12, label: 'Sep 2022 — five-year low €161.80, RSI 28.3',                color: '#ef4444' },
+  { idx: 30, label: 'Mar 2024 — breakout, €277.80 (+9.4% month)',                color: '#22c55e' },
+  { idx: 43, label: 'Apr 2025 — RSI 92.7, €364.10',                              color: '#f59e0b' },
+  { idx: 54, label: 'Mar 2026 — market sell-off, €359.30',                       color: '#ef4444' },
+  { idx: 59, label: 'Aug 2026 — five-year high €450.80',                         color: '#22c55e' },
+  { idx: 61, label: 'Oct 2, 2026 — settled close €416.20',                       color: '#2EC4C9' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(46,196,201,0.22)');
+grad.addColorStop(1, 'rgba(46,196,201,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#2EC4C9', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2EC4C9'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': €' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '€' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>

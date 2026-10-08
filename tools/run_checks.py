@@ -29,6 +29,7 @@ CHECKS = [
     ('blackjack engine', ['node', 'tables/checks/bj_engine_check.js']),
     ('baccarat engine', ['node', 'tables/checks/baccarat_engine_check.js']),
     ('three card poker engine', ['node', 'tables/checks/tcp_engine_check.js']),
+    ('glossary pages', [sys.executable, 'tools/glossary.py', '--check']),
     ('type check', [sys.executable, '-m', 'mypy']),
 ]
 

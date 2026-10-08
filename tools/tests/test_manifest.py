@@ -75,6 +75,14 @@ class ManifestRecords(unittest.TestCase):
         with tempfile.TemporaryDirectory() as repo, self.assertRaises(FileNotFoundError):
             rd.parse_index_cards(repo)
 
+    def test_home_exchange_with_a_digit(self):   # B3 (São Paulo) was dropped before 8 Oct 2026
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'reports'))
+            with open(os.path.join(repo, 'reports', 'index.html'), 'w', encoding='utf-8') as fh:
+                fh.write(self.INDEX.replace('<a class="rep" href="view.html?r=gone"',
+                                            '<a class="rep" data-gl="B3" href="view.html?r=gone"'))
+            self.assertEqual(rd.parse_index_cards(repo)['gone']['indices']['global_exchange'], 'B3')
+
 
 class Verify(unittest.TestCase):
     def check(self, page, name='acme_analysis.html'):

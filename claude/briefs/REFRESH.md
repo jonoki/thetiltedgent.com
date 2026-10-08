@@ -1,6 +1,6 @@
 # Refresh brief — one TTG report, after an earnings print or material news
 
-**Before anything else, read `claude/REPORT_PITFALLS.md`** — the running log of errors earlier runs made, each with the rule that prevents it. Treat every rule there as part of this brief.
+**Before anything else, read `claude/PITFALL_RULES.md`** — the prevention rule for every error class earlier runs made (the full log with examples is `claude/REPORT_PITFALLS.md`; open it only to look up an example). Treat every rule there as part of this brief.
 
 REPO: C:\Users\jon_o\Desktop\Coding projects\thetiltedgent.com (Windows, Git Bash; Python is `py -3`). Edit exactly ONE file: reports/<slug>_analysis.html (it already exists and is live). Do NOT git add/commit/push. Temp files only in $TEMP/ttgref_<slug>/.
 
@@ -29,7 +29,7 @@ New as-of = the most recent settled close (a stockanalysis history row WITH Adj.
 - Section 02 segments, Section 05 analyst calls, Section 06 catalysts (the print moves from "upcoming" to "happened"; add the next one only if dated by the company or labelled estimated).
 
 ## TASK B — did the business change? (decide the tier honestly)
-- **T1 Rewrite** if ANY: |EPS or revenue surprise| ≥ 10%; earnings-day move ≥ 5% (close-to-close on the first session after the print); guidance changed; OR significant company news since the print (M&A, CEO/CFO change, restructuring, major contract/regulatory/legal event, guidance withdrawal, dividend/buyback policy change). Dow 30 / Nasdaq-100 / mega-cap names default to T1. T1 = rewrite the narrative sections (overview, moat/vulnerabilities, bull/bear, risks, industry commentary) wherever the quarter changed the story.
+- **T1 Rewrite** if ANY: |EPS or revenue surprise| ≥ 10%; earnings-day move ≥ 5% (close-to-close on the first session after the print); guidance changed; OR significant company news since the print (M&A, CEO/CFO change, restructuring, major contract/regulatory/legal event, guidance withdrawal, dividend/buyback policy change). Dow 30 / Nasdaq-100 names default to T1; market cap alone does not (Oki, 8 Oct 2026). T1 = rewrite the narrative sections (overview, moat/vulnerabilities, bull/bear, risks, industry commentary) wherever the quarter changed the story.
 - **T2 Numbers** otherwise: TASK A plus a short factual paragraph on the quarter; narrative untouched except where now false.
 - "The business is unchanged; the multiple re-rated" is a correct and welcome finding. Do not manufacture a narrative to explain a price move.
 

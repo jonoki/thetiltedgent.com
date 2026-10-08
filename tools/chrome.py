@@ -33,13 +33,14 @@ class NavMenu(NamedTuple):
 
 
 # The site nav (Oki, 30 Sep 2026): Learn and Le Degens stay, marked Soon; Reports and The Tables open panels, and
-# every trainer sits under The Tables. The Toolbox stays a homepage section, linked from the footer.
+# every trainer sits under The Tables. The Toolbox stays a homepage section, linked from the footer. The two glossaries
+# (Oki, 5 Oct 2026): finance under Reports, poker & gambling under The Tables.
 # Hrefs are root-relative so the same markup works at any depth. Games follow the board's order (best grade first).
 NAV: list[NavLink | NavMenu] = [
     NavLink('learn', 'Learn', '/#learn', 'Soon'),
     NavMenu('reports', 'Reports', [('Reports', [
         ('Stocks', '/reports/'), ('ETFs', '/reports/?f=etf'), ('Crypto', '/reports/?f=crypto'),
-        ('Bonds &amp; cash', '/reports/?f=fixed')])]),
+        ('Bonds &amp; cash', '/reports/?f=fixed'), ('Glossary', '/glossary/finance.html')])]),
     NavMenu('tables', 'The Tables', [
         ('Games, graded', [
             ('All games: the grades', '/tables/casino-games.html'), ('Blackjack', '/tables/blackjack.html'),
@@ -51,7 +52,8 @@ NAV: list[NavLink | NavMenu] = [
         ('Trainers', [('Blackjack Trainer', '/tables/blackjack-trainer.html'),
                       ('Craps Table', '/tables/craps-table.html'),
                       ('Baccarat Table', '/tables/baccarat-table.html'),
-                      ('Three Card Poker Table', '/tables/three-card-poker-table.html')])]),
+                      ('Three Card Poker Table', '/tables/three-card-poker-table.html')]),
+        ('Glossary', [('Poker &amp; gambling terms', '/glossary/poker.html')])]),
     NavLink('degens', 'Le Degens', '/#degens', 'Soon'),
     NavLink('about', 'The Gent', '/#about'),
 ]
@@ -63,7 +65,7 @@ CTA = ('Take a Seat', '/#learn')
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
 # Bump ASSET_V whenever site.css or site.js changes: Pages caches for ten minutes, and new nav markup with the old
 # stylesheet shows an unstyled menu. write_chrome replaces any older stamp.
-ASSET_V = '20260930'
+ASSET_V = '20261005'
 SITE_CSS = f'<link rel="stylesheet" href="/assets/site.css?v={ASSET_V}">'
 SITE_JS = f'<script src="/assets/site.js?v={ASSET_V}" defer></script>'
 OLD_SITE_CSS = re.compile(r'<link rel="stylesheet" href="/assets/site\.css(?:\?v=[^"]*)?">')
@@ -79,6 +81,8 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('tables/craps-table.html', 'tables', True),
     ('tables/baccarat-table.html', 'tables', True),
     ('tables/three-card-poker-table.html', 'tables', True),
+    ('glossary/finance.html', 'reports', True),   # written by tools/glossary.py
+    ('glossary/poker.html', 'tables', True),
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "

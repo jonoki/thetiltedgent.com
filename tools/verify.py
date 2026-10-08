@@ -15,6 +15,7 @@ import sys
 from typing import NotRequired
 
 import reportlib as rl
+import chart_audit
 import repodata as rd
 
 
@@ -45,7 +46,7 @@ class CheckResult(rl.StructureCounts):
 def plain_value(cell: str) -> float | None:
     """A value cell that is a plain number ('24.1x', '−$1.20'); None for n/m, n/a, ~257x and the like, so an
     unreadable cell yields no P/E check rather than a wrong one."""
-    m = re.match(r'^\s*([−-])?\s*\$?([\d,]+(?:\.\d+)?)\s*[x×]?\s*(?:$|\(|—|–|-|\s)', cell)
+    m = re.match(r'^\s*([−-])?\s*' + rl.CUR + r'([\d,]+(?:\.\d+)?)\s*[x×]?\s*(?:$|\(|—|–|-|\s)', cell)
     return (-1 if m.group(1) else 1) * float(m.group(2).replace(',', '')) if m else None
 
 
@@ -74,7 +75,9 @@ def title_matches(ticker: str | None, path: str) -> bool:
     """The <title> ticker names the file: on 21 Sep 2026 a builder wrote the Cboe report into mtd_analysis.html
     and a PG&E copy into cboe_analysis.html, and every other check passed."""
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
-    return norm(ticker) == norm(rd.slug_of(path))
+    slug = rd.slug_of(path)
+    # a non-US listing is filed under a short name; chart_audit maps that slug to its exchange symbol (0700.HK)
+    return norm(ticker) in (norm(slug), norm(chart_audit.YAHOO_SYMBOL.get(slug)))
 
 
 def check(path: str) -> CheckResult:

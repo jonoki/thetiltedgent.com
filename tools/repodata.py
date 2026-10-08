@@ -129,7 +129,7 @@ def parse_index_cards(repo: str = ROOT) -> dict[str, IndexCard]:
         a = m.group('attrs')
         sp = re.search(r'data-sp="([\d-]+)"', a)
         dow = re.search(r'data-dow="([\d-]+)"', a)
-        gl = re.search(r'data-gl="([A-Z ]+)"', a)   # global (non-US-index) names carry their home exchange
+        gl = re.search(r'data-gl="([A-Z0-9 ]+)"', a)   # global (non-US-index) names carry their home exchange (B3)
         out[m.group('slug')] = {
             'ticker': m.group('tick'),
             'card_name': htmllib.unescape(m.group('name')),

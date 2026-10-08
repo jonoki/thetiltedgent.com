@@ -65,7 +65,7 @@ class Queue(unittest.TestCase):
         p['surprise_pct'] = 2.0
         self.assertEqual(q.tier(holding('x', 'X', '2026-09-01'), p, -4.9), ('T2', []))
         self.assertEqual(q.tier(holding('x', 'X', '2026-09-01', dow=True, mcap=250e9), p, -5.0)[1],
-                         ['Dow 30', 'mega-cap $250B', 'first-session move -5.0%'])
+                         ['Dow 30', 'first-session move -5.0%'])
 
     def test_status(self):
         rel = D('2026-09-23')

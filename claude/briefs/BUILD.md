@@ -1,6 +1,6 @@
 # Builder brief — one TTG stock report
 
-**Before anything else, read `claude/REPORT_PITFALLS.md`** — the running log of errors earlier runs made, each with the rule that prevents it. Treat every rule there as part of this brief.
+**Before anything else, read `claude/PITFALL_RULES.md`** — the prevention rule for every error class earlier runs made (the full log with examples is `claude/REPORT_PITFALLS.md`; open it only to look up an example). Treat every rule there as part of this brief.
 
 REPO: C:\Users\jon_o\Desktop\Coding projects\thetiltedgent.com (Windows, Git Bash). Write exactly ONE file: reports/<slug>_analysis.html (slug = lowercase ticker, dots removed). Touch nothing else in the repo. Do NOT git add/commit/push — the orchestrator verifies and publishes. Temp files go ONLY in a per-ticker folder $TEMP/ttg_<slug>/ (other builders run in parallel and share $TEMP — never use generic names).
 
@@ -15,6 +15,19 @@ REQUIRED vs CTSH: wrap the metrics table as `<div class="fin-scroll"><table clas
 .fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .fin-scroll > .fin-table { min-width: 760px; }
 The metrics table must have a row whose label cell is exactly `EPS (TTM)` (tooltip span allowed) and a `Trailing P/E` row. Never include the string "tg-sitenav". LF line endings, UTF-8.
+
+## Depth — every new build is T1 (Oki, 5 Oct 2026)
+An initial build covers everything a T1 refresh would (`claude/briefs/REFRESH.md`, TASK B): the latest reported quarter or half, with results vs consensus where a primary source gives it; management's own words from the latest call or presentation (verbatim only from a fetched transcript or release); current guidance; analyst rating and target changes since that print (dated, from the firm or a ratings table); and material company news up to the banner date. No delta box on a new build. Before writing 01 and 06, read the company's own releases from the last print up to the banner date: approvals, pricing or regulatory agreements, list designations and deals that land between results are part of the picture (6 Oct 2026 batch).
+
+## Non-US listings (6 Oct 2026)
+For a company whose report uses its home-market listing (no S&P 500 requirement; identity check still applies):
+- Slug: a short lowercase name (≤ 8 letters, e.g. `tencent`, `dtelekom`) when the ticker is numeric or clashes with a library slug; otherwise the ticker. Add the slug → Yahoo symbol pair to `YAHOO_SYMBOL` in `tools/chart_audit.py` before the build.
+- `<title>` = `<EXCHANGE SYMBOL> — <Company name> | Stock Analysis`, the symbol exactly as Yahoo lists it (`0700.HK`, `DTE.DE`, `ATCO-A.ST`). No pseudo-tickers.
+- Price, chart and per-share figures in the listing's currency, with its marker (€, HK$, ¥, ₩, £/p, CHF …); the hero says which. `Mkt Cap:` in USD at the banner-date FX close (source named), local figure beside it.
+- Banner date = the latest settled home-market close on or before the batch date (holidays move it earlier; say which).
+- Metrics columns: Industry Avg plus the home benchmark (DAX, Nikkei 225, Hang Seng …) or the S&P 500 where no reliable home figure exists — say which. Short interest only where the market publishes it.
+- Primary sources: the exchange's filing system (HKEXnews, DART, MOPS, TDnet/EDINET, CNMV …) and the company's IR site, English versions where they exist.
+- Long unbroken strings (source URLs, "US$488.1B (HK$3.83T)") overflow 390 px: keep `.container * { overflow-wrap: anywhere; }` in the page CSS.
 
 ## Data rules (hard — a plausible fabrication is the worst outcome)
 - Price: the most recent settled close — a stockanalysis.com/stocks/<t>/history/ row that HAS an Adj. Close value. (WebFetch needs a domain surfaced by a WebSearch first; one search per new domain.) Header .price-current == LAST value of `prices` to the cent. Banner date = that close's date.

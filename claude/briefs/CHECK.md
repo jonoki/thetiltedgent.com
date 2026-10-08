@@ -1,6 +1,6 @@
 # Checker brief — independent check of built or refreshed TTG stock reports
 
-**Before anything else, read `claude/REPORT_PITFALLS.md`** — the running log of errors earlier runs made, each with the rule that prevents it. Treat every rule there as part of this brief.
+**Before anything else, read `claude/PITFALL_RULES.md`** — the prevention rule for every error class earlier runs made (the full log with examples is `claude/REPORT_PITFALLS.md`; open it only to look up an example). Treat every rule there as part of this brief.
 
 REPO: C:\Users\jon_o\Desktop\Coding projects\thetiltedgent.com (Windows, Git Bash; Python is `py -3`). You check reports another agent built. They are uncommitted files in reports/. Edit ONLY your assigned reports/<slug>_analysis.html files. Do NOT git add/commit/push. Temp files go ONLY in $TEMP/ttgchk_<slug>/.
 
@@ -19,7 +19,7 @@ WebFetch needs a domain surfaced by a WebSearch first (one search per new domain
 PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). Read sec.gov with WebFetch; never add a contact user-agent yourself. If WebFetch can't read a page, use another source.
 
 ## Return (short, no file contents), one block per report
-- PITFALLS: one tag per correction you made, `<letter>:<short example>` using the classes in REPORT_PITFALLS.md (new class → `NEW:<description>`). Required — the orchestrator tallies these into the log.
+- PITFALLS: one tag per correction you made, `<letter>:<short example>` using the letters in PITFALL_RULES.md (new class → `NEW:<description>`). Required — the orchestrator tallies these into the log.
 - VERDICT: PUBLISH or HOLD (+ one-line reason for HOLD)
 - verify line
 - what you changed (one line each)

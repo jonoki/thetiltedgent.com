@@ -261,7 +261,8 @@
   clearBtn.addEventListener('click',foldAll);
 })();
 
-// ---- card tags: families, tooltips and one-liners from ../data/card_tags.json (built by tools/card_tags.py)
+// ---- card tags: families, tooltips and one-liners from ../data/card_tags.json (built by tools/card_tags.py);
+// "New results" from ../data/new_results.json (same tool, from the refresh queue)
 (function(){
   var ICON={
     list:'<circle cx="12" cy="6.6" r="4.3"/><circle cx="6.6" cy="13.4" r="4.3"/><circle cx="17.4" cy="13.4" r="4.3"/><path d="M11 12h2l1.6 9.2H9.4z"/>',
@@ -279,6 +280,7 @@
     return '<span class="tg t fam-'+fam+'" tabindex="0" role="button" data-label="'+esc(label)+'" data-tip="'+esc(tip)+'" aria-label="'+esc(label+': '+tip)+'">'+icon(fam)+esc(label)+'</span>';
   }
   var NOW=new Date(), YEAR=NOW.getUTCFullYear();
+  var TODAY=new Date(NOW.getTime()-NOW.getTimezoneOffset()*6e4).toISOString().slice(0,10);   // local date
   function yr(iso){return iso?+iso.slice(0,4):null;}
   function nice(iso){var d=new Date(iso+'T00:00:00Z');return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});}
   function when(iso){ // "in 2001", or "on March 3" for this year
@@ -287,9 +289,9 @@
   }
   var SP='In the S&P 500: about 500 of America’s largest companies, and the benchmark most people mean by “the market”. Index funds and many retirement plans simply own the whole list.',
       NDX='In the Nasdaq-100: the 100 biggest companies trading on the Nasdaq stock exchange, leaving out banks and other finance firms.',
-      DOW='One of just 30 companies in the Dow Jones Industrial Average (“the Dow”), the oldest US stock-market average, running since 1896.';
+      DOW='One of just 30 companies in the Dow Jones Industrial Average (“the Dow”), one of the oldest US stock-market averages, running since 1896.';
 
-  function decorate(card,c){
+  function decorate(card,c,nr){
     c=c||{};
     // take the link off the card and lay it over the card instead ("stretched link"), with tags stacked above it:
     // a tap on a tag or on +N then never reaches the link, whatever else is listening for link clicks
@@ -334,7 +336,13 @@
       if(x[0]==='New CEO' && x[2] && (NOW-Date.parse(x[2]+'-01T00:00:00Z'))/864e5>730) return;
       fams.who.push(tagHtml('who',x[0],x[1]));
     });
-    if(c.ed && (NOW-Date.parse(c.ed[0]+'T00:00:00Z'))/864e5<=60)
+    // a print after this edition replaces "Updated": [release, show from, page as-of, name]
+    if(nr && TODAY>=nr[1]){
+      var sameYr=nr[0].slice(0,4)===nr[2].slice(0,4);
+      var asof=sameYr?new Date(nr[2]+'T00:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):nice(nr[2]);
+      fams['new'].push(tagHtml('new','New results','Reported '+nice(nr[0])+', after this edition (data as of '+asof+'). The new numbers aren’t in it yet.'));
+    }
+    else if(c.ed && (NOW-Date.parse(c.ed[0]+'T00:00:00Z'))/864e5<=60)
       fams['new'].push(tagHtml('new','Updated','Refreshed '+when(c.ed[0])+', replacing the edition of '+nice(c.ed[1])+' (then $'+(+c.ed[2]).toFixed(2)+'). The report opens with what changed.'));
     var income=false;
     (c.st||[]).forEach(function(s){ if(s[0]==='Income') income=true; fams.style.push(tagHtml('style',s[0],s[1])); });
@@ -398,11 +406,12 @@
   });
   addEventListener('scroll',function(){if(!tip.hidden&&cur) show(cur);},{passive:true});
 
-  fetch('../data/card_tags.json').then(function(r){return r.ok?r.json():null;}).then(function(d){
-    var cards=(d&&d.cards)||{};
+  function getJson(u){return fetch(u).then(function(r){return r.ok?r.json():null;});}
+  Promise.all([getJson('../data/card_tags.json'),getJson('../data/new_results.json').catch(function(){return null;})]).then(function(d){
+    var cards=(d[0]&&d[0].cards)||{}, nrs=(d[1]&&d[1].cards)||{};
     [].forEach.call(document.querySelectorAll('.rep'),function(card){
       var m=/r=([a-z0-9.\-]+)/.exec(card.getAttribute('href')||'');
-      decorate(card,m?cards[m[1]]:null);
+      decorate(card,m?cards[m[1]]:null,m?nrs[m[1]]:null);
     });
   }).catch(function(){
     [].forEach.call(document.querySelectorAll('.rep'),function(card){decorate(card,null);});
