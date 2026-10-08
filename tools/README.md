@@ -14,8 +14,9 @@ Each finds the repo from its own location, so the working directory only matters
 | `glossary.py` | the finance and poker & gambling glossaries from their data; fails when a recurring tear-sheet label has no entry (`--check`: page out of date) | `glossary/finance.html`, `glossary/poker.html` |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
-| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch | branch `claude/auto-refresh`, `tasks/queue/runs/` |
+| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
+| `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
 | `refresh_data.py` | the number layer of a refresh: settled close, chart, 52-week range, returns, P/E, yield, short interest, EPS surprise | `facts.json`, `stale_hits.txt`; with `--write` the report's structured fields |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
 
@@ -135,7 +136,32 @@ or a first-session move of 5% or more; T2 otherwise (the builder may still raise
 Writes `tasks/queue/queue.json` and `tasks/queue/today.md`, never the repo: `tasks/` is excluded from git.
 Nasdaq often drops a release's time once it has happened; the queue keeps the time an earlier fetch saw, and
 with no time at all it assumes after the close (the later T+2) and takes the larger of the two possible moves.
-Exits 1 if any calendar day could not be fetched.
+Exits 1 if any calendar day could not be fetched, or any page of the global calendar (below) failed.
+The prints of the names Nasdaq does not list come from `global_calendar.py` and are added to Nasdaq's; queue.json
+carries its coverage under `global_calendar` (names looked up, how many have a date, which have none).
+
+## `global_calendar.py` — earnings dates for the names Nasdaq does not list
+
+    py -3 tools/global_calendar.py          # what it finds today (looks up every global name; refresh_queue skips the ones Nasdaq lists)
+
+Covers every report whose `<title>` ticker is a home listing abroad (`.HK .KS .SZ .SS .TW .T .PA .SW .DE .MC .MI
+.AS .ST .L .SR .NS .AX .SI`) and every US-listed global name (a card with `data-gl`) that has no print in the run's
+Nasdaq calendar (Oki, 8 Oct 2026). Sources, best first when two give the same release (within 7 days):
+`data/ir_calendar.json` (kept by hand: revenue-only and trading updates read on the company's own IR calendar, with
+that page as `source`); HKEX's board-meeting list (`www3.hkexnews.hk/reports/bmn/ebmn.htm`, results meetings of the
+Hong Kong names); each name's stockanalysis.com statistics page (`/quote/<exch>/<code>/statistics/`, US names
+`/stocks/<ticker>/statistics/`; `SA_PAGE` holds the exceptions, e.g. Ping An's HK page is a 404 so its Shanghai A share
+is read); and what the previous day's run saw confirmed. No Yahoo, no JPX/TDnet. Each stockanalysis page is read at
+most once a day: `robots.txt` is read first and obeyed, requests are 3 s apart with a generic browser user agent and
+nothing personal, and the day's result (pages with their `<title>`, HKEX rows, merged events) is cached as
+`global-YYYY-MM-DD.json` in the queue's calendar cache; a second run that day fetches only what failed. A page gives
+either "The next confirmed|estimated earnings date is …" or "The last earnings date was …", sometimes with "before
+market open" / "after market close"; a Saturday "confirmed" date is kept as estimated, and a past date counts only
+when it was reported or confirmed. The prints carry no EPS, so the tier comes from index membership and the
+first-session move (Yahoo daily closes, symbols from `chart_audit.YAHOO_SYMBOL`). T+2 still runs on the NYSE
+calendar, not the home market's. Coverage on 8 Oct 2026: all 63 home listings and 31 US-listed global names dated
+(dates from stockanalysis for 59 home listings, the IR file for 5, HKEX for 2, some from more than one; 15 home
+listings had only an estimated next date).
 
 ## `auto_refresh.py` — unattended refreshes onto the review branch
 
@@ -151,7 +177,32 @@ re-runs `verify.py` and `chart_audit.py` itself and commits the report only if b
 did not say HOLD; anything else is reverted, with the rejected page and both agents' JSON results kept in
 `tasks/queue/runs/<date>/`. After the reports: manifest, style and card tags, `run_checks.py`, push of the review
 branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines collect in
-`tasks/queue/pitfalls_pending.md` for the next retro.
+`tasks/queue/pitfalls_pending.md` for the next retro. One run at a time: every run except a dry run takes an OS lock
+on `tasks/queue/run.lock` in the main checkout, and a run that finds it held waits (polling each minute, up to 12
+hours, then ALERT); the OS drops the lock when a run's process ends, so a crash never leaves it held.
+
+### `--assets` — the monthly numbers-only refresh of the ETF, crypto and bond & cash reports
+
+    py -3 tools/auto_refresh.py --assets --dry-run                     # what would refresh today, and one builder prompt
+    py -3 tools/auto_refresh.py --assets --dry-run --today 2026-11-02  # what a later run would take
+    py -3 tools/auto_refresh.py --assets --builder-model sonnet        # the scheduled run
+
+These reports have no earnings print, so they would freeze at their build date (Oki, 8 Oct 2026). The asset run
+takes every report under `reports/etf/`, `reports/crypto/` and `reports/fixed/` whose banner as-of is 28 days old or
+more (`--min-age`; `--families etf,crypto,fixed`; `--only etf/voo` or `voo`), oldest first, and gives each to a
+headless builder and then a checker with `claude/briefs/REFRESH_ASSETS.md` (new as-of = the last settled close or
+the latest official daily value on or before the run date; header, banner, chart month-ends, 52-week range, metrics,
+holdings, distributions, events and every sentence whose number changed; a `tg-d--price` "Monthly update" delta
+box). The indicator-rate pages (`INDICATORS` in `asset_cards.py`: SOFR, EFFR, CORRA) are refreshed like the others
+for now. Same worktree, branch, allow-list, parallelism and commit-or-revert as the earnings run; the gates are
+`verify.py`, `chart_audit.py` for ETF and crypto pages (bond pages chart yields, which the agents check against the
+official daily file), `node --check` on every inline script, exactly one delta box, LF only. A builder that finds no
+newer data changes nothing (`unchanged`, no checker). Attempts count per report and run month (2 a month). After the
+reports: `asset_cards.py`, the manifest and the tags, `run_checks.py`, push; the summary is
+`tasks/queue/runs/<date>-assets.md`, and any report not committed raises an ALERT. 28 days is the shortest gap
+between two first Mondays, so every page refreshed at one monthly run is due at the next. The dry run reads the pages
+of the checkout it runs from (`--repo`) and touches no worktree. Scheduled by
+`%LOCALAPPDATA%\ttg-refresh-queue\ttg-assets.cmd` (first Monday, 17:30).
 
 ## `refresh_data.py` — the scripted number layer of a refresh
 

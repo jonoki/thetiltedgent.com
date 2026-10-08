@@ -2,7 +2,8 @@
 date, when each refresh becomes due (the T+2 settled close, claude/briefs/REFRESH.md) and its tier (T1 rewrite / T2
 numbers).   Run: py -3 tools/refresh_queue.py [--today YYYY-MM-DD] [--ahead N]
 
-Reads the Nasdaq earnings calendar (one file per day, cached), the manifest (as-of dates, index membership),
+Reads the Nasdaq earnings calendar (one file per day, cached), tools/global_calendar.py for the names Nasdaq does
+not list (home listings abroad, some ADRs), the manifest (as-of dates, index membership),
 data/style_tags.json (market caps) and Yahoo daily closes (the first-session move). Writes tasks/queue/queue.json and
 tasks/queue/today.md; tasks/ is git-excluded because the repo is served publicly. No AI, no writes to reports."""
 import datetime
@@ -17,6 +18,7 @@ from http.client import HTTPException
 from typing import Literal, TypedDict
 
 import repodata as rd
+from chart_audit import YAHOO_SYMBOL   # one slug -> Yahoo symbol map (BRK-B, 0700.HK ...) for the first-session move
 
 Date = datetime.date
 Timing = Literal['pre', 'post', 'unknown']
@@ -29,7 +31,6 @@ NASDAQ_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Apple
                                 'Chrome/140.0 Safari/537.36', 'Accept': 'application/json, text/plain, */*',
                   'Accept-Language': 'en-US,en;q=0.9'}
 YAHOO_HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-YAHOO_SYMBOL = {'brkb': 'BRK-B', 'bfb': 'BF-B'}   # as in chart_audit.py
 FETCH_TIMEOUT_S, FETCH_PAUSE_S = 30, 0.3
 # One cache per user, not per checkout: the review worktree's runs must see the release times the nightly run saw.
 CAL_CACHE = os.path.join(os.environ.get('LOCALAPPDATA') or tempfile.gettempdir(), 'ttg-refresh-queue', 'calendar')
@@ -46,7 +47,6 @@ NYSE_HOLIDAYS = frozenset(Date.fromisoformat(d) for d in (
 # membership; guidance changes and company news are judged by the builder, who may still raise a T2 to T1.
 T1_SURPRISE_PCT = 10.0
 T1_MOVE_PCT = 5.0
-MEGA_CAP_USD = 200e9   # "mega-cap names default to T1": our threshold (Oki may change it)
 DUE_WITHIN_SESSIONS = 5   # finish within 5 trading days of the release, or the refresh is overdue
 
 
@@ -238,8 +238,7 @@ def tier(h: Holding, p: Print, move: float | None) -> tuple[Literal['T1', 'T2'],
         triggers.append('Dow 30')
     if h['ndx']:
         triggers.append('Nasdaq-100')
-    if h['mcap'] and h['mcap'] >= MEGA_CAP_USD:
-        triggers.append(f"mega-cap ${h['mcap'] / 1e9:,.0f}B")
+    # market cap alone does not make a print T1 (Oki, 8 Oct 2026)
     if p['surprise_pct'] is not None and abs(p['surprise_pct']) >= T1_SURPRISE_PCT:
         triggers.append(f"EPS surprise {p['surprise_pct']:+.1f}%")
     if move is not None and abs(move) >= T1_MOVE_PCT:
@@ -299,10 +298,13 @@ def build_items(prints: list[Print], lib: dict[str, Holding], today: Date,
     return items, covered
 
 
-def today_md(items: list[Item], today: Date, generated: str) -> str:
+def today_md(items: list[Item], today: Date, generated: str, alert_text: str = '') -> str:
     """The short list read in the morning."""
     lines = [f'# Refresh queue — {today.isoformat()}', '', f'_Generated {generated} by tools/refresh_queue.py. '
              'Due = the T+2 close has settled; overdue = more than 5 trading days since the release._', '']
+    if alert_text:
+        lines[1:1] = ['', '> **ALERT — a refresh run failed** (tasks/queue/ALERT.txt; delete it once handled):', '>',
+                      *[f'> {ln}' for ln in alert_text.strip().splitlines()[-5:]], '']
     for st, title in (('overdue', 'Overdue'), ('due', 'Due now'), ('waiting', 'Reported, waiting for T+2'),
                       ('upcoming', 'Next 14 days')):
         rows = [i for i in items if i['status'] == st]
@@ -317,6 +319,24 @@ def today_md(items: list[Item], today: Date, generated: str) -> str:
             lines.append(f'- … {len(rows) - 60} more in queue.json')
         lines.append('')
     return '\n'.join(lines)
+
+
+class GlobalPrints(TypedDict):
+    prints: list[Print]
+    failures: list[str]
+    coverage: dict      # global_calendar.coverage(); {} when the global calendar failed
+
+
+def global_prints(repo: str, nasdaq_symbols: set[str], today: Date, cache: str, ahead: int) -> GlobalPrints:
+    """The prints of the names Nasdaq's calendar does not carry (tools/global_calendar.py). Any failure there is
+    logged with the calendar failures and never stops the Nasdaq queue."""
+    try:
+        import global_calendar as gc   # here, not at the top: global_calendar imports this module
+        day = gc.collect(rd.load_report_records(repo), nasdaq_symbols, today, cache, repo)
+        return {'prints': gc.to_prints(day['events'], today, ahead), 'failures': day['failures'],
+                'coverage': gc.coverage(day)}
+    except Exception as e:   # noqa: BLE001 - deliberately broad: the US queue must still be written
+        return {'prints': [], 'failures': [f'global calendar: {type(e).__name__}: {e}'], 'coverage': {}}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -343,18 +363,25 @@ def main(argv: list[str] | None = None) -> int:
             except (urllib.error.URLError, HTTPException, TimeoutError, OSError, ValueError) as e:
                 failed.append(f'{d.isoformat()}: {e}')
         d += datetime.timedelta(days=1)
+    gcal = global_prints(args.repo, {norm(p['symbol']) for p in prints}, today, cache, args.ahead)
+    prints += gcal['prints']
+    failed += gcal['failures']
     items, covered = build_items(prints, lib, today)
     generated = datetime.datetime.now().isoformat(timespec='minutes')
     counts = {st: sum(i['status'] == st for i in items) for st in ('overdue', 'due', 'waiting', 'upcoming')}
     rd.write_json(os.path.join(out_dir, 'queue.json'), {
         'generated_at': generated, 'today': today.isoformat(), 'calendar_from': start.isoformat(),
-        'rules': {'t1_surprise_pct': T1_SURPRISE_PCT, 't1_move_pct': T1_MOVE_PCT, 'mega_cap_usd': MEGA_CAP_USD,
+        'rules': {'t1_surprise_pct': T1_SURPRISE_PCT, 't1_move_pct': T1_MOVE_PCT,
                   'due_within_sessions': DUE_WITHIN_SESSIONS},
-        'counts': counts, 'prints_already_covered': covered, 'calendar_failures': failed, 'items': items}, indent=1)
+        'counts': counts, 'prints_already_covered': covered, 'calendar_failures': failed,
+        'global_calendar': gcal['coverage'], 'items': items}, indent=1)
     with open(os.path.join(out_dir, 'today.md'), 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(today_md(items, today, generated))
+        alert_path = os.path.join(out_dir, 'ALERT.txt')   # written by auto_refresh.py when a run fails
+        alert_text = open(alert_path, encoding='utf-8').read() if os.path.exists(alert_path) else ''
+        fh.write(today_md(items, today, generated, alert_text))
     print(f"queue {today}: " + ' · '.join(f'{k} {v}' for k, v in counts.items())
-          + f" · covered {covered}" + (f" · CALENDAR FAILURES {len(failed)}" if failed else ''))
+          + f" · covered {covered}" + (f" · global dated {gcal['coverage']['dated']}/{gcal['coverage']['names']}"
+                                       if gcal['coverage'] else '') + (f" · CALENDAR FAILURES {len(failed)}" if failed else ''))
     return 1 if failed else 0
 
 
