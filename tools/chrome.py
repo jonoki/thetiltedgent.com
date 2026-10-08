@@ -32,15 +32,18 @@ class NavMenu(NamedTuple):
     groups: list[tuple[str, list[tuple[str, str]]]]
 
 
-# The site nav (Oki, 30 Sep 2026): Learn and Le Degens stay, marked Soon; Reports and The Tables open panels, and
-# every trainer sits under The Tables. The Toolbox stays a homepage section, linked from the footer. The two glossaries
-# (Oki, 5 Oct 2026): finance under Reports, poker & gambling under The Tables.
+# The site nav (Oki, 30 Sep 2026): Le Degens stays, marked Soon; Reports and The Tables open panels, and every trainer
+# sits under The Tables. The Toolbox stays a homepage section, linked from the footer. Learn (Oki, 8 Oct 2026) is a
+# section of its own: its home page and Table Talk, the two glossaries (which were under Reports and The Tables).
 # Hrefs are root-relative so the same markup works at any depth. Games follow the board's order (best grade first).
 NAV: list[NavLink | NavMenu] = [
-    NavLink('learn', 'Learn', '/#learn', 'Soon'),
+    NavMenu('learn', 'Learn', [
+        ('Learn', [('Learn home', '/learn/')]),
+        ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
+                        ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')])]),
     NavMenu('reports', 'Reports', [('Reports', [
         ('Stocks', '/reports/'), ('ETFs', '/reports/?f=etf'), ('Crypto', '/reports/?f=crypto'),
-        ('Bonds &amp; cash', '/reports/?f=fixed'), ('Glossary', '/glossary/finance.html')])]),
+        ('Bonds &amp; cash', '/reports/?f=fixed')])]),
     NavMenu('tables', 'The Tables', [
         ('Games, graded', [
             ('All games: the grades', '/tables/casino-games.html'), ('Blackjack', '/tables/blackjack.html'),
@@ -52,14 +55,13 @@ NAV: list[NavLink | NavMenu] = [
         ('Trainers', [('Blackjack Trainer', '/tables/blackjack-trainer.html'),
                       ('Craps Table', '/tables/craps-table.html'),
                       ('Baccarat Table', '/tables/baccarat-table.html'),
-                      ('Three Card Poker Table', '/tables/three-card-poker-table.html')]),
-        ('Glossary', [('Poker &amp; gambling terms', '/glossary/poker.html')])]),
+                      ('Three Card Poker Table', '/tables/three-card-poker-table.html')])]),
     NavLink('degens', 'Le Degens', '/#degens', 'Soon'),
     NavLink('about', 'The Gent', '/#about'),
 ]
-FOOT_LINKS = [('Learn', '/#learn'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
+FOOT_LINKS = [('Learn', '/learn/'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
               ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
-CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tables index, not Learn (Soon)
+CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tables index
 
 # The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
@@ -81,8 +83,10 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('tables/craps-table.html', 'tables', True),
     ('tables/baccarat-table.html', 'tables', True),
     ('tables/three-card-poker-table.html', 'tables', True),
-    ('glossary/finance.html', 'reports', True),   # written by tools/glossary.py
-    ('glossary/poker.html', 'tables', True),
+    ('learn/index.html', 'learn', True),
+    ('learn/table-talk/index.html', 'learn', True),
+    ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
+    ('learn/table-talk/poker.html', 'learn', True),
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "

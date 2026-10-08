@@ -1,6 +1,6 @@
 # Brief: the two glossaries (finance, poker & gambling)
 
-Pages: `glossary/finance.html` and `glossary/poker.html`, written by `py -3 tools/glossary.py` from
+Pages: `learn/table-talk/finance.html` and `learn/table-talk/poker.html` (Learn · Table Talk; the old `glossary/` URLs redirect), written by `py -3 tools/glossary.py` from
 `data/glossary_finance.json` and `data/glossary_poker.json`. Edit the JSON and rebuild; never hand-edit the pages.
 The tool fails when a recurring tear-sheet label has no entry (see "Coverage" below).
 

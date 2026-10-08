@@ -65,10 +65,14 @@ class Chrome(unittest.TestCase):
 
     def test_nav_sections_and_badges(self):
         n = chrome.nav(None)
-        self.assertEqual(n.count('<details class="navmenu"'), 2)
-        for href in ('/tables/craps-table.html', '/tables/blackjack-trainer.html', '/reports/?f=etf', '/reports/?f=fixed'):
+        self.assertEqual(n.count('<details class="navmenu"'), 3)
+        for href in ('/tables/craps-table.html', '/tables/blackjack-trainer.html', '/reports/?f=etf', '/reports/?f=fixed',
+                     '/learn/', '/learn/table-talk/finance.html', '/learn/table-talk/poker.html'):
             self.assertIn(f'<a href="{href}">', n)
-        self.assertIn('aria-label="Learn (coming soon)">Learn <span class="soon">Soon</span></a>', n)
+        self.assertIn('data-menu="learn"><summary>Learn</summary>', n)   # Learn is a section now, not Soon
+        self.assertNotIn('Learn <span class="soon">', n)
+        self.assertIn('Le Degens <span class="soon">Soon</span></a>', n)
+        self.assertNotIn('/glossary/', n)   # the old glossary URLs are redirect stubs only
         self.assertNotIn('/#tools', n)   # the Toolbox is a homepage section, in the footer only
         self.assertIn('/#tools', chrome.footer(chrome.SITE_FINE))
 

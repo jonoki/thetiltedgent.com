@@ -57,5 +57,35 @@ class Page(unittest.TestCase):
             self.assertEqual(glossary.tear_sheet_labels(repo, min_reports=2), ['Industry Avg', 'Trailing P/E'])
 
 
+class Learn(unittest.TestCase):
+    def test_counts_are_written_into_the_table_talk_page(self):
+        page = '<p><b data-terms="finance">1</b> terms</p><p><b data-terms="poker">2</b> terms</p>'
+        out = glossary.with_counts(page, {'finance': 154, 'poker': 150})
+        self.assertEqual(out, '<p><b data-terms="finance">154</b> terms</p><p><b data-terms="poker">150</b> terms</p>')
+
+    def test_a_missing_or_repeated_count_is_named(self):
+        with self.assertRaisesRegex(ValueError, 'data-terms="poker"'):
+            glossary.with_counts('<b data-terms="finance">1</b>', {'finance': 3, 'poker': 4})
+        with self.assertRaisesRegex(ValueError, 'data-terms="finance"'):
+            glossary.with_counts('<b data-terms="finance">1</b><b data-terms="finance">1</b>', {'finance': 3})
+
+    def test_the_pages_live_under_learn(self):
+        out = glossary.page_html('finance', DOC)
+        self.assertIn('<div class="kicker">Learn &middot; Table Talk</div>', out)
+        self.assertIn('<summary class="on">Learn</summary>', out)
+        self.assertIn('href="/assets/ttg-favicon.svg"', out)   # root-relative at any depth
+
+    def test_the_old_urls_redirect_and_keep_the_anchor(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        for page in glossary.PAGES:
+            new = f'/learn/table-talk/{page}.html'
+            with open(os.path.join(root, 'glossary', f'{page}.html'), encoding='utf-8') as fh:
+                stub = fh.read()
+            self.assertIn(f"location.replace('{new}' + location.hash)", stub)
+            self.assertIn(f'<link rel="canonical" href="https://thetiltedgent.com{new}">', stub)
+            self.assertIn(f'url={new}"', stub)
+            self.assertIn('<meta name="robots" content="noindex">', stub)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -11,7 +11,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `card_tags.py` | everything on a report card besides the index badges; pages that predate a print, from the refresh queue | `data/card_tags.json`, `data/new_results.json` |
 | `asset_cards.py` | the ETF, crypto and bond cards on the reports index | `reports/index.html` |
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
-| `glossary.py` | the finance and poker & gambling glossaries from their data; fails when a recurring tear-sheet label has no entry (`--check`: page out of date) | `glossary/finance.html`, `glossary/poker.html` |
+| `glossary.py` | the finance and poker & gambling glossaries (Learn · Table Talk) from their data, and their term counts on the Table Talk page; fails when a recurring tear-sheet label has no entry (`--check`: a page or a count out of date) | `learn/table-talk/finance.html`, `learn/table-talk/poker.html`, the counts in `learn/table-talk/index.html` |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
 | `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |

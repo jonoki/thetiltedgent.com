@@ -1,11 +1,13 @@
-"""The two glossaries: data/glossary_<page>.json -> glossary/<page>.html (finance, poker).
+"""The two glossaries: data/glossary_<page>.json -> learn/table-talk/<page>.html (finance, poker), and the term
+counts on the Table Talk landing page (learn/table-talk/index.html, each in a <b data-terms="<page>">).
 
-usage: py -3 tools/glossary.py            (writes both pages; exits non-zero on any problem in the data)
-       py -3 tools/glossary.py --check    (writes nothing; non-zero when a page differs from what would be written)
+usage: py -3 tools/glossary.py            (writes both pages and the counts; exits non-zero on any problem in the data)
+       py -3 tools/glossary.py --check    (writes nothing; non-zero when a page or a count differs from what would be written)
 
 Brief and schema: claude/briefs/GLOSSARY.md. The pages carry the site nav and footer from tools/chrome.py, which
 also keeps them current when the nav changes. The finance glossary must explain every label the stock tear
 sheets print often (COVERAGE_MIN reports or more): every Key Financial Metrics row and column, plus FIXED_LABELS.
+The old URLs (glossary/finance.html, glossary/poker.html) are hand-written redirect stubs that keep the #term anchor.
 """
 import collections
 import glob
@@ -21,6 +23,8 @@ import reportlib as rl
 import repodata as rd
 
 PAGES = ('finance', 'poker')
+OUT_DIR = os.path.join('learn', 'table-talk')          # Oki, 8 Oct 2026: the glossaries live under Learn
+LANDING = os.path.join(OUT_DIR, 'index.html')          # the Table Talk page, which shows each glossary's term count
 COVERAGE_MIN = 50          # a tear-sheet label printed on this many stock reports needs a glossary entry
 FIXED_LABELS = ['Mkt Cap', 'Mkt Cap Ranking', 'Next Earnings', 'Static data as of', 'Consensus Rating',
                 'Rating Breakdown', 'Average Price Target', 'Target Range', 'Key Institutional Investors',
@@ -28,11 +32,11 @@ FIXED_LABELS = ['Mkt Cap', 'Mkt Cap Ranking', 'Next Earnings', 'Static data as o
 NOT_TERMS = {'metric'}     # the metrics table's first column header names the rows; it is not a term
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261005'         # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261008'         # ?v= on glossary.css / glossary.js: bump when either changes
 
 HEAD = {
     'finance': dict(
-        title='Finance Glossary — The Tilted Gent', active='reports', kicker='Reports &middot; Glossary',
+        title='Finance Glossary — The Tilted Gent', active='learn', kicker='Learn &middot; Table Talk',
         h1='The <em>Tear-Sheet</em> Glossary',
         desc='Every number, ratio and acronym on The Tilted Gent stock reports, explained in plain English.',
         lede='Every number, ratio and acronym on our stock reports, in plain English: what it measures, how to read '
@@ -43,7 +47,7 @@ HEAD = {
                 'sell. Where a report states its own basis for a figure, such as the period behind a beta, the '
                 'report&rsquo;s note applies.'),
     'poker': dict(
-        title='Poker &amp; Gambling Glossary — The Tilted Gent', active='tables', kicker='The Tables &middot; Glossary',
+        title='Poker &amp; Gambling Glossary — The Tilted Gent', active='learn', kicker='Learn &middot; Table Talk',
         h1='Poker &amp; <em>Gambling</em> Glossary',
         desc='The words of the poker table and the casino floor, from pot odds to the house edge, in plain English.',
         lede='The words you&rsquo;ll hear at the poker table and read on The Tables, from pot odds to the house '
@@ -159,9 +163,9 @@ def page_html(page: str, doc: dict[str, Any]) -> str:
 <meta name="color-scheme" content="dark">
 <title>{h['title']}</title>
 <meta name="description" content="{h['desc']}">
-<link rel="icon" type="image/svg+xml" href="../assets/ttg-favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="/assets/ttg-favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 {chrome.SITE_CSS}
 <link rel="stylesheet" href="glossary.css?v={STAMP}">
@@ -209,16 +213,29 @@ def page_html(page: str, doc: dict[str, Any]) -> str:
 '''
 
 
+def with_counts(text: str, counts: dict[str, int]) -> str:
+    """The Table Talk page with each glossary's term count written into its <b data-terms="<page>">; ValueError
+    naming the page when a marker is missing or repeated."""
+    for page, n in counts.items():
+        pat = re.compile(rf'(<b data-terms="{page}">)\d+(</b>)')
+        if len(pat.findall(text)) != 1:
+            raise ValueError(f'{LANDING}: needs exactly one <b data-terms="{page}">N</b>')
+        text = pat.sub(rf'\g<1>{n}\g<2>', text)
+    return text
+
+
 def build(repo: str, check: bool) -> int | str:
     required = {'finance': tear_sheet_labels(repo) + FIXED_LABELS, 'poker': []}
     stale = []
+    counts = {}
     for page in PAGES:
         doc = load(repo, page)
         bad = problems(doc, required[page])
         if bad:
             return f'data/glossary_{page}.json:\n  ' + '\n  '.join(bad)
+        counts[page] = len(doc['terms'])
         out = page_html(page, doc)
-        path = os.path.join(repo, 'glossary', f'{page}.html')
+        path = os.path.join(repo, OUT_DIR, f'{page}.html')
         current = rl.read_text(path) if os.path.exists(path) else None
         if check:
             if current != out:
@@ -227,14 +244,26 @@ def build(repo: str, check: bool) -> int | str:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         if current != out:
             rl.write_text(path, out)
-        print(f'{"updated" if current != out else "unchanged"} glossary/{page}.html ({len(doc["terms"])} terms)')
+        print(f'{"updated" if current != out else "unchanged"} {OUT_DIR}/{page}.html ({len(doc["terms"])} terms)'.replace(os.sep, '/'))
+    landing = os.path.join(repo, LANDING)
+    try:
+        current = rl.read_text(landing)
+        out = with_counts(current, counts)
+    except (OSError, ValueError) as err:
+        return str(err)
+    if check and current != out:
+        stale.append(landing)
+    elif not check:
+        if current != out:
+            rl.write_text(landing, out)
+        print(f'{"updated" if current != out else "unchanged"} {LANDING} (term counts)'.replace(os.sep, '/'))
     if stale:
         return 'out of date (run py -3 tools/glossary.py): ' + ', '.join(os.path.relpath(p, repo) for p in stale)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int | str:
-    ap = rd.parser('Write glossary/finance.html and glossary/poker.html from data/glossary_*.json.')
+    ap = rd.parser('Write learn/table-talk/finance.html and poker.html from data/glossary_*.json, and their counts.')
     ap.add_argument('--check', action='store_true', help='write nothing; fail when a page is out of date')
     args = ap.parse_args(argv)
     return build(args.repo, args.check)
