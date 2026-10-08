@@ -124,11 +124,12 @@ var MAP = [
   [/^Ante & Play, Q-6-4 strategy, as a % of money wagered/, R['541q64'].edgeWagered],
   [/^Pair Plus, 40-30-6-4-1$/, ppEdge(E.PAIRPLUS['40-30-6-4-1'])],
   [/^Ante & Play, 5-4-1 bonus/, A541.edge], [/^Ante & Play, 4-3-1/, R['431optimal'].edge], [/^Ante & Play, 3-2-1/, R['321optimal'].edge],
-  [/^Pair Plus, 50-30-6-3-1/, ppEdge(E.PAIRPLUS['50-30-6-3-1'])], [/^Pair Plus, 40-30-6-3-1/, ppEdge(E.PAIRPLUS['40-30-6-3-1'])]];
-/* Rows this table can't settle or that the count contradicts: printed, not failed (they are the page's copy, not this engine's). */
+  [/^Pair Plus, 50-30-6-3-1/, ppEdge(E.PAIRPLUS['50-30-6-3-1'])], [/^Pair Plus, 40-30-6-3-1/, ppEdge(E.PAIRPLUS['40-30-6-3-1'])],
+  // corrected 8 Oct 2026 from this count: the page had '40-33-6-4-1 or 35-33-6-4-1: 2.70%' and 'never folding ~5.4%'
+  [/^Pair Plus, 40-33-6-4-1$/, ppEdge({ 5: 40, 4: 33, 3: 6, 2: 4, 1: 1 })], [/^Pair Plus, 35-33-6-4-1$/, ppEdge({ 5: 35, 4: 33, 3: 6, 2: 4, 1: 1 })],
+  [/^Ante & Play, never folding, of the ante$/, R['541always'].edge]];
+/* Rows this table can't settle: printed, not failed (they are the page's copy, not this engine's). */
 var NOTES = [
-  [/^Pair Plus, 40-33-6-4-1 or 35-33-6-4-1/, function () { return '40-33-6-4-1 counts to ' + pct(ppEdge({ 5: 40, 4: 33, 3: 6, 2: 4, 1: 1 }), 2) + ', 35-33-6-4-1 to ' + pct(ppEdge({ 5: 35, 4: 33, 3: 6, 2: 4, 1: 1 }), 2); }],
-  [/^Ante & Play, never folding/, function () { return 'never folding counts to ' + pct(R['541always'].edge, 2) + ' of the ante (' + pct(R['541always'].edgeWagered, 2) + ' of money wagered)'; }],
   [/^Six Card Bonus/, function () { return 'not a bet at this table'; }]];
 var matched = 0;
 rows.forEach(function (r) {
