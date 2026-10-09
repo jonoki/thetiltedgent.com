@@ -1,5 +1,5 @@
 /* The Tilted Gent — Craps Table. CrapsTable.mount('#craps') puts a practice craps table on the page.
-   Needs craps-engine.js (the rules, the money and the luck ledger). Vanilla JS, no dependencies.
+   Needs edge-bands.js and craps-engine.js (the rules, the money and the luck ledger). Vanilla JS, no dependencies.
    The felt is built once and updated in place, so keyboard focus survives every bet.
    Settings and the bankroll persist in localStorage 'ttg-crt'; the session ledger starts fresh on load. */
 window.CrapsTable = (function () {
@@ -610,7 +610,7 @@ window.CrapsTable = (function () {
         h += '<tr data-n="' + r.num + '"><td>' + r.num + '</td><td>' + CE.fq(r.p) + ' <small>' + pct(100 * CE.num(r.p), 1) + '</small></td><td>' + r.against + '</td><td>' + G.byKey['place' + r.num].pays + '</td></tr>';
       });
       h += '</tbody></table></div>';
-      h += '<h4>The price of every bet</h4><p class="cpt-help">House edge per bet settled, at this table’s rules. <span class="band up">Under 2%</span> <span class="band au">2–5%</span> <span class="band dn">5% and up</span></p>' + priceList();
+      h += '<h4>The price of every bet</h4><p class="cpt-help">House edge per bet settled, at this table’s rules. ' + window.TtgEdgeBands.legend('craps') + '</p>' + priceList();
       $('.cpt-pane[data-p="odds"]').innerHTML = h;
       renderOddsPoint();
     }

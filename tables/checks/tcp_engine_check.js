@@ -1,8 +1,8 @@
 /* Checks tables/sim/tcp-engine.js. Run from the repo root:  node tables/checks/tcp_engine_check.js
    1. Hand counts and every edge, counted exactly: once through the engine's suit-isomorphism classes and once by brute
       force (all 22,100 player hands x all 18,424 dealer hands, no grouping), against tables/sim/games.js and the
-      house-edge table on tables/three-card-poker.html; the Q-6-4 rule against optimal play; fold rate, average wager,
-      dealer qualifying rates.
+      house-edge table on tables/three-card-poker.html (value and colour class, tables/sim/edge-bands.js); the Q-6-4
+      rule against optimal play; fold rate, average wager, dealer qualifying rates.
    2. Hand ranking: an independent ranker in this file agrees with the engine on every hand's category and on the
       order of 2,000,000 random pairs; unit tests (A-2-3 and Q-K-A straights, no K-A-2, ties, kickers, the dealer's
       Queen-high qualifier, the Q-6-4 line); scripted hands settle as the rules say.
@@ -117,8 +117,9 @@ if (ok(GJ.pace === E.PACE, 'pace ' + GJ.pace + ' vs engine ' + E.PACE)) console.
 
 console.log('\n   vs the house-edge table on tables/three-card-poker.html');
 var html = fs.readFileSync(path.join(ROOT, 'tables/three-card-poker.html'), 'utf8');
-var rows = [], re = /<tr><td>(.*?)<\/td><td class="num \w+">(~?)([\d.]+)(?:&ndash;[\d.]+)?%<\/td><\/tr>/g, m;
-while ((m = re.exec(html))) rows.push({ name: m[1].replace(/&amp;/g, '&'), approx: !!m[2], pct: +m[3] });
+var rows = [], re = /<tr><td>(.*?)<\/td><td class="num (\w+)">(~?)([\d.]+)(&ndash;[\d.]+)?%<\/td><\/tr>/g, m;
+while ((m = re.exec(html))) rows.push({ name: m[1].replace(/&amp;/g, '&'), cls: m[2], approx: !!m[3], pct: +m[4], range: !!m[5] });
+var EB = require(path.join(ROOT, 'tables/sim/edge-bands.js'));
 function ppEdge(pays) { var s = 0; for (var k = 1; k <= 5; k++) s += CN[k] * pays[k]; return -(s - CN[0]) / E.N_HANDS; }
 var MAP = [
   [/^Ante & Play, Q-6-4 strategy, as a % of money wagered/, R['541q64'].edgeWagered],
@@ -136,10 +137,14 @@ rows.forEach(function (r) {
   var hit = MAP.filter(function (x) { return x[0].test(r.name); })[0];
   if (hit) {
     matched++;
-    if (ok(Math.abs(100 * hit[1] - r.pct) < 0.005 + 1e-9, r.name + ': page ' + r.pct + '% vs engine ' + (100 * hit[1]).toFixed(4) + '%'))
-      console.log('   ok   ' + pad(r.name, 58) + lpad(r.pct.toFixed(2) + '%', 7) + '  engine ' + lpad((100 * hit[1]).toFixed(4) + '%', 9));
+    var band = E.create().band(hit[1]);      // the table's colour for the engine's exact edge (edge-bands.js)
+    if (ok(Math.abs(100 * hit[1] - r.pct) < 0.005 + 1e-9, r.name + ': page ' + r.pct + '% vs engine ' + (100 * hit[1]).toFixed(4) + '%') &
+        ok(band === r.cls, r.name + ': page class ' + r.cls + ' vs table band ' + band))
+      console.log('   ok   ' + pad(r.name, 58) + lpad(r.pct.toFixed(2) + '%', 7) + '  engine ' + lpad((100 * hit[1]).toFixed(4) + '%', 9) + '  ' + band);
     return;
   }
+  // a row this table doesn't deal: its single figure still takes the same colour (ranges are the page's call)
+  if (!r.range) ok(EB.band('tcp', r.pct / 100) === r.cls, r.name + ': page class ' + r.cls + ' vs band ' + EB.band('tcp', r.pct / 100));
   var note = NOTES.filter(function (x) { return x[0].test(r.name); })[0];
   if (ok(note, 'no mapping for three-card-poker.html row "' + r.name + '"')) console.log('   NOTE ' + pad(r.name, 58) + lpad((r.approx ? '~' : '') + r.pct + '%', 7) + '  ' + note[1]());
 });

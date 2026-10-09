@@ -2,7 +2,8 @@
    1. The engine's exact enumeration of the 8-deck tableau (every ordered deal, up to six cards without
       replacement from 416) against an independent enumeration written here from the printed drawing chart,
       and both against the published figures: tables/sim/games.js (probabilities to 6 dp, edges) and the
-      house-edge table on tables/baccarat.html (2 dp). Pace against games.js.
+      house-edge table on tables/baccarat.html (2 dp, and every row's colour class against tables/sim/edge-bands.js).
+      Pace against games.js.
    2. The tableau, hand by hand: every Banker total 0-7 against every Player third card (and Player standing),
       naturals, totals mod 10, winners, pairs, and what each bet pays.
    3. A 200,000-hand session with a random bettor (legal and illegal chips, take-downs, a $5,000 buy-in with
@@ -115,9 +116,15 @@ PAGE.forEach(function (r) {
   var row = rows[r[0]];
   if (!ok(row, 'baccarat.html row "' + r[0] + '" not found')) return;
   var mine = 100 * BE.fnum(r[1]);
-  if (ok(mine.toFixed(2) === row.pct.toFixed(2), r[0] + ': page ' + row.pct + '% vs engine ' + mine.toFixed(4) + '%'))
-    console.log('   ok   ' + pad(r[0], 44) + lpad(row.pct.toFixed(2) + '%', 7) + '   engine ' + lpad(mine.toFixed(4) + '%', 9) + '   page class ' + row.cls + ', table band ' + g.band(r[1]));
+  if (ok(mine.toFixed(2) === row.pct.toFixed(2), r[0] + ': page ' + row.pct + '% vs engine ' + mine.toFixed(4) + '%') &
+      ok(g.band(r[1]) === row.cls, r[0] + ': page class ' + row.cls + ' vs table band ' + g.band(r[1])))
+    console.log('   ok   ' + pad(r[0], 44) + lpad(row.pct.toFixed(2) + '%', 7) + '   engine ' + lpad(mine.toFixed(4) + '%', 9) + '   page class ' + row.cls + ' = table band');
 });
+/* Every row of the page's table, the bets this table doesn't deal included, is coloured by the same bands (edge-bands.js). */
+var EB = require(path.join(ROOT, 'tables/sim/edge-bands.js')), nRows = 0;
+Object.keys(rows).forEach(function (k) { nRows++; ok(EB.band('baccarat', rows[k].pct / 100) === rows[k].cls, 'baccarat.html row "' + k + '": class ' + rows[k].cls + ' vs band ' + EB.band('baccarat', rows[k].pct / 100)); });
+ok(nRows >= PAGE.length, 'baccarat.html: ' + nRows + ' edge rows parsed');
+console.log('   ' + nRows + ' page rows, each coloured as edge-bands.js colours its value (' + EB.legend('baccarat').replace(/<[^>]+>/g, '') + ')');
 ok(BE.PACE.big === GB.pace, 'pace: engine ' + BE.PACE.big + ' vs games.js ' + GB.pace);
 ok(/120.150/.test(GB.paceNote) && BE.PACE.mini[0] === 120 && BE.PACE.mini[1] === 150, 'mini pace 120-150 vs games.js paceNote "' + GB.paceNote + '"');
 console.log('   pace: ' + BE.PACE.big + ' hands/hour at the big table, ' + BE.PACE.mini.join('–') + ' at mini (games.js: ' + GB.pace + ', "' + GB.paceNote + '")');

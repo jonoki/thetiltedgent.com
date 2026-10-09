@@ -1,4 +1,4 @@
-/* The Tilted Gent — baccarat engine for the Baccarat Table. Vanilla JS, no dependencies; runs in the browser
+/* The Tilted Gent — baccarat engine for the Baccarat Table. Vanilla JS; needs edge-bands.js (the colour bands); runs in the browser
    (window.BaccaratEngine) and in Node (module.exports) for tables/checks/baccarat_engine_check.js.
 
    Rules (punto banco, the standard tableau):
@@ -27,6 +27,7 @@
    shift it by a few hundredths of a percent; the table does not count the shoe). */
 (function (root) {
   'use strict';
+  var EB = typeof module !== 'undefined' && module.exports ? require('./edge-bands.js') : root.TtgEdgeBands;   // edge colour bands
 
   /* ---------- cards ---------- */
   var RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -157,7 +158,7 @@
     function payout(type, amount, hand) {        // dollars, to the cent
       return Math.round(net(type, hand) * amount * 100) / 100;
     }
-    function band(e) { var x = fnum(e); return x < 0.02 ? 'up' : x < 0.05 ? 'au' : 'dn'; }
+    function band(e) { return EB.band('baccarat', fnum(e)); }   // green / gold / red, as on baccarat.html
     function ratio(a, b) { return (Math.round(a / b * 100) / 100) + ':1'; }
     var p = E.p;
     var info = {

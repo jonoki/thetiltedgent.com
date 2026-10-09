@@ -1,4 +1,4 @@
-/* The Tilted Gent — craps engine for the Craps Table. Vanilla JS, no dependencies; runs in the browser
+/* The Tilted Gent — craps engine for the Craps Table. Vanilla JS; needs edge-bands.js (the colour bands); runs in the browser
    (window.CrapsEngine) and in Node (module.exports) for tables/checks/craps_engine_check.js.
    Every probability is exact: counted from the 36 dice combinations and carried as a fraction.
    A bet's value V (expected net result from now until it settles, per $1) is derived from the same
@@ -23,6 +23,7 @@
    come number, which Wizard also describes, is not offered here. A put is a contract bet like pass. */
 (function (root) {
   'use strict';
+  var EB = typeof module !== 'undefined' && module.exports ? require('./edge-bands.js') : root.TtgEdgeBands;   // edge colour bands
 
   /* ---------- exact fractions ---------- */
   function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { var t = a % b; a = b; b = t; } return a || 1; }
@@ -222,7 +223,7 @@
     }
 
     /* ---------- the bet catalogue (fresh bets, as offered on the felt) ---------- */
-    function band(e) { var x = num(e); return x < 0.02 ? 'up' : x < 0.05 ? 'au' : 'dn'; }
+    function band(e) { return EB.band('craps', num(e)); }   // green / gold / red, as on craps.html
     var NAMES = { pass: 'Pass line', dontpass: 'Don’t pass', come: 'Come', dontcome: 'Don’t come', put: 'Put bet on',
                   odds: 'Odds on', layodds: 'Lay odds on', place: 'Place', buy: 'Buy', lay: 'Lay', hard: 'Hard',
                   big: 'Big', field: 'Field', any7: 'Any seven', anycraps: 'Any craps', two: 'Two (aces)',

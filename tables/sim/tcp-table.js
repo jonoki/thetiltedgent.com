@@ -1,5 +1,5 @@
 /* The Tilted Gent — Three Card Poker Table. TcpTable.mount('#tcp') puts a practice Three Card Poker table on the page.
-   Needs tcp-engine.js (the rules, the exact values and the ledger). Vanilla JS, no dependencies.
+   Needs edge-bands.js and tcp-engine.js (the rules, the exact values and the ledger). Vanilla JS, no dependencies.
    The felt is built once and updated in place, so keyboard focus survives every bet.
    Settings and the bankroll persist in localStorage 'ttg-tcp'; the session ledger starts fresh on load. */
 window.TcpTable = (function () {
@@ -351,7 +351,7 @@ window.TcpTable = (function () {
         h += '<tr><td>' + TE.CAT_NAME[c] + '</td><td>' + CN[c].toLocaleString('en-US') + '</td><td>' + pct(CN[c] / TE.N_HANDS) + '</td><td>' + (c ? G.ppPays(c) + ' to 1' : 'loses') + '</td><td>' + (G.bonus(c) ? G.bonus(c) + ' to 1' : '—') + '</td></tr>';
       });
       h += '</tbody></table></div><p class="tcp-fine">With three cards a straight is rarer than a flush, so it ranks higher. A-2-3 is the lowest straight and Q-K-A the highest; K-A-2 is just Ace high.</p>';
-      h += '<h4>The price of each bet</h4><p class="tcp-help">Every paytable you can pick here, counted exactly. This table’s rules are marked. <span class="band up">Under 2%</span> <span class="band au">2–5%</span> <span class="band dn">5% and up</span></p>';
+      h += '<h4>The price of each bet</h4><p class="tcp-help">Every paytable you can pick here, counted exactly. This table’s rules are marked. ' + window.TtgEdgeBands.legend('tcp') + '</p>';
       var rows = [];
       TE.BONUS_KEYS.forEach(function (k) { var g = TE.create({ bonus: k }), a = g.ante(); rows.push({ name: 'Ante & Play, ' + TE.BONUS_LABEL[k] + ' bonus, of the Ante', e: a.edge, on: k === G.rules.bonus }); rows.push({ name: 'Ante & Play, ' + TE.BONUS_LABEL[k] + ', of all money put up', e: a.edgeWagered, on: k === G.rules.bonus }); });
       TE.PAIRPLUS_KEYS.forEach(function (k) { rows.push({ name: 'Pair Plus, ' + k, e: TE.create({ pp: k }).pairPlus().edge, on: k === G.rules.pp }); });

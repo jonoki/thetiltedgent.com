@@ -1,10 +1,10 @@
 /* The Tilted Gent — Baccarat Table. BaccaratTable.mount('#baccarat') puts a practice baccarat table on the page.
-   Needs baccarat-engine.js (the rules, the shoe, the exact odds and the ledger). Vanilla JS, no dependencies.
+   Needs edge-bands.js and baccarat-engine.js (the rules, the shoe, the exact odds and the ledger). Vanilla JS, no dependencies.
    The felt is built once and updated in place, so keyboard focus survives every bet.
    Settings and the bankroll persist in localStorage 'ttg-bct'; the session ledger starts fresh on load. */
 window.BaccaratTable = (function () {
   'use strict';
-  var BE = window.BaccaratEngine;
+  var BE = window.BaccaratEngine, EB = window.TtgEdgeBands;
   var DEFAULTS = { tiePays: 8, max: 1000, start: 1000, bank: 1000, rebet: true, chip: 25 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-bct') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
   function save(s) { try { localStorage.setItem('ttg-bct', JSON.stringify(s)); } catch (e) {} }
@@ -269,7 +269,7 @@ window.BaccaratTable = (function () {
            usd(-sp.ev * BE.PACE.mini[0]) + '–' + usd(-sp.ev * BE.PACE.mini[1]) + '.</p>';
       el.innerHTML = h;
     }
-    function bandOf(p) { return p < 2 ? 'up' : p < 5 ? 'au' : 'dn'; }
+    function bandOf(p) { return EB.band('baccarat', p / 100); }   // p in percent
 
     /* ---------- bet card (side pane + the one-line hint under the felt) ---------- */
     function showCard(el) {
@@ -303,7 +303,7 @@ window.BaccaratTable = (function () {
         '</tbody></table></div>' +
         '<dl class="bct-dl"><dt>Natural</dt><dd>' + pct(100 * p.natural) + ' of hands (an 8 or 9 on two cards: nobody draws)</dd>' +
         '<dt>Player draws</dt><dd>' + pct(100 * p.pDraw) + '</dd><dt>Banker draws</dt><dd>' + pct(100 * p.bDraw) + '</dd></dl>';
-      h += '<h4>The price of every bet</h4><p class="bct-help">House edge per hand bet. <span class="band up">Under 2%</span> <span class="band au">2–5%</span> <span class="band dn">5% and up</span></p>' +
+      h += '<h4>The price of every bet</h4><p class="bct-help">House edge per hand bet. ' + EB.legend('baccarat') + '</p>' +
         '<div class="tw"><table class="bct-t price"><thead><tr><th>Bet</th><th>Pays</th><th>House edge</th></tr></thead><tbody>';
       var other = BE.create({ tiePays: G.rules.tiePays === 8 ? 9 : 8 }).byKey.tie;
       var rows = G.catalogue.map(function (c) { return { name: c.name + (c.type === 'tie' ? ' (this table)' : ''), pays: c.pays, pct: c.edgePct, band: c.band }; });
