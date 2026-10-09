@@ -7,7 +7,7 @@ usage:  py -3 tools/run_checks.py
 Runs, from the repo root:
   the tools unit tests         py -3 -m unittest discover -s tools/tests -t tools
   the Tables builder tests     py -3 -m unittest discover -s tables/checks -t tables  (incl. committed pages == build)
-  the Tables engine checks     node tables/checks/{craps_engine_check,games_check,bj_engine_check,baccarat_engine_check,tcp_engine_check}.js
+  the Tables engine checks     node tables/checks/{craps_engine_check,games_check,uth_trips_check,bj_engine_check,baccarat_engine_check,tcp_engine_check}.js
   the type check               py -3 -m mypy   (skipped, and said so, when mypy is not installed)
 Exits 1 when any of them fails. The report-content gates (verify.py, chart_audit.py) are separate: they
 check the published reports, not this code.
@@ -26,6 +26,7 @@ CHECKS = [
     ('Tables builder tests', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tables/checks', '-t', 'tables']),
     ('craps engine', ['node', 'tables/checks/craps_engine_check.js']),
     ('simulator outcome tables', ['node', 'tables/checks/games_check.js']),
+    ('UTH Trips 7-card counts', ['node', 'tables/checks/uth_trips_check.js']),
     ('blackjack engine', ['node', 'tables/checks/bj_engine_check.js']),
     ('baccarat engine', ['node', 'tables/checks/baccarat_engine_check.js']),
     ('three card poker engine', ['node', 'tables/checks/tcp_engine_check.js']),

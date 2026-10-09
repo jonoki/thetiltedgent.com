@@ -171,7 +171,7 @@ class TagPipeline(unittest.TestCase):
     def test_the_three_writers_run_in_order(self):
         with tempfile.TemporaryDirectory() as repo:
             files = {'reports/index.html': self.INDEX, 'reports/acme_analysis.html': self.PAGE,
-                     'claude/card_lines.json': '{"acme": "Sells widgets."}', 'claude/hand_tags.json': '{}',
+                     'data/card_lines.json': '{"acme": "Sells widgets."}', 'data/hand_tags.json': '{}',
                      'assets/logos/index.json': '{}'}
             for rel, text in files.items():
                 os.makedirs(os.path.dirname(os.path.join(repo, rel)), exist_ok=True)
