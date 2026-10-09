@@ -1,7 +1,7 @@
 /* The Morning Line: reads the Day Trading Aid's public pre-market brief and explains it for a reader who does not
    follow markets. Vanilla JS, no dependencies. Bump the ?v= on morning-line/index.html when this file changes.
 
-   The feed (https://jonoki.github.io/ttg-brief/brief.json) is owned by the Day Trading Aid repo
+   The feed (FEED below) is owned by the Day Trading Aid repo
    (src/daytradingaid/brief/public.py decides what it may carry); this page only reads it. It is rebuilt about every
    15 minutes on weekdays from 06:25 to 12:00 ET, plus one run at about 16:05 ET after the close. This page fetches it at load, again
    every five minutes while the tab is visible during the session (weekdays 06:00–17:30 ET), and every five minutes
@@ -17,7 +17,6 @@
   'use strict';
 
   var FEED = 'https://jonoki.github.io/ttg-brief/brief.json';
-  var FEED_PAGE = 'https://jonoki.github.io/ttg-brief/';
   var REPORTS = '/data/reports.json';             // ticker -> report slug, written by tools/manifest.py
   var REFRESH_MS = 5 * 60 * 1000;
   var STALE_HOURS = 20;
@@ -280,7 +279,7 @@
     }).join('')
       + '<p class="note">The regular session is 9:30 a.m. to 4 p.m. ET, while the stock exchanges are open; overnight is futures trading from 6 p.m. until the next morning’s open. '
       + 'Prices are in index points. The average daily range is how far the price has travelled from high to low on a typical day lately, overnight gaps included. '
-      + 'Traders who want every level, from volume profile to VWAP, will find them on the <a href="' + FEED_PAGE + '">full brief</a>.</p>';
+      + '</p>';
     sets.forEach(function(ls, i){ var cv = $('ml-chart-' + i); if (cv) charts.push({cv: cv, ls: ls}); });
     drawCharts();
   }
@@ -416,7 +415,7 @@
     $('ml-notice').innerHTML = '<div class="notice"><p class="nh">The line isn’t posted yet.</p>'
       + '<p>The brief posts on weekdays from about 6:25 a.m. ET and updates every 15 minutes until noon, with one more after the 4 p.m. close. This page checks again every five minutes.</p>'
       + (lastSeen && lastSeen.day && lastSeen.at ? '<p>The last line this browser loaded was the brief for <b>' + esc(dayLong(lastSeen.day)) + '</b>, updated ' + esc(stampEt(lastSeen.at, true)) + '.</p>' : '')
-      + '<p>You can also read the brief as posted at <a href="' + FEED_PAGE + '">jonoki.github.io/ttg-brief</a>.</p></div>';
+      + '</div>';
     $('ml-body').hidden = true;
   }
 
