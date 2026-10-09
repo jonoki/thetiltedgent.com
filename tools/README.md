@@ -9,13 +9,14 @@ Each finds the repo from its own location, so the working directory only matters
 | `manifest.py` | the machine-readable manifest of every stock report | `data/reports.json`, `data/reports/*.json` |
 | `style_tags.py` | the Value / Growth / Income … style tags | `data/style_tags.json` |
 | `card_tags.py` | everything on a report card besides the index badges; pages that predate a print, from the refresh queue | `data/card_tags.json`, `data/new_results.json` |
-| `asset_cards.py` | the ETF, crypto and bond cards on the reports index | `reports/index.html` |
+| `asset_cards.py` | the ETF, crypto and bond cards on the reports index, and the cards on the economic-indicators hub (`INDICATOR_HUB`: built ones link to the viewer, the rest say Coming) | `reports/index.html`, `learn/indicators/index.html` |
 | `chrome.py` | the one site nav and footer on every chrome page | the pages in its `PAGES` list |
 | `glossary.py` | the finance and poker & gambling glossaries (Learn · Table Talk) from their data, and their term counts on the Table Talk page; fails when a recurring tear-sheet label has no entry (`--check`: a page or a count out of date) | `learn/table-talk/finance.html`, `learn/table-talk/poker.html`, the counts in `learn/table-talk/index.html` |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
+| `indicator_audit.py` | every chart point of an economic-indicator report against its official series (FRED, Bank of Canada Valet; `SERIES`) | nothing in the repo |
 | `index_rank.py` | each S&P 500 / Nasdaq-100 member report's market-cap rank on its banner date (shares × Yahoo close for every member); global listings are left alone; `--check`: a member row out of date | the "Mkt Cap Ranking" row and the rank sentence of the fine print in member `reports/*_analysis.html` |
-| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
+| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto, bond & cash and indicator reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
 | `refresh_data.py` | the number layer of a refresh: settled close, chart, 52-week range, returns, P/E, yield, short interest, EPS surprise | `facts.json`, `stale_hits.txt`; with `--write` the report's structured fields |
@@ -76,7 +77,7 @@ shape — a consumer that wants one sector fetches ~18 KB instead of the lot.
 
 Checks document skeleton (including `</head>` and matched `<style>` tags),
 exactly two canvases (three for bond/cash reports under `reports/fixed/`, which
-add a yield-curve chart), equal `labels`/`prices` array lengths, final chart
+add a yield-curve chart; two or three for economic indicators under `reports/indicators/`), equal `labels`/`prices` array lengths, final chart
 value == header price to the cent, that the 52-week range contains the price
 (a page with no readable 52-week range fails; every report had one on 26 Sep 2026),
 that the `<title>` ticker matches the file name, no embedded site nav, and that the page loads the
@@ -98,6 +99,27 @@ Treasury / Bank of Canada daily files by the checkers' own scripts. `LAUNCH` hol
 the first month-end of a security whose Yahoo ticker was recycled (ARTI: Mar 2024):
 Yahoo rows before it are dropped, and any chart point before it fails the audit.
 Brief: `claude/briefs/BUILD_ASSETS.md`.
+
+An economic indicator (`reports/indicators/`, since 8 Oct 2026) has a value, not a price: the header value is
+`reportlib.header_value` (the `.price-current`'s `data-value` when it shows a range such as the Fed's target range,
+else its first number with its sign: `3.88%`, `+22K`), the range row may be `12-Month Range` or `52-Week Range`
+(`reportlib.indicator_range`, signs kept), and the `<title>` code is the slug or the series id in
+`indicator_audit.SERIES`. The redirect stubs left at moved reports' old paths (`repodata.MOVED_REPORTS`) are skipped.
+
+## `indicator_audit.py` — every indicator chart point vs the official series
+
+    py -3 tools/indicator_audit.py                    # every indicator report
+    py -3 tools/indicator_audit.py indicators/cpi     # named (or just `cpi`)
+
+Each slug's series is in `SERIES` (FRED id or Bank of Canada Valet name, daily or monthly, the transform, the dp the
+page shows). A month label is the month's observation of a monthly series, or the last observation in that month on
+or before the as-of of a daily one; a day label (`'Oct 2 26'`) is that day's value. Transforms: level, 12-month %
+change = 100 × (x_t ÷ x_t−12 − 1), monthly change = x_t − x_t−1. A point more than 0.55 of the last shown digit
+away is wrong; a label with no official value is unmatched; the page must cite the series id. Every point counts,
+the last included. FRED is read from `fredgraph.csv` with Python's default User-Agent (a browser-like or custom one
+hung until the timeout, 9 Oct 2026); downloads are cached in `<temp>/ttg_indicator_audit` for 6 hours. Compared with
+today's vintage: a point revised after the page's as-of fails until the next refresh updates it.
+Brief: `claude/briefs/BUILD_INDICATORS.md`.
 
 ## `chart_audit.py` — every chart point vs Yahoo month-end closes
 
@@ -182,22 +204,22 @@ branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines c
 on `tasks/queue/run.lock` in the main checkout, and a run that finds it held waits (polling each minute, up to 12
 hours, then ALERT); the OS drops the lock when a run's process ends, so a crash never leaves it held.
 
-### `--assets` — the monthly numbers-only refresh of the ETF, crypto and bond & cash reports
+### `--assets` — the monthly numbers-only refresh of the ETF, crypto, bond & cash and indicator reports
 
     py -3 tools/auto_refresh.py --assets --dry-run                     # what would refresh today, and one builder prompt
     py -3 tools/auto_refresh.py --assets --dry-run --today 2026-11-02  # what a later run would take
     py -3 tools/auto_refresh.py --assets --builder-model sonnet        # the scheduled run
 
 These reports have no earnings print, so they would freeze at their build date (Oki, 8 Oct 2026). The asset run
-takes every report under `reports/etf/`, `reports/crypto/` and `reports/fixed/` whose banner as-of is 28 days old or
-more (`--min-age`; `--families etf,crypto,fixed`; `--only etf/voo` or `voo`), oldest first, and gives each to a
+takes every report under `reports/etf/`, `reports/crypto/`, `reports/fixed/` and `reports/indicators/` whose banner
+as-of is 28 days old or more (`--min-age`; `--families etf,crypto,fixed,indicators`; `--only etf/voo` or `voo`),
+oldest first (never the redirect stubs of moved reports, `repodata.MOVED_REPORTS`), and gives each to a
 headless builder and then a checker with `claude/briefs/REFRESH_ASSETS.md` (new as-of = the last settled close or
 the latest official daily value on or before the run date; header, banner, chart month-ends, 52-week range, metrics,
 holdings, distributions, events and every sentence whose number changed; a `tg-d--price` "Monthly update" delta
-box). The indicator-rate pages (`INDICATORS` in `asset_cards.py`: SOFR, EFFR, CORRA) are refreshed like the others
-for now. Same worktree, branch, allow-list, parallelism and commit-or-revert as the earnings run; the gates are
-`verify.py`, `chart_audit.py` for ETF and crypto pages (bond pages chart yields, which the agents check against the
-official daily file), `node --check` on every inline script, exactly one delta box, LF only. A builder that finds no
+box). Same worktree, branch, allow-list, parallelism and commit-or-revert as the earnings run; the gates are
+`verify.py`, `chart_audit.py` for ETF and crypto pages, `indicator_audit.py` for indicator pages (bond pages chart
+yields, which the agents check against the official daily file), `node --check` on every inline script, exactly one delta box, LF only. A builder that finds no
 newer data changes nothing (`unchanged`, no checker). Attempts count per report and run month (2 a month). After the
 reports: `asset_cards.py`, the manifest and the tags, `run_checks.py`, push; the summary is
 `tasks/queue/runs/<date>-assets.md`, and any report not committed raises an ALERT. 28 days is the shortest gap

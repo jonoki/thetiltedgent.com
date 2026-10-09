@@ -1,10 +1,11 @@
-# Refresh brief — monthly numbers-only refresh of one ETF, crypto or bond & cash report (Oki, 8 Oct 2026)
+# Refresh brief — monthly numbers-only refresh of one ETF, crypto, bond & cash or economic-indicator report (Oki, 8 Oct 2026)
 
-ETF, crypto and bond & cash reports have no earnings print to trigger a refresh, so they would freeze at their build
-date. Once a month (first Monday, 17:30) `py -3 tools/auto_refresh.py --assets` takes every report under
-`reports/etf/`, `reports/crypto/` and `reports/fixed/` whose banner as-of is 28 days old or more and gives each to one
-builder and then one independent checker with this brief. The indicator-rate pages (SOFR, EFFR, CORRA — `INDICATORS`
-in `tools/asset_cards.py`) are refreshed like the others until they move to their own section.
+ETF, crypto, bond & cash and economic-indicator reports have no earnings print to trigger a refresh, so they would
+freeze at their build date. Once a month (first Monday, 17:30) `py -3 tools/auto_refresh.py --assets` takes every
+report under `reports/etf/`, `reports/crypto/`, `reports/fixed/` and `reports/indicators/` whose banner as-of is 28
+days old or more and gives each to one builder and then one independent checker with this brief. The redirect stubs
+left at the old paths of moved reports (`reports/fixed/sofr_analysis.html` and the like, `MOVED_REPORTS` in
+`tools/repodata.py`) are not reports and are never taken.
 
 **This is a numbers refresh, not a rewrite.** Every figure that has a newer value on or before the new as-of is
 updated; the narrative is left alone except where a sentence is now false.
@@ -14,6 +15,7 @@ updated; the narrative is left alone except where a sentence is now false.
 2. `claude/briefs/BUILD_ASSETS.md` — the hard rules (privacy, no hedge or process caveats, nothing after the banner
    date, Sharpe house formula, fees with their source document, closes from Nasdaq/Yahoo daily rows not issuer price
    APIs, fund renames, data licensing), your family's section and its batch rules, and "Verify". They all apply.
+   Economic indicators: `claude/briefs/BUILD_INDICATORS.md` in full instead of the family sections of BUILD_ASSETS.md.
 3. `claude/briefs/BUILD.md` — only "Data rules" and "Lessons from the last checker round".
 4. `claude/briefs/REFRESH.md` — only "Delta box" (markup, entities); this brief gives the numbers-only variant.
 Where this brief differs from those, this brief wins.
@@ -39,6 +41,9 @@ with Grep or a Read with offset/limit; never re-read the whole file.
   and EFFR, Bank of Canada CORRA, TreasuryDirect rates, the weekly posted rate). Series published a day late (SOFR,
   CORRA) keep the page's wording about when that day's value was published. Rates set twice a year (I bond, EE bond:
   May 1 and November 1) take the rate in force on the as-of date.
+- **Economic indicator:** a daily rate (SOFR, EFFR, CORRA, the Fed and Bank of Canada policy rates, prime) as for bond
+  & cash, from the series the page names; a monthly series (CPI, core PCE, unemployment, payrolls) takes the latest
+  release published on or before the run date, and the banner names the release, its reference period and its date.
 - One as-of for the whole page; nothing dated after it (rule B). The banner keeps its wording; only the date, weekday
   and source note change.
 - If the new as-of equals the page's as-of (no newer data), change nothing and return `NO CHANGE`.
@@ -72,6 +77,14 @@ with Grep or a Read with offset/limit; never re-read the whole file.
      at the new yield with the page's formulas, ±1 pp price change, model price, real yield and breakeven, spreads;
      the Fed SEP or the Bank of Canada MPR only when a newer release came out on or before the as-of; a rating only
      when the agency's own page shows a change.
+   - **Economic indicator:** the latest reading, the prior period and a year earlier, the 12-month (or 52-week)
+     range, the components and related rates in 04, the revisions the new release states for earlier months (and
+     the chart points they change: a monthly series is charted at its latest vintage, so a revised month is updated
+     and the delta box says so), the central bank's projection only when a newer one was published on or before the
+     as-of, and the next release dates in 06 from the publisher's calendar. A monthly series appends one point per new
+     reference month and drops the oldest, staying at 60; it has no as-of day point. SOFR, EFFR and CORRA were built
+     as bond & cash pages: at their first refresh in this family the hero's "Family: Bonds &amp; cash" becomes
+     "Family: Economic indicator" (no other layout change).
    - **Recomputed (ETF and crypto):** 5-yr annualised return, volatility, Sharpe (house formula: e = r − rf monthly;
      mean(e) / sd(e) × √12, rf series as the page states it), beta and correlation vs the S&P 500, maximum drawdown —
      on the 60 monthly returns ending at the latest month-end on or before the new as-of (younger funds: since
@@ -115,14 +128,16 @@ edition, and say what it was.
 
 ## Verify
 - ETF and crypto: `py -3 tools/chart_audit.py <family>/<slug>` → 0 wrong points.
+- Economic indicator: `py -3 tools/indicator_audit.py indicators/<slug>` → `ok`, wrong 0, unmatched 0, series cited
+  True (every chart point against FRED / Bank of Canada Valet at the page's dp).
 - Bond & cash: compare every point you appended or changed with the official daily file (scratch script in your temp
   folder): each equal to the source at the page's 2 dp.
 - `py -3 tools/verify.py reports/<family>/<slug>_analysis.html` → PASS (header value == last chart point, 52-week
   range contains it).
 - Extract each inline `<script>` body to your temp folder and `node --check` it. LF only; no `tg-sitenav`; exactly one
   `.tg-d` section.
-The runner re-runs verify, chart_audit (ETF and crypto), node --check and the delta-box count itself, and commits
-nothing that fails.
+The runner re-runs verify, chart_audit (ETF and crypto), indicator_audit (indicators), node --check and the
+delta-box count itself, and commits nothing that fails.
 
 ## Return (short, no file contents)
 `NO CHANGE` (and why) when there was no newer data; otherwise: 1 verify line, chart_audit or bond comparison

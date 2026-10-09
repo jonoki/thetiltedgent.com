@@ -131,9 +131,10 @@ def asset_repo(d, pages):
 
 
 class Assets(unittest.TestCase):
-    """--assets: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports (Oki, 8 Oct 2026)."""
+    """--assets: the monthly numbers-only refresh of the ETF, crypto, bond & cash and indicator reports (Oki, 8 Oct 2026)."""
     PAGES = [('etf', 'voo', 'October 5, 2026'), ('etf', 'xeqt', 'October 6, 2026'), ('crypto', 'btc', 'September 22, 2026'),
-             ('fixed', 'ust10y', 'September 23, 2026'), ('fixed', 'sofr', None)]
+             ('fixed', 'ust10y', 'September 23, 2026'), ('fixed', 'ust5y', None), ('indicators', 'cpi', 'September 30, 2026'),
+             ('fixed', 'sofr', 'August 3, 2026')]   # fixed/sofr is a redirect stub since it moved (MOVED_REPORTS): skipped
     TODAY = __import__('datetime').date(2026, 11, 2)
 
     def items(self):
@@ -143,16 +144,16 @@ class Assets(unittest.TestCase):
 
     def test_items(self):
         by = {i['slug']: i for i in self.items()}
-        self.assertEqual(set(by), {'etf/voo', 'etf/xeqt', 'crypto/btc', 'fixed/ust10y', 'fixed/sofr'})
+        self.assertEqual(set(by), {'etf/voo', 'etf/xeqt', 'crypto/btc', 'fixed/ust10y', 'fixed/ust5y', 'indicators/cpi'})
         self.assertEqual((by['etf/voo']['ticker'], by['etf/voo']['as_of'], by['etf/voo']['age_days']), ('VOO', '2026-10-05', 28))
         self.assertEqual((by['etf/voo']['release'], by['etf/voo']['run_date']), ('2026-11', '2026-11-02'))
-        self.assertIsNone(by['fixed/sofr']['age_days'])   # no readable banner: never selected
+        self.assertIsNone(by['fixed/ust5y']['age_days'])   # no readable banner: never selected
         self.assertEqual(set(ar.FAMILY_NAME), set(ar.rd.ASSET_FAMILIES))
 
     def test_age_threshold_and_order(self):
         items = self.items()
         self.assertEqual([i['slug'] for i in ar.select_assets(items, {})],   # 28 days due, 27 not; oldest first
-                         ['crypto/btc', 'fixed/ust10y', 'etf/voo'])
+                         ['crypto/btc', 'fixed/ust10y', 'indicators/cpi', 'etf/voo'])
         self.assertEqual([i['slug'] for i in ar.select_assets(items, {}, min_age=27)][-1], 'etf/xeqt')
         self.assertEqual(ar.select_assets(items, {}, min_age=60), [])
 
@@ -177,6 +178,11 @@ class Assets(unittest.TestCase):
         self.assertIn('reports/fixed/ust10y_analysis.html', bond)
         self.assertNotIn('chart_audit', bond)          # bond pages chart yields
         self.assertIn('official daily file', bond)
+        ind = ar.asset_builder_prompt(by['indicators/cpi'], 'C:/wt')
+        for s in ('ONE economic indicator report', 'reports/indicators/cpi_analysis.html',
+                  '`py -3 tools/indicator_audit.py indicators/cpi`', 'latest release (economic indicator)'):
+            self.assertIn(s, ind)
+        self.assertNotIn('chart_audit', ind)
         c = ar.asset_checker_prompt(by['crypto/btc'], 'C:/wt', 'x' * 20000)
         for s in (ar.ASSET_BRIEF, '"Checker" section', 'reports/crypto/btc_analysis.html', 'VERDICT line', 'PITFALLS:',
                   '$TEMP/ttgchk_crypto_btc/', 'chart_audit.py crypto/btc'):
@@ -205,12 +211,16 @@ class Assets(unittest.TestCase):
                 return subprocess.CompletedProcess(cmd, 0, 'PASS ust10y_analysis.html', '')
             if 'chart_audit.py' in cmd[1]:
                 return subprocess.CompletedProcess(cmd, 0, 'reports 1 | errors 0 | WRONG points >3% vs x: 0 | y', '')
+            if 'indicator_audit.py' in cmd[1]:
+                bad = 'bad' in cmd[2]
+                return subprocess.CompletedProcess(cmd, int(bad), f"{'FAIL' if bad else 'ok  '} {cmd[2]}: 61 points", '')
             return subprocess.CompletedProcess(cmd, 0, '', '')   # node --check
         page = '<section class="tg-d tg-d--price" data-x="1"></section>\n<script>var a = 1;</script>\n'
         with tempfile.TemporaryDirectory() as wt, unittest.mock.patch.object(ar, 'run', fake_run):
             os.makedirs(os.path.join(wt, 'reports', 'fixed'))
             os.makedirs(os.path.join(wt, 'reports', 'etf'))
-            for fam in ('fixed', 'etf'):
+            os.makedirs(os.path.join(wt, 'reports', 'indicators'))
+            for fam in ('fixed', 'etf', 'indicators'):
                 with open(os.path.join(wt, 'reports', fam, 'x_analysis.html'), 'w', encoding='utf-8', newline='\n') as fh:
                     fh.write(page)
             ok, why = ar.gates(wt, 'fixed/x', family='fixed')
@@ -219,6 +229,13 @@ class Assets(unittest.TestCase):
             self.assertIn('node --check ok | delta boxes 1', why)
             self.assertTrue(ar.gates(wt, 'etf/x', family='etf')[0])
             self.assertEqual(calls[-2][1:], ['tools/chart_audit.py', 'etf/x'])
+            ok, why = ar.gates(wt, 'indicators/x', family='indicators')
+            self.assertTrue(ok, why)
+            self.assertEqual(calls[-2][1:], ['tools/indicator_audit.py', 'indicators/x'])
+            self.assertIn('indicator_audit ok', why)
+            os.replace(os.path.join(wt, 'reports', 'indicators', 'x_analysis.html'),
+                       os.path.join(wt, 'reports', 'indicators', 'bad_analysis.html'))
+            self.assertFalse(ar.gates(wt, 'indicators/bad', family='indicators')[0])   # a wrong point fails the gate
             with open(os.path.join(wt, 'reports', 'etf', 'x_analysis.html'), 'w', encoding='utf-8', newline='\n') as fh:
                 fh.write(page.replace('<section class="tg-d tg-d--price" data-x="1"></section>', ''))
             ok, why = ar.gates(wt, 'etf/x', family='etf')

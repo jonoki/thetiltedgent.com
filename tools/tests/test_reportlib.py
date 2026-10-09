@@ -95,8 +95,55 @@ class ReportPage(unittest.TestCase):
         self.assertEqual(rl.row_value(rows, r'net interest', re.I), '2.96%')
         self.assertIsNone(rl.row_value(rows, r'ROTCE'))
 
-    def test_every_asset_family_has_a_tab(self):
-        self.assertEqual(tuple(asset_cards.FAMILIES), rd.ASSET_FAMILIES)
+    def test_every_index_family_has_a_tab(self):
+        self.assertEqual(tuple(asset_cards.FAMILIES), rd.INDEX_FAMILIES)
+        self.assertEqual(set(rd.ASSET_FAMILIES) - set(rd.INDEX_FAMILIES), {'indicators'})   # on the Learn hub instead
+
+    def test_family_and_canvases(self):
+        self.assertEqual(rl.family_of(os.path.join('x', 'reports', 'indicators', 'cpi_analysis.html')), 'indicators')
+        self.assertIsNone(rl.family_of(os.path.join('x', 'reports', 'aapl_analysis.html')))
+        self.assertEqual(rl.expected_canvases('reports/indicators/cpi_analysis.html'), (2, 3))
+        problems = lambda t, path: rl.structure_problems(rl.structure_counts(t), path)
+        self.assertEqual(problems(PAGE, 'reports/indicators/cpi_analysis.html'), [])   # history chart + one other
+        self.assertEqual(problems(PAGE.replace('<canvas', '<canvas id="x"></canvas><canvas', 1),
+                                  'reports/indicators/sofr_analysis.html'), [])           # + the curve chart
+        self.assertEqual(problems(PAGE.replace('<canvas', '<x', 1), 'reports/indicators/cpi_analysis.html'),
+                         ['canvas_count:1'])
+
+    def test_header_value(self):
+        page = lambda inner, attrs='': f'<div class="hero"><div class="price-current"{attrs}>{inner}</div></div>'
+        self.assertEqual(rl.header_value(page('3.88%')), 3.88)
+        self.assertEqual(rl.header_value(page('\u22120.2 pp')), -0.2)
+        self.assertEqual(rl.header_value(page('+142K <span>jobs</span>')), 142)
+        self.assertEqual(rl.header_value(page('1,234')), 1234)
+        self.assertEqual(rl.header_value(page('3.75\u20134.00%', ' data-value="4.00"')), 4.0)   # a range names its point
+        self.assertIsNone(rl.header_value(page('n/a')))
+        self.assertIsNone(rl.header_value('<div class="price">3.88</div>'))
+
+    def test_indicator_range(self):
+        row = lambda label, cell: f'<table><tr><td>{label}</td><td>{cell}</td></tr></table>'
+        self.assertEqual(rl.indicator_range(row('52-Week Range', '3.50 \u2013 4.31%')), [3.5, 4.31])
+        self.assertEqual(rl.indicator_range(row('12-Month Range', '\u221213K \u2013 254K')), [-13, 254])
+        self.assertEqual(rl.indicator_range(row('12-month range', '2.4 to 3.1%')), [2.4, 3.1])
+        self.assertEqual(rl.indicator_range(row('12-Month Range', '-0.2 - 0.4')), [-0.2, 0.4])
+        self.assertIsNone(rl.indicator_range(row('Range', '1 \u2013 2')))
+
+    def test_moved_reports_are_stubs_not_reports(self):
+        with tempfile.TemporaryDirectory() as d:
+            for fam, slug in (('fixed', 'sofr'), ('fixed', 'ust10y'), ('indicators', 'sofr')):
+                rl.write_text(rd.report_path(slug, fam, repo=d), 'x')
+            self.assertEqual([rd.slug_of(p) for p in rd.family_reports('fixed', d)], ['ust10y'])
+            self.assertEqual(sorted(os.path.relpath(p, d).replace(os.sep, '/') for p in rd.report_paths(d, assets=True)),
+                             ['reports/fixed/ust10y_analysis.html', 'reports/indicators/sofr_analysis.html'])
+        for old, new in rd.MOVED_REPORTS.items():   # every stub redirects to its new page, keeping the anchor
+            stub = rl.read_text(rd.report_path(old, repo=rd.ROOT))
+            self.assertIn(f"location.replace('/reports/{new}_analysis.html' + location.hash)", stub)
+            self.assertIn(f'url=/reports/{new}_analysis.html"', stub)
+            self.assertIn('<meta name="robots" content="noindex">', stub)
+            self.assertTrue(os.path.exists(rd.report_path(new, repo=rd.ROOT)))
+        view = rl.read_text(os.path.join(rd.ROOT, 'reports', 'view.html'))   # and ?r=fixed/sofr still opens it
+        for old, new in rd.MOVED_REPORTS.items():
+            self.assertIn(f"'{old}': '{new}'", view)
 
     def test_report_path(self):
         self.assertEqual(rd.report_path('aapl', repo='r'), os.path.join('r', 'reports', 'aapl_analysis.html'))

@@ -90,7 +90,7 @@ Hero meta: Market cap · Circulating supply · Max supply · Launch year.
 - For a token tied to a company or exchange (e.g. BNB — Binance; XRP — Ripple): state the relationship from primary sources (the issuer's own pages, filings, court records); enforcement actions and settlements go in the regulatory table with docket/release links.
 
 ## Bond & cash family — `reports/fixed/<slug>_analysis.html`
-Only things a reader can buy: securities, savings bonds, deposits. Indicator rates and economic series (overnight/repo rates, policy, prime and mortgage rates, CPI…) are NOT built here — they wait for the economic-indicators section (Oki, 6 Oct 2026; flagged list in `tools/asset_cards.py` `INDICATORS`).
+Only things a reader can buy: securities, savings bonds, deposits. Indicator rates and economic series (overnight/repo rates, policy, prime and mortgage rates, CPI…) are NOT built here — they are the economic-indicators family, `reports/indicators/`, brief `claude/briefs/BUILD_INDICATORS.md` (Oki, 6 and 8 Oct 2026; SOFR, EFFR and CORRA moved there).
 Source hierarchy: U.S. Treasury (home.treasury.gov daily par yield curve, TreasuryDirect auction results), FRED, Federal Reserve; Bank of Canada Valet for Canadian series.
 Header `.price-current` shows the yield (e.g. `4.12%`, 2 dp) for the banner date; chart = month-end daily yields (last business day of each month — NOT FRED's monthly-average series), last point == header yield.
 Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name the agency).
@@ -110,7 +110,7 @@ Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name t
 - **TIPS**: header = the par REAL yield (Treasury daily par real yield curve); also nominal and breakeven for the banner date; CPI indexation and the deflation floor from TreasuryDirect's own pages; on-the-run TIPS from TreasuryDirect.
 - **Government of Canada**: Bank of Canada Valet benchmark bond yields (name the series id), GoC auction results from the Bank of Canada, currency CAD; policy expectations = the latest Monetary Policy Report (no dot plot); ratings n/v unless the agency's own page is readable; Canadian tax facts only if sourced (CRA).
 - Ratings: n/v unless the agency's own page is readable (Moody's usually is). No press-report ratings. U.S. Treasury and savings-bond pages all show "Aa1, stable (Moody's)", since May 16, 2025, sourced to Moody's U.S. rating page (Oki, 8 Oct 2026); S&P and Fitch n/v unless read.
-- verify.py accepts 3 canvases for files under `reports/fixed/`.
+- verify.py accepts 3 canvases for files under `reports/fixed/` (2 or 3 under `reports/indicators/`).
 
 ## Verify
 - Extract the `<script>` bodies to `$TEMP/ttg_<slug>/` and `node --check` each.

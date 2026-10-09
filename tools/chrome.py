@@ -40,7 +40,8 @@ NAV: list[NavLink | NavMenu] = [
     NavMenu('learn', 'Learn', [
         ('Learn', [('Learn home', '/learn/')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
-                        ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')])]),
+                        ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
+        ('Economic Indicators', [('Rates, inflation &amp; jobs', '/learn/indicators/')])]),   # Oki, 8 Oct 2026
     NavMenu('reports', 'Reports', [('Reports', [
         ('Stocks', '/reports/'), ('ETFs', '/reports/?f=etf'), ('Crypto', '/reports/?f=crypto'),
         ('Bonds &amp; cash', '/reports/?f=fixed')])]),
@@ -87,6 +88,7 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/index.html', 'learn', True),
     ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
     ('learn/table-talk/poker.html', 'learn', True),
+    ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "

@@ -134,6 +134,37 @@ def header_price(t: str) -> float | None:
     return to_number(m.group(1)) if m else None
 
 
+_NUM = r'[−\-+]?\d[\d,]*(?:\.\d+)?'   # a signed number as printed: '−0.2', '+142', '3.88', '1,234'
+
+
+def header_value(t: str) -> float | None:
+    """An economic indicator's header value: the .price-current's data-value attribute when it has one (a range such
+    as the Fed's target range prints both ends, and data-value names the one the chart plots), else the first number
+    in it with its sign ('3.88%', '−0.2 pp', '+142K' -> 142). None when there is no .price-current or no number."""
+    m = re.search(r'<div\b([^>]*\bclass="price-current\b[^"]*"[^>]*)>(.*?)</div>', t, re.S)
+    if not m:
+        return None
+    dv = re.search(r'\bdata-value="([^"]*)"', m.group(1))
+    if dv:
+        return to_number(dv.group(1))
+    n = re.search(_NUM, strip_tags(m.group(2)))
+    return to_number(n.group(0)) if n else None
+
+
+_RANGE = re.compile(r'(' + _NUM + r')[^\d\s–—]*\s*(?:–|—|\s-\s|\sto\s)\s*(' + _NUM + ')')
+
+
+def indicator_range(t: str) -> list[float] | None:
+    """[low, high] from the first table row labelled '52-Week Range' or '12-Month Range' (an indicator's Key Figures
+    table): the two numbers either side of an en/em dash, a spaced hyphen or 'to', signs kept ('−13K – 254K')."""
+    cell = row_value(table_rows(t), r'(?:52-Week|12-Month) Range\b', re.I)
+    m = _RANGE.search(cell) if cell else None
+    if not m:
+        return None
+    lo, hi = to_number(m.group(1)), to_number(m.group(2))
+    return [lo, hi] if lo is not None and hi is not None else None
+
+
 _ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
 _CELL = re.compile(r'<(t[dh])[^>]*>(.*?)</t[dh]>', re.S)
 
@@ -253,9 +284,17 @@ def structure_counts(t: str) -> StructureCounts:
 SKELETON: Final = ('doctype', 'html', 'head', 'head_close', 'body', 'body_close', 'html_close')
 
 
-def expected_canvases(path: str) -> int:
-    """The price chart and one other; bond and cash reports (reports/fixed/) add the yield curve."""
-    return 3 if os.path.basename(os.path.dirname(os.path.abspath(path))) == 'fixed' else 2
+def family_of(path: str) -> str | None:
+    """The family folder of a report under reports/<family>/ ('etf', 'indicators'), else None (a stock report)."""
+    folder = os.path.dirname(os.path.abspath(path))
+    return os.path.basename(folder) if os.path.basename(os.path.dirname(folder)) == 'reports' else None
+
+
+def expected_canvases(path: str) -> tuple[int, ...]:
+    """The canvas counts a sound page may have: the price chart and one other; bond and cash reports
+    (reports/fixed/) add the yield curve; an economic indicator (reports/indicators/) has its history chart and one
+    or two others (SOFR, EFFR and CORRA, built as bond pages, keep their curve chart)."""
+    return {'fixed': (3,), 'indicators': (2, 3)}.get(family_of(path) or '', (2,))
 
 
 def structure_problems(counts: StructureCounts, path: str) -> list[str]:
@@ -270,7 +309,7 @@ def structure_problems(counts: StructureCounts, path: str) -> list[str]:
         problems.append('style_unbalanced')
     if counts['style_in_comment']:
         problems.append('style_tag_in_css_comment')
-    if counts['canvas'] != expected_canvases(path):
+    if counts['canvas'] not in expected_canvases(path):
         problems.append(f"canvas_count:{counts['canvas']}")
     if counts['sitenav']:
         problems.append('has_legacy_sitenav')
