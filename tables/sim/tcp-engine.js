@@ -1,4 +1,4 @@
-/* The Tilted Gent — Three Card Poker engine for the Three Card Poker Table. Vanilla JS, no dependencies; runs in
+/* The Tilted Gent — Three Card Poker engine for the Three Card Poker Table. Vanilla JS; needs edge-bands.js (the colour bands); runs in
    the browser (window.TcpEngine) and in Node (module.exports) for tables/checks/tcp_engine_check.js.
    Every figure is counted, not simulated: one 52-card deck, 22,100 three-card hands for the player and, for each,
    the C(49,3) = 18,424 hands the dealer can hold. Player hands that differ only by a relabelling of suits have
@@ -19,6 +19,7 @@
      Pair Plus edge = -(1/22100) * sum over player hands of pays(hand), with pays(high card) = -1. */
 (function (root) {
   'use strict';
+  var EB = typeof module !== 'undefined' && module.exports ? require('./edge-bands.js') : root.TtgEdgeBands;   // edge colour bands
 
   /* ---------- cards: 0..51, rank = 2 + (c >> 2) (14 = ace), suit = c & 3 ---------- */
   var SUITS = ['♠', '♥', '♦', '♣'];
@@ -183,7 +184,7 @@
                best: pn > -N_DEALER ? 'play' : pn === -N_DEALER ? 'either' : 'fold', q64: q64(s) ? 'play' : 'fold',
                nq: e.nq, w: e.w, l: e.l, t: e.t, n: e.n, bonus: bonus(catOf(s)), ppPays: ppPays(catOf(s)) };
     }
-    function band(x) { return x < 0.02 ? 'up' : x < 0.05 ? 'au' : 'dn'; }
+    function band(x) { return EB.band('tcp', x); }   // green / gold / red, as on three-card-poker.html
     return { rules: R, bonus: bonus, ppPays: ppPays, ante: ante, pairPlus: pairPlus, q64Misses: q64Misses, decision: decision, band: band,
              Table: function (opts) { return new Table(this, opts || {}); } };
   }
