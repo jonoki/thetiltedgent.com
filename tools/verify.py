@@ -2,7 +2,7 @@
 """Pre-publish gate for report pages: document skeleton, chart arrays, final chart value == header price,
 52-week range, <title> ticker == file name, no embedded site nav.
 
-usage:  py -3 tools/verify.py [report.html ...]      (no arguments = every report in the library)
+usage:  py -3 tools/verify.py [report.html ...]      (no arguments = every report in the library, archived ones too)
 Prints one PASS/FAIL line per report and exits 1 if any report fails.
 
 P/E is printed as stated/calculated (price ÷ EPS) for a reader to compare, and is deliberately not part of
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int | str:
     ap = rd.parser('Pre-publish gate for report pages.')
     ap.add_argument('reports', nargs='*', help='report files (default: every report in the library)')
     args = ap.parse_args(argv)
-    files = args.reports or rd.report_paths(args.repo, assets=True)
+    files = args.reports or rd.report_paths(args.repo, assets=True, archived=True)   # an archived page is still published
     failed = 0
     for f in files:
         if not os.path.isfile(f):

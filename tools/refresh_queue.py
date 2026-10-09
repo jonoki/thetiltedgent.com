@@ -200,6 +200,8 @@ def holdings(repo: str = rd.ROOT) -> dict[str, Holding]:
         mcap = {r['slug']: r.get('mcap') for r in json.load(fh)['reports']}
     out: dict[str, Holding] = {}
     for slug, r in rd.load_report_records(repo).items():
+        if slug in rd.ARCHIVED or slug in rd.RENAMED:   # a final edition is never refreshed, even from a stale manifest
+            continue
         out[norm(r['ticker'])] = {'slug': slug, 'ticker': r['ticker'], 'as_of': r['as_of'], 'ndx': bool(r.get('ndx')),
                                   'dow': bool(r.get('dow30_added')), 'mcap': mcap.get(slug)}
     return out

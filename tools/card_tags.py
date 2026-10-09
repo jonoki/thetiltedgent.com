@@ -121,6 +121,8 @@ def new_results(items: list[dict[str, Any]], records: dict[str, rd.ReportRecord]
     unless it came before that session's open."""
     out: dict[str, list[str]] = {}
     for i in sorted(items, key=lambda i: i['release']):
+        if i['slug'] in rd.ARCHIVED or i['slug'] in rd.RENAMED:   # a queue written before the archive or the rename
+            continue
         rec = records.get(i['slug']) or {}
         as_of = rec.get('as_of') or i['as_of']
         if i['release'] < as_of or (i['release'] == as_of and i.get('timing') == 'pre'):

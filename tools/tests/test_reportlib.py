@@ -1,6 +1,7 @@
 """Unit tests for reportlib: numbers, dates and what a report page says.   Run: py -3 tools/run_checks.py"""
 import os
 import re
+import tempfile
 import unittest
 
 from tests.fixtures import PAGE
@@ -100,6 +101,15 @@ class ReportPage(unittest.TestCase):
     def test_report_path(self):
         self.assertEqual(rd.report_path('aapl', repo='r'), os.path.join('r', 'reports', 'aapl_analysis.html'))
         self.assertEqual(rd.report_path('voo', 'etf', repo='r'), os.path.join('r', 'reports', 'etf', 'voo_analysis.html'))
+
+    def test_report_paths_leave_out_renamed_stubs_and_archived_reports(self):
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'reports', 'etf'))
+            for rel in ('aapl', 'wbd', 'psky', 'skyd', os.path.join('etf', 'voo')):
+                rl.write_text(os.path.join(repo, 'reports', rel + '_analysis.html'), 'x')
+            slugs = lambda **kw: [rd.slug_of(p) for p in rd.report_paths(repo, **kw)]
+            self.assertEqual(slugs(), ['aapl', 'skyd'])                      # psky is a redirect stub, wbd archived
+            self.assertEqual(slugs(assets=True, archived=True), ['aapl', 'voo', 'skyd', 'wbd'])
 
 
 if __name__ == '__main__':
