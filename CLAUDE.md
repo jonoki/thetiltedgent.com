@@ -55,6 +55,7 @@ The chrome pages are `index.html`, `brand.html`, `reports/index.html`, `reports/
 
 - Re-fetch the current price yourself; the header price must equal the final chart value.
 - Use about 60 monthly closes (a 5-year monthly series), never daily closes under a 5-year heading.
+- The header's "Mkt Cap Ranking" row is written by `py -3 tools/index_rank.py <slug>` (S&P 500 / Nasdaq-100 rank on the banner date, shares × close for every member); never type a rank (Oki, 8 Oct 2026).
 - Never trust an agent's self-reported "verified". Named analyst calls only if seen on a fetched page.
 
 ## Recurring runs learn from their own mistakes
