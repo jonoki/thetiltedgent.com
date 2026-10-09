@@ -3,8 +3,8 @@
 
    The feed (https://jonoki.github.io/ttg-brief/brief.json) is owned by the Day Trading Aid repo
    (src/daytradingaid/brief/public.py decides what it may carry); this page only reads it. It is rebuilt about every
-   15 minutes on weekdays from 07:25 to 12:00 ET, plus one run after the close. This page fetches it at load, again
-   every five minutes while the tab is visible during the session (weekdays 07:00–17:30 ET), and every five minutes
+   15 minutes on weekdays from 06:25 to 12:00 ET, plus one run at about 16:05 ET after the close. This page fetches it at load, again
+   every five minutes while the tab is visible during the session (weekdays 06:00–17:30 ET), and every five minutes
    while it has not loaded at all.
 
    The page never shows an old brief as today's: lineState() compares the brief's trading day with today's date in
@@ -62,9 +62,9 @@
     var day = withDay ? new Date(isoTime).toLocaleDateString('en-US', {timeZone: ET, weekday: 'short', month: 'short', day: 'numeric'}) + ', ' : '';
     return day + timeEt(isoTime) + ' ET';
   }
-  function inSession(){   // weekdays 07:00–17:30 ET: when the brief can change
+  function inSession(){   // weekdays 06:00–17:30 ET: when the brief can change
     var p = etParts(now());
-    return isWeekday(p.date) && p.mins >= 7 * 60 && p.mins <= 17 * 60 + 30;
+    return isWeekday(p.date) && p.mins >= 6 * 60 && p.mins <= 17 * 60 + 30;
   }
 
   /* ---------- is this brief today's? ---------- */
@@ -74,7 +74,7 @@
     if (day >= p.date && ageHours <= STALE_HOURS){
       return b.meta.run === 'post-close' ? {kind: 'closed', next: nextWeekday(day)} : {kind: 'live'};
     }
-    if (isWeekday(p.date) && p.mins < 7 * 60 + 25) return {kind: 'old', when: 'early'};
+    if (isWeekday(p.date) && p.mins < 6 * 60 + 25) return {kind: 'old', when: 'early'};
     if (isWeekday(p.date) && p.mins < 12 * 60) return {kind: 'old', when: 'late'};
     return {kind: 'old', when: 'next', next: nextWeekday(p.date)};
   }
@@ -123,7 +123,7 @@
   function renderNotice(b, st){
     var day = dayLong(b.meta.trading_day), html = '';
     if (st.kind === 'old'){
-      var next = st.when === 'early' ? 'Today’s line posts from about 7:25 a.m. ET, before the open.'
+      var next = st.when === 'early' ? 'Today’s line posts from about 6:25 a.m. ET, before the open.'
         : st.when === 'late' ? 'Today’s line hasn’t posted yet. This page checks again every five minutes.'
         : 'The next one posts before ' + weekday(st.next) + '’s open.';
       html = '<div class="notice"><p class="nh">This is the brief for ' + esc(day) + '.</p><p>' + esc(next)
@@ -407,7 +407,7 @@
     try { lastSeen = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) {}
     $('ml-status').innerHTML = '<span class="chip none">Not posted yet</span>';
     $('ml-notice').innerHTML = '<div class="notice"><p class="nh">The line isn’t posted yet.</p>'
-      + '<p>The brief posts on weekdays from about 7:25 a.m. ET and updates every 15 minutes until noon, with one more after the 4 p.m. close. This page checks again every five minutes.</p>'
+      + '<p>The brief posts on weekdays from about 6:25 a.m. ET and updates every 15 minutes until noon, with one more after the 4 p.m. close. This page checks again every five minutes.</p>'
       + (lastSeen && lastSeen.day && lastSeen.at ? '<p>The last line this browser loaded was the brief for <b>' + esc(dayLong(lastSeen.day)) + '</b>, updated ' + esc(stampEt(lastSeen.at, true)) + '.</p>' : '')
       + '<p>You can also read the brief as posted at <a href="' + FEED_PAGE + '">jonoki.github.io/ttg-brief</a>.</p></div>';
     $('ml-body').hidden = true;
