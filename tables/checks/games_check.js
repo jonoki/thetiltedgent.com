@@ -20,9 +20,7 @@ vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'tables/sim/ttg-sim.js'), 'ut
 var GAMES = ctx.window.TTG_GAMES, SIM = ctx.window.TTGSim;
 
 var EDGE_TOL = 1e-4, EXACT_SUM_TOL = 1e-9;
-var TRIPS = 'labelled exact but its frequencies are rounded (rows sum to 1.0000913) and it has no published edge to check';
-var KNOWN = { 'ultimate-texas-holdem/trips-9743': TRIPS, 'ultimate-texas-holdem/trips-8653': TRIPS,
-              'ultimate-texas-holdem/trips-9733': TRIPS };
+var KNOWN = {};   // none since 8 Oct 2026: the UTH Trips tables are exact counts now (tables/checks/uth_trips_check.js)
 var failures = [], known = [], checked = 0;
 
 Object.keys(GAMES).forEach(function (gid) {

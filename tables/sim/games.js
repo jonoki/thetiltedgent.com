@@ -145,7 +145,20 @@ window.TTG_GAMES = (function () {
   };
 
   /* ---------- ULTIMATE TEXAS HOLD'EM ---------- */
-  // Trips: exact 7-card hand frequencies (royal 0.0032%, straight flush 0.028%, quads 0.17%, full house 2.60%, flush 3.03%, straight 4.62%, trips 4.83%); edge computed from the rows.
+  // Trips: exact. Pays on the player's final 7-card hand (2 hole + 5 board), three of a kind or better;
+  // anything less loses the bet. Rows are the 7-card best-five-hand counts over C(52,7) = 133,784,560:
+  // royal 4,324; straight flush (non-royal) 37,260; quads 224,848; full house 3,473,184; flush 4,047,644;
+  // straight 6,180,020; trips 6,461,620; below trips 113,355,660 (two pair 31,433,400 + pair 58,627,800
+  // + high card 23,294,460). Derived, not typed in, by tables/checks/uth_trips_check.js (combinatorial,
+  // and with --brute over every hand); same as the standard 7-card table (Wikipedia, "Poker probability").
+  // Edge = -(sum of count * pay - 113,355,660) / 133,784,560:
+  //   50-40-30-9-7-4-3 -> 1,206,516 / N = 0.9018%; 50-40-30-8-6-5-3 -> 2,547,324 / N = 1.9040%;
+  //   50-40-30-9-7-3-3 -> 7,386,536 / N = 5.5212%.
+  var N7 = 133784560;
+  function trips(rf, sf, qu, fh, fl, st, tk) {
+    return [ {p: 4324/N7, x: rf}, {p: 37260/N7, x: sf}, {p: 224848/N7, x: qu}, {p: 3473184/N7, x: fh}, {p: 4047644/N7, x: fl},
+             {p: 6180020/N7, x: st}, {p: 6461620/N7, x: tk}, {p: 113355660/N7, x: -1} ];
+  }
   G["ultimate-texas-holdem"] = {
     name: "Ultimate Texas Hold'em", pace: 40, paceNote: "hands per hour at a moderately busy table",
     unit: 10, defaultBet: "ante-blind",
@@ -159,12 +172,9 @@ window.TTG_GAMES = (function () {
                 {p: 0.03, x: 3}, {p: 0.02, x: 2}, {p: 0.05, x: -4},
                 {p: 0.08, x: 2}, {p: 0.02, x: 1}, {p: 0.12, x: -3} ],
         bonusRows: [ {p: 0.046, add: 1}, {p: 0.030, add: 1.5}, {p: 0.026, add: 3}, {p: 0.0017, add: 10}, {p: 0.0003, add: 50} ] },
-      "trips-9743": { name: "Trips — 50-40-30-9-7-4-3 paytable", kind: "exact",
-        rows: [ {p: 0.0000323, x: 50}, {p: 0.000279, x: 40}, {p: 0.00168, x: 30}, {p: 0.0260, x: 9}, {p: 0.0303, x: 7}, {p: 0.0462, x: 4}, {p: 0.0483, x: 3}, {p: 0.8473, x: -1} ] },
-      "trips-8653": { name: "Trips — 50-40-30-8-6-5-3 paytable", kind: "exact",
-        rows: [ {p: 0.0000323, x: 50}, {p: 0.000279, x: 40}, {p: 0.00168, x: 30}, {p: 0.0260, x: 8}, {p: 0.0303, x: 6}, {p: 0.0462, x: 5}, {p: 0.0483, x: 3}, {p: 0.8473, x: -1} ] },
-      "trips-9733": { name: "Trips — 50-40-30-9-7-3-3 paytable", kind: "exact",
-        rows: [ {p: 0.0000323, x: 50}, {p: 0.000279, x: 40}, {p: 0.00168, x: 30}, {p: 0.0260, x: 9}, {p: 0.0303, x: 7}, {p: 0.0462, x: 3}, {p: 0.0483, x: 3}, {p: 0.8473, x: -1} ] }
+      "trips-9743": { name: "Trips — 50-40-30-9-7-4-3 paytable", edge: 0.009018, kind: "exact", rows: trips(50, 40, 30, 9, 7, 4, 3) },
+      "trips-8653": { name: "Trips — 50-40-30-8-6-5-3 paytable", edge: 0.019040, kind: "exact", rows: trips(50, 40, 30, 8, 6, 5, 3) },
+      "trips-9733": { name: "Trips — 50-40-30-9-7-3-3 paytable", edge: 0.055212, kind: "exact", rows: trips(50, 40, 30, 9, 7, 3, 3) }
     }
   };
 
