@@ -444,7 +444,7 @@
   });
   addEventListener('scroll',function(){if(!tip.hidden&&cur) show(cur);},{passive:true});
 
-  function getJson(u){return fetch(u).then(function(r){return r.ok?r.json():null;});}
+  function getJson(u){return fetch(u,{cache:'no-cache'}).then(function(r){return r.ok?r.json():null;});}
   Promise.all([getJson('../data/card_tags.json'),getJson('../data/new_results.json').catch(function(){return null;})]).then(function(d){
     var cards=(d[0]&&d[0].cards)||{}, nrs=(d[1]&&d[1].cards)||{};
     if(window.TTG_sortKeys) window.TTG_sortKeys(cards);   // market cap and as-of: the Stocks tab's sort keys
