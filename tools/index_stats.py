@@ -13,7 +13,11 @@ Mkt Cap / header price from member i's own report, and Yahoo's daily close on or
 report's share basis. Every member's figures come from its own latest report in the library, whatever its date.
 
 Which index: the one the page's column header names (S&P 500 or Nasdaq-100). The header is normalised to
-"S&P 500" or "Nasdaq-100". Pages whose fourth column names another index (DAX, Nikkei 225 ...) are left alone.
+"S&P 500" or "Nasdaq-100". A non-US report whose metrics table compares with its home index (Nikkei 225, DAX,
+FTSE 100, Hang Seng ...: HOME_INDEX) gets the S&P 500 column instead, computed the same way, so every report
+compares with the same benchmark (Oki, 9 Oct 2026). Its old sentences about the home-index column are not
+rewritten by this tool (they were removed by hand that day): a sentence in Section 04's notes or the disclaimer
+that names a home index next to the word "column" is listed as LEFT.
 
 For a page with banner date D and each member i of its index:
   cap_i(D) = shares_i x close_i(D)                     market cap on the page's date
@@ -39,7 +43,10 @@ For a page with banner date D and each member i of its index:
   Revenue growth = sum Rev_i / sum Prior_i - 1
   ROE            = sum E_i / sum Eq_i
   Debt-to-equity = sum Debt_i / sum Eq_i
-  Beta           = S&P 500: 1.00, its definition (betas are measured against it); Nasdaq-100: "—". The
+  Beta           = S&P 500: 1.00, its definition (betas are measured against it), except where the company's beta
+                   is not measured against the S&P 500: "—" on a row whose label or Context names another index (the
+                   Nikkei 225, the SMI ...), and on a home-market listing (6857.T, ALV.DE ...) unless the row says
+                   it is against the S&P 500, SPY or the US market. Nasdaq-100: "—". The
                    cap-weighted mean of the members' own betas, sum cap_i(D) x beta_i / sum cap_i(D), is printed
                    by --stats and --dry-run but not shown: for the S&P 500 it comes to 1.18-1.21, not 1.00, because
                    each beta is measured over its own past five years, when today's largest (and most volatile)
@@ -76,6 +83,10 @@ COVERAGE = 0.80             # share of the index's cap on D the contributing mem
 PE_EPS_TOLERANCE = 0.25     # flag a member whose P/E and price / EPS disagree by more than this
 THIN_MARGIN = 0.01          # flag a member whose net margin is under 1%: Rev_i = E_i / NPM_i is sensitive there
 HEADERS = {'sp500': 'S&amp;P 500', 'ndx': 'Nasdaq-100'}
+# a non-US report's home index, in a column header or a beta row (its metrics table gets the S&P 500 column)
+HOME_INDEX = re.compile(r'Nikkei|TOPIX|\bDAX\b|\bCAC\b|FTSE|\bSMI\b|Swiss Market Index|Hang Seng|\bHSI\b|KOSPI|'
+                        r'KOSDAQ|IBEX|\bAEX\b|\bOMX|CSI 300|\bASX\b|Australia Large Cap|TAIEX|Ibovespa|BEL ?20|'
+                        r'\bSTI\b|Straits Times|\bOBX\b|(?i:nifty)|(?i:sensex)|\bTSX\b|\bTASI\b|(?i:euro ?stoxx)')
 
 # The metrics rows, by key: the label patterns for both the members' own rows and the rows this tool fills.
 ROWS: dict[str, str] = {
@@ -160,8 +171,8 @@ def cell_figure(text: str | None, key: str) -> float | None:
 
 
 def metrics_table(t: str) -> tuple[int, int] | None:
-    """(start, end) of the page's metrics table: the first .fin-table whose fourth header names the S&P 500 or the
-    Nasdaq-100. None when it has none."""
+    """(start, end) of the page's metrics table: the first .fin-table whose fourth header names the S&P 500, the
+    Nasdaq-100 or (on a metrics table) a home index. None when it has none."""
     for m in re.finditer(r'<table class="fin-table"[^>]*>.*?</table>', t, re.S):
         if header_index(m.group(0)):
             return m.start(), m.end()
@@ -178,7 +189,8 @@ def header_cells(table: str) -> list[tuple[int, int, str]]:
 
 
 def header_index(table: str) -> str | None:
-    """'sp500' or 'ndx' when the table's fourth header names that index, else None."""
+    """'sp500' or 'ndx' when the table's fourth header names that index; 'sp500' when it names a home index and the
+    table is a metrics table (it has a Trailing P/E or EPS (TTM) row); else None."""
     th = header_cells(table)
     if len(th) < 4:
         return None
@@ -187,7 +199,21 @@ def header_index(table: str) -> str | None:
         return 'sp500'
     if re.search(r'(?i)nasdaq[- ]100', text):
         return 'ndx'
+    if home_header(table):
+        return 'sp500'
     return None
+
+
+def home_header(table: str) -> bool:
+    """True when the table's fourth header names a home index (not the S&P 500 or the Nasdaq-100) and the table
+    is the metrics table."""
+    th = header_cells(table)
+    if len(th) < 4:
+        return False
+    text = rl.strip_tags(th[3][2])
+    if re.search(r'S&P 500|(?i:nasdaq[- ]100)', text) or not HOME_INDEX.search(text):
+        return False
+    return any(re.match(ROWS['pe'], lab) or re.match(EPS_ROW, lab) for lab, _ in rl.table_rows(table))
 
 
 def member_rows(t: str) -> list[tuple[str, str]]:
@@ -343,6 +369,22 @@ def row_key(label: str) -> str | None:
     return next((k for k, pat in ROWS.items() if re.match(pat, label)), None)
 
 
+US_BASIS = re.compile(r'S&P 500|\bSPY\b|\bU\.?S\.? market\b')
+# a home-market symbol in the page's <title> ("6857.T — ...", "ALV.DE — ..."): BRK.B and BF.B are not one
+HOME_LISTING = re.compile(r'<title>\s*[0-9A-Z][0-9A-Z-]*\.(?:T|DE|PA|L|SW|HK|KS|KQ|NS|BO|MC|AS|ST|SS|SZ|AX|TW|TWO|SA|BR|'
+                          r'SI|OL|MI|TO|V|CO|HE|IR|VI|LS|F|SR|JK|NZ|WA|BK|KL|MX|JO)\s+—')
+
+
+def other_basis(label: str, context: str, home_listing: bool = False) -> bool:
+    """True when a beta row is not measured against the S&P 500, so the S&P 500's own beta of 1.00 is not the
+    comparable figure: its label or Context names another index, or the page's listing is a home-market line
+    (6857.T, ALV.DE ...) and the row does not say it is measured against the S&P 500 (data sites measure such a
+    line's beta on their own basis)."""
+    if HOME_INDEX.search(label) or HOME_INDEX.search(context):
+        return True
+    return home_listing and not (US_BASIS.search(label) or US_BASIS.search(context))
+
+
 def neutral(td: str) -> str:
     """A cell's opening tag without a green, red or amber colour."""
     return re.sub(r'\s*color:\s*var\(--(?:green|red|amber)\);?', '', td).replace(' style=""', '')
@@ -371,6 +413,9 @@ def write_column(t: str, stats: Mapping[str, Stat]) -> tuple[str, dict[str, int]
             continue
         label = re.sub(r'\s+', ' ', rl.strip_tags(cells[0].group(2)))
         key = row_key(label)
+        if key == 'beta' and other_basis(label, rl.strip_tags(cells[-1].group(2)) if len(cells) > 4 else '',
+                                         bool(HOME_LISTING.search(t))):
+            key = None
         st = stats.get(key) if key else None
         if key and st is not None and st.value is not None:
             text = render(st.value, key, cell_format(key, rl.strip_tags(cells[1].group(2)), suffix))
@@ -653,13 +698,19 @@ def fallback_anchor(html: str) -> int | None:
     return best
 
 
+# a home index named next to a column that is not the Context or industry column
+COLUMN_WORD = r'(?<!Context )(?<![Ii]ndustry )(?<!Avg )\bcolumns?\b'
+HOME_COLUMN = re.compile(r'(?:' + HOME_INDEX.pattern + r')[^.;]{0,60}?' + COLUMN_WORD + '|'
+                         + COLUMN_WORD + r'[^.;]{0,60}?(?:' + HOME_INDEX.pattern + r')')
+
+
 def old_sentences(html: str) -> list[str]:
-    """Sentences of html that still describe the old index column, as a reader sees them."""
+    """Sentences of html that still describe the old index column (or a home-index column), as a reader sees them."""
     out = []
     for seg in ir.BLOCK.split(html)[::2]:
         b = ir.protect(seg)
         out += [' '.join(ir.plain(b.text[x:y]).split()) for x, y in ir.sentences(b.text, b.tags)
-                if talks_of_column(b.text[x:y])]
+                if talks_of_column(b.text[x:y]) or HOME_COLUMN.search(ir.plain(b.text[x:y]))]
     return out
 
 
@@ -781,11 +832,13 @@ def main(argv: list[str] | None = None) -> int | str:
         return 0
     cells: dict[str, int] = {}
     rules: dict[str, int] = {}
-    changed, left_pages = [], []
+    changed, left_pages, home = [], [], []
     for slug, (path, t, a) in sorted(pages.items()):
         try:
             span = metrics_table(t)
             assert span
+            if home_header(t[span[0]:span[1]]):
+                home.append(f'{slug} ({rl.strip_tags(header_cells(t[span[0]:span[1]])[3][2])})')
             index = header_index(t[span[0]:span[1]])
             assert index
             new, counts, _ = write_column(t, stats_on(index, a, lib, memo))
@@ -813,6 +866,8 @@ def main(argv: list[str] | None = None) -> int | str:
         print('ERRORS:')
         print('\n'.join('  ' + e for e in errs))
     print(f'pages with an S&P 500 / Nasdaq-100 column: {len(pages)}; without one (left alone): {len(skipped)}')
+    if home:
+        print(f'home-index columns given the S&P 500: {len(home)}', ', '.join(home))
     print('cells:', ', '.join(f'{k} {v}' for k, v in sorted(cells.items())))
     print('fine print:', ', '.join(f'{k} {v}' for k, v in sorted(rules.items())))
     print('member flags:', len(lib.flags))

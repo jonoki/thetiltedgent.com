@@ -140,6 +140,65 @@ class Column(unittest.TestCase):
         self.assertEqual(xs.write_column(new, stats)[0], new)
 
 
+NIKKEI_TABLE = ('<table class="fin-table">\n'
+                '    <thead><tr><th>Metric</th><th>7974.T</th><th>Industry Avg</th><th>Nikkei 225</th><th>Context</th></tr></thead>\n'
+                '    <tbody>\n'
+                '      <tr><td>Trailing P/E</td><td>19.15</td><td>22.3</td><td>—</td><td>¥7,849 ÷ ¥409.91.</td></tr>\n'
+                '      <tr><td>Forward P/E</td><td>29.19</td><td>—</td><td>17.37</td><td>Guidance.</td></tr>\n'
+                '      <tr><td>P/B</td><td>3.06</td><td>2.5</td><td>1.90</td><td>.</td></tr>\n'
+                '      <tr><td>1-Year Price Return</td><td>+30.8%</td><td>—</td><td style="color:var(--green);">+52.0%</td><td>.</td></tr>\n'
+                '      <tr><td>Beta (vs Nikkei 225)</td><td>2.37</td><td>—</td><td>1.00</td><td>Against the Nikkei 225.</td></tr>\n'
+                '    </tbody>\n'
+                '  </table>')
+RETURNS_TABLE = ('<table class="fin-table"><tr><th>Period</th><th>7974.T</th><th>Peers</th><th>Nikkei 225</th></tr>'
+                 '<tr><td>1 year</td><td>+30.8%</td><td>—</td><td>+52.0%</td></tr></table>')
+
+
+class HomeIndex(unittest.TestCase):
+    """Non-US reports compare with the S&P 500 too (Oki, 9 Oct 2026)."""
+    stats = {k: stat(None) for k in xs.ROWS} | {'pe': stat(26.0551), 'fpe': stat(20.42), 'beta': stat(1.0)}
+
+    def test_a_nikkei_column_is_rewritten_as_the_sp500(self):
+        t = '<title>7974.T — Nintendo Co., Ltd. | Stock Analysis</title>\n' + NIKKEI_TABLE
+        self.assertTrue(xs.home_header(NIKKEI_TABLE))
+        new, counts, index = xs.write_column(t, self.stats)
+        self.assertEqual(index, 'sp500')
+        self.assertIn('<th>S&amp;P 500</th>', new)
+        self.assertNotIn('Nikkei 225</th>', new)
+        self.assertIn('<td>22.3</td><td>26.06</td>', new)                # the company cell's two decimals
+        self.assertIn('<td>29.19</td><td>—</td><td>20.42</td>', new)
+        self.assertIn('<td>2.5</td><td>—</td>', new)                      # P/B: no aggregate
+        self.assertIn('<td>—</td><td>—</td><td>.</td>', new)              # the home index's return goes
+        self.assertIn('<td>2.37</td><td>—</td><td>—</td>', new)           # a beta against the Nikkei: not 1.00
+        self.assertEqual(counts, {'pe': 1, 'fpe': 1, '—': 3})
+        self.assertFalse(xs.home_header(new[new.index('<table'):]))
+        self.assertEqual(xs.write_column(new, self.stats)[0], new)        # a second run changes nothing
+
+    def test_a_member_page_is_unchanged(self):
+        new, _, _ = xs.write_column(TABLE, self.stats)
+        self.assertFalse(xs.home_header(TABLE))
+        self.assertEqual(xs.write_column(new, self.stats)[0], new)
+        self.assertIn('<td>~1.05</td><td>1.00</td>', new)                 # a member's beta row keeps 1.00
+
+    def test_a_home_index_table_without_metrics_rows_is_not_the_metrics_table(self):
+        self.assertFalse(xs.home_header(RETURNS_TABLE))
+        self.assertIsNone(xs.metrics_table(RETURNS_TABLE))
+
+    def test_beta_on_a_home_listing_needs_an_sp500_basis(self):
+        self.assertTrue(xs.other_basis('Beta', '5-year beta (StockAnalysis).', home_listing=True))
+        self.assertFalse(xs.other_basis('Beta', 'Against SPY, 60 monthly returns.', home_listing=True))
+        self.assertFalse(xs.other_basis('Beta', '5-year, StockAnalysis.', home_listing=False))
+        self.assertTrue(xs.other_basis('Beta', 'Against the SMI, our calculation.', home_listing=False))
+        self.assertTrue(xs.HOME_LISTING.search('<title>ALV.DE — Allianz SE | Stock Analysis</title>'))
+        self.assertIsNone(xs.HOME_LISTING.search('<title>BRK.B — Berkshire Hathaway | Stock Analysis</title>'))
+
+    def test_old_home_column_wording_is_listed_and_the_context_column_is_not(self):
+        t = page('The benchmark column is the <strong>Nikkei 225</strong>, using Nikkei Inc.\'s values. '
+                 'Nikkei 225 returns in the Context column are from Yahoo.', 'Sources: SEC.')
+        _, _, left = xs.rewrite_fine_print(t, 'sp500', 'October 2, 2026')
+        self.assertEqual(left, ["The benchmark column is the Nikkei 225, using Nikkei Inc.'s values."])
+
+
 def page(prose: str, disclaimer: str) -> str:
     return ('<div class="section">\n  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>\n'
             f'  <p class="prose">{prose}</p>\n  {TABLE}\n</div>\n'
