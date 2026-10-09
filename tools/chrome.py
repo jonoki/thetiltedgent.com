@@ -64,12 +64,15 @@ NAV: list[NavLink | NavMenu] = [
 FOOT_LINKS = [('Learn', '/learn/'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
               ('The Morning Line', '/morning-line/'), ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
 CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tables index
+# The footer's last link (Oki, 9 Oct 2026): the feedback form. assets/site.js points it at
+# /feedback/?type=bug&page=<this page> so a bug report starts with the page filled in; without JS it is plain /feedback/.
+FEEDBACK = ('Feedback', '/feedback/')
 
 # The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
 # Bump ASSET_V whenever site.css or site.js changes: Pages caches for ten minutes, and new nav markup with the old
 # stylesheet shows an unstyled menu. write_chrome replaces any older stamp.
-ASSET_V = '20261005'
+ASSET_V = '20261009'
 SITE_CSS = f'<link rel="stylesheet" href="/assets/site.css?v={ASSET_V}">'
 SITE_JS = f'<script src="/assets/site.js?v={ASSET_V}" defer></script>'
 OLD_SITE_CSS = re.compile(r'<link rel="stylesheet" href="/assets/site\.css(?:\?v=[^"]*)?">')
@@ -91,6 +94,7 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/poker.html', 'learn', True),
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
+    ('feedback/index.html', None, True),   # the form is run by feedback/feedback.js (Formspree; FORM_ID at its top)
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "
@@ -137,6 +141,7 @@ def nav(active: str | None) -> str:
 
 def footer(fine: str) -> str:
     links = ' '.join(f'<a href="{href}">{label}</a>' for label, href in FOOT_LINKS)
+    links += f' <a href="{FEEDBACK[1]}" data-feedback>{FEEDBACK[0]}</a>'
     return f'''<footer class="site">
   <div class="wrap foot">
     <div>

@@ -173,6 +173,47 @@ class Chrome(unittest.TestCase):
                 chrome.write_chrome(p, None, False)
 
 
+class Feedback(unittest.TestCase):
+    """The feedback form (Oki, 9 Oct 2026) and its entry points, checked on the repo itself."""
+
+    def test_the_page_is_chrome_and_ships_switched_off_until_its_form_id_is_set(self):
+        self.assertIn(('feedback/index.html', None, True), chrome.PAGES)
+        page = rl.read_text(os.path.join(rd.ROOT, 'feedback', 'index.html'))
+        self.assertIn(chrome.SITE_CSS, page)
+        self.assertIn(chrome.SITE_JS, page)
+        self.assertIn(chrome.footer(chrome.SITE_FINE), page)
+        self.assertRegex(page, r'<link rel="stylesheet" href="/feedback/feedback\.css\?v=\w+">')
+        self.assertRegex(page, r'<script src="/feedback/feedback\.js\?v=\w+" defer></script>')
+        for name in ('type', 'company', 'report', 'source', 'page', 'browser', 'details', 'email', 'subject', '_gotcha'):
+            self.assertIn(f'name="{name}"', page)
+        self.assertIn('<fieldset class="all" id="fb-fields" disabled>', page)   # off without JS, and until FORM_ID is set
+        js = rl.read_text(os.path.join(rd.ROOT, 'feedback', 'feedback.js'))
+        self.assertRegex(js, r"\n  var FORM_ID = '[A-Za-z0-9]*';")
+        self.assertIn("'https://formspree.io/f/' + FORM_ID", js)
+        self.assertIn("headers: {'Accept': 'application/json'}", js)
+
+    def test_every_footer_links_to_the_form_and_site_js_fills_the_page(self):
+        foot = chrome.footer(chrome.SITE_FINE)
+        self.assertIn('<a href="/feedback/" data-feedback>Feedback</a></p>', foot)
+        for path, _, has_footer in chrome.PAGES:
+            if has_footer:
+                self.assertIn(foot.split('<div class="fine">')[0].split('<p class="footlinks">')[1],
+                              rl.read_text(os.path.join(rd.ROOT, path)), path)
+        tables = [f for f in os.listdir(os.path.join(rd.ROOT, 'tables')) if f.endswith('.html')]
+        for f in tables:   # the Tables pages take their footer from the source, via tables/build_tables.py
+            self.assertIn('data-feedback>Feedback</a>', rl.read_text(os.path.join(rd.ROOT, 'tables', f)), f)
+        site_js = rl.read_text(os.path.join(rd.ROOT, 'assets', 'site.js'))
+        self.assertIn("'/feedback/?type=bug&page=' + encodeURIComponent(location.pathname + location.search)", site_js)
+
+    def test_the_viewer_and_the_stocks_tab_link_to_the_form(self):
+        view = rl.read_text(os.path.join(rd.ROOT, 'reports', 'view.html'))
+        self.assertIn('<a class="fix" href="/feedback/?type=error">SPOTTED AN ERROR?</a>', view)
+        self.assertIn("'/feedback/?type=error&r=' + encodeURIComponent(r)", view)
+        index = rl.read_text(os.path.join(rd.ROOT, 'reports', 'index.html'))
+        stocks = index[index.index('id="fam-stocks"'):index.index('class="filters"')]
+        self.assertIn('<a href="/feedback/?type=request">Request a report</a>', stocks)
+
+
 class Chips(unittest.TestCase):
     def test_eight_alternating_edge_spots(self):
         s = build_chips.spots('#aaa', '#bbb')

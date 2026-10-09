@@ -1,6 +1,12 @@
 /* The Tilted Gent — shared site script: the mobile menu and the nav's section panels. Without JS the menu is a
    plain stacked list and the sections still open and close (they are native <details>). */
 (function(){
+  // the footer's Feedback link starts a bug report with this page filled in (tools/chrome.py FEEDBACK)
+  var fb = document.querySelector('footer.site a[data-feedback]');
+  if(fb && location.pathname.indexOf('/feedback/') !== 0)
+    fb.href = '/feedback/?type=bug&page=' + encodeURIComponent(location.pathname + location.search);
+})();
+(function(){
   var nav = document.querySelector('nav.site');
   var btn = nav && nav.querySelector('.navtoggle');
   if(!btn) return;
