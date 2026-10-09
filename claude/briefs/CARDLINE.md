@@ -1,6 +1,6 @@
 # Card-line brief: the "Their hand" line on each report card
 
-Each card on `reports/index.html` carries one line, framed as **Their hand**, that tells a newcomer **what the company does and how it makes money**. The curiosity comes from something surprising about that business model. Approved pilot (Oki, 23 Sep 2026): see `claude/card_lines.json` for nvda, tsla, ko, lmt, jpm, cost, mtd, cboe, o, fisv, pcg, deck.
+Each card on `reports/index.html` carries one line, framed as **Their hand**, that tells a newcomer **what the company does and how it makes money**. The curiosity comes from something surprising about that business model. Approved pilot (Oki, 23 Sep 2026): see `data/card_lines.json` for nvda, tsla, ko, lmt, jpm, cost, mtd, cboe, o, fisv, pcg, deck.
 
 ## The line
 - **What it says:** what the business is and how the money comes in, and the surprising part of that. Examples:

@@ -7,9 +7,9 @@ Per report slug:
   dv   dividend yield % (0 = pays none; missing = unknown), from the manifest
   hq   [short label, full head-office text] from the report's "HQ:" line (tools/headoffice.py)
   ed   [latest edition date, previous edition date, previous price] when the report has been refreshed
-  ln   one-line hook (claude/card_lines.json; empty until written)
+  ln   one-line hook (data/card_lines.json; empty until written)
   sp   [year, sentence] overriding the S&P 500 badge's year and tooltip (SP_NOTE below)
-  hw   ♥ what you know them for, th ♠ big themes, pp ★ key people: [label, tooltip(, since YYYY-MM)] from claude/hand_tags.json
+  hw   ♥ what you know them for, th ♠ big themes, pp ★ key people: [label, tooltip(, since YYYY-MM)] from data/hand_tags.json
   lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
 
@@ -52,7 +52,7 @@ class CardTags(TypedDict, total=False):
 
 
 class HandTags(TypedDict, total=False):
-    """One report's entry in claude/hand_tags.json: [label, tooltip] tags per family, and the New CEO's start month."""
+    """One report's entry in data/hand_tags.json: [label, tooltip] tags per family, and the New CEO's start month."""
     hw: list[list[str]]
     th: list[list[str]]
     pp: list[list[str]]
@@ -149,8 +149,8 @@ def main(argv: list[str] | None = None) -> int | str:
     repo = rd.parser('Write data/card_tags.json, the tags on every report card.').parse_args(argv).repo
     try:
         style: dict[str, rd.TagInputs] = {d['slug']: d for d in load_json(repo, 'data', 'style_tags.json')['reports']}
-        lines: dict[str, str] = load_json(repo, 'claude', 'card_lines.json')
-        hand: dict[str, HandTags] = load_json(repo, 'claude', 'hand_tags.json')   # ♥ ♠ ★ tags (claude/briefs/HANDTAGS.md)
+        lines: dict[str, str] = load_json(repo, 'data', 'card_lines.json')
+        hand: dict[str, HandTags] = load_json(repo, 'data', 'hand_tags.json')   # ♥ ♠ ★ tags (claude/briefs/HANDTAGS.md)
         logos: dict[str, dict[str, str]] = load_json(repo, 'assets', 'logos', 'index.json')   # logo files and sources
         records = rd.load_report_records(repo)
     except FileNotFoundError as e:
