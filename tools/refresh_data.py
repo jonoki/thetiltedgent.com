@@ -31,9 +31,10 @@ the replacements are facts.json fixed_points and their old values are stale hits
 
 Declared spin-offs (chart_audit.SPINOFFS, e.g. CTVA 2026-10-01 x6.665: a spin Yahoo books as a large "split") are
 handled as chart_audit handles them, never as a real split: the existing-points check and --fix-points take a real
-pre-spin close as a basis step and a spin-adjusted one as on Yahoo's daily basis; a spin between the two editions
-does not rescale the page's points, new pre-spin month-ends go on their real-close basis, and facts.json
-chart.spin_crossed plus a warning hand the choice of basis (and its label) to the builder.
+pre-spin close as a basis step and a spin-adjusted one as on Yahoo's daily basis. A spin between the two editions
+puts the chart on the spin-adjusted basis (Oki, 9 Oct 2026, as for CTVA): the page's pre-spin points are divided by
+the factor, new month-ends are Yahoo's daily closes as served, and facts.json chart.spin_crossed and
+required_labels tell the builder to label the chart "spin-adjusted" in plain words (chart_audit fails it unlabelled).
 
 Post-pass (after the builder). Re-reads the page against facts.json: as-of, header price, the script's chart points
 and the 52-week range must still match (exit 1 if not); the last chart point is re-synced to the header; P/E is
@@ -331,10 +332,10 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
     Labels follow the page's own styles: its month labels, and its last label's style for the as-of point.
 
     spin is the report's chart_audit.SPINOFFS entry (date, factor): a spin-off Yahoo books as a large "split". It is
-    never a real split here. When it went ex between the two editions the kept points (the previous edition's, on
-    the real pre-spin closes) are not rescaled, and a new month-end dated before the spin goes on the same basis:
-    Yahoo's spin-adjusted daily close x the factor = the real close (a basis step in chart_audit). The result's
-    spin_crossed says so; rebasing the chart to spin-adjusted (and labelling it) is the builder's call."""
+    never a real split here (split_rescale stays None). When it went ex between the two editions the chart goes on
+    the spin-adjusted basis (Oki, 9 Oct 2026): the kept points, all before the spin and on the real pre-spin closes,
+    are divided by the factor, and the new month-ends are Yahoo's daily closes as served (spin-adjusted before the
+    spin). The result's spin_crossed says so; the page must then say "spin-adjusted" (chart_audit.SPIN_LABEL)."""
     pts = [rp.point_label(lab) for lab in labels]
     bad = [lab for lab, p in zip(labels, pts) if p is None]
     if bad or len(labels) < 2:
@@ -352,13 +353,11 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
         raise ChartError(f'the chart runs past the as-of ({labels[-1]!r})')
     real = [(d, r) for d, r in splits if old_as_of < d <= as_of and not (ca.SPIN_RATIO_LO < r < ca.SPIN_RATIO_HI)
             and (d, r) != spin]
-    crossed = spin if spin and old_as_of < spin[0] <= as_of else None
-
-    def basis(day: Day) -> float:   # factor, times the declared spin's factor for a pre-spin day once it has crossed
-        return factor * (crossed[1] if crossed and day.date < crossed[0] else 1.0)
-    rescale = 1.0
+    crossed = spin if spin and old_as_of < spin[0] <= as_of else None   # the kept points all predate it
+    split_ratio = 1.0
     for _, r in real:
-        rescale *= r
+        split_ratio *= r
+    rescale = split_ratio * (crossed[1] if crossed else 1.0)   # spin-adjusted: real pre-spin closes / the factor
     kept = [round(p / rescale, 2) for p in prices] if rescale != 1.0 else list(prices)
     out_l, out_p = list(labels[:-1]), kept[:-1]
     replaced: list[Json] = []
@@ -370,7 +369,7 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
             raise ChartError(f'no Yahoo close for {y}-{m:02d}')
         lab = rp.format_label(before.style, y, m)
         out_l.append(lab)
-        out_p.append(round(me.close * basis(me), 2))
+        out_p.append(round(me.close * factor, 2))
         replaced.append({'old_label': labels[-1], 'old_value': prices[-1], 'label': lab, 'value': out_p[-1],
                          'date': me.date, 'kind': 'month-end'})
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
@@ -380,7 +379,7 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
                 raise ChartError(f'no Yahoo close for {y}-{m:02d}')
             lab = rp.format_label(before.style, y, m)
             out_l.append(lab)
-            out_p.append(round(me.close * basis(me), 2))
+            out_p.append(round(me.close * factor, 2))
             appended.append({'label': lab, 'value': out_p[-1], 'date': me.date, 'kind': 'month-end'})
             y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     end = on_or_before(days, as_of)
@@ -395,8 +394,8 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
     else:
         appended.append(point)
     return {'labels': out_l, 'prices': out_p, 'replaced': replaced, 'appended': appended,
-            'split_rescale': {'ratio': rescale, 'splits': real} if rescale != 1.0 else None,
-            'spin_crossed': {'date': crossed[0], 'factor': crossed[1]} if crossed else None}
+            'split_rescale': {'ratio': split_ratio, 'splits': real} if split_ratio != 1.0 else None,
+            'spin_crossed': {'date': crossed[0], 'factor': crossed[1], 'basis': 'spin-adjusted'} if crossed else None}
 
 
 def window_drop(n_points: int, window: int) -> int:
@@ -699,13 +698,18 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     if chart['split_rescale']:
         warnings.append(f"split between the editions: existing chart points divided by {chart['split_rescale']['ratio']}"
                         ' — say so on the page')
+    required_labels: list[Json] = []
     if chart['spin_crossed']:
         sc = chart['spin_crossed']
         warnings.append(f"declared spin-off {sc['date']} between the editions (Yahoo books it as a {sc['factor']}:1 "
-                        'split; chart_audit.SPINOFFS): not a split, so the chart keeps the real pre-spin closes (a basis '
-                        f"step). To chart it spin-adjusted, divide every point before {sc['date']} by {sc['factor']} and "
-                        "label the chart 'spin-adjusted' (chart_audit fails an unlabelled one). The 52-week range, "
-                        "returns and dividends here are on Yahoo's spin-adjusted basis")
+                        f"split; chart_audit.SPINOFFS): every chart point before {sc['date']} divided by {sc['factor']} "
+                        "(spin-adjusted, Oki 9 Oct 2026); the 52-week range, returns and dividends are on the same basis. "
+                        'Label the chart (required_labels)')
+        required_labels.append({
+            'what': 'chart', 'label': 'spin-adjusted', 'check': 'chart_audit.SPIN_LABEL (fails the run when missing)',
+            'text': f"Say on the page, near the chart, that it is spin-adjusted, with a plain-words clause: closes "
+                    f"before the {sc['date']} spin-off are divided by {sc['factor']}, the factor Yahoo Finance applied, "
+                    'so old and new prices compare after the value that left with the spun-off company'})
     spins = [(d, r) for d, r in daily.splits if old['as_of'] < d <= as_of and ca.SPIN_RATIO_LO < r < ca.SPIN_RATIO_HI]
     if spins:
         warnings.append(f'Yahoo books a spin-off or capital return as a fractional split {spins}: older chart points '
@@ -853,7 +857,8 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
         'previous_edition': {'as_of': old['as_of'], 'price': old['price'], 'source': 'the page before this run'},
         'page_before': {k: v for k, v in old.items() if k != 'mcap'},
         'fields': f, 'written': written, 'not_written': not_written, 'warnings': warnings, 'new_values': newvals,
-        'fixed_points': fixinfo['fixed'] if fixinfo else [], 'previous_window': prev_window}
+        'fixed_points': fixinfo['fixed'] if fixinfo else [], 'previous_window': prev_window,
+        'required_labels': required_labels}
     return facts, new
 
 

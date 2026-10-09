@@ -322,7 +322,8 @@ class FixPoints(unittest.TestCase):
 
 
 # CTVA-like: a spin-off Yahoo books as a large "split" (chart_audit.SPINOFFS). Yahoo's daily closes before it are
-# spin-adjusted (the real close / 6.665); the previous edition (Aug 28 as-of) charted the real pre-spin closes.
+# spin-adjusted (the real close / 6.665); the previous edition (Aug 28 as-of) charted the real pre-spin closes, which
+# a refresh across the spin puts on the spin-adjusted basis (Oki, 9 Oct 2026).
 SPIN = ('2026-10-01', 6.665)
 SPIN_SPLITS = [SPIN]
 SPIN_DAYS = bars({'2026-07-31': 10.00, '2026-08-28': 9.50, '2026-08-31': 9.60, '2026-09-30': 9.80,
@@ -332,13 +333,13 @@ SPIN_DAYS = bars({'2026-07-31': 10.00, '2026-08-28': 9.50, '2026-08-31': 9.60, '
 class DeclaredSpinOff(unittest.TestCase):
     """A declared spin-off is never a real split: the chart, --fix-points and build() handle it as chart_audit does."""
 
-    def test_the_chart_is_not_rescaled_and_new_pre_spin_month_ends_go_on_the_real_basis(self):
+    def test_across_the_spin_the_chart_goes_spin_adjusted_and_is_not_a_split(self):   # Oki, 9 Oct 2026
         got = rdt.extend_series(["Jul '26", "Aug '26"], [66.65, 63.32], '2026-08-28', '2026-10-02', SPIN_DAYS, 1.0,
                                 SPIN_SPLITS, SPIN)
         self.assertEqual(got['labels'], ["Jul '26", "Aug '26", "Sep '26", "Oct '26"])
-        self.assertEqual(got['prices'], [66.65, 63.98, 65.32, 13.40])   # 9.60 and 9.80 x 6.665; post-spin as is
+        self.assertEqual(got['prices'], [10.0, 9.6, 9.8, 13.4])   # 66.65 / 6.665; Yahoo's daily closes as served
         self.assertIsNone(got['split_rescale'])
-        self.assertEqual(got['spin_crossed'], {'date': '2026-10-01', 'factor': 6.665})
+        self.assertEqual(got['spin_crossed'], {'date': '2026-10-01', 'factor': 6.665, 'basis': 'spin-adjusted'})
 
     def test_undeclared_the_same_ratio_is_a_real_split(self):   # chart_audit's rule for any large ratio
         got = rdt.extend_series(["Jul '26", "Aug '26"], [66.65, 63.32], '2026-08-28', '2026-10-02', SPIN_DAYS, 1.0,
@@ -381,7 +382,7 @@ class DeclaredSpinOff(unittest.TestCase):
         self.assertEqual(self.fix([66.65, 63.98, 65.32], as_of='2026-09-30')['skipped'],
                          {'split after the as-of': ['Jul 26', 'Aug 26'], 'the as-of month': ['Sep 26']})
 
-    def test_build_warns_and_checks_on_the_daily_feed(self):
+    def test_build_rebases_requires_the_label_and_checks_on_the_daily_feed(self):
         daily = rdt.parse_daily(load('yahoo_daily_ccl.json'), 'https://yahoo/ccl', 'now')._replace(
             splits=[('2026-09-15', 6.665)])
         monthly = ({(2026, 6): (26.51 / 6.665, None), (2026, 7): (27.81 / 6.665, None)}, daily.splits)
@@ -389,13 +390,21 @@ class DeclaredSpinOff(unittest.TestCase):
             facts, new = rdt.build('ccl', PAGE, daily, '2026-10-01', {'SPY': 'skipped', 'QQQ': 'skipped'},
                                    'offline', 'offline', monthly)
         chart = facts['fields']['chart']
-        self.assertEqual(rl.chart_series(new)[1], [26.51, 27.81, round(23.89 * 6.665, 2), 24.54, 25.07])
+        self.assertEqual(rl.chart_series(new)[1],
+                         [round(26.51 / 6.665, 2), round(27.81 / 6.665, 2), 23.89, 24.54, 25.07])
         self.assertIsNone(chart['split_rescale'])
-        self.assertEqual(chart['spin_crossed'], {'date': '2026-09-15', 'factor': 6.665})
+        self.assertEqual(chart['spin_crossed'], {'date': '2026-09-15', 'factor': 6.665, 'basis': 'spin-adjusted'})
         check = chart['existing_points_check']
-        self.assertEqual((check['wrong'], check['basis_steps']), ([], 2))   # real pre-spin closes: basis steps
+        self.assertEqual((check['wrong'], check['basis_steps'], check['spin_adjusted_points']), ([], 0, 2))
         self.assertIn('interval=1d', check['source'])
         self.assertTrue(any(w.startswith('declared spin-off 2026-09-15') for w in facts['warnings']))
+        [req] = facts['required_labels']
+        self.assertEqual((req['what'], req['label']), ('chart', 'spin-adjusted'))
+        self.assertTrue(rdt.ca.SPIN_LABEL.search(req['label']))   # the label chart_audit looks for
+        self.assertIn('divided by 6.665', req['text'])
+
+    def test_no_required_label_without_a_crossed_spin(self):
+        self.assertEqual(built()[0]['required_labels'], [])
 
 
 PAGE_W = (PAGE.replace("const prices = [26.51,27.81,24.76];\n",
