@@ -75,6 +75,20 @@ class Ranking(unittest.TestCase):
         self.assertEqual(ir.ranks_on('big', '2026-09-21', members, series), {'sp500': 2, 'ndx': 2})
         self.assertEqual(ir.ranks_on('mid', '2026-09-21', members, series), {'sp500': 3})
 
+    def test_member_not_yet_listed_is_left_out_only_before_its_join_date(self):
+        # a spin-off that joined the S&P 500 on its first trading day (Oct 1) has no close in September
+        spin = member('spin', 500.0, 50.0, as_of='2026-10-08')._replace(sp500_added='2026-10-01')
+        old = member('old', 200.0, 20.0)
+        series = {'spin': daily(('2026-10-01', 50.0)), 'old': daily(('2026-09-21', 20.0))}
+        self.assertEqual(ir.index_caps('sp500', '2026-09-21', {'spin': spin, 'old': old}, series), {'old': 200.0})
+        self.assertEqual(ir.ranks_on('old', '2026-09-21', {'spin': spin, 'old': old}, series), {'sp500': 1})
+        self.assertEqual(ir.ranks_on('old', '2026-10-01', {'spin': spin, 'old': old}, series), {'sp500': 2})
+        # a member that joined before the date and has no close then is still an error, never left out quietly
+        with self.assertRaises(ir.RankError):
+            ir.index_caps('sp500', '2026-09-21', {'spin': spin._replace(sp500_added='2026-09-01'), 'old': old}, series)
+        with self.assertRaises(ir.RankError):
+            ir.index_caps('sp500', '2026-09-21', {'spin': spin._replace(sp500_added=None), 'old': old}, series)
+
     def test_dual_class_company_ranks_once_at_its_whole_market_cap(self):
         # one card per company: Alphabet's report states A+B+C together; its shares are counted in GOOGL units
         goog = member('googl', 4.33e12, 354.30)
