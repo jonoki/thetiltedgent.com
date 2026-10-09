@@ -65,6 +65,8 @@ SERIES: dict[str, Series] = {
                         'upper limit of the FOMC federal funds target range, %, Federal Reserve'),
     'bocrate': Series('valet', 'V39079', 'daily', 'level', 2, 'target for the overnight rate, %, Bank of Canada'),
     'prime': Series('fred', 'DPRIME', 'daily', 'level', 2, 'bank prime loan rate, %, Federal Reserve H.15'),
+    'hqm10y': Series('fred', 'HQMCB10YR', 'monthly', 'level', 2,
+                     'HQM corporate bond 10-year spot rate, %, monthly average, U.S. Treasury'),
     'cpi': Series('fred', 'CPIAUCNS', 'monthly', 'yoy', 1,
                   'CPI-U all items, 12-month % change, not seasonally adjusted, BLS (CUUR0000SA0)'),
     'corepce': Series('fred', 'PCEPILFE', 'monthly', 'yoy', 1,
