@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TWLO — Twilio Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #22D3EE;
+  --accent-dim: #22D3EE33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 8, 2026 (Thursday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">TWLO</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Technology / Software - Infrastructure</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $42.35B</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.5px;">Mkt Cap Ranking:</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);padding:3px 10px;border-radius:4px;">S&amp;P 500: #258</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);background:var(--green-dim);border:1px solid #22c55e44;padding:3px 10px;border-radius:4px;">S&amp;P 500: ADDED — effective before the open, October 6, 2026 (replaced Warner Bros. Discovery)</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Twilio Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$275.77</div>
+      <div class="price-change" style="color:var(--green);">+$2.77 (+1.01%)</div>
+      <div class="price-date">Close, Thursday October 8, 2026 · last completed settled market close</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 101 Spear Street, San Francisco, California</div>
+    <div class="meta-item"><span>Employees:</span> 5,492 (Jun 30, 2026)</div>
+    <div class="meta-item"><span>Founded:</span> 2008 (IPO Jun 23, 2016)</div>
+    <div class="meta-item"><span>Next Earnings:</span> October 29, 2026 (Q3 2026)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Twilio is the plumbing behind the texts, phone calls, emails and log-in codes that companies send their customers. A developer plugs Twilio's <span class="tip" title="Application Programming Interface — a ready-made software hook that lets one program use another's service with a few lines of code.">APIs</span> into an app, and Twilio carries the message across phone networks and inboxes worldwide; on top of that sits Segment, a customer-data platform that tells the business who it is talking to. It counted <strong>more than 402,000 active customer accounts</strong> at the end of 2025. FY2025 revenue was <strong>$5.07B, up 13.7%</strong>, with GAAP <span class="tip" title="Earnings Per Share — net income divided by diluted shares outstanding.">EPS</span> of <strong>$0.21</strong>: a profit after losses in each of 2021–2024. Trailing-twelve-month revenue to June 2026 is <strong>$5.57B</strong>. On <strong>October 6, 2026</strong> Twilio moved up from the S&amp;P MidCap 400 into the <strong>S&amp;P 500</strong>, replacing Warner Bros. Discovery, which Paramount Skydance is acquiring.</p>
+  <p class="prose" style="margin-top:16px;">The five-year chart is a round trip with a hole in the middle. The stock closed October 2021 at <strong>$291.36</strong>, fell <strong>83%</strong> to a <strong>$48.96</strong> month-end in December 2022, while revenue growth slowed from 61% in 2021 to 35% in 2022 and 9% in 2023 and annual losses ran near $1B, then spent nearly two years between $51 and $76. Since late 2024 it has climbed back to <strong>$275.77</strong>, 5.6 times the low and still 5.4% below where the window starts. What changed is the shape of the business: growth that had slowed to single digits is accelerating again (organic revenue up <strong>16%</strong> in Q1 2026 and <strong>17%</strong> in Q2), and a company that lost money for years now generates over $1B of <span class="tip" title="Free cash flow — cash from operations minus capital spending: the cash left over for buybacks, debt repayment or acquisitions.">free cash flow</span> a year. The new driver is voice: AI agents that answer and make phone calls need phone lines, and management says most of the voice-AI start-ups are choosing Twilio to provide them. The central question is whether that AI-driven usage is a lasting second engine of growth, or whether a price of <strong>46.5 times</strong> this year's expected earnings has already paid for it, with reported growth flattered by roughly $250M of carrier fees that Twilio collects and passes on.</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Khozema Shipchandler</div>
+      <div class="card-note">CEO since January 8, 2024, when he succeeded co-founder Jeff Lawson, who stepped down as CEO and from the board (8-K, Jan 8, 2024). Previously President of Twilio Communications. In the Q2 2026 release (Aug 6, 2026) he called this "a powerful new chapter at Twilio, marked by another quarter of organic growth acceleration as well as record profitability and free cash flow."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">Aidan Viggiano</div>
+      <div class="card-note">CFO, who gave the numbers on the Q2 2026 call (Aug 6, 2026): a 116% dollar-based net expansion rate, a 19% non-GAAP operating margin (up 100 basis points) and record quarterly free cash flow of $353M, alongside a full-year guidance raise to 13–13.5% organic growth.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Key Institutional Investors</div>
+      <div class="card-value" style="font-size:20px;">84–91% institutional</div>
+      <div class="card-note">91.11% per stockanalysis, 84.27% per MarketBeat. Largest holders by value per MarketBeat: <strong>Vanguard Group</strong>, <strong>State Street</strong>, <strong>Invesco</strong>, <strong>FMR (Fidelity)</strong>, <strong>Royal Bank of Canada</strong> and <strong>Geode Capital</strong>. Insiders own 0.31% (stockanalysis). S&amp;P 500 entry adds index funds that track the large-cap benchmark to the register.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Twilio reports as <strong>a single operating segment</strong> and does not publish revenue by product, so the bar below is the one split the 10-Q gives: <strong>geography, Q2 2026 (quarter ended June 30, 2026)</strong>. The two regions sum to $1,499.1M, the reported total. The 10-K describes five product lines, shown as cards beneath; the growth rates on them are the ones management gave on the Q2 call. Messaging, Voice and identity are billed by usage (per message, per minute, per check); Email and Segment are mainly subscriptions.</p>
+  <div class="seg-bar">
+    <div style="flex:64.1;background:#22D3EE;">UNITED STATES 64.1%</div>
+    <div style="flex:35.9;background:#22c55e;">INTERNATIONAL 35.9%</div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> United States — $961.4M (Q2'26), +22.2% <span class="tip" title="Year over year — versus the same quarter one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> International — $537.7M, +21.8% YoY</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Both regions grew at the same pace and the mix was unchanged from a year earlier (64% / 36%). Of the quarter's $1,499.1M, <strong>$71.1M</strong> was revenue from increases in fees that major US carriers charge on business text messages; Twilio excludes it, and $1.7M from an acquired business, when it reports organic growth.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #22D3EE;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Messaging</div>
+        <span class="biz-badge dominant">USAGE-PRICED</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">$71.1M</div><div class="biz-stat-label">Q2 Carrier-Fee Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">SMS, MMS, RCS and over-the-top (chat-app) messaging sent through one API: delivery notices, appointment reminders, two-way customer chat. It is the line most tied to the phone carriers, whose fees on business-to-consumer texts ("A2P", application-to-person) Twilio pays and passes on. When US carriers raise those fees, Twilio's reported revenue rises with little change in the work it does, which is why management strips the increases out of organic growth. The CFO said full-year 2026 guidance assumes about <strong>$250M</strong> of incremental pass-through revenue from US carrier fees, and the Q3 guide assumes $56M.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Bandwidth</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.67B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Sinch</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #22c55e;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Voice (incl. Voice AI)</div>
+        <span class="biz-badge growth">GROWTH &gt;20%</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">&gt;20%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">APIs to make, receive and manage phone calls, now including the connections that let AI agents talk to callers. The CFO said voice growth accelerated to above 20% year over year in Q2. On the call the CEO described heavy activity in voice from both large companies and voice-AI start-ups: "Just a lot of traction, and we're obviously fortunate that most of these companies are choosing Twilio as their voice infrastructure." The conversations layer Twilio describes (Conversation Memory, Orchestrator, Intelligence, Relay and Agent Connect) is aimed at that market: the phone line, plus the context an AI agent needs about the person on the other end.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">RingCentral</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$6.54B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Bandwidth</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$1.67B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #f59e0b;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Email (SendGrid)</div>
+        <span class="biz-badge dominant">SUBSCRIPTION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">An API and a no-code tool for sending email at scale (receipts, password resets, newsletters), plus Marketing Campaigns for bulk email. The 10-K says Email revenue is recognised mainly on a subscription basis, so it is steadier than the usage lines and does not swing with message volumes. No growth rate for email was given on the Q2 call.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Salesforce</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$187.48B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Adobe</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$93.82B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">User Authentication &amp; Identity</div>
+        <span class="biz-badge emerging">STYTCH CLOSED NOV 14, 2025</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Verify confirms that a user is who they claim to be across several channels (the one-time codes sent at log-in); Lookup is an API for identity intelligence on phone numbers. Revenue is recognised mainly on a usage basis. Twilio's 10-K records the acquisition of Stytch, closed on November 14, 2025. The line matters more in a world of AI agents acting on a customer's behalf: someone has to confirm the agent is allowed to.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Okta</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$38.50B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Segment (customer data platform)</div>
+        <span class="biz-badge dominant">SUBSCRIPTION</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Q2'26 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--text-dim);">n/d</div><div class="biz-stat-label">Revenue Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Segment gathers a company's scattered data about each customer (website visits, purchases, support calls) into one live profile that other tools, and now AI agents, can use. It is sold as a subscription. Twilio does not report Segment's revenue separately. Its rivals are the big customer-relationship and marketing suites as well as stand-alone data-platform vendors, two of the competitor groups the 10-K names.</p>
+    <div class="comp-bubbles">
+      <div class="comp-bubble"><div class="comp-bubble-name">Salesforce</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$187.48B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+      <div class="comp-bubble"><div class="comp-bubble-name">Adobe</div><div class="comp-bubble-stats"><div><div class="comp-bubble-val">$93.82B</div><div class="comp-bubble-label">Mkt Cap</div></div><div><div class="comp-bubble-val">n/v</div><div class="comp-bubble-label">Share</div></div></div></div>
+    </div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating metrics that matter</h3>
+  <p class="prose">For a usage-priced platform, the test is whether existing customers keep sending more through it, and whether the extra revenue reaches cash.</p>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Dollar-Based Net Expansion</div>
+      <div class="card-value" style="color:var(--green);">116%</div>
+      <div class="card-note">Q2 2026, up from 108% a year earlier and 114% in Q1 2026. Customers who were on the platform a year ago spent 16% more this quarter than they did then: growth from the existing base before any new customer is counted.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Organic Revenue Growth</div>
+      <div class="card-value">17%</div>
+      <div class="card-note">Q2 2026, against Twilio's own guidance of 10–11% and up from 16% in Q1. Reported growth was 22%; the gap is carrier-fee increases and acquired revenue. The CFO cited ISV (software makers building on Twilio) growth of 25%+, self-serve growth of 30%+ and software add-on growth of 25%+.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Non-GAAP Operating Margin</div>
+      <div class="card-value">19%</div>
+      <div class="card-note">Q2 2026, up 100 basis points. The GAAP operating margin was <strong>5.6%</strong> ($84.5M on $1,499.1M): the gap is mostly <span class="tip" title="Stock-based compensation — employee pay in shares rather than cash. A real cost to shareholders through dilution, excluded from non-GAAP profit.">stock-based compensation</span> of $141.9M (9.5% of revenue) and a $32.8M impairment of prepaid assets.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Free Cash Flow (Q2)</div>
+      <div class="card-value" style="color:var(--green);">$352.6M</div>
+      <div class="card-note">A quarterly record, up from $263.5M a year earlier: 23.5% of revenue. Full-year 2026 guidance was raised to <strong>$1.135–1.155B</strong> from $1.08–1.10B.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">402,000+ customer accounts</span>
+    <span class="moat-pill">Developer-first adoption</span>
+    <span class="moat-pill">Carrier connections at scale</span>
+    <span class="moat-pill">Usage expansion (DBNE 116%)</span>
+    <span class="moat-pill">Voice-AI infrastructure share</span>
+    <span class="moat-pill">Customer data (Segment)</span>
+    <span class="moat-pill">Net cash $1.59B</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">The moat is <strong>being the default</strong>. A developer who needs to send a text or place a call from code usually starts with Twilio, builds it into the product, and stays as volumes grow, which is what a 116% net expansion rate measures. Behind the API sit the connections to carriers worldwide, the number registrations and the compliance work that a start-up does not want to rebuild. The weakness is that the core service, moving a message from A to B, is hard to tell apart from a rival's, and the carriers set a large share of the cost. Twilio's answer is to sell the layers above the pipe: identity checks, customer data and the memory and orchestration tools an AI agent needs. Software add-on revenue growing 25%+ in Q2 (CFO) says that is working; the company does not say how large it is.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Reported growth includes fees Twilio passes through.</strong> Q2's 22% reported growth contained $71.1M of revenue from US carrier fee increases; full-year guidance assumes about $250M. That money goes out to the carriers again, so it adds revenue without adding much profit, and it stops flattering the growth rate once the fee increases are a year old. The organic figure (17% in Q2, 11–12% guided for Q3) is the one to watch.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">The price assumes the acceleration lasts.</strong> At $275.77 the stock trades at 46.5 times consensus FY2026 earnings and about 7.3 times trailing sales, and it has moved more than 20% in a single session after each of the last two reports (+23.8% on May 1 and +24.9% on August 7, 2026). The Q3 guide implies organic growth slowing from 17% to 11–12%. Twilio has beaten its own guide by a wide margin twice this year; a quarter where it only meets it would test the multiple.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">GAAP profit is thin under the non-GAAP margin.</strong> Q2's GAAP operating margin was 5.6% against 19% non-GAAP. Stock-based compensation ran at $141.9M in the quarter, and the headline GAAP net income of $1.07B is almost entirely a $991.7M tax benefit, most of it the release of a valuation allowance (an accounting reserve against old losses, written back once the company expects to keep earning profits).</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Competition on every side.</strong> The 10-K lists other communications-platform companies, regional network operators, customer-relationship and customer-experience vendors, and stand-alone customer-data-platform vendors as competitors. The fastest-growing customers, voice-AI start-ups, are also the easiest to lose: they can route calls through another provider if price or quality slips.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, which TWLO joined on October 6, 2026; it is listed on the NYSE and is not a Nasdaq-100 constituent. Figures are trailing twelve months to June 30, 2026 from stockanalysis.com unless marked otherwise; quarter figures are from Twilio's Q2 2026 release and 10-Q.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>TWLO</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>38.1</td><td>—</td><td>26.2</td><td>$275.77 ÷ $7.23 TTM EPS = 38.14. Flattered by a one-off tax gain: without Q2's tax benefit the trailing figure would be far higher.</td></tr>
+      <tr><td><span class="tip" title="Forward P/E: share price divided by the consensus estimate of this year's earnings per share.">Forward P/E</span></td><td>46.5</td><td>—</td><td>20.6</td><td>$275.77 ÷ consensus FY2026 EPS of $5.93 (stockanalysis; adjusted basis, so it excludes the tax gain). Higher than the trailing P/E because the trailing figure includes it.</td></tr>
+      <tr><td><span class="tip" title="Enterprise value to sales: market value plus debt minus cash, divided by revenue. Useful when earnings are distorted.">EV / Sales</span></td><td>7.3x</td><td>—</td><td>—</td><td>EV $40.76B ($42.35B market cap + $1.07B debt − $2.66B cash and short-term investments) ÷ $5.57B TTM revenue. Our calculation at the Oct 8 close.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of profit per share.">EPS (TTM)</span></td><td>$7.23</td><td>—</td><td>—</td><td>GAAP, diluted. Twelve-month figure from stockanalysis.com. Quarter by quarter: Q3'25 $0.23, Q4'25 −$0.31, Q1'26 $0.57, Q2'26 <strong>$6.68</strong>, which sum to $7.17; quarterly per-share figures don't add exactly because the share count changes from quarter to quarter. Q2 non-GAAP EPS was $1.47.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+17.8%</td><td>—</td><td>+12.1%</td><td>TTM. Q2 2026: <strong>+22% reported, +17% organic</strong>. FY2026 guidance: 18–18.5% reported, 13–13.5% organic.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of delivering the service (carrier fees, hosting), as a percentage of revenue.">Gross Margin</span></td><td>48.6%</td><td>—</td><td>37.4%</td><td>TTM. Q2 2026 GAAP 48.4% ($725.9M on $1,499.1M). Low for software because carrier fees sit in the cost of every message and call.</td></tr>
+      <tr><td><span class="tip" title="Operating margin: profit from operations before interest and tax, as a percentage of revenue.">Operating Margin (Q2)</span></td><td>5.6%</td><td>—</td><td>—</td><td>GAAP $84.5M. Non-GAAP $285M, 19%, against guidance of $250–260M.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>20.6%</td><td>—</td><td>14.1%</td><td>TTM, inflated by the Q2 tax benefit of $991.7M. Pre-tax margin was 3.1%.</td></tr>
+      <tr><td><span class="tip" title="Free Cash Flow: cash from operations minus capital expenditure — the cash actually available for buybacks and debt repayment.">Free Cash Flow</span></td><td>$1.05B</td><td>—</td><td>—</td><td>TTM, an 18.8% FCF margin; 2.5% FCF yield on the $42.35B market cap. FY2026 guidance $1.135–1.155B.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>0.00%</td><td>—</td><td>1.07%</td><td>No dividend. Cash goes to buybacks: $2.0B authorised through December 31, 2027, about $1.2B used, $826.0M left at June 30, 2026.</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float — the proportion of shares sold short by investors betting the price falls.">Short Interest (% float)</span></td><td>3.5%</td><td>—</td><td>—</td><td>5,406,382 shares short at the Sep 15, 2026 settlement (MarketBeat), up 20.4% from Aug 31; ÷ 152.93M float (stockanalysis). About 3.5 days to cover.</td></tr>
+      <tr><td><span class="tip" title="Debt-to-Equity: total borrowings divided by shareholders' equity. Lower means less financial leverage.">Debt-to-Equity</span></td><td>0.12</td><td>—</td><td>0.78</td><td>$1.07B total debt, mainly two $500M senior notes (3.625% due 2029, 3.875% due 2031), against $8.98B of equity. Cash and short-term investments of $2.66B leave <strong>net cash of $1.59B</strong>.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities. Above 1.0 means short-term assets cover short-term obligations.">Current Ratio</span></td><td>4.62</td><td>—</td><td>—</td><td>$3.75B of current assets against $0.81B of current liabilities at June 30, 2026.</td></tr>
+      <tr><td><span class="tip" title="Return on Equity: net income divided by shareholders' equity — how much profit the company generates per dollar of owner capital.">ROE</span></td><td>13.5%</td><td>—</td><td>22.0%</td><td>TTM, lifted by the tax gain. ROIC, which uses operating profit, is <strong>4.9%</strong>: the better gauge of what the business earns on its capital today.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market. Above 1.0 means historically more volatile than the index.">Beta</span></td><td>1.36</td><td>—</td><td>1.00</td><td>Five-year beta (stockanalysis). Single-day gains of 19.5%, 23.8% and 24.9% after the Q3 2025, Q1 2026 and Q2 2026 reports make it look tame.</td></tr>
+      <tr><td>52-Week Range</td><td>$104.50 – $308.40</td><td>—</td><td>—</td><td>Intraday low Oct 17, 2025; intraday high Oct 6, 2026, its first day in the S&amp;P 500. The $275.77 close is 10.6% below the high and 2.6 times the low.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">Two items distort the 2026 figures. First, the <strong>tax benefit</strong>: Q2 carried an income-tax benefit of <strong>$991.7M</strong>, and the 10-Q shows a $944.1M release of the valuation allowance in the first half. The company now expects to earn enough taxable profit to use its past losses, so it put them back on the balance sheet as an asset. That turned $75.5M of pre-tax income into $1.07B of net income and GAAP EPS of $6.68, and it is why the trailing P/E (38.1) sits below the forward P/E (46.5). Second, <strong>carrier fees</strong>: $71.1M of Q2 revenue came from increases in US carrier fees that Twilio passes through; the organic growth rate (17%) excludes them, the reported rate (22%) does not. Smaller items: a $32.8M impairment loss on prepaid assets in Q2's operating expenses, and $66.0M of buybacks (0.5M shares) in the quarter.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Consensus Rating</div><div class="card-value" style="color:var(--green);">Buy</div><div class="card-note">30 analysts on stockanalysis.com (read Oct 9, 2026; latest action Oct 8). MarketBeat's 28-analyst panel reads <strong>Moderate Buy</strong> with an average target of $258.65.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$265.71</div><div class="card-note"><span style="color:var(--red);">−3.6%</span> from $275.77. Median $270 (−2.1%). The stock has run past the average target: the Street is bullish on the business and split on the price.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$165 – $335</div><div class="card-note">−40.2% to +21.5%. The top of the range is J.P. Morgan's $335, set on Oct 8.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">25 / 3 / 2</div><div class="card-note">19 Strong Buy + 6 Buy, 3 Hold, 1 Sell + 1 Strong Sell (stockanalysis, October 2026).</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:83.3;background:#22c55e;"></div>
+    <div style="flex:10.0;background:#f59e0b;"></div>
+    <div style="flex:6.7;background:#ef4444;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Strong Buy — 25 (83.3%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Hold — 3 (10.0%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell / Strong Sell — 2 (6.7%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">J.P. Morgan</strong> · Overweight · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260 → $335</span> (Oct 8, 2026). The highest target on the board, raised two days after the stock joined the S&amp;P 500; +21.5% from the close.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">TD Cowen — Derrick Wood</strong> · Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$260 → $300</span> (Sep 22, 2026). Same day, <strong>Rosenblatt — Catharine Trebnick</strong>, Buy, <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$275 → $290</span>; and on Sep 24 <strong>Stifel</strong>, Buy, <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$275 → $300</span>.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--red);">●</span><div><strong style="color:#fff;">HSBC</strong> · Downgrade, Hold → Reduce · PT <span style="color:var(--red);font-family:'JetBrains Mono',monospace;">$211</span> (Sep 24, 2026, per MarketBeat; stockanalysis files it as a Sell). The target sits 23.5% below the close. The stock closed up 3.08% that day and fell 7.96% the next.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">Bernstein — Mark Shmulik</strong> · Hold · PT <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$199</span> (Sep 15, 2026), and <strong>Northland — Michael Latimore</strong> · Hold · <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$230</span> (Aug 10). After the Q2 print <strong>Mizuho — Siti Panigrahi</strong> raised to <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$240 → $270</span> (Aug 12) and <strong>BTIG — Nick Altmann</strong> reiterated Buy, $285 (Sep 11, MarketBeat).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Oct 29, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q3 2026 Earnings</div>
+        <div class="tl-desc">Date announced on October 8. The guide is revenue of <strong>$1.505–1.515B</strong> (16–16.5% reported, 11–12% organic), non-GAAP operating income of $285–295M and non-GAAP EPS of $1.42–1.47. Q2's guide was 10–11% organic and Twilio printed 17%; the market will be measuring the size of the beat, and whether net expansion holds at 116%.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Ongoing</div>
+      <div class="tl-content">
+        <div class="tl-title">Buyback — $826.0M remaining</div>
+        <div class="tl-desc">The $2.0B program runs to December 31, 2027; about $1.2B has been used. Q2 buying was modest at $66.0M, and the authorisation left is about 2% of the market cap at the current price.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Joined the S&amp;P 500 — reaction already happened</div>
+        <div class="tl-desc">S&amp;P Dow Jones Indices announced on October 1 that Twilio would move from the S&amp;P MidCap 400 to the S&amp;P 500 before the open on October 6, replacing Warner Bros. Discovery. Index funds buy at the close before the change: on October 5 the stock rose 2.15% to $300.91 on 31.4M shares, more than eight times the prior session's 3.7M. It then fell 6.81% on its first day as a member, 2.64% the next, and rose 1.01% on October 8, ending 8.4% below the October 5 close.</div>
+        <div class="tl-impact down">Oct 5 → Oct 8: −8.4%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 21–25, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">A four-session run, then a reversal</div>
+        <div class="tl-desc">From the September 18 close of $243.84 the stock rose four sessions in a row (+9.11%, +6.94%, +2.17%, +3.08%) to $299.66 on September 24, a 22.9% gain, with no 8-K filed by Twilio in those days. TD Cowen, Rosenblatt and Stifel raised targets during the run; HSBC downgraded on September 24, and the stock fell 7.96% on September 25.</div>
+        <div class="tl-impact up">Sep 18 → Sep 24: +22.9%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Aug 6, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q2 2026 results — beat and raise</div>
+        <div class="tl-desc">Revenue <strong>$1.50B</strong> (+22% reported, +17% organic) against a guide of $1.420–1.430B; non-GAAP EPS <strong>$1.47</strong> against $1.27–1.32; record free cash flow of $352.6M; dollar-based net expansion 116%. Full-year organic growth guidance went to 13–13.5% from 9.5–10.5%. The results came after the close; the next session, August 7, the stock rose <strong>24.89%</strong> to $241.28.</div>
+        <div class="tl-impact up">Reaction already happened: +24.9% on Aug 7</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Apr 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Q1 2026 results</div>
+        <div class="tl-desc">Revenue $1.41B (+20% reported, +16% organic), which the CEO called the highest revenue and gross-profit growth rates in more than three years, with full-year guidance raised. Released after the close; the stock rose 23.83% on May 1.</div>
+        <div class="tl-impact up">Reaction already happened: +23.8% on May 1</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> 5-Year Stock Price Analysis</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">TWLO — Monthly Closes, Oct 2021 → Oct 8, 2026</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 8, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">61 points · 60 real month-end closes + Oct 8, 2026 settled close · dashed lines are 1/3/10-month moving averages · dots mark annotated events (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#22D3EE;"></span> Price</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> 1-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> 3-Month MA</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> 10-Month MA</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">RELATIVE STRENGTH INDEX (RSI) — 6-PERIOD, MONTHLY</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 8, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">RSI measures how one-sided recent price moves have been on a 0–100 scale. Readings above 70 mean the stock has risen hard and fast relative to its own recent history ("overbought"); below 30 means it has fallen hard and fast ("oversold"). It is a measure of momentum, not of value — a cheap stock can stay oversold for a long time.</div>
+    <div style="position:relative;width:100%;height:150px;"><canvas id="rsiChart"></canvas></div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">From the October 2021 month-end close of <strong>$291.36</strong> to the October 8, 2026 settled close of <strong>$275.77</strong>, TWLO is <strong>down 5.4%</strong> on price; Twilio pays no dividend, so that is also the total return. The S&amp;P 500 rose <strong>68.6%</strong> over the same window (Yahoo Finance index closes, 4,605.38 to 7,765.36). The endpoints hide the path. The stock lost 83% by December 2022, closed every month from January 2023 to September 2024 between $51.26 and $75.87, and then more than doubled in four months, from $65.22 in September 2024 to $146.58 in January 2025. After a 2025 round trip it began 2026 at $142.24 and ended September at <strong>$292.46</strong>, the highest month-end in the window. Over the past year the stock is up <strong>141.8%</strong> (from $114.05 on October 8, 2025) against 15.0% for the S&amp;P 500; year to date it is up 93.9% against 13.4%.</p>
+  <p class="prose" style="margin-top:14px;">The 6-period monthly RSI reads <strong>79.2</strong>, down from <strong>89.3</strong> at the September close, which was the second-highest reading in the five years. The highest, <strong>93.3</strong> in January 2025, was followed by two straight months of 18% declines. The 10-month moving average, about <strong>$191</strong>, sits 31% below the price. Momentum is stretched, and the long-term average is far below the price.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Dec 2022</div><div class="tl-content"><div class="tl-title">The bottom — $48.96 month-end close</div><div class="tl-desc">Down 83% from the October 2021 close of $291.36. Monthly RSI stayed below 10 from April to December 2022. FY2022 ended with a net loss of $1.26B on $3.83B of revenue.</div><div class="tl-impact down">5-yr low close</div></div></div>
+    <div class="tl-item"><div class="tl-date">Jan 2024</div><div class="tl-content"><div class="tl-title">CEO change — $70.33</div><div class="tl-desc">On January 8, 2024 Khozema Shipchandler replaced co-founder Jeff Lawson as CEO. The stock kept drifting for most of the year, closing June 2024 at $56.81.</div><div class="tl-impact neutral">Leadership change</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2024 – Jan 2025</div><div class="tl-content"><div class="tl-title">The re-rating — $65.22 to $146.58</div><div class="tl-desc">Four straight monthly gains (+23.7%, +29.6%, +3.4%, +35.6%) took the stock up 125%. January 2025 included the company's Investor Day on January 23. FY2024 net loss had narrowed to $109M.</div><div class="tl-impact up">+124.7% in four months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Feb – Mar 2025</div><div class="tl-content"><div class="tl-title">Give-back — $97.91</div><div class="tl-desc">Two months of −18.2% and −18.4% erased a third of the value from the January peak. The stock would not close a month above $146.58 again until April 2026.</div><div class="tl-impact down">−33.2% in two months</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2025</div><div class="tl-content"><div class="tl-title">Q3 2025 results — $134.88 (+34.8% month)</div><div class="tl-desc">The stock rose 19.51% on October 31, the day after the October 30 report. FY2025 ended with GAAP net income of $33.8M, after losses in each of 2021–2024.</div><div class="tl-impact up">+34.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">May 2026</div><div class="tl-content"><div class="tl-title">Q1 2026 beat — $190.64 (+28.8% month)</div><div class="tl-desc">Organic growth of 16% and a guidance raise; the stock jumped 23.83% on May 1, the session after the April 30 report.</div><div class="tl-impact up">+28.8% month</div></div></div>
+    <div class="tl-item"><div class="tl-date">Aug – Sep 2026</div><div class="tl-content"><div class="tl-title">Q2 beat, then the run into the index — $292.46</div><div class="tl-desc">+19.4% in August on the Q2 print (+24.89% on August 7), +24.1% in September, ending at the highest month-end close in the five-year window.</div><div class="tl-impact up">5-yr high month-end</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 8, 2026</div><div class="tl-content"><div class="tl-title">Settled close — $275.77</div><div class="tl-desc">Three sessions into S&amp;P 500 membership: down 5.7% from the September close and 8.4% from the October 5 index-inclusion close.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">TWLO is <strong>down 5.4% over five years</strong> against an S&amp;P 500 up 68.6%, and <strong>up 141.8% over one year</strong> against 15.0%. At $42.35B, Twilio is worth under a quarter of Salesforce ($187.48B) and more than six times RingCentral ($6.54B) or twenty-five times Bandwidth ($1.67B), a communications-platform peer (peer values: our calculation, October 8 closes × shares outstanding from stockanalysis.com). Okta, the identity peer, is $38.50B.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>By management's account Twilio is growing faster than at any time in more than three years, and doing it profitably: organic growth of 16% then 17%, a net expansion rate climbing from 108% to 116%, a 19% non-GAAP margin and over $1B of free cash flow guided for 2026, with $1.59B of net cash. Voice AI gives it a new source of volume: every AI agent that talks to customers needs a phone line, and management says most of the voice-AI start-ups are building on Twilio. Software add-ons growing 25%+ show the company can sell more than the pipe. It has beaten its own guide by six to seven points of organic growth in Q2, and S&amp;P 500 membership puts it in front of a wider set of large-cap buyers. If 2027 looks like 2026, 46 times this year's earnings becomes much less demanding.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>The stock is up 142% in a year and trades above the average analyst target. The headline numbers flatter: the trailing P/E of 38 rests on a $944M tax-accounting gain, the 22% reported growth includes carrier fees passed straight through, and the GAAP operating margin is 5.6% once stock pay is counted. Guidance already has organic growth slowing to 11–12% in Q3. The voice-AI customers driving the acceleration are young companies that can switch providers, and the core service — moving a message or a call — is a commodity whose costs the carriers set. Index-inclusion buying has come and gone: the stock fell 8.4% in the three sessions after it. In January 2025, the only time monthly RSI ran higher than September's 89.3, the stock fell 33% over the next two months.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Deceleration from a high multiple.</strong> Q3 guidance implies organic growth of 11–12% after 17% in Q2. At 46.5 times FY2026 consensus earnings, a quarter that only meets guidance could cost more than the 20%+ gains the last two beats delivered. The October 29 report is the first test as an S&amp;P 500 member.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Voice-AI concentration and churn.</strong> The newest and fastest-growing demand comes from AI-agent and voice-AI companies. That growth is usage-billed, so it can fall as fast as it rose if those customers consolidate, fail, or move calls to a rival or a carrier directly.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Carrier fees and margin.</strong> Twilio pays network operators for every message and call. Fee increases lift reported revenue without lifting profit, and fees it cannot pass on would come straight out of a 48% gross margin, already low for a software company.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">AI agents need phone lines</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">EMERGING TAILWIND</span></div>
+    <p class="biz-desc">For most software companies, AI raises the question of whether customers will need fewer seats. Twilio's pricing is mostly per message, per minute and per check (the 10-K: Messaging, Voice and identity revenue is recognised mainly on a usage basis), so an AI agent that places or answers calls is another source of billable traffic rather than a replaced user. That is the bull reading of Q2's voice growth above 20%. The products Twilio launched at SIGNAL, its customer conference, are built for it: the CEO said the conversations layer — Conversation Memory, Conversation Orchestrator, Conversation Intelligence, Conversation Relay and Agent Connect — provides "the building blocks customers need to deliver context-rich conversations over a consumer's lifetime." The open question is pricing power: the same AI firms are sophisticated buyers who can route traffic across several providers.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Carrier fees: revenue that is not quite growth</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">ONGOING DISTORTION</span></div>
+    <p class="biz-desc">US carriers charge registration and per-message fees on business texting (A2P, application-to-person traffic). When they raise those fees, platforms like Twilio collect the increase from customers and hand it on, which lifts reported revenue. Twilio's organic revenue definition excludes the increases until a year after they start, and its 2026 guidance assumes about $250M of them. The practical effect: in 2026 the reported growth rate (18–18.5% guided) runs about five points above the organic rate (13–13.5%), and that gap narrows as the fee increases pass their first anniversary.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #ef4444;">
+    <div class="biz-header"><div class="biz-name">A volatile software tape</div><span class="biz-badge" style="background:var(--red-dim);color:var(--red);">MARKET RISK</span></div>
+    <p class="biz-desc">Twilio's own record shows how large the moves in a software stock can be: single-day gains of 19.5%, 23.8% and 24.9% after the Q3 2025, Q1 2026 and Q2 2026 reports, a 7.96% one-day fall on September 25 and a 6.81% fall on its first day in the S&amp;P 500. Index membership brings steadier passive ownership, but at a 1.36 beta and a 79 monthly RSI the stock is likely to keep amplifying both the sector's mood and its own results.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Thursday, October 8, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/twlo/history/</strong> — the October 8, 2026 settled close of $275.77 (open 273.86, high 280.53, low 273.46, volume 1,865,230, Adj. Close present, +1.01% on the prior close of $273.00). Matches Yahoo Finance's daily close for the same session.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Twilio's Q2 2026 earnings release (8-K Exhibit 99.1, Aug 6, 2026) and Q2 2026 10-Q (filed Aug 7, 2026) on sec.gov for revenue, organic growth, carrier-fee and acquisition adjustments, margins, the income statement, the tax benefit and valuation-allowance release, free cash flow, net expansion, guidance, buybacks, senior notes, balance sheet, geography, employees, the cover share count (153,575,220 at July 24, 2026) and headquarters; the Q1 2026 release (Apr 30, 2026) for Q1 results, Q2 guidance and call timing; the FY2025 10-K (filed Feb 24, 2026) for active customer accounts, product lines, revenue recognition, competitors and the Stytch closing date; the 8-K of Jan 8, 2024 for the CEO transition; the S&amp;P Dow Jones Indices release of Oct 1, 2026 (PRNewswire) for the index change; the Q2 2026 earnings-call transcript on stockanalysis.com for management's remarks; stockanalysis.com (statistics, financials, forecast, ratings, profile, news) for TTM figures, ratios, consensus and analyst actions; MarketBeat for analyst actions, consensus, short interest and institutional holders; Yahoo Finance for month-end closes, daily closes and S&amp;P 500 index levels.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 61 points — 60 month-end closes from October 2021 through September 2026 (Yahoo Finance monthly Close: split-adjusted, not dividend-adjusted; Twilio has no splits or dividends in the window), plus a final point at the October 8, 2026 settled close of $275.77. The August and September 2026 month-ends match the stockanalysis.com daily rows ($235.63, $292.46). <strong>No interior months were reconstructed or estimated.</strong> The final point is a settled close six trading days into October, not a month-end. Market cap is $275.77 × 153,575,220 shares (10-Q cover) = $42.35B, our calculation; peer market caps are October 8 closes × stockanalysis.com shares outstanding, also our calculation. The figures in the industry-average benchmark column in Section 04 are shown as "—"; none are estimated. S&amp;P 500 column in Section 04: our aggregate of each index member's latest report in this library, weighted by market cap on October 8, 2026, shown where members worth at least 80% of the index report the figure (formulas in the finance glossary). Product-line revenues are not disclosed by Twilio and are shown as "n/d"; market shares as "n/v". Consensus EPS ($5.93 for FY2026) is the stockanalysis.com average and is on the adjusted basis analysts use, not GAAP.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — 60 month-end closes Oct 2021 → Sep 2026 (Yahoo Finance monthly Close, split-adjusted, not dividend-adjusted) + Oct 8, 2026 settled close =====
+const labels = ['Oct 21','Nov 21','Dec 21','Jan 22','Feb 22','Mar 22','Apr 22','May 22','Jun 22','Jul 22','Aug 22','Sep 22','Oct 22','Nov 22','Dec 22','Jan 23','Feb 23','Mar 23','Apr 23','May 23','Jun 23','Jul 23','Aug 23','Sep 23','Oct 23','Nov 23','Dec 23','Jan 24','Feb 24','Mar 24','Apr 24','May 24','Jun 24','Jul 24','Aug 24','Sep 24','Oct 24','Nov 24','Dec 24','Jan 25','Feb 25','Mar 25','Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26','May 26','Jun 26','Jul 26','Aug 26','Sep 26','Oct 8 26'];
+const prices = [291.36,286.15,263.34,206.12,174.8,164.81,111.82,105.17,83.81,84.8,69.58,69.14,74.37,49.02,48.96,59.84,67.21,66.63,52.61,69.62,63.62,66.03,63.71,58.53,51.26,64.68,75.87,70.33,59.59,61.15,59.88,57.4,56.81,59.13,62.76,65.22,80.65,104.54,108.08,146.58,119.93,97.91,96.71,117.7,124.36,129,105.61,100.09,134.88,129.69,142.24,120.46,120.96,125.82,148.06,190.64,206.33,197.35,235.63,292.46,275.77];
+
+function sma(arr, w) {
+  return arr.map(function(_, i) {
+    if (i < w - 1) return null;
+    var s = 0;
+    for (var j = i - w + 1; j <= i; j++) s += arr[j];
+    return +(s / w).toFixed(2);
+  });
+}
+function computeRSI(arr, period) {
+  var out = new Array(arr.length).fill(null);
+  var gains = [], losses = [];
+  for (var i = 1; i < arr.length; i++) {
+    var d = arr[i] - arr[i - 1];
+    gains.push(d > 0 ? d : 0);
+    losses.push(d < 0 ? -d : 0);
+  }
+  var ag = 0, al = 0;
+  for (var k = 0; k < period; k++) { ag += gains[k]; al += losses[k]; }
+  ag /= period; al /= period;
+  out[period] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  for (var m = period; m < gains.length; m++) {
+    ag = (ag * (period - 1) + gains[m]) / period;
+    al = (al * (period - 1) + losses[m]) / period;
+    out[m + 1] = al === 0 ? 100 : +(100 - 100 / (1 + ag / al)).toFixed(2);
+  }
+  return out;
+}
+
+
+const events = [
+  { idx: 14, label: 'Dec 2022 — 5-year low close $48.96',                       color: '#ef4444' },
+  { idx: 27, label: 'Jan 2024 — Shipchandler succeeds Lawson as CEO; $70.33',   color: '#3b82f6' },
+  { idx: 39, label: 'Jan 2025 — re-rating peak $146.58 (Investor Day Jan 23)',  color: '#22c55e' },
+  { idx: 41, label: 'Mar 2025 — two-month give-back to $97.91 (−33%)',          color: '#ef4444' },
+  { idx: 48, label: 'Oct 2025 — Q3 2025 results; $134.88 (+34.8% month)',       color: '#22c55e' },
+  { idx: 55, label: 'May 2026 — Q1 beat & raise; $190.64 (+28.8% month)',       color: '#22c55e' },
+  { idx: 58, label: 'Aug 2026 — Q2 beat & raise; $235.63 (+24.9% on Aug 7)',    color: '#22c55e' },
+  { idx: 59, label: 'Sep 2026 — 5-year high month-end $292.46',                 color: '#f59e0b' },
+  { idx: 60, label: 'Oct 8, 2026 — S&P 500 member since Oct 6; close $275.77',  color: '#22D3EE' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const ma1  = sma(prices, 1);
+const ma3  = sma(prices, 3);
+const ma10 = sma(prices, 10);
+const rsi  = computeRSI(prices, 6);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(34,211,238,0.22)');
+grad.addColorStop(1, 'rgba(34,211,238,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Price', data: prices, borderColor: '#22D3EE', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.25,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 0; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#22D3EE'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      },
+      { label: '1-Month MA', data: ma1, borderColor: '#f59e0b', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '3-Month MA', data: ma3, borderColor: '#3b82f6', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 },
+      { label: '10-Month MA', data: ma10, borderColor: '#ef4444', borderWidth: 1.2, borderDash: [5,4], fill: false, pointRadius: 0, tension: 0.25 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } },
+      y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('rsiChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'RSI (6)', data: rsi, borderColor: '#a78bfa', borderWidth: 2, fill: false, pointRadius: 0, tension: 0.25, spanGaps: false }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return 'RSI: ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(1)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+      y: {
+        min: 0, max: 100,
+        grid: { color: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? '#334155' : '#1e293b'; },
+                lineWidth: function(c) { return (c.tick.value === 70 || c.tick.value === 30) ? 1.6 : 1; } },
+        ticks: {
+          stepSize: 10, color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 },
+          callback: function(v) {
+            if (v === 70) return '70 — OVERBOUGHT';
+            if (v === 50) return '50 — Neutral';
+            if (v === 30) return '30 — OVERSOLD';
+            return v;
+          }
+        }
+      }
+    }
+  }
+});
+
+</script>
+</body>
+</html>

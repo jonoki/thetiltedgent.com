@@ -14,7 +14,9 @@ Shares: market cap / header price, both as the member's own report states them a
 Close on date D: Yahoo's daily close (split-adjusted, not dividend-adjusted), the last one on or before D, times the
 splits Yahoo booked after the member's as-of (Yahoo back-adjusts every close for them; the report's share count is
 on its as-of basis). Market cap on D = shares x that close.
-Rank on D: 1 + the number of the index's members with a larger market cap on D.
+Rank on D: 1 + the number of the index's members with a larger market cap on D. A member with no Yahoo close on or
+before D whose card's S&P 500 join date (data-sp) is after D had not listed yet (VYLR, spun off and added 1 Oct 2026)
+and is left out on D; any other member with no close on D is an error.
 The row: "Mkt Cap Ranking:" then "S&P 500: #N" and/or "Nasdaq-100: #N", first pill in the page's accent pill style, the
 second dim; a member page without one gets it under the ticker line.
 Member pages only: a page in neither index (a global listing) is never written and --check never flags it. Its rank
@@ -74,6 +76,7 @@ class Member(NamedTuple):
     stated_shares: float | None
     sp500: bool
     ndx: bool
+    sp500_added: str | None = None   # the card's data-sp join date (YYYY-MM-DD)
 
 
 class RankError(Exception):
@@ -140,7 +143,7 @@ def read_member(slug: str, card: rd.IndexCard, repo: str) -> Member:
         raise RankError(f'{slug}: as-of {as_of}, header price {price}, Mkt Cap {mcap and mcap[0]}: one is unreadable')
     stated = parse_shares(shares_cell(t))
     return Member(slug, ca.yahoo_symbol(slug, ticker), as_of, price, mcap[1], mcap[1] / price, stated,
-                  bool(card['indices']['sp500_added']), card['indices']['ndx'])
+                  bool(card['indices']['sp500_added']), card['indices']['ndx'], card['indices']['sp500_added'])
 
 
 def index_members(repo: str) -> tuple[dict[str, Member], list[str]]:
@@ -214,11 +217,15 @@ def rank_of(caps: Mapping[str, float], slug: str) -> int:
 
 
 def index_caps(key: str, iso: str, members: Mapping[str, Member], series: Mapping[str, rf.Daily]) -> dict[str, float]:
-    """Every member of index key ('sp500', 'ndx') with its market cap on iso. RankError when a member has no close."""
+    """Every member of index key ('sp500', 'ndx') with its market cap on iso. RankError when a member has no close,
+    except an S&P 500 member that joined after iso and had not traded by then (a spin-off listed on its join date,
+    VYLR 1 Oct 2026): it was in neither index on iso, so it is left out of that date's caps."""
     caps = {}
     for s, m in members.items():
         if getattr(m, key):
             cap = cap_on(m, series[s], iso)
+            if cap is None and m.sp500_added and m.sp500_added > iso:
+                continue
             if cap is None:
                 raise RankError(f'{s}: no Yahoo close on or before {iso}')
             caps[s] = cap
