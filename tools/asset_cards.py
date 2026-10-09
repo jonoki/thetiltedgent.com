@@ -87,7 +87,9 @@ INDICATOR_HUB: list[tuple[str, str, list[tuple[str, str, str, str]]]] = [
         ('bocrate', 'BOC RATE', 'Bank of Canada policy rate',
          "The Bank of Canada's target for the overnight rate, its main policy lever."),
         ('prime', 'PRIME', 'US prime rate',
-         "The base rate many US banks use to price variable-rate loans; it moves when the Fed's target moves.")]),
+         "The base rate many US banks use to price variable-rate loans; it moves when the Fed's target moves."),
+        ('hqm10y', 'HQM 10Y', 'US high-quality corporate bond yield, 10-year',
+         "The Treasury's 10-year rate for top-rated (AAA to A) corporate bonds, the curve pension plans use to value what they owe.")]),
     ('Inflation', 'How fast prices are rising.', [
         ('cpi', 'CPI', 'US Consumer Price Index',
          'How fast prices are rising for US households, from the basket the Bureau of Labor Statistics prices monthly.'),
