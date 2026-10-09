@@ -151,9 +151,13 @@ window.TTG_GAMES = (function () {
   // straight 6,180,020; trips 6,461,620; below trips 113,355,660 (two pair 31,433,400 + pair 58,627,800
   // + high card 23,294,460). Derived, not typed in, by tables/checks/uth_trips_check.js (combinatorial,
   // and with --brute over every hand); same as the standard 7-card table (Wikipedia, "Poker probability").
+  // Paytables: the four in the game's literature and in the regulators' approved rules, Paytables A-D
+  // (royal-SF-quads-FH-flush-straight-trips, "N to 1"): Wizard of Odds, Ultimate Texas Hold'em, #trips-bet
+  // ("Shufflemaster literature mentions the following four possible pay tables", updated Aug 3 2026);
+  // 58 Pa. Code § 653a.12(c); N.J.A.C. 13:69F-32.11. No source names any of them "common" or "standard".
   // Edge = -(sum of count * pay - 113,355,660) / 133,784,560:
-  //   50-40-30-9-7-4-3 -> 1,206,516 / N = 0.9018%; 50-40-30-8-6-5-3 -> 2,547,324 / N = 1.9040%;
-  //   50-40-30-9-7-3-3 -> 7,386,536 / N = 5.5212%.
+  //   A 50-40-30-9-7-4-3 -> 1,206,516 / N = 0.9018%; B 50-40-30-8-6-5-3 -> 2,547,324 / N = 1.9040%;
+  //   C 50-40-30-8-7-4-3 -> 4,679,700 / N = 3.4979%; D 50-40-20-7-6-5-3 -> 8,268,988 / N = 6.1808%.
   var N7 = 133784560;
   function trips(rf, sf, qu, fh, fl, st, tk) {
     return [ {p: 4324/N7, x: rf}, {p: 37260/N7, x: sf}, {p: 224848/N7, x: qu}, {p: 3473184/N7, x: fh}, {p: 4047644/N7, x: fl},
@@ -172,9 +176,10 @@ window.TTG_GAMES = (function () {
                 {p: 0.03, x: 3}, {p: 0.02, x: 2}, {p: 0.05, x: -4},
                 {p: 0.08, x: 2}, {p: 0.02, x: 1}, {p: 0.12, x: -3} ],
         bonusRows: [ {p: 0.046, add: 1}, {p: 0.030, add: 1.5}, {p: 0.026, add: 3}, {p: 0.0017, add: 10}, {p: 0.0003, add: 50} ] },
-      "trips-9743": { name: "Trips — 50-40-30-9-7-4-3 paytable", edge: 0.009018, kind: "exact", rows: trips(50, 40, 30, 9, 7, 4, 3) },
-      "trips-8653": { name: "Trips — 50-40-30-8-6-5-3 paytable", edge: 0.019040, kind: "exact", rows: trips(50, 40, 30, 8, 6, 5, 3) },
-      "trips-9733": { name: "Trips — 50-40-30-9-7-3-3 paytable", edge: 0.055212, kind: "exact", rows: trips(50, 40, 30, 9, 7, 3, 3) }
+      "trips-9743": { name: "Trips — Paytable A (50-40-30-9-7-4-3)", edge: 0.009018, kind: "exact", rows: trips(50, 40, 30, 9, 7, 4, 3) },
+      "trips-8653": { name: "Trips — Paytable B (50-40-30-8-6-5-3)", edge: 0.019040, kind: "exact", rows: trips(50, 40, 30, 8, 6, 5, 3) },
+      "trips-8743": { name: "Trips — Paytable C (50-40-30-8-7-4-3)", edge: 0.034979, kind: "exact", rows: trips(50, 40, 30, 8, 7, 4, 3) },
+      "trips-7653": { name: "Trips — Paytable D (50-40-20-7-6-5-3)", edge: 0.061808, kind: "exact", rows: trips(50, 40, 20, 7, 6, 5, 3) }
     }
   };
 

@@ -134,5 +134,23 @@ Object.keys(bets).filter(function (id) { return /^trips-/.test(id); }).forEach(f
 });
 if (!seen) failures.push('no Trips tables found in games.js');
 
+// The simulator offers exactly the four published paytables A-D (Wizard of Odds, UTH #trips-bet;
+// 58 Pa. Code § 653a.12(c); N.J.A.C. 13:69F-32.11), each with its exact edge from the counts above:
+// A 1,206,516 / N; B 2,547,324 / N; C 4,679,700 / N; D 8,268,988 / N.
+var PUBLISHED = { A: ['50-40-30-9-7-4-3', 0.009018], B: ['50-40-30-8-6-5-3', 0.019040],
+                  C: ['50-40-30-8-7-4-3', 0.034979], D: ['50-40-20-7-6-5-3', 0.061808] };
+var offered = Object.keys(bets).filter(function (id) { return /^trips-/.test(id); }).map(function (id) {
+  return { id: id, pays: bets[id].rows.slice(0, 7).map(function (r) { return r.x; }).join('-'), bet: bets[id] };
+});
+if (offered.length !== 4) failures.push(offered.length + ' Trips tables in games.js, expected exactly the four published (A-D)');
+Object.keys(PUBLISHED).forEach(function (k) {
+  var pays = PUBLISHED[k][0], want = PUBLISHED[k][1], o = offered.filter(function (t) { return t.pays === pays; })[0];
+  if (!o) { failures.push('Paytable ' + k + ' (' + pays + ') missing from games.js'); return; }
+  var ev = 0; WIN.forEach(function (c, i) { ev += derived[c] * o.bet.rows[i].x; }); ev = -(ev - LOSS) / N;
+  if (Math.abs(ev - want) > 5e-6) failures.push('Paytable ' + k + ': exact edge ' + ev + ' vs published ' + want);
+  if (o.bet.name.indexOf('Paytable ' + k + ' (' + pays + ')') < 0) failures.push(o.id + ': name "' + o.bet.name + '" does not label it Paytable ' + k + ' (' + pays + ')');
+  console.log('  Paytable ' + k + ' ' + pays + ': ' + (ev * 100).toFixed(4) + '% (expected ' + (want * 100).toFixed(4) + '%) as ' + o.id);
+});
+
 if (failures.length) { failures.forEach(function (f) { console.log('  FAIL ' + f); }); process.exit(1); }
 console.log('ALL CHECKS PASS (' + seen + ' Trips tables)');
