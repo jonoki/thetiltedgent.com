@@ -110,6 +110,12 @@ class Chrome(unittest.TestCase):
         self.assertNotIn('/glossary/', n)   # the old glossary URLs are redirect stubs only
         self.assertNotIn('/#tools', n)   # the Toolbox is a homepage section, in the footer only
         self.assertIn('/#tools', chrome.footer(chrome.SITE_FINE))
+        # The Morning Line (Oki, 9 Oct 2026): a top-level link between The Tables and Le Degens, and in the footer
+        self.assertLess(n.index('data-menu="tables"'), n.index('<a href="/morning-line/">The Morning Line</a>'))
+        self.assertLess(n.index('/morning-line/'), n.index('/#degens'))
+        self.assertIn('<a href="/morning-line/" aria-current="page">', chrome.nav('morningline'))
+        self.assertIn('<a href="/morning-line/">The Morning Line</a>', chrome.footer(chrome.SITE_FINE))
+        self.assertIn(('morning-line/index.html', 'morningline', True), chrome.PAGES)
 
     def test_asset_stamp_replaces_an_old_one(self):
         with tempfile.TemporaryDirectory() as repo:

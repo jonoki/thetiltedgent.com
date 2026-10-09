@@ -57,11 +57,12 @@ NAV: list[NavLink | NavMenu] = [
                       ('Craps Trainer', '/tables/craps-table.html'),
                       ('Baccarat Trainer', '/tables/baccarat-table.html'),
                       ('Three Card Poker Trainer', '/tables/three-card-poker-table.html')])]),
+    NavLink('morningline', 'The Morning Line', '/morning-line/'),   # Oki, 9 Oct 2026: the daily pre-market brief
     NavLink('degens', 'Le Degens', '/#degens', 'Soon'),
     NavLink('about', 'The Gent', '/#about'),
 ]
 FOOT_LINKS = [('Learn', '/learn/'), ('Reports', '/reports/'), ('The Tables', '/tables/casino-games.html'),
-              ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
+              ('The Morning Line', '/morning-line/'), ('Le Degens', '/#degens'), ('The Toolbox', '/#tools'), ('The Gent', '/#about')]
 CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tables index
 
 # The shared wiring every page carries; tables/build_tables.py copies these three from the Tables source.
@@ -89,6 +90,7 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
     ('learn/table-talk/poker.html', 'learn', True),
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
+    ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]
 
 SITE_FINE = ("<b>The fine print (we read it, so should you):</b> Everything on this site is education and entertainment, "
