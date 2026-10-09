@@ -86,7 +86,8 @@ class ReportRecord(TypedDict, total=False):
     as_of: str                      # YYYY-MM-DD
     price: float
     change_pct: float
-    market_cap: str
+    market_cap: str                 # the header's 'Mkt Cap:' text, as printed
+    market_cap_usd: float           # the same header in US dollars (reportlib.header_mcap)
     w52: list[float]                # [low, high]
     chart_points: int
     chart_ok: bool

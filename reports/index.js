@@ -39,8 +39,9 @@
 
   // one record per card; el stays a single node that we move between views
   var cards=all('#fam-stocks .rep').map(function(el){
-    var t=$('.tick',el).textContent.trim();
-    return {el:el, home:el.parentNode, t:t, tf:t.replace(/[^A-Z0-9]/g,''),
+    var t=$('.tick',el).textContent.trim(), m=/r=([a-z0-9.\-]+)/.exec(el.getAttribute('href')||'');
+    return {el:el, home:el.parentNode, t:t, tf:t.replace(/[^A-Z0-9]/g,''), slug:m?m[1]:'',
+            cap:null, asof:null,                // market cap (US$) and report as-of: from card_tags.json, set by TTG_sortKeys
             n:$('h3',el).textContent.trim().toLowerCase(),
             i:$('.sect',el).textContent.trim(),
             sector:el.closest('.sgroup').getAttribute('data-s'),
@@ -73,9 +74,14 @@
     });
   });
 
-  // ---- state
-  var st={q:'',ind:'',idx:'',sort:'az',sector:'all'};
-  function dirty(){return st.q||st.ind||st.idx||st.sort!=='az';}
+  // ---- state. Sorts: cap = market cap, largest first (the default, no URL param); az = company name; updated = report
+  // as-of, newest first; old/new = index tenure. Every sort runs inside each sector group, or across the flat list
+  // that a search, industry or index filter shows.
+  var SORTS=['cap','az','updated','old','new'], DEF='cap';
+  var SAY={cap:'largest first',az:'by company name',updated:'latest update first',old:'longest in an index first',new:'most recently added first'};
+  var st={q:'',ind:'',idx:'',sort:DEF,sector:'all'};
+  function filtered(){return st.q||st.ind||st.idx;}            // a filter shows one flat list instead of the sectors
+  function dirty(){return filtered()||st.sort!==DEF;}
 
   function matches(c){
     if(st.ind && c.i!==st.ind) return false;
@@ -100,20 +106,42 @@
     if(st.idx==='gl')  return null;          // global names sit in no US index
     return c.ts;
   }
+  function byName(a,b){return a.n.localeCompare(b.n,'en')||(a.t<b.t?-1:a.t>b.t?1:0);}
+  function byCap(a,b){                      // largest first; a card without a cap sorts last
+    if(a.cap===null||b.cap===null) return a.cap===b.cap?byName(a,b):a.cap===null?1:-1;
+    return (b.cap-a.cap)||byName(a,b);
+  }
   function sorted(list){
     var arr=list.slice();
-    if(st.sort==='az') arr.sort(function(a,b){return a.t<b.t?-1:a.t>b.t?1:0;});
-    else{
+    if(st.sort==='az') arr.sort(byName);
+    else if(st.sort==='updated') arr.sort(function(a,b){   // newest as-of first; same day: largest first
+      if(a.asof===b.asof) return byCap(a,b);
+      if(a.asof===null||b.asof===null) return a.asof===null?1:-1;
+      return a.asof<b.asof?1:-1;
+    });
+    else if(st.sort==='old'||st.sort==='new'){
       var dir=st.sort==='old'?1:-1;
       arr.sort(function(a,b){
         var x=keyTs(a), y=keyTs(b);
-        if(x===null&&y===null) return a.t<b.t?-1:1;
+        if(x===null&&y===null) return byCap(a,b);
         if(x===null) return 1;               // unknown dates always last
         if(y===null) return -1;
-        return (x-y)*dir || (a.t<b.t?-1:1);
+        return (x-y)*dir || byCap(a,b);
       });
     }
+    else arr.sort(byCap);
     return arr;
+  }
+  // the sector view: each group's cards in the chosen order, re-laid only when the order can have changed
+  var laid=null;
+  function layGroups(){
+    if(laid===st.sort) return;
+    groups.forEach(function(g){
+      var grid=$('.grid',g), frag=document.createDocumentFragment();
+      sorted(cards.filter(function(c){return c.home===grid;})).forEach(function(c){frag.appendChild(c.el);});
+      grid.appendChild(frag);
+    });
+    laid=st.sort;
   }
 
   var flat=false;
@@ -124,7 +152,7 @@
       results.appendChild(frag);
       results.classList.add('on'); sectors.classList.add('off'); flat=true;
     }else if(flat){
-      cards.forEach(function(c){c.home.appendChild(c.el);});
+      laid=null;                              // layGroups puts every card back in its sector, in order
       results.classList.remove('on'); sectors.classList.remove('off'); flat=false;
     }
   }
@@ -138,12 +166,13 @@
   function apply(push){
     var hits=cards.filter(matches), n=hits.length;
 
-    if(dirty()){
+    if(filtered()){
       setFlat(true,sorted(hits));
       cards.forEach(function(c){c.el.hidden=hits.indexOf(c)<0;});
       groups.forEach(function(g){g.hidden=true;});
     }else{
       setFlat(false);
+      layGroups();
       groups.forEach(function(g){
         var vis=0;
         all('.rep',g).forEach(function(el){
@@ -159,15 +188,15 @@
     if(n===0){
       none.textContent='No report matches that. Try a different ticker, industry or index.';
       countEl.textContent='';
-    }else if(dirty()||st.sector!=='all'){
+    }else if(filtered()||st.sector!=='all'){
       countEl.innerHTML='Showing <b>'+n+'</b> of '+TOTAL+' reports';
     }else{
       countEl.innerHTML='<b>'+TOTAL+'</b> reports, grouped by sector';
     }
-    if(n>0 && st.sort!=='az' && (st.idx==='ndx'||st.idx==='gl')){
-      countEl.innerHTML+=' <span style="opacity:.7">&middot; '+(st.idx==='gl'?'Global names sit in no US index, so':'Nasdaq-100 addition dates aren\'t published, so')+' these are ordered A&ndash;Z</span>';
+    if(n>0 && (st.sort==='old'||st.sort==='new') && (st.idx==='ndx'||st.idx==='gl')){
+      countEl.innerHTML+=' <span style="opacity:.7">&middot; '+(st.idx==='gl'?'Global names sit in no US index, so':'Nasdaq-100 addition dates aren\'t published, so')+' these are ordered largest first</span>';
     }
-    announce(n===0?'No reports match your filters.':n+' of '+TOTAL+' reports shown.');
+    announce(n===0?'No reports match your filters.':n+' of '+TOTAL+' reports shown, '+SAY[st.sort]+'.');
 
     // sector chips act as live facets: each count is what you'd get if you clicked it
     var savedSector=st.sector;
@@ -185,7 +214,7 @@
     q.classList.toggle('on',!!st.q);
     fInd.parentNode.classList.toggle('on',!!st.ind);
     fIdx.parentNode.classList.toggle('on',!!st.idx);
-    fSort.parentNode.classList.toggle('on',st.sort!=='az');
+    fSort.parentNode.classList.toggle('on',st.sort!==DEF);
     chips.forEach(function(c){c.classList.toggle('active',c.getAttribute('data-f')===st.sector);});
 
     if(push!==false) writeUrl();
@@ -197,7 +226,7 @@
     if(st.q) p.push('q='+encodeURIComponent(st.q));
     if(st.ind) p.push('i='+encodeURIComponent(st.ind));
     if(st.idx) p.push('x='+st.idx);
-    if(st.sort!=='az') p.push('sort='+st.sort);
+    if(st.sort!==DEF) p.push('sort='+st.sort);
     if(st.sector!=='all') p.push('s='+st.sector);
     try{history.replaceState(null,'',location.pathname+(p.length?'?'+p.join('&'):''));}catch(e){}
   }
@@ -216,8 +245,8 @@
   fSort.addEventListener('change',function(){st.sort=fSort.value;apply();});
   chips.forEach(function(c){c.addEventListener('click',function(){st.sector=c.getAttribute('data-f');apply();});});
   clearBtn.addEventListener('click',function(){
-    st={q:'',ind:'',idx:'',sort:'az',sector:'all'};
-    q.value='';fInd.value='';fIdx.value='';fSort.value='az';
+    st={q:'',ind:'',idx:'',sort:DEF,sector:'all'};
+    q.value='';fInd.value='';fIdx.value='';fSort.value=DEF;
     apply();q.focus();
   });
   document.addEventListener('keydown',function(e){
@@ -253,8 +282,17 @@
   if(p.get('q')){q.value=p.get('q');st.q=q.value.trim().toLowerCase();}
   if(p.get('i')&&[].some.call(fInd.options,function(o){return o.value===p.get('i');})){fInd.value=p.get('i');st.ind=fInd.value;}
   if(['sp','ndx','dow','gl'].indexOf(p.get('x'))>-1){fIdx.value=p.get('x');st.idx=fIdx.value;}
-  if(['old','new'].indexOf(p.get('sort'))>-1){fSort.value=p.get('sort');st.sort=fSort.value;}
+  if(SORTS.indexOf(p.get('sort'))>0){fSort.value=p.get('sort');st.sort=fSort.value;}
   var s=p.get('s'); if(s&&$('.chip[data-f="'+s.replace(/[^a-z0-9]/g,'')+'"]')) st.sector=s;
+  // the sort keys arrive with card_tags.json (the card-tags block below); until then, and if it never loads, every
+  // cap and as-of is unknown and the cards fall back to company name
+  window.TTG_sortKeys=function(data){
+    cards.forEach(function(c){
+      var d=data[c.slug]||{};
+      c.cap=typeof d.mc==='number'?d.mc:null; c.asof=d.ao||null;
+    });
+    laid=null; apply(false);
+  };
   apply(false);
   foldAll();
   chips.forEach(function(c){c.addEventListener('click',foldAll);});
@@ -409,6 +447,7 @@
   function getJson(u){return fetch(u).then(function(r){return r.ok?r.json():null;});}
   Promise.all([getJson('../data/card_tags.json'),getJson('../data/new_results.json').catch(function(){return null;})]).then(function(d){
     var cards=(d[0]&&d[0].cards)||{}, nrs=(d[1]&&d[1].cards)||{};
+    if(window.TTG_sortKeys) window.TTG_sortKeys(cards);   // market cap and as-of: the Stocks tab's sort keys
     [].forEach.call(document.querySelectorAll('.rep'),function(card){
       var m=/r=([a-z0-9.\-]+)/.exec(card.getAttribute('href')||'');
       decorate(card,m?cards[m[1]]:null,m?nrs[m[1]]:null);

@@ -481,16 +481,7 @@ def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: li
 
 # ---------- reading the page ----------
 
-def header_mcap(t: str) -> tuple[str, float] | None:
-    """The header's 'Mkt Cap: ~$33.7B' as (text, dollars)."""
-    m = re.search(r'Mkt Cap:(?:\s*</[^>]+>)?\s*(?:<[^>]+>\s*)*([^<]+)', t)
-    if not m:
-        return None
-    n = re.search(r'\$\s*([\d,]+(?:\.\d+)?)\s*(T|B|M|Trillion|Billion)\b', m.group(1))
-    if not n:
-        return None
-    unit = {'T': 1e12, 'Trillion': 1e12, 'B': 1e9, 'Billion': 1e9, 'M': 1e6}[n.group(2)]
-    return m.group(1).strip(), float(round(float(n.group(1).replace(',', '')) * unit))
+header_mcap = rl.header_mcap   # the header's 'Mkt Cap:' as (text, dollars); shared with manifest.py
 
 
 def cell_number(text: str | None) -> tuple[float, int] | None:

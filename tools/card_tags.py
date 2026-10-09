@@ -11,6 +11,12 @@ Per report slug:
   sp   [year, sentence] overriding the S&P 500 badge's year and tooltip (SP_NOTE below)
   hw   ♥ what you know them for, th ♠ big themes, pp ★ key people: [label, tooltip(, since YYYY-MM)] from data/hand_tags.json
   lg   logo path (assets/logos/<slug>.<ext>; sources in assets/logos/index.json)
+  mc   market cap in US dollars, whole dollars, from the manifest's market_cap_usd (the report header's "Mkt Cap:",
+       read by reportlib.header_mcap); missing when the header has none, and that card sorts last
+  ao   the report's as-of date (YYYY-MM-DD), from the manifest
+  mc and ao are the Stocks tab's sort keys (reports/index.js: largest first by default, or latest update first).
+  They live here, not as attributes on reports/index.html, so every refresh run's card_tags.py keeps them in step
+  and a clash between two runs heals by regenerating data/ (auto_refresh.py GENERATED).
 Index badges (S&P 500 / Nasdaq-100 / Dow) are not here: they come from the card's own data attributes.
 
 Also writes data/new_results.json from the refresh queue (tasks/queue/queue.json, tools/refresh_queue.py): per slug
@@ -49,6 +55,8 @@ class CardTags(TypedDict, total=False):
     th: list[list[str]]
     pp: list[list[str]]
     lg: str
+    mc: int                                  # market cap, US dollars
+    ao: str                                  # as-of, YYYY-MM-DD
 
 
 class HandTags(TypedDict, total=False):
@@ -109,6 +117,11 @@ def card_for(slug: str, *, style: rd.TagInputs, record: rd.ReportRecord | None, 
     c.update(hand_tags(hand))
     if logo:
         c['lg'] = logo
+    cap = record.get('market_cap_usd') if record else None
+    if cap:
+        c['mc'] = round(cap)
+    if record and record.get('as_of'):
+        c['ao'] = record['as_of']
     return c
 
 
@@ -171,6 +184,8 @@ def main(argv: list[str] | None = None) -> int | str:
     print(write_new_results(repo, records))
     print('refreshed:', sum('ed' in c for c in out.values()), ' one-liners:', sum('ln' in c for c in out.values()),
           ' hand tags:', sum('hw' in c for c in out.values()), ' logos:', sum('lg' in c for c in out.values()))
+    print('market cap (sort key):', sum('mc' in c for c in out.values()), ' none, sorted last:',
+          [slug for slug, c in out.items() if 'mc' not in c])
     return 0
 
 

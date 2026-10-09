@@ -134,6 +134,30 @@ def header_price(t: str) -> float | None:
     return to_number(m.group(1)) if m else None
 
 
+# A US-dollar amount with its scale: '$41.89B', 'US$79.69B', '~$4.50 Trillion', '$950M'. The '$' must be bare or 'US$':
+# HK$, NT$, A$, S$, R$ (a letter before the '$') are local currencies, which a non-US report prints after the USD figure.
+_USD_CAP = re.compile(r'(?:\bUS|(?<![A-Za-z]))\$\s*(\d[\d,]*(?:\.\d+)?)\s*(Trillion|Billion|Million|T|B|M)\b')
+_SCALE = {'T': 1e12, 'Trillion': 1e12, 'B': 1e9, 'Billion': 1e9, 'M': 1e6, 'Million': 1e6}
+
+
+def usd_cap(s: str | None) -> float | None:
+    """A market-cap text's first US-dollar amount, in dollars: '$1.2T' -> 1.2e12, 'US$488.1B (HK$3.83T)' -> 4.881e11,
+    '$950M' -> 9.5e8. None when the text is missing or has no dollar amount with a T/B/M scale ('HK$673B' alone)."""
+    m = _USD_CAP.search(s or '')
+    return float(round(float(m.group(1).replace(',', '')) * _SCALE[m.group(2)])) if m else None
+
+
+def header_mcap(t: str) -> tuple[str, float] | None:
+    """The header's 'Mkt Cap: ~$33.7B' as (text, dollars): the first text after the label, past any tags that wrap it
+    (a tooltip span on the non-US reports), read by usd_cap. Global listings print US dollars first (BUILD.md "Non-US
+    listings")."""
+    m = re.search(r'Mkt Cap:(?:\s*</[^>]+>)?\s*(?:<[^>]+>\s*)*([^<]+)', t)
+    if not m:
+        return None
+    dollars = usd_cap(m.group(1))
+    return (m.group(1).strip(), dollars) if dollars is not None else None
+
+
 _NUM = r'[−\-+]?\d[\d,]*(?:\.\d+)?'   # a signed number as printed: '−0.2', '+142', '3.88', '1,234'
 
 

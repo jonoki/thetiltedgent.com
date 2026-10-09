@@ -6,7 +6,9 @@ Extracts from the report HTML itself rather than re-researching, so the manifest
 what is actually published. A field that cannot be parsed is left out of the record (a missing key means
 "not extracted"); nothing is guessed. The fields the pipeline depends on (ticker, name, industry, price, as-of,
 chart, metrics table, structure, index card) add a warning when missing; the rest (exchange, market cap, change,
-key metrics) are simply absent.
+key metrics) are simply absent. market_cap is the header's 'Mkt Cap:' text as printed; market_cap_usd is the same
+header read as US dollars (reportlib.header_mcap, which also reads a figure wrapped in a tooltip span), the number
+the reports index sorts by (card_tags.py -> data/card_tags.json 'mc').
 
 usage:  py -3 tools/manifest.py [--repo PATH] [-o data/reports.json] [--full-metrics]
 """
@@ -205,6 +207,7 @@ def extract(path: str, cards: dict[str, rd.IndexCard], full_metrics: bool = Fals
         'ticker': ticker, 'slug': slug, 'name': name,
         **card_sector(card), 'industry_raw': industry, 'exchange': meta_field(t, 'Exchange'), **card_indices(card),
         'as_of': as_of, 'price': price, 'change_pct': change_pct(t), 'market_cap': meta_field(t, r'Mkt Cap'),
+        'market_cap_usd': (rl.header_mcap(t) or (None, None))[1],
         'w52': w52, 'chart_points': points, 'chart_ok': chart_ok,
         'metrics_count': len(metrics), 'bytes': size, 'blob_sha': sha, 'structure_ok': struct_ok,
         'editions': eds, 'delta_state': delta_state, 'warnings': warn or None, 'fin_table': rl.fin_table(t),
@@ -233,7 +236,7 @@ def reconciliation(reports: list[rd.ReportRecord], cards: dict[str, rd.IndexCard
 
 def print_coverage(reports: list[rd.ReportRecord], full_metrics: bool) -> None:
     fields = ['ticker', 'name', 'exchange', 'sector_key', 'industry', 'industry_raw', 'as_of', 'price',
-              'change_pct', 'market_cap', 'w52', 'chart_points', 'eps_ttm', 'pe_forward', 'yield_pct']
+              'change_pct', 'market_cap', 'market_cap_usd', 'w52', 'chart_points', 'eps_ttm', 'pe_forward', 'yield_pct']
     for f in fields:
         c = sum(1 for r in reports if r.get(f) not in (None, [], {}))
         print(f'  {f:22s} {c:3d}/{len(reports)}' + ('' if c == len(reports) else '   <-- gaps'), file=sys.stderr)

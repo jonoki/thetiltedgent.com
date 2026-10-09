@@ -188,6 +188,16 @@ class TagPipeline(unittest.TestCase):
         # Steady (checked before Rollercoaster) as well as Growth, Income, Cash machine and Quality
         self.assertEqual([t for t, _ in card['st']], ['Value', 'Growth', 'Income', 'Cash machine', 'Steady', 'Quality'])
         self.assertEqual((card['dv'], card['ln'], card['hq']), (3.0, 'Sells widgets.', ['US-based', 'Springfield, Illinois']))
+        # the Stocks tab's sort keys: the header's Mkt Cap in whole US dollars, and the page's as-of
+        self.assertEqual((card['mc'], card['ao']), (100_000_000_000, '2026-09-10'))
+
+    def test_sort_keys_come_from_the_manifest_record(self):
+        rec: rd.ReportRecord = {'market_cap_usd': 41.89e9, 'as_of': '2026-10-02'}
+        card = card_tags.card_for('acme', style=StyleTagRules.inputs(), record=rec, text='', line=None, hand={}, logo=None)
+        self.assertEqual((card['mc'], card['ao']), (41_890_000_000, '2026-10-02'))
+        card = card_tags.card_for('acme', style=StyleTagRules.inputs(), record={}, text='', line=None, hand={}, logo=None)
+        self.assertNotIn('mc', card)                       # no cap: the card sorts last
+        self.assertNotIn('ao', card)
 
 
 class NewResults(unittest.TestCase):

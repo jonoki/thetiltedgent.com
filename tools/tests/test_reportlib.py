@@ -37,6 +37,27 @@ class Numbers(unittest.TestCase):
         self.assertEqual(rl.iso_date('Sept 3, 2026'), '2026-09-03')
         self.assertIsNone(rl.iso_date('10/09/2026'))
 
+    def test_usd_cap_reads_the_first_dollar_amount_with_its_scale(self):
+        """The reports index sorts by this number (manifest market_cap_usd -> card_tags 'mc')."""
+        self.assertEqual(rl.usd_cap('$1.2T'), 1.2e12)
+        self.assertEqual(rl.usd_cap('$41.89B'), 41.89e9)
+        self.assertEqual(rl.usd_cap('$950M'), 950e6)
+        self.assertEqual(rl.usd_cap('~$4.50 Trillion'), 4.5e12)
+        self.assertEqual(rl.usd_cap('US$488.1B (HK$3.83T)'), 488.1e9)          # a global listing: US dollars first
+        self.assertEqual(rl.usd_cap('$134.02B (R$700.08B at the BCB PTAX rate)'), 134.02e9)
+        self.assertEqual(rl.usd_cap('US$134.1B (HK$1,052.0B)'), 134.1e9)
+        self.assertIsNone(rl.usd_cap('HK$673.76B'))                            # a local currency is not US dollars
+        self.assertIsNone(rl.usd_cap('n/a'))
+        self.assertIsNone(rl.usd_cap(''))
+        self.assertIsNone(rl.usd_cap(None))                                    # missing
+
+    def test_header_mcap_reads_past_a_tooltip_span(self):
+        t = '<span>Mkt Cap:</span> <span class="tip" title="All 9.1B shares at HK$73.90">$85.87B (HK$673.76B)</span>'
+        self.assertEqual(rl.header_mcap(t), ('$85.87B (HK$673.76B)', 85.87e9))
+        self.assertEqual(rl.header_mcap('<b>Mkt Cap:</b><span>$337.4B</span>'), ('$337.4B', 337.4e9))
+        self.assertIsNone(rl.header_mcap('<span>Mkt Cap:</span> n/a</span>'))
+        self.assertIsNone(rl.header_mcap('<p>no header</p>'))
+
 
 class ReportPage(unittest.TestCase):
     def test_title(self):
