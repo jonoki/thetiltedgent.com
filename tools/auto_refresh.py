@@ -3,9 +3,10 @@ independent checker refresh each one (headless Claude Code, the project agents t
 ttg-report-checker), re-run the gates here, commit what passes to the review branch and push it. Nothing reaches
 main: Oki merges the branch.   Run: py -3 tools/auto_refresh.py [--dry-run] [--only SLUG ...]
 
---assets is the monthly numbers-only refresh of the ETF, crypto and bond & cash reports (Oki, 8 Oct 2026): every
-report under reports/etf, reports/crypto and reports/fixed whose banner as-of is ASSET_MIN_AGE_DAYS old or more, same
-agents, gates, branch and commit-or-revert, brief claude/briefs/REFRESH_ASSETS.md; summary tasks/queue/runs/<date>-assets.md.
+--assets is the monthly numbers-only refresh of the ETF, crypto, bond & cash and economic-indicator reports (Oki,
+8 Oct 2026): every report under reports/etf, reports/crypto, reports/fixed and reports/indicators whose banner as-of is
+ASSET_MIN_AGE_DAYS old or more, same agents, gates, branch and commit-or-revert, brief claude/briefs/REFRESH_ASSETS.md;
+summary tasks/queue/runs/<date>-assets.md.
 
 Works in its own git worktree (.claude/worktrees/auto-refresh of the main checkout, branch claude/auto-refresh).
 Writes a summary to tasks/queue/runs/<date>.md there (git-excluded), each agent's JSON result beside it, and the
@@ -15,7 +16,6 @@ import argparse
 import concurrent.futures
 import contextlib
 import datetime
-import glob
 import json
 import os
 import re
@@ -58,8 +58,10 @@ UNATTENDED = ('You are running as an unattended scheduled job, not an interactiv
 # a refresh's as-of is never after its run date, so every report refreshed at one run is due again at the next.
 ASSET_MIN_AGE_DAYS = 28
 ASSET_BRIEF = 'claude/briefs/REFRESH_ASSETS.md'
-FAMILY_NAME = {'etf': 'ETF', 'crypto': 'crypto', 'fixed': 'bond & cash'}   # one per repodata.ASSET_FAMILIES folder
+FAMILY_NAME = {'etf': 'ETF', 'crypto': 'crypto', 'fixed': 'bond & cash',   # one per repodata.ASSET_FAMILIES folder
+               'indicators': 'economic indicator'}
 AUDITED_FAMILIES = ('etf', 'crypto')   # chart_audit.py covers these; bond pages chart yields (checked by the agents)
+INDICATOR_FAMILY = 'indicators'        # indicator_audit.py checks every chart point against FRED / Bank of Canada Valet
 # The daily, weekly and monthly runs share one worktree; a run that finds the lock held waits for it, up to this long.
 LOCK_WAIT_S = 12 * 3600
 LOCK_POLL_S = 60
@@ -108,12 +110,13 @@ def jobs_for(n: int, asked: int | None = None) -> int:
 
 
 def asset_items(repo: str, today: datetime.date) -> list[dict]:
-    """Every ETF, crypto and bond & cash report under repo: slug ('etf/voo', the form chart_audit and the report path
+    """Every ETF, crypto, bond & cash and indicator report under repo (not the redirect stubs of moved ones,
+    repodata.MOVED_REPORTS): slug ('etf/voo', the form chart_audit and the report path
     take), family, ticker, banner as-of and its age in days on today (None when the banner cannot be read), and
     'release', the attempts key: the run's month, so a report out of attempts is tried again the next month."""
     items = []
     for fam in rd.ASSET_FAMILIES:
-        for p in sorted(glob.glob(rd.report_path('*', fam, repo=repo))):
+        for p in rd.family_reports(fam, repo):
             t = rl.read_text(p)
             as_of, _ = rl.as_of(t)
             tick, _name = rl.parse_title(t)
@@ -210,16 +213,17 @@ def checker_prompt(i: dict, wt: str, builder_result: str, post: str | None = Non
 
 
 def asset_checks(i: dict) -> str:
-    """The checks an asset builder or checker runs and reports verbatim: chart_audit for ETF and crypto pages, the
-    official daily file for bond pages, verify.py, node --check."""
+    """The checks an asset builder or checker runs and reports verbatim: chart_audit for ETF and crypto pages,
+    indicator_audit for indicator pages, the official daily file for bond pages, verify.py, node --check."""
     chart = (f"`py -3 tools/chart_audit.py {i['slug']}`" if i['family'] in AUDITED_FAMILIES else
+             f"`py -3 tools/indicator_audit.py {i['slug']}`" if i['family'] == INDICATOR_FAMILY else
              'the comparison of every appended or changed chart point with the official daily file')
     return (f"Run {chart}, `py -3 tools/verify.py reports/{i['slug']}_analysis.html` and `node --check` on each "
             "extracted inline script, and report the outputs verbatim.")
 
 
 def asset_builder_prompt(i: dict, wt: str) -> str:
-    """The builder's prompt for the monthly numbers-only refresh of one ETF, crypto or bond & cash report."""
+    """The builder's prompt for the monthly numbers-only refresh of one ETF, crypto, bond & cash or indicator report."""
     return (f"Monthly numbers-only refresh of ONE {FAMILY_NAME[i['family']]} report: {i['ticker']}, file "
             f"reports/{i['slug']}_analysis.html (current as-of {i['as_of']}, {i['age_days']} days old). This is an "
             "unattended run: no person will answer questions, so stop and report anything that blocks you instead "
@@ -228,7 +232,8 @@ def asset_builder_prompt(i: dict, wt: str) -> str:
             f"tools from it.\n\nSpec: read claude/PITFALL_RULES.md, then {ASSET_BRIEF}, and follow it exactly (it says "
             "which parts of BUILD_ASSETS.md, BUILD.md and REFRESH.md apply).\n\n"
             f"Run date {i['run_date']}: the new as-of is the last settled close (ETF, crypto) or the latest official "
-            f"daily value (bond & cash) on or before it, per {ASSET_BRIEF} Step 2. If there is nothing newer than "
+            f"daily value (bond & cash) or the latest release (economic indicator) on or before it, per {ASSET_BRIEF} "
+            "Step 2. If there is nothing newer than "
             f"{i['as_of']}, change nothing and return NO CHANGE.\n\n"
             "Privacy: never put personal data (names, emails) in any request or User-Agent; read sec.gov with "
             f"WebFetch only. No git commands. {ONE_COMMAND} Temp files only in $TEMP/ttgref_{file_key(i['slug'])}/. "
@@ -312,7 +317,7 @@ def gates(wt: str, slug: str, facts_out: str | None = None, family: str | None =
     """Our own re-run of the publish gates; the agents' reports of them are not trusted. With the data layer, the
     page must also still match facts.json (refresh_data.py --post --check). An asset report (family set, slug
     'etf/voo') also needs every inline script to pass node --check and exactly one delta box; chart_audit runs for
-    ETF and crypto pages only (bond pages chart yields, which it does not cover)."""
+    ETF and crypto pages, indicator_audit for indicator pages (bond pages chart yields, which neither covers)."""
     path = os.path.join(wt, 'reports', f'{slug}_analysis.html')
     v = run([sys.executable, 'tools/verify.py', f'reports/{slug}_analysis.html'], wt, 600)
     ok = v.returncode == 0 and v.stdout.startswith('PASS')
@@ -321,6 +326,10 @@ def gates(wt: str, slug: str, facts_out: str | None = None, family: str | None =
         audit = (a.stdout.splitlines() or [''])[0]
         wrong = re.search(r'WRONG points[^:]*: (\d+)', audit)
         ok = ok and wrong is not None and wrong.group(1) == '0' and ' errors 0 ' in audit
+    elif family == INDICATOR_FAMILY:
+        a = run([sys.executable, 'tools/indicator_audit.py', slug], wt, 600)
+        audit = 'indicator_audit ' + ' / '.join(a.stdout.strip().splitlines()[:2])
+        ok = ok and a.returncode == 0
     else:
         audit = 'chart_audit n/a (bond yields)'
     with open(path, 'rb') as fh:
@@ -421,7 +430,8 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: b
                     new_as_of = rl.as_of(rl.read_text(os.path.join(wt, path)))[0]
                     msg = (f"{i['ticker']} monthly numbers refresh ({FAMILY_NAME[family]}, as-of {i['as_of']} -> "
                            f"{new_as_of}), unattended: builder + independent checker, verify PASS, node --check ok"
-                           + (', chart_audit 0 wrong' if family in AUDITED_FAMILIES else ''))
+                           + (', chart_audit 0 wrong' if family in AUDITED_FAMILIES else
+                              ', indicator_audit 0 wrong' if family == INDICATOR_FAMILY else ''))
                 else:
                     out['tier'] = built_tier(str(b.get('result', '')), i['tier'])
                     msg = (f"{i['ticker']} earnings refresh ({out['tier']}, print {i['release']}), "
@@ -630,7 +640,7 @@ def finish(wt: str, qdir: str, day: str, rid: str, outcomes: list[Outcome], wait
         for tool in tools:
             r = run([sys.executable, f'tools/{tool}'], wt)
             notes.append(f"- {tool}: exit {r.returncode}")
-        paths = ['data'] + (['reports/index.html'] if assets else [])
+        paths = ['data'] + (['reports/index.html', 'learn/indicators/index.html'] if assets else [])
         git(wt, 'add', '--', *paths)
         if git(wt, 'status', '--porcelain', '--', *paths).strip():
             what = 'Asset cards, manifest, style and card tags' if assets else 'Manifest, style and card tags'
@@ -663,8 +673,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--dry-run', action='store_true', help='show what would run; no agents, commits or push')
     ap.add_argument('--data-layer', action='store_true', help='run tools/refresh_data.py before the builder (structured '
                     'numbers written from facts.json) and after it (--post), and gate on --post --check (opt-in)')
-    ap.add_argument('--assets', action='store_true', help='the monthly numbers-only refresh of the ETF, crypto and bond '
-                    f'& cash reports whose as-of is --min-age days old or more ({ASSET_BRIEF})')
+    ap.add_argument('--assets', action='store_true', help='the monthly numbers-only refresh of the ETF, crypto, bond '
+                    f'& cash and indicator reports whose as-of is --min-age days old or more ({ASSET_BRIEF})')
     ap.add_argument('--families', default=','.join(rd.ASSET_FAMILIES), help='with --assets: the families to take')
     ap.add_argument('--min-age', type=int, default=ASSET_MIN_AGE_DAYS, help='with --assets: days since the as-of')
     ap.add_argument('--today', help='with --assets: the run date YYYY-MM-DD for the selection and the prompts '
@@ -749,7 +759,7 @@ def assets_dry_run(args: argparse.Namespace, today: datetime.date) -> int:
 
 
 def run_assets(args: argparse.Namespace, today: datetime.date) -> int:
-    """The monthly asset run: every due ETF, crypto and bond & cash report, then the asset cards and the generated
+    """The monthly asset run: every due ETF, crypto, bond & cash and indicator report, then the asset cards and the generated
     data, the checks and the push; an ALERT when any report was not committed (the page then waits a month)."""
     day = today.isoformat()
     main = main_checkout()

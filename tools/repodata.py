@@ -13,9 +13,15 @@ import reportlib as rl
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # the repo root, from this file's place in tools/
 
-ASSET_FAMILIES = ('etf', 'crypto', 'fixed')   # reports/<family>/: ETFs, crypto, bonds and cash
+# reports/<family>/: ETFs, crypto, bonds and cash, and economic indicators (rates and data that are not securities;
+# Oki, 8 Oct 2026). The first three have a tab on reports/index.html (INDEX_FAMILIES); the indicators have their hub
+# at learn/indicators/ instead. All four take the monthly asset refresh (auto_refresh.py --assets).
+ASSET_FAMILIES = ('etf', 'crypto', 'fixed', 'indicators')
+INDEX_FAMILIES = ('etf', 'crypto', 'fixed')
 STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
-ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ASSET_FAMILIES]
+# Reports that moved to another family: the old path is a redirect stub (it keeps old links working), never a report,
+# so every tool that lists a family's reports skips it. reports/view.html carries the same map for ?r= links.
+MOVED_REPORTS = {'fixed/sofr': 'indicators/sofr', 'fixed/effr': 'indicators/effr', 'fixed/corra': 'indicators/corra'}
 
 
 def parser(description: str) -> argparse.ArgumentParser:
@@ -39,7 +45,8 @@ def write_json(path: str, obj: object, indent: int | None = None) -> int:
 
 
 def report_path(slug: str, family: str | None = None, repo: str = ROOT) -> str:
-    """reports/<slug>_analysis.html, or reports/<family>/<slug>_analysis.html for an ETF, crypto or bond report."""
+    """reports/<slug>_analysis.html, or reports/<family>/<slug>_analysis.html for an ETF, crypto, bond or indicator
+    report."""
     return os.path.join(repo, 'reports', *([family] if family else []), f'{slug}_analysis.html')
 
 
@@ -176,7 +183,16 @@ TagInputs = TypedDict('TagInputs', {
 })
 
 
+def family_reports(family: str, repo: str = ROOT) -> list[str]:
+    """Sorted paths of one family's reports (reports/<family>/*_analysis.html), without the redirect stubs left at
+    the old paths of reports that moved (MOVED_REPORTS)."""
+    return sorted(p for p in glob.glob(report_path('*', family, repo=repo))
+                  if f'{family}/{slug_of(p)}' not in MOVED_REPORTS)
+
+
 def report_paths(repo: str = ROOT, assets: bool = False) -> list[str]:
-    """Sorted paths of the stock reports (and the ETF, crypto and bond reports when assets=True)."""
-    pats = [STOCK_REPORTS] + (ASSET_REPORTS if assets else [])
-    return sorted(p for pat in pats for p in glob.glob(os.path.join(repo, pat)))
+    """Sorted paths of the stock reports (and the ETF, crypto, bond and indicator reports when assets=True)."""
+    paths = glob.glob(os.path.join(repo, STOCK_REPORTS))
+    if assets:
+        paths += [p for fam in ASSET_FAMILIES for p in family_reports(fam, repo)]
+    return sorted(paths)

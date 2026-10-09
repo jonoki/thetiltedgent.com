@@ -27,12 +27,46 @@ class AssetCards(unittest.TestCase):
            '<div class="section-title">01 What it is</div><p>What it is. VOO holds the five hundred largest US companies '
            'in one fund. Cheap.</p></section></body></html>')
 
-    def repo_with(self, repo: str, index: str) -> None:
+    HUB = '<main>\n<!-- indicator-cards old -->x<!-- /indicator-cards -->\n</main>'
+
+    def repo_with(self, repo: str, index: str, hub: str | None = None) -> None:
         os.makedirs(os.path.join(repo, 'reports', 'etf'))
         with open(os.path.join(repo, 'reports', 'index.html'), 'w', encoding='utf-8') as fh:
             fh.write(index)
         with open(os.path.join(repo, 'reports', 'etf', 'voo_analysis.html'), 'w', encoding='utf-8') as fh:
             fh.write(self.VOO)
+        rl.write_text(os.path.join(repo, asset_cards.HUB), self.HUB if hub is None else hub)
+
+    def test_the_indicator_hub_links_built_pages_and_marks_the_rest_coming(self):
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            self.repo_with(repo, self.INDEX)
+            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'sofr_analysis.html'), 'x')
+            rl.write_text(os.path.join(repo, 'reports', 'fixed', 'sofr_analysis.html'), 'stub')   # a moved report's stub
+            self.assertEqual(asset_cards.main(['--repo', repo]), 0)
+            hub = rl.read_text(os.path.join(repo, asset_cards.HUB))
+            index = rl.read_text(os.path.join(repo, 'reports', 'index.html'))
+        self.assertIn('<a class="card ind" href="/reports/view.html?r=indicators/sofr"><span class="code">SOFR</span>', hub)
+        self.assertIn('<div class="card ind soon"><span class="code">CPI</span>', hub)
+        self.assertEqual(hub.count('class="card ind'), sum(len(cards) for _, _, cards in asset_cards.INDICATOR_HUB))
+        self.assertEqual(hub.count('<span class="coming">Coming</span>'), hub.count('class="card ind soon"'))
+        for gid in ('g-rates', 'g-inflation', 'g-jobs'):   # learn/index.html links to these anchors
+            self.assertIn(f'id="{gid}"', hub)
+        self.assertNotIn('fixed/sofr', index)   # the stub is not a Bonds & cash card
+        self.assertIn('<h2 class="shead">Bonds &amp; cash <span class="scount">0</span></h2>', index)
+
+    def test_an_indicator_page_missing_from_the_hub_stops_the_script(self):
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            self.repo_with(repo, self.INDEX)
+            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'gdp_analysis.html'), 'x')
+            self.assertIn("add ['gdp'] to INDICATOR_HUB", str(asset_cards.main(['--repo', repo])))
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
+            self.repo_with(repo, self.INDEX, hub='<main></main>')
+            self.assertIn('marker for the indicator cards', str(asset_cards.main(['--repo', repo])))
+            self.assertEqual(rl.read_text(os.path.join(repo, 'reports', 'index.html')), self.INDEX)   # nothing written
+
+    def test_hub_slugs_are_the_audited_series(self):
+        import indicator_audit
+        self.assertEqual({c[0] for _, _, cards in asset_cards.INDICATOR_HUB for c in cards}, set(indicator_audit.SERIES))
 
     def test_main_writes_the_cards_and_tab_counts(self):
         with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
@@ -67,7 +101,7 @@ class Chrome(unittest.TestCase):
         n = chrome.nav(None)
         self.assertEqual(n.count('<details class="navmenu"'), 3)
         for href in ('/tables/craps-table.html', '/tables/blackjack-trainer.html', '/reports/?f=etf', '/reports/?f=fixed',
-                     '/learn/', '/learn/table-talk/finance.html', '/learn/table-talk/poker.html'):
+                     '/learn/', '/learn/table-talk/finance.html', '/learn/table-talk/poker.html', '/learn/indicators/'):
             self.assertIn(f'<a href="{href}">', n)
         self.assertIn('data-menu="learn"><summary>Learn</summary>', n)   # Learn is a section now, not Soon
         self.assertNotIn('Learn <span class="soon">', n)

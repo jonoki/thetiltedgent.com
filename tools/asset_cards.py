@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Write the ETF, crypto and bond cards on reports/index.html from the reports themselves.
+"""Write the ETF, crypto and bond cards on reports/index.html from the reports themselves, and the cards on the
+economic-indicators hub (learn/indicators/index.html).
 
-Run from the repo root after adding or renaming a report in reports/etf/, reports/crypto/ or reports/fixed/:
+Run from the repo root after adding or renaming a report in reports/etf/, reports/crypto/, reports/fixed/ or
+reports/indicators/:
     py -3 tools/asset_cards.py
 
 For each report: ticker and name come from its <title> ("VOO — Vanguard S&P 500 ETF | ETF Analysis"),
 the "What it is" line is the first sentence of its section 01, and the category label comes from LABEL below
-(add one when you add a report; the script stops if one is missing). The family tab counts are updated too."""
-import glob
+(add one when you add a report; the script stops if one is missing). The family tab counts are updated too.
+
+The indicator hub lists every indicator in INDICATOR_HUB, built or not: a built one (its page is in
+reports/indicators/) links to the report viewer, the rest show "Coming". A page in reports/indicators/ that the hub
+does not list stops the script."""
 import html
 import os
 import re
@@ -20,7 +25,7 @@ FAMILIES = {  # folder: (heading, one-line note, sort), plain text
     'etf': ('ETFs', 'Exchange-traded funds: one share, a whole basket.', 'az'),
     'crypto': ('Crypto', 'Cryptoassets, priced at the UTC daily close.', 'az'),
     'fixed': ('Bonds & cash', 'Bonds, bills, savings bonds and deposits, priced by their yield. Shortest term first.', 'term'),
-}   # one per reportlib.ASSET_FAMILIES folder (a unit test checks)
+}   # one per repodata.INDEX_FAMILIES folder (a unit test checks); the indicators have the hub below
 LABEL = {  # slug: category line on the card, plain text
     'arti': 'AI stocks, active, CAD-hedged', 'bnd': 'US investment-grade bonds', 'gld': 'Gold bullion', 'vfv': 'S&P 500 in Canadian dollars',
     'voo': 'S&P 500', 'xeqt': 'Global stocks, all in one',
@@ -48,14 +53,13 @@ LABEL = {  # slug: category line on the card, plain text
     'vbal': 'Balanced, 60/40, all in one', 'vgro': 'Growth, 80/20, all in one', 'ijh': 'US mid caps', 'ijr': 'US small caps, S&P 600',
     'vig': 'US dividend growers', 'vym': 'US high dividend yield', 'vxus': 'Stocks outside the US', 'xli': 'US industrial sector',
     'xlp': 'US consumer staples sector', 'shy': 'US Treasuries, 1-3 years', 'ief': 'US Treasuries, 7-10 years', 'gdx': 'Gold miners',
-    'sofr': 'US overnight secured rate', 'effr': 'US federal funds rate', 'cp3m': 'US commercial paper, 3-month',
-    'ust3y': 'US Treasury note, 3-year', 'corra': 'Canada overnight repo rate',
+    'cp3m': 'US commercial paper, 3-month', 'ust3y': 'US Treasury note, 3-year',
 }
 TERM = {'ust3m': 0.25, 'ust10y': 10, 'tips10y': 10.1, 'ust30y': 30, 'goc10y': 10.2,   # years; ties broken by the decimal
         'ust1m': 0.08, 'goc3m': 0.26, 'ust6m': 0.5, 'ust1y': 1, 'ust2y': 2, 'frn2y': 2.05, 'goc2y': 2.1, 'ust5y': 5,
         'tips5y': 5.05, 'goc5y': 5.1, 'gic5y': 5.2, 'ust7y': 7, 'ust20y': 20, 'eebond': 20.5, 'corpaaa': 25,
         'corpbaa': 25.1, 'tips30y': 30.05, 'goc30y': 30.1, 'gocrrb': 30.2, 'ibond': 30.3,
-        'sofr': 0.001, 'effr': 0.002, 'corra': 0.003, 'cp3m': 0.24, 'ust3y': 3}
+        'cp3m': 0.24, 'ust3y': 3}
 
 CARD_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" width="10.5" height="14.5" rx="1.8" '
              'transform="rotate(-13 8.5 12.2)"/><rect x="10" y="3.6" width="10.5" height="14.5" rx="1.8" '
@@ -63,10 +67,40 @@ CARD_ICON = ('<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" wi
 
 
 QUOTED_DEFINITION = {'ust30y'}   # its section 01 opens with the definition quoted from TreasuryDirect
-# Not securities (Oki, 6 Oct 2026): indicator rates and economic series move to their own economic-indicators section
-# when it is built. Until then they stay on the Bonds & cash tab. Never add new ones there.
-INDICATORS = {'sofr', 'effr', 'corra'}   # overnight / repo / policy-linked rates
-INDICATOR_REVIEW = {'gic5y'}   # a deposit you can buy, but the page charts the Bank of Canada's posted-rate series: Oki to decide
+# Bonds & cash holds only what a reader can buy. Indicator rates and economic series (not securities) are the
+# economic-indicators family, reports/indicators/, with its hub under Learn (Oki, 6 and 8 Oct 2026); SOFR, EFFR and
+# CORRA moved there on 8 Oct 2026. GIC5Y stays in Bonds & cash: a deposit you can buy (Oki, 8 Oct 2026).
+
+# The economic-indicators hub (Oki, 8 Oct 2026; first version: rates, inflation, jobs): (group, note, cards), each
+# card (slug, code shown on the card, name, one line), plain text. The slugs are tools/indicator_audit.py SERIES (a
+# unit test checks). The card copy is a placeholder until Oki reviews it.
+INDICATOR_HUB: list[tuple[str, str, list[tuple[str, str, str, str]]]] = [
+    ('Rates', 'What money costs: overnight, at the central bank and at the bank counter.', [
+        ('sofr', 'SOFR', 'Secured Overnight Financing Rate',
+         'What it costs to borrow cash overnight against Treasuries; the US benchmark that replaced LIBOR.'),
+        ('effr', 'EFFR', 'Effective Federal Funds Rate',
+         "The rate banks pay each other for overnight money, inside the Fed's target range."),
+        ('corra', 'CORRA', 'Canadian Overnight Repo Rate Average',
+         "Canada's overnight benchmark: borrowing cash overnight against Government of Canada bonds."),
+        ('fedtarget', 'FED TARGET', 'Fed funds target range',
+         'The range the Federal Reserve sets for overnight lending between banks: the policy rate behind US rates.'),
+        ('bocrate', 'BOC RATE', 'Bank of Canada policy rate',
+         "The Bank of Canada's target for the overnight rate, its main policy lever."),
+        ('prime', 'PRIME', 'US prime rate',
+         "The base rate many US banks use to price variable-rate loans; it moves when the Fed's target moves.")]),
+    ('Inflation', 'How fast prices are rising.', [
+        ('cpi', 'CPI', 'US Consumer Price Index',
+         'How fast prices are rising for US households, from the basket the Bureau of Labor Statistics prices monthly.'),
+        ('corepce', 'CORE PCE', 'US core PCE inflation',
+         "The PCE price index without food and energy; the Fed's 2% goal is set in PCE terms.")]),
+    ('Jobs', 'Who is working, and how many jobs were added.', [
+        ('unrate', 'UNEMPLOYMENT', 'US unemployment rate',
+         'The share of the labor force out of work and looking for it, from the monthly household survey.'),
+        ('payrolls', 'PAYROLLS', 'US nonfarm payrolls',
+         'How many jobs US employers added or cut last month, from the monthly survey of businesses.')]),
+]
+HUB = os.path.join('learn', 'indicators', 'index.html')
+VIEWER = '/reports/view.html?r=indicators/'
 
 
 def section_01(page: str) -> str:
@@ -129,22 +163,58 @@ def set_family_count(t: str, family: str, n: int) -> str:
 def main(argv: list[str] | None = None) -> int | str:
     """0 when the cards are written, else what stopped it (a report that cannot be made into a card, a missing
     marker or tab count, a file that cannot be read or written)."""
-    repo = rd.parser('Write the ETF, crypto and bond cards on reports/index.html.').parse_args(argv).repo
-    index = os.path.join(repo, 'reports', 'index.html')
+    repo = rd.parser('Write the ETF, crypto and bond cards on reports/index.html and the indicator hub cards.'
+                     ).parse_args(argv).repo
+    index, hub = os.path.join(repo, 'reports', 'index.html'), os.path.join(repo, HUB)
     try:
         with open(index, encoding='utf-8', newline='') as fh:
             t = write_cards(fh.read(), repo)
+        with open(hub, encoding='utf-8', newline='') as fh:
+            h = write_hub(fh.read(), repo)
         rl.write_text(index, t)
+        rl.write_text(hub, h)
     except (ValueError, OSError) as e:
         return str(e)
     return 0
+
+
+def hub_card(slug: str, code: str, name: str, line: str, built: bool) -> str:
+    """One card on the indicator hub: a link to the report viewer when the page is built, else marked Coming."""
+    e = lambda s: html.escape(s, quote=False)
+    inner = f'<span class="code">{e(code)}</span><h3>{e(name)}</h3><p>{e(line)}</p>'
+    if built:
+        return f'    <a class="card ind" href="{VIEWER}{slug}">{inner}<span class="more">Read the report</span></a>'
+    return f'    <div class="card ind soon">{inner}<span class="coming">Coming</span></div>'
+
+
+def write_hub(t: str, repo: str) -> str:
+    """The hub page t with its card block rewritten: every INDICATOR_HUB card, linked when its page is built.
+    ValueError when a built page is not on the hub or the marker is missing."""
+    built = {rd.slug_of(p) for p in rd.family_reports('indicators', repo)}
+    listed = {c[0] for _, _, cards in INDICATOR_HUB for c in cards}
+    if built - listed:
+        raise ValueError(f'add {sorted(built - listed)} to INDICATOR_HUB in tools/asset_cards.py')
+    groups = []
+    for head, note, cards in INDICATOR_HUB:
+        gid = 'g-' + re.sub(r'[^a-z]+', '-', head.lower()).strip('-')
+        groups.append(f'<section class="igroup" aria-labelledby="{gid}">\n'
+                      f'  <h2 class="ghead" id="{gid}">{html.escape(head)}</h2>\n'
+                      f'  <p class="gnote">{html.escape(note)}</p>\n  <div class="cards icards">\n'
+                      + '\n'.join(hub_card(*c, built=c[0] in built) for c in cards) + '\n  </div>\n</section>')
+    block = ('<!-- indicator-cards (written by tools/asset_cards.py) -->\n' + '\n'.join(groups)
+             + '\n<!-- /indicator-cards -->')
+    t, n = re.subn(r'<!-- indicator-cards .*?<!-- /indicator-cards -->', lambda _: block, t, flags=re.S)
+    if n != 1:
+        raise ValueError(f'marker for the indicator cards not found in {HUB}')
+    print(f'indicators: {len(built)} built of {len(listed)} on the hub')
+    return t
 
 
 def write_cards(t: str, repo: str) -> str:
     """The index page t with every family's card block and tab count rewritten from the reports under repo."""
     for folder, (head, note, order) in FAMILIES.items():
         cards = []
-        for p in glob.glob(rd.report_path('*', folder, repo=repo)):
+        for p in rd.family_reports(folder, repo):
             try:
                 cards.append(card(folder, p))
             except ValueError as e:

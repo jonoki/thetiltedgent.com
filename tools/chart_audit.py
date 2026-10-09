@@ -3,6 +3,7 @@
 usage: py -3 tools/chart_audit.py [slug ...]      (no args = every stock report; exits 1 on any wrong point or error,
        and on a named slug's unlabelled dividend-adjusted series)
        an ETF or crypto report is named with its folder: etf/arti, crypto/btc
+       (economic indicators, reports/indicators/, are audited against FRED / Valet by tools/indicator_audit.py)
 Flags any chart point more than 3% from Yahoo's split-adjusted month-end close AND from its dividend-adjusted
 close, and lists series that are dividend-adjusted but never say so (a named slug with such a series fails:
 every report moves to plain closes at its next refresh). The last point (the as-of close) is
@@ -259,6 +260,8 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
     """One report's chart against Yahoo, with its ticker and as-of date read from the page itself (so a new or
     just-refreshed report is checked before the manifest is rebuilt); {'slug', 'err'} when it cannot be audited
     (no such page, no ticker in the title, no chart arrays, no Yahoo series)."""
+    if slug.startswith('indicators/'):   # values from FRED / Valet, not Yahoo closes
+        return {'slug': slug, 'err': 'an economic indicator: audit it with tools/indicator_audit.py'}
     path = rd.report_path(slug, repo=repo)
     if not os.path.exists(path):
         return {'slug': slug, 'err': f'no page {os.path.relpath(path, repo)}'}

@@ -2,6 +2,11 @@
 """Pre-publish gate for report pages: document skeleton, chart arrays, final chart value == header price,
 52-week range, <title> ticker == file name, no embedded site nav.
 
+An economic indicator (reports/indicators/) has a value, not a price: the header value is read by
+reportlib.header_value (the .price-current's data-value, else its first number, sign kept), the range row may be
+'52-Week Range' or '12-Month Range' (reportlib.indicator_range), and the <title> code is the slug or the official
+series id (indicator_audit.SERIES). Its chart points are checked against the official series by indicator_audit.py.
+
 usage:  py -3 tools/verify.py [report.html ...]      (no arguments = every report in the library)
 Prints one PASS/FAIL line per report and exits 1 if any report fails.
 
@@ -16,6 +21,7 @@ from typing import NotRequired
 
 import reportlib as rl
 import chart_audit
+import indicator_audit
 import repodata as rd
 
 
@@ -76,15 +82,19 @@ def title_matches(ticker: str | None, path: str) -> bool:
     and a PG&E copy into cboe_analysis.html, and every other check passed."""
     norm = lambda s: re.sub(r'[.\-]', '', s or '').lower()
     slug = rd.slug_of(path)
+    if rl.family_of(path) == indicator_audit.FAMILY:   # an indicator: the slug or its official series id
+        ser = indicator_audit.SERIES.get(slug)
+        return norm(ticker) in (norm(slug), norm(ser.series_id if ser else None))
     # a non-US listing is filed under a short name; chart_audit maps that slug to its exchange symbol (0700.HK)
     return norm(ticker) in (norm(slug), norm(chart_audit.YAHOO_SYMBOL.get(slug)))
 
 
 def check(path: str) -> CheckResult:
     t = rl.read_text(path)
-    price = rl.header_price(t)
+    indicator = rl.family_of(path) == indicator_audit.FAMILY
+    price = rl.header_value(t) if indicator else rl.header_price(t)
     labels, prices = rl.chart_series(t)
-    pe_stated, pe_calc = pe_pair(t, price)
+    pe_stated, pe_calc = pe_pair(t, price) if not indicator else (None, None)
     ticker = rl.parse_title(t)[0]
     out = CheckResult(
         **rl.structure_counts(t), price=price,
@@ -93,8 +103,8 @@ def check(path: str) -> CheckResult:
         price_match=bool(price is not None and prices and abs(prices[-1] - price) < rl.PRICE_EXACT),
         pe_stated=pe_stated, pe_calc=pe_calc, date=rl.as_of(t)[0], chart_js=bool(CHART_JS.search(t)),
         title_ticker=ticker, title_ok=title_matches(ticker, path), ok=False)
-    w52 = rl.range_52w(t)
-    if w52 and price:
+    w52 = rl.indicator_range(t) if indicator else rl.range_52w(t)
+    if w52 and price is not None:
         out['range'] = (w52[0], w52[1])
         out['range_ok'] = w52[0] <= price <= w52[1]
     out['ok'] = passes(out, path)
