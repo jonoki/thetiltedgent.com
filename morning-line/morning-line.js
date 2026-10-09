@@ -137,7 +137,14 @@
 
   function renderMatters(b, st, heads){
     $('h-matters').textContent = st.kind === 'old' ? 'What mattered on ' + weekday(b.meta.trading_day) : 'What matters today';
-    var lines = (b.news && b.news.summary && b.news.summary.lines) || [];
+    var sum = (b.news && b.news.summary) || {};
+    var lines = sum.lines || [];
+    // when the summariser fails the feed falls back to a digest of top headlines; say so instead of calling them AI lines
+    var digest = (sum.warnings || []).some(function(w){ return /digest|no valid lines/i.test(String(w)); });
+    if (!$('why-matters').dataset.ai) $('why-matters').dataset.ai = $('why-matters').textContent;
+    $('why-matters').textContent = digest
+      ? 'The written summary isn’t ready for this brief, so here are the morning’s top headlines instead. Each one links to its story.'
+      : $('why-matters').dataset.ai;
     if (!lines.length){
       $('ml-matters').innerHTML = '<p class="empty">No summary in this brief' + (heads.length ? '; the headlines are below.' : '.') + '</p>';
       return;
