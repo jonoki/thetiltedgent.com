@@ -14,6 +14,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `glossary.py` | the finance and poker & gambling glossaries (Learn · Table Talk) from their data, and their term counts on the Table Talk page; fails when a recurring tear-sheet label has no entry (`--check`: a page or a count out of date) | `learn/table-talk/finance.html`, `learn/table-talk/poker.html`, the counts in `learn/table-talk/index.html` |
 | `verify.py` | pre-publish gate for report pages | nothing |
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
+| `index_rank.py` | each stock report's S&P 500 / Nasdaq-100 market-cap rank on its banner date (shares × Yahoo close for every member); `--check`: a row out of date | the "Mkt Cap Ranking" row and the rank sentence of the fine print in `reports/*_analysis.html` |
 | `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto and bond & cash reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
