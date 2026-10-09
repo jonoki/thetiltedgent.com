@@ -27,6 +27,7 @@ For a company whose report uses its home-market listing (no S&P 500 requirement;
 - Banner date = the latest settled home-market close on or before the batch date (holidays move it earlier; say which).
 - Metrics columns: Industry Avg plus the home benchmark (DAX, Nikkei 225, Hang Seng …) or the S&P 500 where no reliable home figure exists — say which. Short interest only where the market publishes it.
 - Primary sources: the exchange's filing system (HKEXnews, DART, MOPS, TDnet/EDINET, CNMV …) and the company's IR site, English versions where they exist.
+- Global listings (in neither the S&P 500 nor the Nasdaq-100): the hero rank row carries home-market ranks/constituencies dated to the banner date from a fetched source; re-check each at every refresh, and drop any you cannot source as of the banner date (Oki, 8 Oct 2026).
 - Long unbroken strings (source URLs, "US$488.1B (HK$3.83T)") overflow 390 px: keep `.container * { overflow-wrap: anywhere; }` in the page CSS.
 
 ## Data rules (hard — a plausible fabrication is the worst outcome)
@@ -40,7 +41,7 @@ For a company whose report uses its home-market listing (no S&P 500 requirement;
 ## Verify
 `py -3 tools/chart_audit.py <slug>` must report 0 wrong points (every chart point within 3% of Yahoo's month-end close, or of its dividend-adjusted close if the chart says it is dividend-adjusted). Chart plain closes, not dividend-adjusted ones: a named slug whose series is dividend-adjusted without saying so fails the audit (Oki, 8 Oct 2026).
 `py -3 tools/verify.py reports/<slug>_analysis.html` must print PASS and its pe=stated/calc pair must agree (±0.1). Extract the <script> body to $TEMP and `node --check` it. Fix until clean.
-`py -3 tools/index_rank.py <slug>` once the page and its index card exist: it writes the header's "Mkt Cap Ranking" row (S&P 500 / Nasdaq-100 rank on the banner date; no row for a page in neither index). Ranks are tool-written, never typed: no Global/US/exchange rank pills, no companiesmarketcap.com ranks (Oki, 8 Oct 2026).
+`py -3 tools/index_rank.py <slug>` once the page and its index card exist: it writes the header's "Mkt Cap Ranking" row (S&P 500 / Nasdaq-100 rank on the banner date). It writes member pages only; a global listing's row and fine print are left alone (see Non-US listings). On a member page ranks are tool-written, never typed: no Global/US/exchange rank pills, no companiesmarketcap.com ranks (Oki, 8 Oct 2026).
 
 ## Return (short, no file contents)
 1 verify line + chart_audit line · 2 index-card company name · 3 sector key (communicationservices consumerdiscretionary consumerstaples energy financials healthcare industrials materials realestate technology utilities) · 4 industry label in index style — reuse one of the existing labels in reports/index.html's #find options when one fits · 5 S&P 500 add date YYYY-MM-DD + source · 6 Nasdaq-100 member now? · 7 price, date, source URLs · 8 anything unsourced or doubtful (brief) · 9 `PITFALLS:` any error class from REPORT_PITFALLS.md you caught yourself mid-build (letter + one-line example) — this feeds the log.

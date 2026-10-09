@@ -26,6 +26,7 @@ New as-of = the most recent settled close (a stockanalysis history row WITH Adj.
 - header price/change, banner date ("Static data as of <Month D, YYYY> …"), market cap and every price-derived ratio (recompute at the new close);
 - chart: keep existing month-ends, add the missing month-end closes (digrin "Real price" / stockanalysis daily), end with the new close; labels/prices equal length; if a split/spin happened since, make the series consistent and label it; if `chart_audit.py <slug>` lists the page under ADJ-UNLABELLED, or the series is dividend-adjusted, rebase every point to the plain month-end close (Yahoo close / digrin "Real price") and sweep the prose for the old values (Oki, 8 Oct 2026);
 - metrics table from the new quarter (EPS TTM, margins, FCF, debt, etc.), 52-week range as of the new date, consensus/targets as of the new date (drop anything dated after it);
+- Global listings (in neither the S&P 500 nor the Nasdaq-100): the hero rank row carries home-market ranks/constituencies dated to the banner date from a fetched source; re-check each at every refresh, and drop any you cannot source as of the banner date (Oki, 8 Oct 2026);
 - Section 02 segments, Section 05 analyst calls, Section 06 catalysts (the print moves from "upcoming" to "happened"; add the next one only if dated by the company or labelled estimated).
 
 ## TASK B — did the business change? (decide the tier honestly)
@@ -53,7 +54,7 @@ Entities: use `&rarr;` `&middot;` `&mdash;` or real UTF-8 characters; never moji
 ## Verify
 `py -3 tools/chart_audit.py <slug>` → 0 wrong points; every previous-edition chart point is re-checked, not assumed (11 of 17 refreshes on 22 Sep found the previous chart wrong).
 `py -3 tools/verify.py reports/<slug>_analysis.html` → PASS with pe pair within ±0.1 (or None/None when EPS ≤ 0 and the P/E row reads n/m); `node --check` on the extracted <script>; LF only; no "tg-sitenav"; exactly one `.tg-d` section.
-`py -3 tools/index_rank.py <slug>` after the new banner date is in: it writes the header's "Mkt Cap Ranking" row (S&P 500 / Nasdaq-100 rank on the banner date) and the fine-print date. Ranks are tool-written, never typed (Oki, 8 Oct 2026).
+`py -3 tools/index_rank.py <slug>` after the new banner date is in: it writes the header's "Mkt Cap Ranking" row (S&P 500 / Nasdaq-100 rank on the banner date) and the fine-print date, on member pages only (a global listing's row is re-checked by hand, TASK A). Member ranks are tool-written, never typed (Oki, 8 Oct 2026).
 
 ## Return (short, no file contents)
 1 verify line · 2 tier (T1/T2) and the trigger(s) that decided it · 3 prior as-of/price → new as-of/price · 4 the print: date, figures vs consensus, guidance change, first-session move · 5 significant news since the print · 6 one-line list of every claim a checker should re-confirm · 7 `PITFALLS:` errors you found in the previous edition or caught in your own draft (letter + example).

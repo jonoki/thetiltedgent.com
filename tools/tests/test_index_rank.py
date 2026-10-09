@@ -1,5 +1,5 @@
-"""Unit tests for index_rank.py: ranking, dual-class shares, the rank row (write, insert, remove) and the fine-print
-rewrite.   Run: py -3 tools/run_checks.py"""
+"""Unit tests for index_rank.py: ranking, dual-class shares, the rank row (write, insert; a page in neither index left
+alone) and the fine-print rewrite.   Run: py -3 tools/run_checks.py"""
 import unittest
 
 import index_rank as ir
@@ -122,11 +122,10 @@ class Row(unittest.TestCase):
                       + ir.DEFAULT_ACCENT + 'S&amp;P 500: #400</span>\n    </div>\n    <div style="margin-top:12px;">', new)
         self.assertEqual(ir.write_row(new, {'sp500': 400}), (new, 'unchanged'))
 
-    def test_remove_for_a_page_in_neither_index(self):
-        new, what = ir.write_row(hero(OLD_ROW), {})
-        self.assertEqual(what, 'removed')
-        self.assertEqual(new, hero())
-        self.assertEqual(ir.write_row(hero(), {}), (hero(), 'none'))
+    def test_page_in_neither_index_is_left_alone(self):
+        # a global listing keeps its home-market rank row as it is (Oki, 8 Oct 2026)
+        self.assertEqual(ir.write_row(hero(OLD_ROW), {}), (hero(OLD_ROW), 'global'))
+        self.assertEqual(ir.write_row(hero(), {}), (hero(), 'global'))
 
     def test_class_styled_row(self):
         row = ('    <div class="rank-row">\n      <span class="rank-label">Mkt Cap Ranking:</span>\n'
@@ -169,21 +168,21 @@ class FinePrint(unittest.TestCase):
 
     def test_last_list_item_removed(self):
         page = disclaimer('Market shares, TAM figures and the NYSE market-cap rank are labelled estimates.')
-        self.assertEqual(self.rewrite(page, None), disclaimer('Market shares and TAM figures are labelled estimates.'))
+        self.assertEqual(self.rewrite(page), disclaimer(f'Market shares and TAM figures are labelled estimates. {NEW}.'))
 
     def test_source_clause_in_a_semicolon_list(self):
         page = disclaimer('Sources: SEC filings; CompaniesMarketCap (global market-cap rank); MarketBeat (analyst actions).')
         new_clause = NEW[0].lower() + NEW[1:]
         self.assertEqual(self.rewrite(page), disclaimer(f'Sources: SEC filings; {new_clause}; MarketBeat (analyst actions).'))
 
-    def test_page_in_neither_index_loses_the_old_ranks(self):
+    def test_page_in_neither_index_keeps_its_fine_print(self):
         page = disclaimer('Global market-cap rank from companiesmarketcap.com.', 'Other note.')
-        self.assertEqual(self.rewrite(page, None), '<div class="disclaimer">\n  <p>Other note.</p>\n</div>\n')
+        self.assertEqual(ir.rewrite_fine_print(page, None), (page, [], []))
 
-    def test_own_sentence_gets_the_new_date_and_goes_when_the_page_leaves(self):
+    def test_own_sentence_gets_the_new_date(self):
         page = disclaimer(f'{NEW}. Other.')
         self.assertEqual(self.rewrite(page, 'October 2, 2026'), disclaimer(f'{ir.NEW_CLAUSE.format(date="October 2, 2026")}. Other.'))
-        self.assertEqual(self.rewrite(page, None), disclaimer('Other.'))
+        self.assertEqual(self.rewrite(page, None), page)                 # a page in neither index: left alone
 
     def test_mixed_sentence_is_listed_not_forced(self):
         page = disclaimer('Market-cap rank and long-run price history: CompaniesMarketCap.com.')
@@ -193,7 +192,7 @@ class FinePrint(unittest.TestCase):
 
     def test_heading_survives_when_its_first_clause_goes(self):
         page = disclaimer('Flagged items: global, US and NYSE market-cap ranks are approximations; the Q3 date is estimated.')
-        self.assertEqual(self.rewrite(page, None), disclaimer('Flagged items: the Q3 date is estimated.'))
+        self.assertEqual(self.rewrite(page), disclaimer('Flagged items: the Q3 date is estimated.'))
 
     def test_prose_mention_of_the_old_source_is_not_rewritten(self):
         page = disclaimer('Market cap $45.8B, matching companiesmarketcap.com ($45.78B, global rank #569); other.')

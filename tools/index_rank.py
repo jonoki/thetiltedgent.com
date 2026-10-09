@@ -16,10 +16,13 @@ splits Yahoo booked after the member's as-of (Yahoo back-adjusts every close for
 on its as-of basis). Market cap on D = shares x that close.
 Rank on D: 1 + the number of the index's members with a larger market cap on D.
 The row: "Mkt Cap Ranking:" then "S&P 500: #N" and/or "Nasdaq-100: #N", first pill in the page's accent pill style, the
-second dim; a page in neither index has no row; a member page without one gets it under the ticker line.
-Fine print (the page's disclaimer): sentences and list items about the old ranks (companiesmarketcap.com, estimated
-US and exchange ranks) become NEW_CLAUSE with the banner date, or are removed on a page in neither index. What does
-not match a known shape is listed, never forced.
+second dim; a member page without one gets it under the ticker line.
+Member pages only: a page in neither index (a global listing) is never written and --check never flags it. Its rank
+row (home-market ranks and constituencies, e.g. "TSX #1", "SMI constituent") and its fine print about them are dated
+facts sourced at its build and re-checked at each refresh by the refresh agent (Oki, 8 Oct 2026).
+Fine print (a member page's disclaimer): sentences and list items about the old ranks (companiesmarketcap.com,
+estimated US and exchange ranks) become NEW_CLAUSE with the banner date; a second mention is removed. What does not
+match a known shape is listed, never forced.
 Flags, printed: implied shares more than 5% from the page's own Shares Outstanding row; a header price more than 1%
 from Yahoo's close on the as-of. A member without a usable market cap, price or Yahoo series stops the run before
 anything is written: every rank in its index would be in doubt.
@@ -322,10 +325,11 @@ def ticker_block_end(t: str) -> tuple[int, str]:
 
 
 def write_row(t: str, ranks: Mapping[str, int]) -> tuple[str, str]:
-    """(the page with its rank row written, what was done: 'replaced', 'inserted', 'removed', 'unchanged' or 'none')."""
-    row = find_row(t)
+    """(the page with its rank row written, what was done: 'replaced', 'inserted', 'unchanged', or 'global' for a
+    page in neither index (no ranks), which is left exactly as it is)."""
     if not ranks:
-        return (t[:row.start] + t[row.end:], 'removed') if row else (t, 'none')
+        return t, 'global'
+    row = find_row(t)
     if row:
         new = t[:row.start] + render_row(row, ranks) + t[row.end:]
         return new, 'unchanged' if new == t else 'replaced'
@@ -567,7 +571,8 @@ def leftover(s: str) -> bool:
 
 def rewrite_sentence(s: str, tags: list[str], date: str | None, slot: list[bool]) -> tuple[str | None, list[Edit]]:
     """One sentence (protected text) with its old-rank wording rewritten; None drops it. slot[0] turns True once the
-    page's one NEW_CLAUSE is placed. date None: the page is in neither index, so old ranks are removed, never replaced.
+    page's one NEW_CLAUSE is placed. date None: no NEW_CLAUSE is placed, so old ranks are removed, never replaced
+    (rewrite_fine_print never passes None: a page in neither index is left alone).
     A sentence that would still mention the old ranks, or lose tags that do not pair up, is left as it was (and listed)."""
     taken = slot[0]
     new, edits = _rewrite_sentence(s, date, slot)
@@ -663,7 +668,9 @@ def old_mentions(html: str) -> list[str]:
 
 def rewrite_fine_print(t: str, date: str | None) -> tuple[str, list[Edit], list[str]]:
     """(the page with its disclaimer's old-rank wording rewritten, the edits, the old-rank sentences left as they
-    were). date None: the page is in neither index."""
+    were). date None: the page is in neither index, and its fine print is left exactly as it is."""
+    if date is None:
+        return t, [], []
     scope = fine_print_scope(t)
     if not scope:
         return t, [], (['(no disclaimer found)'] if OLD.search(t) else [])
