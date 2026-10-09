@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VYLR — Vylor Inc. | Stock Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e293b;
+  --text: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b;
+  --accent: #2DD4BF;
+  --accent-dim: #2DD4BF33;
+  --red: #ef4444; --red-dim: #ef444422; --green: #22c55e; --green-dim: #22c55e22;
+  --blue: #3b82f6; --blue-dim: #3b82f622; --amber: #f59e0b; --amber-dim: #f59e0b22;
+  --purple: #a78bfa;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
+.noise-overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+.hero { padding: 60px 0 40px; border-bottom: 1px solid var(--border); }
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 24px; }
+.ticker-block { display: flex; align-items: center; gap: 20px; }
+.ticker-badge { background: var(--accent); color: #000; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 14px; border-radius: 6px; letter-spacing: 1px; }
+.company-name { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, #fff 0%, #94a3b8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.price-block { text-align: right; }
+.price-current { font-family: 'JetBrains Mono', monospace; font-size: 38px; font-weight: 600; color: #fff; }
+.price-change { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--red); margin-top: 4px; }
+.price-date { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; font-size: 13px; color: var(--text-muted); }
+.meta-item span { color: var(--text-dim); margin-right: 6px; }
+.section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+.section-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+.section-title .num { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent); background: var(--accent-dim); padding: 4px 10px; border-radius: 4px; font-weight: 600; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; transition: border-color 0.2s; }
+.card:hover { border-color: var(--accent); }
+.card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+.card-value { font-size: 24px; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+.card-note { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.biz-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; transition: border-color 0.2s; }
+.biz-card:hover { border-color: var(--accent); }
+.biz-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.biz-name { font-size: 20px; font-weight: 700; color: #fff; }
+.biz-stats { display: flex; gap: 20px; flex-wrap: wrap; }
+.biz-stat { text-align: right; }
+.biz-stat-val { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; color: #fff; }
+.biz-stat-label { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.biz-badge { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 4px; }
+.biz-badge.growth { background: var(--green-dim); color: var(--green); }
+.biz-badge.dominant { background: var(--accent-dim); color: var(--accent); }
+.biz-badge.emerging { background: var(--blue-dim); color: var(--blue); }
+.comp-bubbles { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.comp-bubble { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; min-width: 180px; flex: 1; max-width: 260px; }
+.comp-bubble-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.comp-bubble-stats { display: flex; gap: 16px; flex-wrap: wrap; }
+.comp-bubble-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+.comp-bubble-label { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.5px; }
+.biz-tam { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 12px; padding: 8px 14px; background: var(--bg); border-radius: 6px; display: inline-block; }
+.biz-tam strong { color: var(--text-muted); }
+.seg-bar { display: flex; height: 32px; border-radius: 8px; overflow: hidden; margin: 16px 0; }
+.seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #000; transition: flex 0.3s; }
+.seg-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.seg-legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.seg-dot { width: 10px; height: 10px; border-radius: 50%; }
+.analyst-bar { display: flex; gap: 2px; height: 20px; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+.fin-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.fin-table th, .fin-table td { padding: 14px 16px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+.fin-table th { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); font-weight: 500; }
+.fin-table td:nth-child(2) { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #fff; }
+.fin-table td:nth-child(3), .fin-table td:nth-child(4) { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-dim); }
+.fin-table td:nth-child(5) { color: var(--text-muted); font-size: 13px; }
+.fin-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fin-scroll > .fin-table { min-width: 760px; }
+.tip { border-bottom: 1px dotted var(--text-dim); cursor: help; }
+.chart-container { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin-top: 16px; position: relative; }
+.chart-canvas-wrap { position: relative; width: 100%; height: 400px; }
+canvas { width: 100% !important; height: 100% !important; }
+.timeline { margin-top: 32px; }
+.tl-item { display: flex; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--border); }
+.tl-item:last-child { border-bottom: none; }
+.tl-date { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); min-width: 100px; padding-top: 3px; }
+.tl-content { flex: 1; }
+.tl-title { font-weight: 600; color: #fff; margin-bottom: 4px; }
+.tl-desc { font-size: 14px; color: var(--text-muted); }
+.tl-impact { font-family: 'JetBrains Mono', monospace; font-size: 12px; margin-top: 6px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+.tl-impact.up { background: var(--green-dim); color: var(--green); }
+.tl-impact.down { background: var(--red-dim); color: var(--red); }
+.tl-impact.neutral { background: var(--amber-dim); color: var(--amber); }
+.moat-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.moat-pill { background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent); padding: 8px 18px; border-radius: 100px; font-size: 13px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+@media (max-width: 640px) { .case-grid { grid-template-columns: 1fr; } }
+.case-card { border-radius: 12px; padding: 24px; }
+.case-card.bull { background: var(--green-dim); border: 1px solid #22c55e44; }
+.case-card.bear { background: var(--red-dim); border: 1px solid #ef444444; }
+.case-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+.case-card.bull h4 { color: var(--green); }
+.case-card.bear h4 { color: var(--red); }
+.case-card p { font-size: 14px; color: var(--text-muted); line-height: 1.7; }
+.risk-list { margin-top: 20px; }
+.risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text-muted); }
+.risk-item:last-child { border-bottom: none; }
+.risk-num { font-family: 'JetBrains Mono', monospace; color: var(--amber); font-weight: 600; font-size: 13px; }
+.prose { font-size: 15px; color: var(--text-muted); line-height: 1.8; max-width: 800px; }
+.prose strong { color: var(--text); }
+.disclaimer { overflow-wrap: anywhere; text-align: center; font-size: 11px; color: var(--text-dim); padding: 40px 0; border-top: 1px solid var(--border); margin-top: 0; }
+@media (max-width: 768px) { .company-name { font-size: 28px; } .price-current { font-size: 28px; } .hero-top { flex-direction: column; } .price-block { text-align: left; } .section-title { font-size: 22px; } }
+</style>
+</head>
+<body>
+<div class="noise-overlay"></div>
+
+<div style="background:#f59e0b14;border-bottom:1px solid #f59e0b44;padding:10px 0;">
+  <div class="container" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#f59e0b;text-align:left;">
+    ⚠ Static data as of October 8, 2026 (Thursday settled close) — prices, metrics, and analyst targets will not update automatically
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <div class="ticker-block">
+        <span class="ticker-badge">VYLR</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Exchange:</span> NYSE</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Industry:</span> Consumer Staples / Agricultural Inputs</span>
+        <span style="font-size:13px;color:var(--text-muted);"><span style="color:var(--text-dim);">Mkt Cap:</span> $48.57B</span>
+      </div>
+      <div style="margin-top:10px;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent);padding:3px 10px;border-radius:4px;">S&amp;P 500: JOINED OCT 2026 — spun off from Corteva, took Corteva's seat</span>
+      </div>
+      <div class="company-name" style="margin-top:14px;">Vylor Inc.</div>
+    </div>
+    <div class="price-block">
+      <div class="price-current">$72.79</div>
+      <div class="price-change">−$0.20 (−0.27%)</div>
+      <div class="price-date">Close, Thursday October 8, 2026 · last completed settled market close</div>
+    </div>
+  </div>
+  <div class="meta-row">
+    <div class="meta-item"><span>HQ:</span> 7100 NW 62nd Avenue, Johnston, Iowa</div>
+    <div class="meta-item"><span>Shares Out:</span> 667.3M</div>
+    <div class="meta-item"><span>Independent:</span> October 1, 2026 (first filed with the SEC as Seed External Spinco Inc. in April 2026)</div>
+    <div class="meta-item"><span>Next Earnings:</span> November 11, 2026, after the close (Q3 2026; webcast Nov 12)</div>
+  </div>
+</div>
+
+<!-- ============ 01 COMPANY OVERVIEW ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">01</span> Company Overview</div>
+  <p class="prose">Vylor is a new name on an old business. It is Corteva's former seed segment — the <strong>Pioneer</strong>, <strong>Brevant</strong>, <strong>Dairyland Seed</strong> and <strong>PhytoGen</strong> brands, the germplasm (the bred genetic lines) behind them and the biotech traits built into them — handed to Corteva's shareholders as a separate company. At 12:03 a.m. New York time on <strong>October 1, 2026</strong>, Corteva distributed every Vylor share to holders of record on <strong>September 24</strong>, <strong>one Vylor share for each Corteva share</strong>. Regular-way trading on the NYSE under <strong>"VYLR"</strong> began the same morning, and S&amp;P Dow Jones Indices added Vylor to the <strong>S&amp;P 500</strong> that day in Corteva's place; Corteva, now the crop-protection company, moved down to the S&amp;P MidCap 400 on October 6. There was no "when-issued" trading beforehand, so October 1 was the first price the market ever set for this business on its own.</p>
+  <p class="prose" style="margin-top:16px;">Who got which half is the first thing to understand. In Corteva's last full year, 2025, the seed segment sold <strong>$9.90B</strong> of the company's $17.40B and earned <strong>$2.64B</strong> of segment operating EBITDA (earnings before interest, tax, depreciation and amortisation, before one-off items), against $1.35B for crop protection. The market agrees with that split: at the first close, a share of Corteva bought for <strong>$77.65</strong> on September 30 had become one VYLR at <strong>$68.26</strong> and one CTVA at <strong>$12.57</strong> — Vylor was about 84% of the combined value. By October 8 the pair was worth <strong>$86.54</strong>, up 11.4% from the last pre-spin close, against +1.5% for the S&amp;P 500 ETF (SPY) over the same window.</p>
+  <p class="prose" style="margin-top:16px;">The business is seasonal and North American. Farmers buy seed for spring planting, so the first half carries the year: in the first half of 2026 seed net sales were <strong>$7.56B (+4%)</strong> and segment operating EBITDA <strong>$3.00B (+11%)</strong>, while the second half of 2025 lost $69M at the same EBITDA line (our arithmetic from Corteva's segment tables). North America was 63% of 2025 seed sales. Management's plan is to grow modestly in sales and faster in profit: <strong>net sales of about $11.2–$11.9B and operating EBITDA of about $3.3–$3.7B by 2029</strong>, plus a licensing business (Vylor One) it expects to bring in more than $500M of gross licensing income in 2027. The separation was not uncontested: California and other states, pointing to Corteva's alleged liabilities for PFAS (long-lasting industrial chemicals often called "forever chemicals"), tried to block it in court. Corteva called the claims unfounded, and California's motion was denied on the eve of the distribution (section 06).</p>
+  <div class="card-grid" style="margin-top:28px;">
+    <div class="card">
+      <div class="card-label">Chief Executive</div>
+      <div class="card-value" style="font-size:20px;">Chuck Magro</div>
+      <div class="card-note">Charles V. Magro, 56, CEO and director at the separation (Vylor 8-K, Oct 7, 2026); he resigned as Corteva's CEO and director at the same moment, per Corteva's 8-K. At launch: "Vylor was created to reimagine agriculture." He added: "Our ambition is to work with farmers of all sizes to solve some of the world's toughest challenges – food security to energy security – and in the process, help farmers and communities thrive."</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Chief Financial Officer</div>
+      <div class="card-value" style="font-size:20px;">David P. Johnson</div>
+      <div class="card-note">59, CFO from the separation (Vylor 8-K, Oct 7); he left his Corteva officer post at the same moment. The rest of the team: Samuel R. Eathington (Chief Technology Officer), Judd M. O'Connor (Chief Commercial &amp; Operations Officer), Jennifer A. Johnson (Chief Legal Officer) and Audrey Grimm (Chief People Officer).</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Board</div>
+      <div class="card-value" style="font-size:20px;">Karen H. Grimes, Chair</div>
+      <div class="card-note">Seven directors from October 1: Grimes, Victor J. Aguilar, Rajesh Kalathur, Marcos M. Lutz, Charles V. Magro, Johannes J. Oosthuizen and Kerry J. Preete. Grimes, Lutz and Preete left Corteva's board the same day. Auditor: PricewaterhouseCoopers.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 02 CORE BUSINESSES ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">02</span> Core Businesses</div>
+  <p class="prose">Vylor has not yet reported as a standalone company; its first results (Q3 2026) come on November 11. The history below is the business as Corteva reported it: the <strong>Seed segment</strong>, with net sales by region for the <strong>full year 2025</strong> from Corteva's fourth-quarter 2025 release schedules. The four regions sum to $9,898M, which ties to reported segment net sales.</p>
+  <div class="seg-bar">
+    <div style="flex:63.4;background:#2DD4BF;">NORTH AMERICA 63.4%</div>
+    <div style="flex:16.3;background:#a78bfa;">LATAM 16.3%</div>
+    <div style="flex:15.8;background:#3b82f6;">EMEA 15.8%</div>
+    <div style="flex:4.6;background:#94a3b8;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> North America — $6,271M (FY2025), +3.9% <span class="tip" title="Year over year — versus the same period one year earlier.">YoY</span></div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#a78bfa;"></span> Latin America — $1,614M, +6.0%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#3b82f6;"></span> Europe, Middle East &amp; Africa — $1,560M, −1.3%</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> Asia Pacific — $453M (4.6%), +11.0%</div>
+  </div>
+  <p class="prose" style="margin-top:12px;font-size:13px;">Vylor's pro forma accounts, prepared on a different basis from Corteva's segment reporting, show slightly higher 2025 net sales of $10,067M; both bases appear in section 04, each labelled.</p>
+
+  <div class="biz-card" style="border-left: 3px solid #2DD4BF;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">North America — corn and soybean seed</div>
+        <span class="biz-badge dominant">CORE FRANCHISE</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$6,271M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+3.9%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">75.8%</div><div class="biz-stat-label">H1'26 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Corteva's 10-K names North America corn and soybeans first among the markets where its seed business leads, and Oppenheimer's initiation points to its leading market positions in corn and soybean seed. In the first half of 2026 North America sold <strong>$5,725M (+3%)</strong>, on 2% price and mix and 1% volume. The second quarter was flat at $3,955M: price and mix rose 2% but volume fell 2%, which management put down to timing shifts and farmers moving acres from corn to soybeans.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #a78bfa;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Rest of world — Latin America, EMEA, Asia Pacific</div>
+        <span class="biz-badge growth">FASTER PRICING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">$3,627M</div><div class="biz-stat-label">FY2025 Revenue</div></div>
+        <div class="biz-stat"><div class="biz-stat-val" style="color:var(--green);">+3.3%</div><div class="biz-stat-label">YoY Growth</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">36.6%</div><div class="biz-stat-label">FY2025 Mix</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">The 10-K lists Europe corn and sunflower and Brazil, India, South Africa and Argentina corn among the seed business's leading positions. Outside North America, first-half 2026 sales rose <strong>8% to $1,830M</strong>, but only 3% organically: price and mix added 5%, volume took off 2% and currency added 5%. Latin America and Asia Pacific posted 7–8% price gains in the second quarter, with Latin American volume down 12% on timing in Brazil. These markets swing with local currencies — the Brazilian real, the euro and the Turkish lira all moved the first-half numbers.</p>
+  </div>
+
+  <div class="biz-card" style="border-left: 3px solid #3b82f6;">
+    <div class="biz-header">
+      <div>
+        <div class="biz-name">Vylor One — licensing</div>
+        <span class="biz-badge emerging">EMERGING</span>
+      </div>
+      <div class="biz-stats">
+        <div class="biz-stat"><div class="biz-stat-val">&gt;$500M</div><div class="biz-stat-label">2027 Gross Target</div></div>
+        <div class="biz-stat"><div class="biz-stat-val">~$2B</div><div class="biz-stat-label">2040 Ambition</div></div>
+      </div>
+    </div>
+    <p class="biz-desc">Vylor licenses its genetics and traits to other seed companies. At launch it said it expects <strong>more than $500M of gross licensing income in 2027, over $1B by 2035, approaching $2B by 2040</strong>. The effect is already in the numbers: Corteva credited "increased out-licensing income" and "reductions in net royalty expense" — paying less to license other companies' traits — for part of the seed segment's margin gains in 2026. Oppenheimer expects the licensing business to turn profitable by 2027.</p>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">The operating facts that matter</h3>
+  <div class="card-grid" style="margin-top:16px;">
+    <div class="card">
+      <div class="card-label">Seed Op. EBITDA, TTM to Jun '26</div>
+      <div class="card-value">$2.93B</div>
+      <div class="card-note">28.7% of $10.21B trailing segment sales (our arithmetic: FY2025 + H1 2026 − H1 2025). FY2025 was $2.64B, up 18.8% on 3.7% sales growth — the margin went from 23.2% to 26.6%.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">First-Half Share of Sales</div>
+      <div class="card-value">74%</div>
+      <div class="card-note">H1 2026 seed sales of $7,555M against $10,209M trailing. The second half of 2025 sold $2,654M at a $69M operating EBITDA loss. Vylor's first two reported quarters will be its weakest.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Q2 2026 Seed Margin</div>
+      <div class="card-value" style="color:var(--green);">43.4%</div>
+      <div class="card-note">$1,966M of operating EBITDA on $4,532M of sales (flat), up from 41.1% — more than 230bps of expansion with no sales growth, from price, lower royalties and cost cuts.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Technology Pipeline</div>
+      <div class="card-value">12 platforms</div>
+      <div class="card-note">Launches in corn, soybeans and wheat over the next decade, which the company values at $19B: seven corn platforms from 2028, four soybean platforms by 2035, and Xpedite hybrid wheat in North America in late 2027.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 03 MOAT ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">03</span> Competitive Moat &amp; Vulnerabilities</div>
+  <p class="prose">Sources of moat:</p>
+  <div class="moat-list">
+    <span class="moat-pill">Elite germplasm</span>
+    <span class="moat-pill">Proprietary traits</span>
+    <span class="moat-pill">Pioneer brand</span>
+    <span class="moat-pill">Multiple routes to market</span>
+    <span class="moat-pill">Licensing income</span>
+    <span class="moat-pill">~$1B a year of R&amp;D</span>
+  </div>
+  <p class="prose" style="margin-top:18px;">A seed company's moat is time. The company describes its germplasm as the industry's most elite and its focus on seed innovation as more than a century old, and its own pipeline shows how long new traits take: corn platforms from 2028, soybean platforms through 2035. Vylor spent <strong>$979M on R&amp;D</strong> in pro forma 2025, about 9.7% of sales. BofA's initiation argues that Vylor's innovation, brands and distribution create high barriers to entry, and two other initiating brokers (Oppenheimer and Mizuho) make the same structural point: it is the only scaled, listed company that does nothing but seed and genetics. Mizuho adds a demand argument: it expects seed purchases to stay resilient because growers put money into seed ahead of other farm inputs.</p>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Key Vulnerabilities</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">The separation is under legal attack.</strong> California, one of several states pointing to Corteva's alleged PFAS liabilities, went to federal court to delay the spin-off. The district court refused to let it file for an injunction; on September 30 the Fourth Circuit reversed that refusal, and on remand the district court denied the motion the same day. Corteva's board then waived the condition that no legal restraint stand in the way, and the distribution went ahead. The challenge itself was not resolved on its merits.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Acreage and the farm economy.</strong> The second quarter showed how acreage moves the top line: a corn-to-soybean shift in North America and corn-to-sunflower in EMEA cut seed volume 3%. Farm incomes, crop prices and planting decisions are outside Vylor's control.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">A balance sheet built for the spin.</strong> Vylor borrowed to fund an estimated $3.54B cash distribution to Corteva. At separation the offering memorandum's pro forma estimate was $5.58B of borrowings against $1.10B of cash, about 1.8x pro forma 2025 operating EBITDA. Management expects 0.8–1.1x debt to EBITDA by December 31, 2026.</div></div>
+    <div class="risk-item"><span class="risk-num">04</span><div><strong style="color:#fff;">Goodwill-heavy and costly to stand up.</strong> Goodwill and other intangibles were $12.4B of $23.7B pro forma assets at March 31, 2026. Pro forma 2025 earnings absorbed $650M of significant items and $305M of separation costs, and the pro forma accounts assume about $270M more of one-off separation spending.</div></div>
+  </div>
+</div>
+
+<!-- ============ 04 METRICS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">04</span> Key Financial Metrics</div>
+  <p class="prose">Benchmark index is the <strong>S&amp;P 500</strong>, of which VYLR is a constituent. Vylor has no reported standalone period yet, so the figures come from two bases, labelled on each row: Vylor's <strong>pro forma</strong> accounts (as if the separation and its financing had already happened; from the offering memorandum Corteva filed on August 6, 2026) and Corteva's reported <strong>Seed segment</strong>. Price-based ratios are at the $72.79 close and our arithmetic.</p>
+  <div class="fin-scroll"><table class="fin-table">
+    <thead><tr><th>Metric</th><th>VYLR</th><th>Industry Avg</th><th>S&amp;P 500</th><th>Context</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tip" title="Price-to-Earnings: share price divided by earnings per share over the last twelve months. How many dollars you pay for one dollar of past-year profit.">Trailing P/E</span></td><td>n/m</td><td>—</td><td>—</td><td>No standalone twelve-month EPS exists. On pro forma FY2025 diluted EPS of $0.36, $72.79 ÷ $0.36 = 202x — a figure dragged up by $650M of significant items and $305M of separation costs, so not a useful gauge.</td></tr>
+      <tr><td><span class="tip" title="Earnings Per Share over the Trailing Twelve Months — the last four reported quarters of GAAP profit per share.">EPS (TTM)</span></td><td>n/m</td><td>—</td><td>—</td><td>Pro forma: $0.36 diluted for FY2025 (net income $243M) and $0.70 for Q1 2026 alone ($471M, a seasonally strong quarter), on Corteva's share count with the 1:1 distribution.</td></tr>
+      <tr><td><span class="tip" title="Market value divided by twelve months of revenue.">Price / Sales</span></td><td>4.8x</td><td>—</td><td>—</td><td>$48.57B market cap ÷ $10.07B pro forma FY2025 net sales = 4.82x; ÷ $10.21B trailing seed-segment sales to June 2026 = 4.76x.</td></tr>
+      <tr><td><span class="tip" title="Enterprise Value to operating EBITDA — market cap plus net debt, divided by earnings before interest, tax, depreciation and amortisation, excluding one-off items.">EV / Op. EBITDA</span></td><td>21.2x</td><td>—</td><td>—</td><td>EV $53.05B = $48.57B + $5.58B borrowings − $1.10B cash (pro forma at separation) ÷ $2.50B pro forma FY2025 operating EBITDA. On $2.93B trailing seed-segment EBITDA: 18.1x. On the 2029 target midpoint ($3.5B): 15.2x.</td></tr>
+      <tr><td><span class="tip" title="Year-over-year revenue growth — sales in the latest period versus the same period a year earlier.">Revenue Growth (YoY)</span></td><td>+3.7%</td><td>—</td><td>—</td><td>Seed segment FY2025: $9,898M vs $9,545M (price/mix +3%, volume +2%, currency −1%). H1 2026 +4.3%; Q2 2026 flat. 2029 target: $11.2–$11.9B, which the company describes as 3–4% annual growth.</td></tr>
+      <tr><td><span class="tip" title="Gross margin: revenue minus the direct cost of goods sold, as a percentage of revenue.">Gross Margin</span></td><td>52.9%</td><td>—</td><td>—</td><td>Pro forma FY2025 ($10,067M sales, $4,742M cost of goods sold). Q1 2026 pro forma: 55.3%.</td></tr>
+      <tr><td><span class="tip" title="Operating EBITDA as a percentage of revenue — the company's preferred profit measure, before one-off items.">Op. EBITDA Margin</span></td><td>24.9%</td><td>—</td><td>—</td><td>Pro forma FY2025 ($2,503M). Corteva's seed segment basis: 26.6% in FY2025, 28.7% trailing to June 2026. 2029 target range implies about 29–31%.</td></tr>
+      <tr><td><span class="tip" title="Net profit margin: net income as a percentage of revenue — what is left after every cost, including tax and interest.">Net Profit Margin</span></td><td>2.4%</td><td>—</td><td>—</td><td>Pro forma FY2025: $243M on $10,067M, after $650M of significant items, $305M of separation costs, $143M of exchange losses and a $259M tax charge.</td></tr>
+      <tr><td><span class="tip" title="Research and development spending as a share of sales.">R&amp;D / Sales</span></td><td>9.7%</td><td>—</td><td>—</td><td>Pro forma FY2025: $979M. Q1 2026: $239M.</td></tr>
+      <tr><td><span class="tip" title="Borrowings minus cash, divided by a year of operating EBITDA: roughly how many years of earnings it would take to repay the debt.">Net Debt / EBITDA</span></td><td>1.8x</td><td>—</td><td>—</td><td>($5,579M − $1,100M) ÷ $2,503M, on the pro forma estimate at separation. Management expects 0.8–1.1x debt to EBITDA at December 31, 2026; long-term ceiling 2.5x.</td></tr>
+      <tr><td><span class="tip" title="Current ratio: current assets divided by current liabilities.">Current Ratio</span></td><td>0.84</td><td>—</td><td>—</td><td>Pro forma at March 31, 2026: $7,968M ÷ $9,493M, in the middle of the selling season. Seed working capital swings through the year, so one quarter-end reading says little.</td></tr>
+      <tr><td><span class="tip" title="Dividend yield: annual dividend per share divided by the share price.">Dividend Yield</span></td><td>—</td><td>—</td><td>—</td><td>No Vylor dividend declared through October 8, 2026 (Vylor's releases and 8-Ks).</td></tr>
+      <tr><td><span class="tip" title="Short interest as a percentage of the freely tradable share float.">Short Interest (% float)</span></td><td>n/a</td><td>—</td><td>—</td><td>Listed October 1, 2026.</td></tr>
+      <tr><td><span class="tip" title="Beta: how much the stock moves relative to the overall market.">Beta</span></td><td>n/a</td><td>—</td><td>—</td><td>Six sessions of trading.</td></tr>
+      <tr><td>Shares Outstanding</td><td>667.3M</td><td>—</td><td>—</td><td>667,302,930 shares issued at the separation for distribution (Vylor 8-K, Oct 7). Market cap $48.57B = shares × $72.79.</td></tr>
+      <tr><td>52-Week Range (since Oct 1 listing)</td><td>$65.00 – $75.49</td><td>—</td><td>—</td><td>Six sessions only: the low came in the first session (Oct 1), the high at the Oct 7 open. $72.79 sits 3.6% below the high.</td></tr>
+    </tbody>
+  </table></div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:28px 0 8px;">Notable One-Off Items</h3>
+  <p class="prose">The pro forma 2025 earnings are mostly one-offs. Starting from <strong>$243M</strong> of net income, the reconciliation to <strong>$2,503M</strong> of operating EBITDA adds back $259M of tax, $781M of depreciation and amortisation, $119M of net interest, $143M of exchange losses, $3M of non-operating costs, <strong>$650M of significant items</strong> and <strong>$305M of separation costs</strong>. Q1 2026 was cleaner: $471M of net income, $29M of significant items and $51M of separation costs on the way to $979M of operating EBITDA. Vylor's first standalone reports will carry more separation spending and the interest on the debt raised at the spin, so GAAP earnings will trail operating EBITDA for a while yet.</p>
+</div>
+
+<!-- ============ 05 ANALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">05</span> Analyst Consensus</div>
+  <div class="card-grid">
+    <div class="card"><div class="card-label">Initiations, Oct 2–8</div><div class="card-value" style="color:var(--green);">8 Buy · 1 Neutral</div><div class="card-note">Nine brokers started coverage in the first six sessions: RBC, BMO, Morgan Stanley, Mizuho, BofA, Vertical Research, Oppenheimer and Goldman Sachs at Buy or the equivalent (Outperform, Overweight), and KeyBanc at Sector Weight.</div></div>
+    <div class="card"><div class="card-label">Average Price Target</div><div class="card-value">$82.00</div><div class="card-note"><span style="color:var(--green);">+12.7%</span> from $72.79. Mean of the nine figures ($87, $85, $85, $85, $84, $82, $78, $78, $74), our arithmetic; it matches MarketBeat's consensus (read Oct 9). One of the $78s is KeyBanc's fair-value estimate, which MarketBeat counts as a target. Stockanalysis.com's 10-analyst average is $81.70.</div></div>
+    <div class="card"><div class="card-label">Target Range</div><div class="card-value" style="font-size:20px;">$74 – $87</div><div class="card-note">+1.7% to +19.5%. The lowest target (Vertical Research) is barely above the price — the Street is positive, not euphoric.</div></div>
+    <div class="card"><div class="card-label">Rating Breakdown</div><div class="card-value" style="font-size:20px;">8 / 1 / 0</div><div class="card-note">Buy or equivalent / Sector Weight / Sell, across the nine broker initiations. MarketBeat's 12-rating panel, which adds quantitative rating services, reads Moderate Buy.</div></div>
+  </div>
+  <div class="analyst-bar">
+    <div style="flex:88.9;background:#22c55e;"></div>
+    <div style="flex:11.1;background:#f59e0b;"></div>
+  </div>
+  <div class="seg-legend">
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#22c55e;"></span> Buy / Outperform / Overweight — 8 (89%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#f59e0b;"></span> Sector Weight — 1 (11%)</div>
+    <div class="seg-legend-item"><span class="seg-dot" style="background:#ef4444;"></span> Sell — 0 (0%)</div>
+  </div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-dim);letter-spacing:1px;margin-top:28px;">KEY RECENT ANALYST CALLS</div>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Goldman Sachs</strong> · Initiates at Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$87</span> (Oct 8, 2026). The highest target: Goldman sees Vylor turning into an asset-light technology platform, with about 4% annual revenue growth and 8% EBITDA growth.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--amber);">●</span><div><strong style="color:#fff;">KeyBanc</strong> · Initiates at Sector Weight · fair value <span style="color:var(--amber);font-family:'JetBrains Mono',monospace;">$78</span> (Oct 7, 2026). Calls it one of the highest-quality companies in chemicals and agriculture, but expects competition to make earnings growth hard and says the valuation already reflects a positive outlook.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">Oppenheimer — Kristen Owen</strong> · Initiates at Outperform · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$82</span> (Oct 6, 2026). Calls Vylor the only scaled pure-play seed and genetics company, points to strong operating margins and leading positions in corn and soybean seed, and expects the licensing business to turn profitable by 2027.</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">BofA — Matthew DeYoe</strong> · Initiates at Buy · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$78</span> (Oct 5, 2026). Sees high barriers to entry and good timing ahead of an expected improvement in grain markets. Also on Oct 5: <strong>Vertical Research</strong>, Buy, $74; and <strong>Mizuho — Edlain Rodriguez</strong>, Outperform, $84, on resilient seed demand (TipRanks dates Mizuho's note Oct 4).</div></div>
+    <div class="risk-item"><span class="risk-num" style="color:var(--green);">●</span><div><strong style="color:#fff;">RBC — Arun Viswanathan</strong> · Initiates at Outperform · PT <span style="color:var(--green);font-family:'JetBrains Mono',monospace;">$85</span> (Oct 2, 2026; TipRanks dates it Oct 1). Same day: <strong>BMO — Joel Jackson</strong>, Outperform, $85, and <strong>Morgan Stanley — Vincent Andrews</strong>, Overweight, $85 (MarketBeat).</div></div>
+  </div>
+</div>
+
+<!-- ============ 06 CATALYSTS ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">06</span> Upcoming Catalysts &amp; News</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-date">Nov 11, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">First earnings as Vylor — Q3 2026</div>
+        <div class="tl-desc">Release after the close on November 11, webcast at 9:00 a.m. ET on November 12. The third quarter is the off-season for seed (the second half of 2025 lost $69M at segment operating EBITDA), so the headline numbers will look weak by design. The useful parts: the first standalone guidance, the dividend and buyback policy, the debt paydown path toward 0.8–1.1x by year-end, and the cost of running Vylor as a company of its own.</div>
+        <div class="tl-impact neutral">Key near-term event</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">2027–2029</div>
+      <div class="tl-content">
+        <div class="tl-title">Licensing, hybrid wheat and the 2029 targets</div>
+        <div class="tl-desc">Vylor One's &gt;$500M gross licensing income in 2027, Xpedite hybrid wheat in North America in late 2027, the first of seven corn platforms from 2028 (one trait averaged three extra bushels an acre in field trials, up to ten), and the 2029 goal of $11.2–$11.9B of sales and $3.3–$3.7B of operating EBITDA.</div>
+        <div class="tl-impact up">Potential upside catalyst</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 2–8, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Coverage begins — nine initiations</div>
+        <div class="tl-desc">RBC, BMO and Morgan Stanley started coverage on October 2; Mizuho, BofA and Vertical Research on October 5; Oppenheimer on October 6, KeyBanc on October 7 and Goldman Sachs on October 8. Eight of the nine are positive. The stock rose 9.02% on October 5, the session in which the Mizuho, BofA and Vertical Research notes came out, to $73.33 on 17.1M shares — its highest volume so far.</div>
+        <div class="tl-impact up">Oct 5: +9.02%</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Oct 1, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Distribution, NYSE debut and S&amp;P 500 entry</div>
+        <div class="tl-desc">Corteva completed the separation at 12:03 a.m.; VYLR opened at $66.00, traded between $65.00 and $75.00 and closed at $68.26. S&amp;P Dow Jones Indices added Vylor to the S&amp;P 500 the same day in Corteva's place. Vylor took on the debt: $1.44B of notes issued in exchange for EIDP notes, $1.1B of notes sold on August 31 ($550M due 2031, $550M due 2036), and $3.08B drawn by its subsidiary PHI on the new revolving credit facilities to repay a bridge loan.</div>
+        <div class="tl-impact neutral">Listing</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 30, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">California's challenge fails on the eve of the spin</div>
+        <div class="tl-desc">The Fourth Circuit reversed the district court's refusal to let California file its motion to block the separation, without ruling on the merits; on remand the district court denied the motion. Corteva's board waived the separation's legal-restraints condition the same day.</div>
+        <div class="tl-impact neutral">Legal overhang</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-date">Sep 15, 2026</div>
+      <div class="tl-content">
+        <div class="tl-title">Board approval, Investor Day, record date</div>
+        <div class="tl-desc">Corteva's board approved the separation on September 12 and set a September 15 Investor Day, with a morning session introducing Vylor. On September 24, the record date, Corteva announced that the SEC had declared Vylor's Form 10 registration effective.</div>
+        <div class="tl-impact neutral">Separation milestone</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 07 PRICE ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">07</span> Stock Price Analysis — Full Listed History (6 Sessions)</div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#fff;">VYLR — Daily Closes Since Listing, Oct 1 → Oct 8, 2026 (six sessions; no monthly or 5-year series exists)</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 8, 2026</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;font-family:'JetBrains Mono',monospace;">6 points · every daily settled close since regular-way trading began on Oct 1, 2026 · no month-end close exists yet · no Corteva history spliced in · dots mark annotated sessions (hover)</div>
+    <div class="chart-canvas-wrap"><canvas id="priceChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:16px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> VYLR daily close</div>
+    </div>
+  </div>
+
+  <div class="chart-container" style="margin-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fff;letter-spacing:0.5px;">VYLR VS THE S&amp;P 500 SINCE LISTING — REBASED TO 100 AT THE OCT 1 CLOSE</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#f59e0b;">⚠ STATIC DATA AS OF OCT 8, 2026</div>
+    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;max-width:800px;">With six sessions there is too little data for a momentum gauge such as RSI. This panel instead sets VYLR against the S&amp;P 500 (through the SPY ETF's daily closes), both starting at 100 on October 1.</div>
+    <div style="position:relative;width:100%;height:200px;"><canvas id="relChart"></canvas></div>
+    <div class="seg-legend" style="margin-top:12px;">
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#2DD4BF;"></span> VYLR</div>
+      <div class="seg-legend-item"><span class="seg-dot" style="background:#94a3b8;"></span> S&amp;P 500 (SPY)</div>
+    </div>
+  </div>
+
+  <p class="prose" style="margin-top:28px;">There is no five-year chart because there is no five-year stock: VYLR has six closes. From the first close of <strong>$68.26</strong> it is up <strong>6.6%</strong> to <strong>$72.79</strong>, against <strong>+1.3%</strong> for SPY over the same sessions; from the $66.00 opening trade it is up 10.3%. Nearly all of the move came in one session — <strong>+9.02% on October 5</strong> — and the stock has held between $72.79 and $73.33 at every close since.</p>
+  <p class="prose" style="margin-top:14px;">For a Corteva holder the better yardstick is the pair. One Corteva share closed at $77.65 on September 30; on October 8 the VYLR and CTVA it became closed at $72.79 and $13.75, together <strong>$86.54 (+11.4%)</strong>, against +1.5% for SPY. Corteva's pre-spin price chart is not VYLR's history and is not shown here: the seed business was never separately priced before October 1.</p>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Inflection points</h3>
+  <div class="timeline">
+    <div class="tl-item"><div class="tl-date">Oct 1</div><div class="tl-content"><div class="tl-title">Debut — $68.26 close</div><div class="tl-desc">Opened at $66.00, ranged $65.00–$75.00 on about 15.0M shares. No when-issued market existed, so price discovery happened in one session.</div><div class="tl-impact neutral">Listing</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 2</div><div class="tl-content"><div class="tl-title">Second day — $67.26</div><div class="tl-desc">The lowest close so far, with an intraday low of $65.11.</div><div class="tl-impact down">−1.46%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 5</div><div class="tl-content"><div class="tl-title">Re-rating — $73.33</div><div class="tl-desc">Up 9.02% on 17.1M shares on the day Mizuho, BofA and Vertical Research started coverage, closing near the day's high of $73.66.</div><div class="tl-impact up">+9.02%</div></div></div>
+    <div class="tl-item"><div class="tl-date">Oct 8</div><div class="tl-content"><div class="tl-title">Settled close — $72.79</div><div class="tl-desc">Three quiet sessions at $72.93, $72.99 and $72.79 on 7.5–8.5M shares; Goldman's Buy initiation came the same morning.</div><div class="tl-impact neutral">Data-as-of price</div></div></div>
+  </div>
+
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Relative performance</h3>
+  <p class="prose">A five-year comparison is impossible. Over its six sessions VYLR has beaten the S&amp;P 500 by about five percentage points (+6.6% vs +1.3%), almost all of it on one day. That is a description of one week, not a trend.</p>
+</div>
+
+<!-- ============ 08 SUMMARY ============ -->
+<div class="section">
+  <div class="section-title"><span class="num">08</span> Summary &amp; Key Risks</div>
+  <div class="case-grid">
+    <div class="case-card bull">
+      <h4>Bull Case</h4>
+      <p>The only scaled, listed pure play in seed and genetics, carrying the business that earned most of Corteva's profit: $2.93B of trailing segment operating EBITDA at a 28.7% margin, with margins up more than 230bps in Q2 2026 on flat sales. Profit is set to grow faster than sales as licensing income rises and royalty payments fall — management targets $3.3–$3.7B of operating EBITDA by 2029, and Vylor One alone is expected to bring in more than $500M of gross licensing income in 2027. Twelve platform launches start in 2027–2028, debt falls to 0.8–1.1x EBITDA by year-end, and on the 2029 target midpoint the stock trades at about 15x EV/EBITDA. Eight of the nine brokers that started coverage rate it a Buy or the equivalent.</p>
+    </div>
+    <div class="case-card bear">
+      <h4>Bear Case</h4>
+      <p>A 3–4% sales grower priced at 21x pro forma operating EBITDA and 4.8x sales, with GAAP earnings of $0.36 a share in 2025 under separation and restructuring charges. Most of the year's profit is made in two quarters and depends on North American corn acres, which were already slipping toward soybeans in Q2. Vylor carries the debt that paid Corteva an estimated $3.54B, has $12.4B of goodwill and intangibles, and starts life with a state's challenge to the spin-off unresolved on its merits. The targets that matter — new corn platforms, hybrid wheat, $2B of licensing income — lie years out, and KeyBanc already thinks the price reflects the good news.</p>
+    </div>
+  </div>
+  <h3 style="font-family:'Playfair Display',serif;font-size:20px;margin:32px 0 8px;">Top 3 Risks</h3>
+  <div class="risk-list">
+    <div class="risk-item"><span class="risk-num">01</span><div><strong style="color:#fff;">Litigation over the separation.</strong> California's bid to delay the spin-off was denied, but the courts did not rule on its substance. If the claim revives, it lands on a company that has just taken on about $5.6B of borrowings.</div></div>
+    <div class="risk-item"><span class="risk-num">02</span><div><strong style="color:#fff;">Acreage and farm income.</strong> A shift from corn to soybeans, a weak harvest price or a cautious farmer shows up directly in seed volume and mix — as it did in Q2 2026, when volume fell 3%.</div></div>
+    <div class="risk-item"><span class="risk-num">03</span><div><strong style="color:#fff;">Execution as a standalone company.</strong> New systems, new financing and a first standalone guide in November. Separation costs and dis-synergies will show in GAAP earnings before the pipeline launches show in sales.</div></div>
+  </div>
+</div>
+
+<!-- ============ INDUSTRY COMMENTARY ============ -->
+<div class="section">
+  <div class="section-title">Industry Commentary</div>
+  <div class="biz-card" style="border-left:3px solid #22c55e;">
+    <div class="biz-header"><div class="biz-name">Seed as a technology business</div><span class="biz-badge" style="background:var(--green-dim);color:var(--green);">STRUCTURAL THEME</span></div>
+    <p class="biz-desc">The bull argument for Vylor is that seed is closer to a technology business than to a commodity input: the value sits in genetics and traits that can be licensed as well as sold, and the company's own launch plan runs a decade out. Corteva's 2026 numbers point that way — margin gains came from price, licensing income and lower royalty costs rather than volume — and Goldman calls the company an asset-light technology platform. The counterweight is that seed still lives on farm economics, and one year of margin expansion is a direction, not a proof.</p>
+  </div>
+  <div class="biz-card" style="border-left:3px solid #f59e0b;">
+    <div class="biz-header"><div class="biz-name">Spin-off mechanics</div><span class="biz-badge" style="background:var(--amber-dim);color:var(--amber);">FADING DISTORTION</span></div>
+    <p class="biz-desc">Vylor started life with a shareholder base that did not choose it (every Corteva holder received it), debt designed by its former parent, and accounts that are still pro forma. S&amp;P 500 index funds received it as Corteva holders, and Vylor took Corteva's seat in the index, so they had no reason to sell. Those distortions fade: the first standalone quarter arrives on November 11, the pro forma figures give way to reported ones over the next year, and the holder base re-sorts toward investors who want a pure seed company.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;"><strong>Data as of Thursday, October 8, 2026. This is a point-in-time snapshot — prices, metrics, and analyst targets are not live and will not update automatically.</strong></p>
+  <p style="max-width:900px;margin:0 auto 10px;">Price source: <strong>https://stockanalysis.com/stocks/vylr/history/</strong> — the October 8, 2026 settled close of $72.79 (open 73.86, high 75.19, low 72.55, Adj. Close present, −0.27% on the prior close of $72.99). Matches the same-day row on Yahoo Finance.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Sources: Corteva's 8-K of October 5, 2026 (completion of the distribution); Vylor's 8-Ks of September 25, October 1, October 5 and October 7, 2026 (Form 10 effectiveness, the California proceedings, governance, directors and officers, shares issued, notes and credit facilities); Corteva's press releases of September 14 (board approval, 1:1 ratio; its response to the state attorneys general on PFAS), September 24 (record date; no when-issued trading), September 30 and October 1, 2026 (exchange offers), filed on EDGAR; Corteva's 8-K of October 1, 2026 (Item 8.01: the Fourth Circuit and the waiver); Corteva's August 6, 2026 8-K, Exhibit 99.1 (offering-memorandum excerpts: pro forma statements, borrowings, cash, leverage targets, separation costs); Corteva's August 31, 2026 8-K (Vylor's 2031 and 2036 notes); Corteva's Q2 2026 (July 30, 2026) and Q4 2025 earnings releases and schedules (Seed segment sales, operating EBITDA, regions, price/volume and the drivers quoted in section 02); Corteva's 2025 10-K (seed brands and market positions); Corteva's 8-K of October 7, 2026 (officer and director departures); Vylor's October 1, 2026 launch release (Magro's quotes, licensing and 2029 targets, pipeline) and October 6 earnings-date release (PR Newswire); S&amp;P Dow Jones Indices' October 1, 2026 index announcement (PR Newswire); MarketBeat's and TipRanks' ratings tables for the nine broker initiations and their dates, and TheFly (via TipRanks) for Goldman Sachs's date and the firms' arguments; stockanalysis.com for its consensus; Yahoo Finance daily history for VYLR, CTVA and SPY.</p>
+  <p style="max-width:900px;margin:0 auto 10px;">Chart data: 6 points — every daily settled close from the start of regular-way trading on October 1, 2026 through October 8, 2026 (stockanalysis.com daily rows, matching Yahoo Finance). <strong>Under one month of history exists, so the chart shows daily closes; no month-end close exists yet, no earlier prices were reconstructed and no Corteva history was spliced in.</strong> Stockanalysis's VYLR page carries Corteva's pre-October price history and Corteva-level statistics (revenue, dividend, 52-week range); none of those figures is used here. The comparison panel uses SPY daily closes from Yahoo Finance, rebased to 100 at October 1. The Corteva pre-spin close of $77.65 (September 30) is from the same stockanalysis rows and matches Yahoo's CTVA series once its 6.665-for-1 spin-off adjustment is reversed. Market cap, EV, P/S, EV/EBITDA, net debt/EBITDA, trailing segment figures, regional shares and the average target are our arithmetic from the sourced inputs. Pro forma figures are management's estimates of what the separated company would have looked like, not reported results; the 2029 targets are management forecasts.</p>
+  <p style="max-width:900px;margin:0 auto;">This report is for informational and educational purposes only. It is not investment advice, a recommendation, or an offer to buy or sell any security. Figures presented as guidance are management forecasts, not results. Do your own research and consider consulting a licensed financial adviser. Past performance does not indicate future results.</p>
+</div>
+
+</div>
+
+<script>
+// ===== STATIC DATA — every daily settled close since VYLR's Oct 1, 2026 listing (stockanalysis.com / Yahoo Finance daily rows) =====
+const labels = ['Oct 1','Oct 2','Oct 5','Oct 6','Oct 7','Oct 8'];
+const prices = [68.26,67.26,73.33,72.93,72.99,72.79];
+// S&P 500 via SPY daily closes (Yahoo Finance), same sessions
+const spyCloses = [763.99,769.64,774.83,779.09,777.22,773.93];
+
+function rebase(arr) {
+  return arr.map(function(v) { return +(v / arr[0] * 100).toFixed(2); });
+}
+
+const events = [
+  { idx: 0, label: 'Oct 1, 2026 — NYSE debut after Corteva spin-off; S&P 500 entry; $68.26', color: '#3b82f6' },
+  { idx: 2, label: 'Oct 5, 2026 — Mizuho, BofA, Vertical initiate; +9.02% to $73.33',       color: '#22c55e' },
+  { idx: 5, label: 'Oct 8, 2026 — settled close $72.79',                                    color: '#2DD4BF' }
+];
+const eventMap = {};
+events.forEach(function(e) { eventMap[e.idx] = e; });
+
+const vylrRel = rebase(prices);
+const spyRel  = rebase(spyCloses);
+
+const priceCtx = document.getElementById('priceChart').getContext('2d');
+const grad = priceCtx.createLinearGradient(0, 0, 0, 400);
+grad.addColorStop(0, 'rgba(45,212,191,0.22)');
+grad.addColorStop(1, 'rgba(45,212,191,0)');
+
+new Chart(priceCtx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'VYLR close', data: prices, borderColor: '#2DD4BF', backgroundColor: grad,
+        borderWidth: 2.5, fill: true, tension: 0.2,
+        pointRadius: prices.map(function(_, i) { return eventMap[i] ? 6 : 3; }),
+        pointBackgroundColor: prices.map(function(_, i) { return eventMap[i] ? eventMap[i].color : '#2DD4BF'; }),
+        pointBorderColor: '#0a0e17', pointBorderWidth: 2, pointHoverRadius: 7
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 12,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: {
+          label: function(c) { return c.dataset.label + ': $' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); },
+          afterBody: function(items) {
+            var e = eventMap[items[0].dataIndex];
+            return e ? ['', e.label] : [];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, maxRotation: 0, autoSkip: false } },
+      y: { grid: { color: '#1e293b' }, suggestedMin: 64, suggestedMax: 76, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 10 }, callback: function(v) { return '$' + v; } } }
+    }
+  }
+});
+
+new Chart(document.getElementById('relChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'VYLR', data: vylrRel, borderColor: '#2DD4BF', borderWidth: 2, fill: false, pointRadius: 2, tension: 0.2 },
+      { label: 'S&P 500 (SPY)', data: spyRel, borderColor: '#94a3b8', borderWidth: 1.6, borderDash: [5,4], fill: false, pointRadius: 2, tension: 0.2 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2235', borderColor: '#1e293b', borderWidth: 1,
+        titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+        titleFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+        callbacks: { label: function(c) { return c.dataset.label + ': ' + (c.parsed.y === null ? '—' : c.parsed.y.toFixed(2)); } }
+      }
+    },
+    scales: {
+      x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 }, maxRotation: 0, autoSkip: false } },
+      y: {
+        grid: { color: function(c) { return c.tick.value === 100 ? '#334155' : '#1e293b'; } },
+        ticks: { color: '#64748b', font: { family: "'JetBrains Mono', monospace", size: 9 } }
+      }
+    }
+  }
+});
+</script>
+</body>
+</html>
