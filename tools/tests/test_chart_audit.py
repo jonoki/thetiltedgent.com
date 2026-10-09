@@ -137,6 +137,91 @@ class ChartAudit(unittest.TestCase):
         assert chart_audit.failed(row)
         self.assertEqual(row['err'], '3 labels for 2 prices')
 
+    @staticmethod
+    def bars_json(rows: list[tuple[int, int, int, float]], splits: dict | None = None) -> str:
+        """A Yahoo chart response with one bar per (year, month, day, close); adjclose = close."""
+        ts = [int(datetime.datetime(y, m, d, 13, 30, tzinfo=datetime.UTC).timestamp()) for y, m, d, _ in rows]
+        closes = [c for *_, c in rows]
+        return json.dumps({'chart': {'result': [{
+            'meta': {'gmtoffset': -14400}, 'timestamp': ts, 'events': {'splits': splits or {}},
+            'indicators': {'quote': [{'close': closes}], 'adjclose': [{'adjclose': closes}]}}]}})
+
+    # CTVA-like (Vylor spin, 1 Oct 2026, booked by Yahoo as a 6.665:1 "split"): real month-end closes before the spin
+    SPIN = ('2026-10-01', 6.665)
+    REAL = {(2025, 11): 67.47, (2025, 12): 67.03, (2026, 1): 72.80, (2026, 2): 80.12, (2026, 9): 77.65}
+    LABELS = ["Nov '25", "Dec '25", "Jan '26", "Feb '26", "Sep '26", "Oct '26"]
+
+    def spin_feeds(self) -> tuple[str, str]:
+        """(monthly, daily) Yahoo responses: the monthly bars mixed (to Dec 2025 real, from Jan 2026 back-adjusted),
+        the daily feed back-adjusted throughout, with a mid-month day that is not the month-end."""
+        split = {str(int(datetime.datetime(2026, 10, 1, 13, 30, tzinfo=datetime.UTC).timestamp())):
+                 {'numerator': 6.665, 'denominator': 1}}
+        f = self.SPIN[1]
+        monthly = [(y, m, 1, c if (y, m) < (2026, 1) else c / f) for (y, m), c in self.REAL.items()] + [(2026, 10, 1, 13.75)]
+        daily = []
+        for (y, m), c in self.REAL.items():
+            daily += [(y, m, 15, c * 0.8 / f), (y, m, 27, c / f)]   # the 27th stands in for the last trading day
+        daily.append((2026, 10, 8, 13.75))
+        return self.bars_json(monthly, split), self.bars_json(daily, split)
+
+    def test_a_declared_spin_is_checked_on_daily_month_ends_not_the_mixed_monthly_bars(self):
+        monthly_json, daily_json = self.spin_feeds()
+        fetched = []
+
+        def fake_fetch(slug, ticker, path, daily=False):
+            fetched.append((slug, daily))
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(daily_json if daily else monthly_json)
+        prices = [round(c / self.SPIN[1], 2) for c in self.REAL.values()] + [13.75]   # the spin-adjusted chart
+        with tempfile.TemporaryDirectory() as d, \
+                unittest.mock.patch.object(chart_audit, 'WORK', d), \
+                unittest.mock.patch.object(chart_audit, 'fetch', fake_fetch), \
+                unittest.mock.patch.object(chart_audit, 'SPINOFFS', {'acme': self.SPIN}):
+            series, splits = chart_audit.monthly_series('acme', 'ACME', '2026-10-08')
+            mixed, _ = chart_audit.monthly_series('other', 'OTHER', '2026-10-08')
+        self.assertEqual(fetched, [('acme', True), ('other', False)])
+        self.assertAlmostEqual(series[(2025, 12)][0], 67.03 / 6.665)                  # the month-end, not the 15th
+        self.assertEqual(splits, [('2026-10-01', 6.665)])
+        row = chart_audit.check_points(self.LABELS, prices, series, splits, '2026-10-08', spin=self.SPIN)
+        self.assertEqual((row['checked'], row['bad'], row['step_pts'], row['spin_adj_pts']), (5, [], 0, 5))
+        # the mixed monthly bars would flag every point before Jan 2026, which is why a declared spin reads the daily feed
+        row = chart_audit.check_points(self.LABELS, prices, mixed, splits, '2026-10-08', spin=self.SPIN)
+        self.assertEqual([b[0] for b in row['bad']], ["Nov '25", "Dec '25"])
+
+    def test_real_pre_spin_closes_of_a_declared_spin_are_a_basis_step(self):
+        series = {ym: (c / self.SPIN[1], c / self.SPIN[1]) for ym, c in self.REAL.items()}
+        prices = list(self.REAL.values()) + [13.75]
+        row = chart_audit.check_points(self.LABELS, prices, series, [('2026-10-01', 6.665)], '2026-10-08', spin=self.SPIN)
+        self.assertEqual((row['bad'], row['step_pts'], row['spin_adj_pts']), ([], 5, 0))
+        # undeclared, the same 6.665 is a real split and the real closes are wrong
+        row = chart_audit.check_points(self.LABELS, prices, series, [('2026-10-01', 6.665)], '2026-10-08')
+        self.assertEqual(len(row['bad']), 5)
+
+    def test_an_undeclared_10_for_1_split_is_still_a_real_split(self):
+        labels, real = ["Jan '26", "Feb '26", "Mar '26", "Apr '26", "May '26"], [500.0, 520.0, 54.0, 55.0, 56.0]
+        series = {(2026, 1): (50.0, None), (2026, 2): (52.0, None), (2026, 3): (54.0, None), (2026, 4): (55.0, None)}
+        splits = [('2026-03-02', 10.0)]
+        row = chart_audit.check_points(labels, real, series, splits, '2026-05-20')      # pre-split points not adjusted
+        self.assertEqual([b[0] for b in row['bad']], ["Jan '26", "Feb '26"])
+        row = chart_audit.check_points(labels, [50.0, 52.0, 54.0, 55.0, 56.0], series, splits, '2026-05-20')
+        self.assertEqual((row['bad'], row['step_pts'], row['spin_adj_pts']), ([], 0, 0))
+        self.assertEqual(chart_audit.spin_factor(splits, (2026, 1), '2026-05-20'), 1.0)
+        self.assertEqual(chart_audit.spin_factor(splits, (2026, 1), '2026-05-20', declared=('2026-04-01', 2.0)), 2.0)   # only the declared one
+        self.assertNotIn('acme', chart_audit.SPINOFFS)   # SPINOFFS is per slug: no other report reads it
+
+    def test_a_spin_adjusted_chart_must_say_so(self):
+        self.assertTrue(chart_audit.spin_adjusted_labelled('5-year closes · SPIN-ADJUSTED'))
+        self.assertTrue(chart_audit.spin_adjusted_labelled('prices adjusted for the spin: spin-off adjusted closes'))
+        self.assertFalse(chart_audit.spin_adjusted_labelled('real closes, not spin-adjusted'))
+        self.assertFalse(chart_audit.spin_adjusted_labelled('split-adjusted closes'))
+        row = {'slug': 'ctva', 'ticker': 'CTVA', 'as_of': '2026-10-08', 'checked': 59, 'bad': [], 'adj_pts': 0, 'step_pts': 0,
+               'splits_after_as_of': 1.0, 'pre_launch': [], 'spin_adj_pts': 59, 'adj_labelled': False}
+        for labelled, code in ((True, 0), (False, 1)):
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    unittest.mock.patch.object(chart_audit, 'WORK', tempfile.gettempdir()), \
+                    unittest.mock.patch.object(chart_audit, 'audit', lambda slug, repo, lab=labelled: {**row, 'spin_labelled': lab}):
+                self.assertEqual(chart_audit.main(['ctva']), code)
+
     def test_an_unknown_slug_fails_the_run(self):
         with contextlib.redirect_stdout(io.StringIO()), \
                 unittest.mock.patch.object(chart_audit, 'WORK', tempfile.gettempdir()):
