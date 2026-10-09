@@ -25,7 +25,7 @@ For a company whose report uses its home-market listing (no S&P 500 requirement;
 - `<title>` = `<EXCHANGE SYMBOL> — <Company name> | Stock Analysis`, the symbol exactly as Yahoo lists it (`0700.HK`, `DTE.DE`, `ATCO-A.ST`). No pseudo-tickers.
 - Price, chart and per-share figures in the listing's currency, with its marker (€, HK$, ¥, ₩, £/p, CHF …); the hero says which. `Mkt Cap:` in USD at the banner-date FX close (source named), local figure beside it.
 - Banner date = the latest settled home-market close on or before the batch date (holidays move it earlier; say which).
-- Metrics columns: Industry Avg plus the home benchmark (DAX, Nikkei 225, Hang Seng …) or the S&P 500 where no reliable home figure exists — say which. Short interest only where the market publishes it.
+- Metrics columns: Industry Avg plus the S&P 500, written by `tools/index_stats.py` like every report (Oki, 9 Oct 2026); never a home-index column. Home-index returns (DAX, Nikkei 225, Hang Seng …) go in the Context column with their levels and source. Short interest only where the market publishes it.
 - Primary sources: the exchange's filing system (HKEXnews, DART, MOPS, TDnet/EDINET, CNMV …) and the company's IR site, English versions where they exist.
 - Global listings (in neither the S&P 500 nor the Nasdaq-100): the hero rank row carries home-market ranks/constituencies dated to the banner date from a fetched source; re-check each at every refresh, and drop any you cannot source as of the banner date (Oki, 8 Oct 2026).
 - Long unbroken strings (source URLs, "US$488.1B (HK$3.83T)") overflow 390 px: keep `.container * { overflow-wrap: anywhere; }` in the page CSS.
