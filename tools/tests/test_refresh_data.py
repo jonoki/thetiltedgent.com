@@ -8,6 +8,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 import reportlib as rl
 import refresh_data as rdt
@@ -318,6 +319,83 @@ class FixPoints(unittest.TestCase):
     def test_window_drop(self):
         self.assertEqual((rdt.window_drop(62, 61), rdt.window_drop(61, 61), rdt.window_drop(40, 61),
                           rdt.window_drop(62, 0)), (1, 0, 0, 0))
+
+
+# CTVA-like: a spin-off Yahoo books as a large "split" (chart_audit.SPINOFFS). Yahoo's daily closes before it are
+# spin-adjusted (the real close / 6.665); the previous edition (Aug 28 as-of) charted the real pre-spin closes.
+SPIN = ('2026-10-01', 6.665)
+SPIN_SPLITS = [SPIN]
+SPIN_DAYS = bars({'2026-07-31': 10.00, '2026-08-28': 9.50, '2026-08-31': 9.60, '2026-09-30': 9.80,
+                  '2026-10-01': 13.10, '2026-10-02': 13.40})
+
+
+class DeclaredSpinOff(unittest.TestCase):
+    """A declared spin-off is never a real split: the chart, --fix-points and build() handle it as chart_audit does."""
+
+    def test_the_chart_is_not_rescaled_and_new_pre_spin_month_ends_go_on_the_real_basis(self):
+        got = rdt.extend_series(["Jul '26", "Aug '26"], [66.65, 63.32], '2026-08-28', '2026-10-02', SPIN_DAYS, 1.0,
+                                SPIN_SPLITS, SPIN)
+        self.assertEqual(got['labels'], ["Jul '26", "Aug '26", "Sep '26", "Oct '26"])
+        self.assertEqual(got['prices'], [66.65, 63.98, 65.32, 13.40])   # 9.60 and 9.80 x 6.665; post-spin as is
+        self.assertIsNone(got['split_rescale'])
+        self.assertEqual(got['spin_crossed'], {'date': '2026-10-01', 'factor': 6.665})
+
+    def test_undeclared_the_same_ratio_is_a_real_split(self):   # chart_audit's rule for any large ratio
+        got = rdt.extend_series(["Jul '26", "Aug '26"], [66.65, 63.32], '2026-08-28', '2026-10-02', SPIN_DAYS, 1.0,
+                                SPIN_SPLITS)
+        self.assertEqual(got['prices'], [10.0, 9.6, 9.8, 13.4])
+        self.assertEqual(got['split_rescale'], {'ratio': 6.665, 'splits': SPIN_SPLITS})
+        self.assertIsNone(got['spin_crossed'])
+
+    def test_before_the_spin_it_is_a_plain_split_after_the_as_of(self):
+        got = rdt.extend_series(["Jul '26", "Aug '26"], [66.65, 63.32], '2026-08-28', '2026-09-30', SPIN_DAYS, 6.665,
+                                SPIN_SPLITS, SPIN)
+        self.assertEqual((got['prices'], got['spin_crossed']), ([66.65, 63.98, 65.32], None))
+
+    def test_a_later_refresh_keeps_whichever_basis_the_page_charts(self):
+        got = rdt.extend_series(["Sep '26", 'Oct 1 26'], [65.32, 13.10], '2026-10-01', '2026-10-02', SPIN_DAYS, 1.0,
+                                SPIN_SPLITS, SPIN)
+        self.assertEqual((got['prices'], got['spin_crossed'], got['split_rescale']), ([65.32, 13.40], None, None))
+
+    def fix(self, prices, spin=SPIN, as_of='2026-10-02'):
+        return rdt.fix_points(['Jul 26', 'Aug 26', 'Sep 26'], prices, [0, 1, 2], SPIN_DAYS,
+                              rdt.ca.splits_after(SPIN_SPLITS, as_of), SPIN_SPLITS, as_of, False, 'u', spin)
+
+    def test_fix_points_leaves_real_pre_spin_closes(self):
+        prices = [66.65, 63.98, 65.32]
+        got = self.fix(prices)
+        self.assertEqual((got['fixed'], prices), ([], [66.65, 63.98, 65.32]))
+        self.assertEqual(got['skipped'], {'basis step': ['Jul 26', 'Aug 26', 'Sep 26']})
+
+    def test_fix_points_compares_a_spin_adjusted_chart_with_yahoo(self):
+        prices = [10.00, 9.61, 9.80]
+        got = self.fix(prices)
+        self.assertEqual(([(f['month'], f['new']) for f in got['fixed']], got['compared']), ([('Aug 26', 9.6)], 3))
+
+    def test_undeclared_fix_points_would_pull_real_closes_down(self):   # what the declaration prevents
+        prices = [66.65, 63.98, 65.32]
+        self.fix(prices, spin=None)
+        self.assertEqual(prices, [10.0, 9.6, 9.8])
+
+    def test_fix_points_before_the_spin_skips_every_point(self):   # factor 6.665: a split after the as-of
+        self.assertEqual(self.fix([66.65, 63.98, 65.32], as_of='2026-09-30')['skipped'],
+                         {'split after the as-of': ['Jul 26', 'Aug 26'], 'the as-of month': ['Sep 26']})
+
+    def test_build_warns_and_checks_on_the_daily_feed(self):
+        daily = rdt.parse_daily(load('yahoo_daily_ccl.json'), 'https://yahoo/ccl', 'now')._replace(
+            splits=[('2026-09-15', 6.665)])
+        monthly = ({(2026, 6): (26.51 / 6.665, None), (2026, 7): (27.81 / 6.665, None)}, daily.splits)
+        with mock.patch.dict(rdt.ca.SPINOFFS, {'ccl': ('2026-09-15', 6.665)}):
+            facts, new = rdt.build('ccl', PAGE, daily, '2026-10-01', {'SPY': 'skipped', 'QQQ': 'skipped'},
+                                   'offline', 'offline', monthly)
+        chart = facts['fields']['chart']
+        self.assertEqual(rl.chart_series(new)[1], [26.51, 27.81, round(23.89 * 6.665, 2), 24.54, 25.07])
+        self.assertIsNone(chart['split_rescale'])
+        self.assertEqual(chart['spin_crossed'], {'date': '2026-09-15', 'factor': 6.665})
+        check = chart['existing_points_check']
+        self.assertEqual((check['wrong'], check['basis_steps']), ([], 2))   # real pre-spin closes: basis steps
+        self.assertIn('interval=1d', check['source'])
+        self.assertTrue(any(w.startswith('declared spin-off 2026-09-15') for w in facts['warnings']))
 
 
 PAGE_W = (PAGE.replace("const prices = [26.51,27.81,24.76];\n",

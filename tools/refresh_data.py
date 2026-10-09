@@ -29,6 +29,12 @@ outside the events (FISV) is not trimmed. --fix-points: every kept existing poin
 on the page's basis and replaced when more than half a cent off (rule A; fix_points says what is skipped and why);
 the replacements are facts.json fixed_points and their old values are stale hits.
 
+Declared spin-offs (chart_audit.SPINOFFS, e.g. CTVA 2026-10-01 x6.665: a spin Yahoo books as a large "split") are
+handled as chart_audit handles them, never as a real split: the existing-points check and --fix-points take a real
+pre-spin close as a basis step and a spin-adjusted one as on Yahoo's daily basis; a spin between the two editions
+does not rescale the page's points, new pre-spin month-ends go on their real-close basis, and facts.json
+chart.spin_crossed plus a warning hand the choice of basis (and its label) to the builder.
+
 Post-pass (after the builder). Re-reads the page against facts.json: as-of, header price, the script's chart points
 and the 52-week range must still match (exit 1 if not); the last chart point is re-synced to the header; P/E is
 recomputed from the page's final EPS cell, and the yield from a "$X ÷ $price" dividend formula when the page has one;
@@ -318,11 +324,17 @@ def yield_formula(context: str) -> tuple[float, float] | None:
 # ---------- the chart ----------
 
 def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of: str, days: list[Day],
-                  factor: float, splits: ca.Splits) -> Json:
+                  factor: float, splits: ca.Splits, spin: tuple[str, float] | None = None) -> Json:
     """The page's chart carried to the as-of: existing points kept (rescaled when a real split went ex between the
     two as-of dates); the last point, the previous as-of, becomes its month's month-end close once that month is
     over (or gives way to the as-of point in the same month); the missing month-ends follow; the as-of close is last.
-    Labels follow the page's own styles: its month labels, and its last label's style for the as-of point."""
+    Labels follow the page's own styles: its month labels, and its last label's style for the as-of point.
+
+    spin is the report's chart_audit.SPINOFFS entry (date, factor): a spin-off Yahoo books as a large "split". It is
+    never a real split here. When it went ex between the two editions the kept points (the previous edition's, on
+    the real pre-spin closes) are not rescaled, and a new month-end dated before the spin goes on the same basis:
+    Yahoo's spin-adjusted daily close x the factor = the real close (a basis step in chart_audit). The result's
+    spin_crossed says so; rebasing the chart to spin-adjusted (and labelling it) is the builder's call."""
     pts = [rp.point_label(lab) for lab in labels]
     bad = [lab for lab, p in zip(labels, pts) if p is None]
     if bad or len(labels) < 2:
@@ -338,7 +350,12 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
     ay, am = int(as_of[:4]), int(as_of[5:7])
     if (last.year, last.month) > (ay, am):
         raise ChartError(f'the chart runs past the as-of ({labels[-1]!r})')
-    real = [(d, r) for d, r in splits if old_as_of < d <= as_of and not (ca.SPIN_RATIO_LO < r < ca.SPIN_RATIO_HI)]
+    real = [(d, r) for d, r in splits if old_as_of < d <= as_of and not (ca.SPIN_RATIO_LO < r < ca.SPIN_RATIO_HI)
+            and (d, r) != spin]
+    crossed = spin if spin and old_as_of < spin[0] <= as_of else None
+
+    def basis(day: Day) -> float:   # factor, times the declared spin's factor for a pre-spin day once it has crossed
+        return factor * (crossed[1] if crossed and day.date < crossed[0] else 1.0)
     rescale = 1.0
     for _, r in real:
         rescale *= r
@@ -353,7 +370,7 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
             raise ChartError(f'no Yahoo close for {y}-{m:02d}')
         lab = rp.format_label(before.style, y, m)
         out_l.append(lab)
-        out_p.append(round(me.close * factor, 2))
+        out_p.append(round(me.close * basis(me), 2))
         replaced.append({'old_label': labels[-1], 'old_value': prices[-1], 'label': lab, 'value': out_p[-1],
                          'date': me.date, 'kind': 'month-end'})
         y, m = (y + 1, 1) if m == 12 else (y, m + 1)
@@ -363,7 +380,7 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
                 raise ChartError(f'no Yahoo close for {y}-{m:02d}')
             lab = rp.format_label(before.style, y, m)
             out_l.append(lab)
-            out_p.append(round(me.close * factor, 2))
+            out_p.append(round(me.close * basis(me), 2))
             appended.append({'label': lab, 'value': out_p[-1], 'date': me.date, 'kind': 'month-end'})
             y, m = (y + 1, 1) if m == 12 else (y, m + 1)
     end = on_or_before(days, as_of)
@@ -378,7 +395,8 @@ def extend_series(labels: list[str], prices: list[float], old_as_of: str, as_of:
     else:
         appended.append(point)
     return {'labels': out_l, 'prices': out_p, 'replaced': replaced, 'appended': appended,
-            'split_rescale': {'ratio': rescale, 'splits': real} if rescale != 1.0 else None}
+            'split_rescale': {'ratio': rescale, 'splits': real} if rescale != 1.0 else None,
+            'spin_crossed': {'date': crossed[0], 'factor': crossed[1]} if crossed else None}
 
 
 def window_drop(n_points: int, window: int) -> int:
@@ -391,7 +409,8 @@ CENT = 0.005    # rule A: a chart point is the source value to the cent; more th
 
 
 def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: list[Day], factor: float,
-               splits: ca.Splits, as_of: str, labelled: bool, source: str) -> Json:
+               splits: ca.Splits, as_of: str, labelled: bool, source: str,
+               spin: tuple[str, float] | None = None) -> Json:
     """Existing chart points (positions idxs) checked against Yahoo's month-end on the page's own basis and replaced,
     in prices, when more than half a cent off. Returns the basis, the fixed points (month, date, old, new, source)
     and the points left alone and why.
@@ -403,8 +422,11 @@ def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: li
     Left alone: labels that are not a month; months Yahoo does not have; every point when a split went ex after the
     as-of (Yahoo's basis is then not the page's); basis steps — a point chart_audit classes 'basis step', or, in a
     month before a spin-off booked as a fractional split, a point nearer the real pre-spin close than Yahoo's
-    spin-adjusted one (both are allowed bases; a small spin is inside chart_audit's 3%)."""
+    spin-adjusted one (both are allowed bases; a small spin is inside chart_audit's 3%). spin is the report's
+    chart_audit.SPINOFFS entry, applied as chart_audit applies it: by the as-of, a real pre-spin close (the declared
+    factor above Yahoo's spin-adjusted close) is a basis step; after the as-of it is a plain split (in factor)."""
     ym_as_of = (int(as_of[:4]), int(as_of[5:7]))
+    spin_on = spin if spin and spin[0] <= as_of else None   # chart_audit.check_points: after the as-of, a plain split
     skipped: dict[str, list[str]] = {}
 
     def skip(why: str, lab: str) -> None:
@@ -426,7 +448,7 @@ def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: li
         if factor != 1.0:
             skip('split after the as-of', labels[i])
             continue
-        cand.append((i, me, ca.spin_factor(splits, (p.year, p.month), as_of)))
+        cand.append((i, me, ca.spin_factor(splits, (p.year, p.month), as_of, spin_on)))
     adj_pts = sum(ca.classify(prices[i], me.close, me.adj, spin) == 'adjusted' for i, me, spin in cand)
     near_adj = sum(me.adj is not None and abs(prices[i] - me.adj) + CENT < abs(prices[i] - me.close) for i, me, _ in cand)
     near_close = sum(me.adj is not None and abs(prices[i] - me.close) + CENT < abs(prices[i] - me.adj) for i, me, _ in cand)
@@ -621,7 +643,8 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     labels, prices = rl.chart_series(t)
     if not labels or not prices or len(labels) != len(prices):
         raise ChartError('the page has no chart arrays of equal length')
-    chart = extend_series(labels, prices, old['as_of'], as_of, days, factor, daily.splits)
+    spin = ca.SPINOFFS.get(slug)   # a spin-off Yahoo books as a large "split": never a real split (chart_audit)
+    chart = extend_series(labels, prices, old['as_of'], as_of, days, factor, daily.splits, spin)
     f: Json = {}
     warnings: list[str] = []
     page = f'reports/{slug}_analysis.html'
@@ -641,7 +664,7 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     fixinfo: Json | None = None
     if fix:
         fixinfo = fix_points(chart['labels'], chart['prices'], list(range(drop, n_exist)), days, factor, daily.splits,
-                             as_of, bool(ca.ADJ_LABEL.search(t)), src)
+                             as_of, bool(ca.ADJ_LABEL.search(t)), src, spin)
         if fixinfo['basis'] == 'adjclose':   # the new month-ends on the series' own basis
             pos = {lab: i for i, lab in enumerate(chart['labels'])}
             for pt in chart['replaced'] + chart['appended']:
@@ -660,19 +683,29 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     if isinstance(monthly, str):
         check: Json = {'error': monthly}
     else:
-        pc = ca.check_points(chart['labels'], chart['prices'], monthly[0], monthly[1], as_of)
+        pc = ca.check_points(chart['labels'], chart['prices'], monthly[0], monthly[1], as_of, spin=spin)
+        feed = ca.YAHOO_DAILY_CHART if spin else ca.YAHOO_CHART   # ca.monthly_series: daily month-ends for SPINOFFS
         check = {'checked': pc['checked'], 'wrong': pc['bad'], 'dividend_adjusted_points': pc['adj_pts'],
-                 'basis_steps': pc['step_pts'], 'source': ca.YAHOO_CHART.format(sym=ca.yahoo_symbol(slug, ticker))}
+                 'basis_steps': pc['step_pts'], 'spin_adjusted_points': pc['spin_adj_pts'],
+                 'source': feed.format(sym=ca.yahoo_symbol(slug, ticker))}
         if pc['bad']:
             warnings.append(f"{len(pc['bad'])} existing chart points are >3% off Yahoo's month-end close: "
                             + ', '.join(f'{b[0]} {b[1]} (Yahoo {b[2]})' for b in pc['bad'][:8]))
     f['chart'] = field({'labels': chart['labels'], 'prices': chart['prices']}, src, at, as_of,
                        BASIS_PRICE + '; month-end = the last session of the month',
                        replaced=chart['replaced'], appended=chart['appended'], split_rescale=chart['split_rescale'],
+                       spin_crossed=chart['spin_crossed'],
                        existing_points_check=check, trim=trim, fix_points=fixinfo)
     if chart['split_rescale']:
         warnings.append(f"split between the editions: existing chart points divided by {chart['split_rescale']['ratio']}"
                         ' — say so on the page')
+    if chart['spin_crossed']:
+        sc = chart['spin_crossed']
+        warnings.append(f"declared spin-off {sc['date']} between the editions (Yahoo books it as a {sc['factor']}:1 "
+                        'split; chart_audit.SPINOFFS): not a split, so the chart keeps the real pre-spin closes (a basis '
+                        f"step). To chart it spin-adjusted, divide every point before {sc['date']} by {sc['factor']} and "
+                        "label the chart 'spin-adjusted' (chart_audit fails an unlabelled one). The 52-week range, "
+                        "returns and dividends here are on Yahoo's spin-adjusted basis")
     spins = [(d, r) for d, r in daily.splits if old['as_of'] < d <= as_of and ca.SPIN_RATIO_LO < r < ca.SPIN_RATIO_HI]
     if spins:
         warnings.append(f'Yahoo books a spin-off or capital return as a fractional split {spins}: older chart points '
