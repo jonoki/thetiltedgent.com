@@ -1,9 +1,14 @@
 """Unit tests for index_rank.py: ranking, dual-class shares, the rank row (write, insert; a page in neither index left
 alone) and the fine-print rewrite.   Run: py -3 tools/run_checks.py"""
+import contextlib
+import io
+import os
+import tempfile
 import unittest
 
 import index_rank as ir
 import refresh_data as rf
+import reportlib as rl
 
 ACCENT = ('<span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--accent);'
           'background:var(--accent-dim);padding:3px 10px;border-radius:4px;">')
@@ -85,6 +90,21 @@ class Ranking(unittest.TestCase):
         self.assertIsNone(ir.parse_shares('n/a'))
         self.assertIsNone(ir.parse_shares('191.61'))        # millions, but the cell does not say so
 
+    def test_shares_row_reads_the_current_column(self):
+        # CCL, 8 Oct 2026: a "Pre-Crisis | Now" table; the first value cell (2019's 693M) gave a false implied-shares flag
+        ccl = ('<table><thead><tr><th>Measure</th><th>Pre-Crisis</th><th>Now</th><th>Change</th><th>What it means</th></tr>'
+               '</thead><tbody><tr>\n  <td>Shares outstanding</td>\n  <td style="color:red;">693M</td>\n  <td>1,344.6M</td>\n'
+               '  <td>+94.0%</td>\n  <td>693M in fiscal Q1 2019; 1,344.6M on the 10-Q cover.</td>\n</tr></tbody></table>')
+        self.assertEqual(ir.shares_cell(ccl), '1,344.6M')
+        self.assertEqual(ir.parse_shares(ir.shares_cell(ccl)), 1344.6e6)
+        years = ccl.replace('Pre-Crisis', 'FY2019').replace('>Now<', '>FY2026<')
+        self.assertEqual(ir.shares_cell(years), '1,344.6M')                        # no "Now": the latest year
+        metrics = ('<table class="fin-table"><tr><th>Metric</th><th>ACME</th><th>Industry Avg</th><th>S&amp;P 500</th></tr>'
+                   '<tr><td>Shares Outstanding</td><td>2.45B</td><td>1.1B</td><td>—</td></tr></table>')
+        self.assertEqual(ir.shares_cell(metrics), '2.45B')                         # a metrics table: its first value
+        self.assertEqual(ir.shares_cell('<table><tr><td>Shares outstanding</td><td>596.00M</td></tr></table>'), '596.00M')
+        self.assertIsNone(ir.shares_cell('<p>no table</p>'))
+
     def test_member_flags_implied_vs_stated_shares_and_the_price(self):
         m = ir.Member('acme', 'ACME', '2026-09-21', 20.0, 2000.0, 100.0, 90.0, True, False)
         flags = ir.member_flags(m, daily(('2026-09-21', 21.0)))
@@ -126,6 +146,38 @@ class Row(unittest.TestCase):
         # a global listing keeps its home-market rank row as it is (Oki, 8 Oct 2026)
         self.assertEqual(ir.write_row(hero(OLD_ROW), {}), (hero(OLD_ROW), 'global'))
         self.assertEqual(ir.write_row(hero(), {}), (hero(), 'global'))
+
+    def test_page_that_left_both_indexes_loses_its_rank_pills(self):
+        # CTVA left the S&P 500 on 6 Oct 2026: its row held only the S&P pill, so the row goes; --check flags it until then
+        sp_only = (f'    <div style="margin-top:10px;">\n      {LABEL}\n      {ACCENT}S&amp;P 500: #208</span>\n    </div>\n')
+        new, what = ir.write_row(hero(sp_only), {})
+        self.assertEqual((new, what), (hero(), 'row removed'))
+        self.assertEqual(ir.write_row(new, {}), (new, 'global'))
+        mixed = OLD_ROW.replace('Global: #1226', 'Nasdaq-100: #101')
+        new, what = ir.write_row(hero(mixed), {})
+        self.assertEqual(what, 'pills removed')
+        self.assertNotIn('Nasdaq-100: #', new)
+        self.assertIn(f'      {LABEL}\n      {ACCENT}US: ~#600 (est.)</span>\n', new)   # anything else stays
+        self.assertEqual(ir.write_row(new, {}), (new, 'global'))
+
+    def test_check_flags_a_non_member_still_showing_an_index_rank(self):
+        card = ('<a class="rep" href="view.html?r={s}"><span class="tick">{S}</span><h3>{S}</h3><span class="sect">X</span>'
+                '<span class="ixrow"></span></a>\n')
+        sp_only = f'    <div style="margin-top:10px;">\n      {LABEL}\n      {ACCENT}S&amp;P 500: #208</span>\n    </div>\n'
+        pages = {'ctva': hero(sp_only), 'nestle': hero(OLD_ROW.replace('S&amp;P 500 member since Aug 27, 2008', 'SMI'))}
+        with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()) as out:
+            os.makedirs(os.path.join(repo, 'reports'))
+            rl.write_text(os.path.join(repo, 'reports', 'index.html'),
+                          ''.join(card.format(s=s, S=s.upper()) for s in pages))
+            for s, page in pages.items():
+                rl.write_text(os.path.join(repo, 'reports', f'{s}_analysis.html'),
+                              '<div>Static data as of October 2, 2026</div>\n' + page)
+            self.assertEqual(ir.main(['--repo', repo, '--check']), 1)
+            self.assertIn('still showing an S&P 500 / Nasdaq-100 rank: ctva', out.getvalue())
+            self.assertIn("rows that differ from what would be written: 1 ['ctva']", out.getvalue())   # not the global page
+            self.assertEqual(ir.main(['--repo', repo]), 0)
+            self.assertEqual(ir.main(['--repo', repo, '--check']), 0)
+            self.assertNotIn('Mkt Cap Ranking', rl.read_text(os.path.join(repo, 'reports', 'ctva_analysis.html')))
 
     def test_class_styled_row(self):
         row = ('    <div class="rank-row">\n      <span class="rank-label">Mkt Cap Ranking:</span>\n'

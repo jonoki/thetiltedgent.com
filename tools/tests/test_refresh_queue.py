@@ -1,6 +1,9 @@
 """Unit tests for refresh_queue.py: the trading calendar, T+2, the calendar parser, tiering and status.
 Run: py -3 tools/run_checks.py"""
 import datetime
+import json
+import os
+import tempfile
 import unittest
 
 import refresh_queue as q
@@ -88,6 +91,21 @@ class Queue(unittest.TestCase):
                          [('GIS', 'due', 'T1'), ('MU', 'upcoming', 'T1')])   # GIS: first-session move -9%
         self.assertEqual(items[0]['t2'], '2026-09-24')
         self.assertEqual(items[0]['triggers'], ['first-session move -9.0%'])
+
+
+class Holdings(unittest.TestCase):
+    def test_archived_and_renamed_reports_are_never_held(self):
+        # a manifest built before WBD was archived (6 Oct 2026) must not queue its final edition
+        rec = lambda slug, t: {'slug': slug, 'ticker': t, 'as_of': '2026-09-04'}
+        with tempfile.TemporaryDirectory() as repo:
+            os.makedirs(os.path.join(repo, 'data', 'reports'))
+            files = {'data/style_tags.json': {'reports': [{'slug': 'aapl', 'mcap': 1.0}]},
+                     'data/reports.json': {'shards': {'x': 'data/reports/x.json'}},
+                     'data/reports/x.json': {'reports': [rec('aapl', 'AAPL'), rec('wbd', 'WBD'), rec('psky', 'PSKY')]}}
+            for rel, obj in files.items():
+                with open(os.path.join(repo, rel), 'w', encoding='utf-8') as fh:
+                    json.dump(obj, fh)
+            self.assertEqual(sorted(q.holdings(repo)), ['AAPL'])
 
 
 if __name__ == '__main__':

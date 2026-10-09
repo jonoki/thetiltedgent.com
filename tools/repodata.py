@@ -17,6 +17,18 @@ ASSET_FAMILIES = ('etf', 'crypto', 'fixed')   # reports/<family>/: ETFs, crypto,
 STOCK_REPORTS = os.path.join('reports', '*_analysis.html')
 ASSET_REPORTS = [os.path.join('reports', fam, '*_analysis.html') for fam in ASSET_FAMILIES]
 
+# Archived stock reports: the company stopped trading, so the page stays at its URL as a final edition (one line on its
+# "Static data as of" banner says why) but leaves the library: no card on reports/index.html, not in the manifest, so
+# never tagged, queued for a refresh or ranked. verify.py still checks the page. slug -> the banner line.
+ARCHIVED: dict[str, str] = {
+    'wbd': 'Acquired by Skydance Corporation on Oct 6, 2026; final edition.',   # Skydance 8-K, 6 Oct 2026 (Oki, 8 Oct)
+}
+# Renamed stock reports, old slug -> new: the old file is a redirect stub (not a report) and reports/view.html maps
+# ?r=<old> to the new slug in its `moved` map; tools/tests/test_site.py keeps the two in step.
+RENAMED: dict[str, str] = {
+    'psky': 'skyd',   # Paramount Skydance (Nasdaq: PSKY) -> Skydance Corporation (NYSE: SKYD), 6 Oct 2026 (Oki, 8 Oct)
+}
+
 
 def parser(description: str) -> argparse.ArgumentParser:
     """The command line every tools/ script shares: its description and --repo (default: this repo)."""
@@ -176,7 +188,9 @@ TagInputs = TypedDict('TagInputs', {
 })
 
 
-def report_paths(repo: str = ROOT, assets: bool = False) -> list[str]:
-    """Sorted paths of the stock reports (and the ETF, crypto and bond reports when assets=True)."""
-    pats = [STOCK_REPORTS] + (ASSET_REPORTS if assets else [])
-    return sorted(p for pat in pats for p in glob.glob(os.path.join(repo, pat)))
+def report_paths(repo: str = ROOT, assets: bool = False, archived: bool = False) -> list[str]:
+    """Sorted paths of the stock reports in the library (and the ETF, crypto and bond reports when assets=True, the
+    ARCHIVED stock reports when archived=True). A RENAMED slug's redirect stub is never one."""
+    skip = set(RENAMED) | (set() if archived else set(ARCHIVED))
+    stocks = [p for p in glob.glob(os.path.join(repo, STOCK_REPORTS)) if slug_of(p) not in skip]
+    return sorted(stocks + [p for pat in (ASSET_REPORTS if assets else []) for p in glob.glob(os.path.join(repo, pat))])

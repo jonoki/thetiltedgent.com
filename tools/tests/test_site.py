@@ -11,6 +11,7 @@ import asset_cards
 import build_chips
 import chrome
 import reportlib as rl
+import repodata as rd
 
 
 class AssetCards(unittest.TestCase):
@@ -160,6 +161,29 @@ class Chips(unittest.TestCase):
         self.assertIn('<stop offset="0.62" stop-color="#F1E6CF"/>', svg)
         self.assertIn('aria-label="The Tilted Gent $1 chip"', svg)
         self.assertNotIn('>old<', svg)
+
+
+class LibraryMoves(unittest.TestCase):
+    """Renamed and archived stock reports (tools/repodata.py RENAMED, ARCHIVED), checked on the repo itself."""
+
+    def test_a_renamed_report_redirects_and_the_viewer_maps_it(self):
+        view = rl.read_text(os.path.join(rd.ROOT, 'reports', 'view.html'))
+        moved = dict(re.findall(r"(\w+): '(\w+)'", re.search(r'var moved = \{(.*?)\};', view).group(1)))
+        cards = rd.parse_index_cards()
+        for old, new in rd.RENAMED.items():
+            self.assertEqual(moved.get(old), new)
+            self.assertTrue(os.path.exists(rd.report_path(new)))
+            stub = rl.read_text(rd.report_path(old))
+            self.assertIn(f"location.replace('/reports/{new}_analysis.html' + location.hash)", stub)
+            self.assertIn(f'url=/reports/{new}_analysis.html', stub)
+            self.assertNotIn(old, cards)
+            self.assertIn(new, cards)
+
+    def test_an_archived_report_keeps_its_page_and_line_but_no_card(self):
+        cards = rd.parse_index_cards()
+        for slug, line in rd.ARCHIVED.items():
+            self.assertIn(line, rl.read_text(rd.report_path(slug)))
+            self.assertNotIn(slug, cards)
 
 
 if __name__ == '__main__':

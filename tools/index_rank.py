@@ -19,11 +19,14 @@ The row: "Mkt Cap Ranking:" then "S&P 500: #N" and/or "Nasdaq-100: #N", first pi
 second dim; a member page without one gets it under the ticker line.
 Member pages only: a page in neither index (a global listing) is never written and --check never flags it. Its rank
 row (home-market ranks and constituencies, e.g. "TSX #1", "SMI constituent") and its fine print about them are dated
-facts sourced at its build and re-checked at each refresh by the refresh agent (Oki, 8 Oct 2026).
+facts sourced at its build and re-checked at each refresh by the refresh agent (Oki, 8 Oct 2026). The one exception:
+a non-member whose row still shows an "S&P 500: #" or "Nasdaq-100: #" pill (it left both indexes) has those pills
+removed, and the row with them when nothing else is in it; --check flags it until then. Archived and renamed slugs
+(repodata.ARCHIVED, RENAMED) are never read or written.
 Fine print (a member page's disclaimer): sentences and list items about the old ranks (companiesmarketcap.com,
 estimated US and exchange ranks) become NEW_CLAUSE with the banner date; a second mention is removed. What does not
 match a known shape is listed, never forced.
-Flags, printed: implied shares more than 5% from the page's own Shares Outstanding row; a header price more than 1%
+Flags, printed: implied shares more than 5% from the page's own Shares Outstanding row (its current column); a header price more than 1%
 from Yahoo's close on the as-of. A member without a usable market cap, price or Yahoo series stops the run before
 anything is written: every rank in its index would be in doubt.
 Yahoo JSON is cached under <temp>/ttg_index_rank; a cached series that does not reach the latest date needed is
@@ -31,6 +34,7 @@ fetched again.
 """
 import datetime
 import html as htmllib
+import io
 import json
 import os
 import re
@@ -91,6 +95,39 @@ def parse_shares(text: str | None) -> float | None:
     return n if m.group(2) or n >= 1e6 else None
 
 
+CURRENT_HEAD = re.compile(r'(?i)\b(?:now|current|latest|today)\b')
+YEAR = re.compile(r'(?<!\d)(?:19|20)\d{2}(?!\d)')
+
+
+def current_column(heads: list[str]) -> int:
+    """Which value column of a table holds the current figure, given its header cells (label column first): the first
+    headed Now / Current / Latest / Today, else the one naming the latest year (the first of equals), else the first."""
+    vals = heads[1:]
+    now = next((i for i, h in enumerate(vals) if CURRENT_HEAD.search(h)), None)
+    if now is not None:
+        return now
+    years = [max((int(y) for y in YEAR.findall(h)), default=0) for h in vals]
+    return years.index(max(years)) if years and max(years) else 0
+
+
+def shares_cell(t: str) -> str | None:
+    """The text of the page's first Shares Outstanding row, from its current column: on 8 Oct 2026 CCL's "Pre-Crisis |
+    Now" table gave its 2019 count, the first value cell, and a false implied-shares flag. A table without a header
+    row gives its first value cell."""
+    for table in re.findall(r'<table\b.*?</table>', t, re.S):
+        heads: list[str] = []
+        for row in re.findall(r'<tr[^>]*>(.*?)</tr>', table, re.S):
+            cells = re.findall(r'<(t[dh])[^>]*>(.*?)</t[dh]>', row, re.S)
+            texts = [re.sub(r'\s+', ' ', rl.strip_tags(body)) for _, body in cells]
+            if cells and all(kind == 'th' for kind, _ in cells):
+                heads = texts
+                continue
+            if len(cells) >= 2 and cells[1][0] == 'td' and re.match(r'(?i)shares outstanding', texts[0]):
+                col = current_column(heads) if len(heads) == len(cells) else 0
+                return texts[1 + col] if 1 + col < len(texts) else texts[1]
+    return None
+
+
 def read_member(slug: str, card: rd.IndexCard, repo: str) -> Member:
     """One index member's numbers from its own report. RankError when a number is missing."""
     path = rd.report_path(slug, repo=repo)
@@ -101,7 +138,7 @@ def read_member(slug: str, card: rd.IndexCard, repo: str) -> Member:
     as_of, price, mcap = rl.as_of(t)[0], rl.header_price(t), rf.header_mcap(t)
     if not (as_of and price and mcap):
         raise RankError(f'{slug}: as-of {as_of}, header price {price}, Mkt Cap {mcap and mcap[0]}: one is unreadable')
-    stated = parse_shares(rl.row_value(rl.table_rows(t), r'(?i)shares outstanding'))
+    stated = parse_shares(shares_cell(t))
     return Member(slug, ca.yahoo_symbol(slug, ticker), as_of, price, mcap[1], mcap[1] / price, stated,
                   bool(card['indices']['sp500_added']), card['indices']['ndx'])
 
@@ -324,11 +361,42 @@ def ticker_block_end(t: str) -> tuple[int, str]:
     return le, indent
 
 
-def write_row(t: str, ranks: Mapping[str, int]) -> tuple[str, str]:
-    """(the page with its rank row written, what was done: 'replaced', 'inserted', 'unchanged', or 'global' for a
-    page in neither index (no ranks), which is left exactly as it is)."""
-    if not ranks:
+INDEX_PILL = re.compile(r'^(?:S&(?:amp;)?P 500|Nasdaq-100): #\d')
+
+
+def index_pills(t: str, row: Row) -> list[str]:
+    """The whole spans in the rank row that show an S&P 500 or Nasdaq-100 rank."""
+    return [s for s in SPAN.findall(t[row.start:row.end]) if INDEX_PILL.match(text_of(s))]
+
+
+def drop_index_pills(t: str) -> tuple[str, str]:
+    """A page in neither index: its rank row without S&P 500 / Nasdaq-100 rank pills (a name that left both, CTVA on
+    6 Oct 2026), and what was done: 'pills removed', 'row removed' when nothing but its label and separators is left,
+    or 'global' when there were none (a global listing's home-market row is left exactly as it is)."""
+    if not re.search(r'(?:S&(?:amp;)?P 500|Nasdaq-100): #\d', t):
         return t, 'global'
+    row = find_row(t)
+    stale = index_pills(t, row) if row else []
+    if not row or not stale:
+        return t, 'global'
+    spans = SPAN.findall(t[row.start:row.end])
+    left = [s for s in spans if s not in stale and not LABEL_SPAN.fullmatch(s) and text_of(s) not in SEPARATORS]
+    if not left:
+        return t[:row.start] + t[row.end:], 'row removed'
+    children = [next(s for s in spans if LABEL_SPAN.fullmatch(s))]   # the row's own label, as it was
+    for i, p in enumerate(left):
+        children += ([row.sep] if i and row.sep else []) + [p]
+    body = (' '.join(children) if row.child_indent is None
+            else ''.join('\n' + row.child_indent + c for c in children) + '\n' + row.indent)
+    return t[:row.start] + f'{row.indent}{row.open_tag}{body}</div>\n' + t[row.end:], 'pills removed'
+
+
+def write_row(t: str, ranks: Mapping[str, int]) -> tuple[str, str]:
+    """(the page with its rank row written, what was done: 'replaced', 'inserted', 'unchanged'; for a page in neither
+    index (no ranks) drop_index_pills: 'global', left exactly as it is, unless its row still shows an S&P 500 or
+    Nasdaq-100 rank)."""
+    if not ranks:
+        return drop_index_pills(t)
     row = find_row(t)
     if row:
         new = t[:row.start] + render_row(row, ranks) + t[row.end:]
@@ -737,9 +805,15 @@ def main(argv: list[str] | None = None) -> int | str:
     ap.add_argument('--dry-run', action='store_true', help='change nothing; print the edits')
     ap.add_argument('--top', metavar='DATE', help='also print the S&P 500 top 15 on DATE (YYYY-MM-DD)')
     args = ap.parse_args(argv)
+    if isinstance(sys.stdout, io.TextIOWrapper):   # the Windows console is cp1252; fine print quotes ×, — and ≈
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     repo = args.repo
     members, errs = index_members(repo)
     slugs = args.slugs or [rd.slug_of(p) for p in rd.report_paths(repo)]
+    gone = [s for s in slugs if s in rd.ARCHIVED or s in rd.RENAMED]
+    if gone:
+        print('skipped (archived or renamed, never ranked):', ', '.join(gone))
+        slugs = [s for s in slugs if s not in gone]
     pages = {}
     for slug in slugs:
         path = rd.report_path(slug, repo=repo)
@@ -775,7 +849,7 @@ def main(argv: list[str] | None = None) -> int | str:
             print(f'  {i:2} {s:6} ${c / 1e12:.3f}T')
     counts: dict[str, int] = {}
     rules: dict[str, int] = {}
-    left_pages, row_diff, changed = [], [], []
+    left_pages, row_diff, changed, stale = [], [], [], []
     for slug, (path, t, a) in sorted(pages.items()):
         try:
             ranks = ranks_on(slug, a, members, series, memo) if slug in members and a else {}
@@ -784,6 +858,8 @@ def main(argv: list[str] | None = None) -> int | str:
             errs.append(f'{slug}: {e}')
             continue
         counts[what] = counts.get(what, 0) + 1
+        if what in ('pills removed', 'row removed'):
+            stale.append(slug)
         if new != t:
             row_diff.append(slug)
         if args.check:
@@ -810,6 +886,8 @@ def main(argv: list[str] | None = None) -> int | str:
     print('\n'.join('  ' + f for f in flags))
     if args.check:
         print(f'rows that differ from what would be written: {len(row_diff)}', row_diff[:40])
+        if stale:
+            print('  in neither index but still showing an S&P 500 / Nasdaq-100 rank:', ', '.join(stale))
         return 1 if row_diff or errs else 0
     print('fine print:', ', '.join(f'{k} {v}' for k, v in sorted(rules.items())))
     print(f'pages {"that would change" if args.dry_run else "written"}: {len(changed)}')
