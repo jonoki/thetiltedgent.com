@@ -11,8 +11,9 @@ the "What it is" line is the first sentence of its section 01, and the category 
 (add one when you add a report; the script stops if one is missing). The family tab counts are updated too.
 
 The indicator hub lists every indicator in INDICATOR_HUB, built or not: a built one (its page is in
-reports/indicators/) links to the report viewer, the rest show "Coming". A page in reports/indicators/ that the hub
-does not list stops the script."""
+reports/indicators/) links to the report viewer and shows the value and date from its header, the rest show "Coming".
+A page in reports/indicators/ that the hub does not list stops the script; so does a built page whose header has no
+value or date."""
 import html
 import os
 import re
@@ -180,29 +181,56 @@ def main(argv: list[str] | None = None) -> int | str:
     return 0
 
 
-def hub_card(slug: str, code: str, name: str, line: str, built: bool) -> str:
-    """One card on the indicator hub: a link to the report viewer when the page is built, else marked Coming."""
+_DATE = re.compile(r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?(?: \d{1,2},)? \d{4}\b')
+
+
+def indicator_value(page: str) -> tuple[str, str]:
+    """(value, date) from an indicator report's header, as printed: the .price-current text ('3.88%', '3.75–4.00%',
+    '+29K') and the first date in its first .price-date, month cut to three letters ('Oct 2, 2026', 'Aug 2026'). The hub shows the same
+    figure as the report, so it changes when the report is refreshed. ValueError naming what is missing."""
+    v = re.search(r'<div\b[^>]*\bclass="price-current\b[^"]*"[^>]*>(.*?)</div>', page, re.S)
+    d = re.search(r'<div\b[^>]*\bclass="price-date\b[^"]*"[^>]*>(.*?)</div>', page, re.S)
+    if not v or not rl.strip_tags(v.group(1)).strip():
+        raise ValueError('no .price-current value in the header')
+    m = _DATE.search(rl.strip_tags(d.group(1))) if d else None
+    if not m:
+        raise ValueError('no date in the header .price-date')
+    return rl.strip_tags(v.group(1)).strip(), re.sub(r'^([A-Z][a-z]{2})[a-z]*\.?', r'\1', m.group(0))
+
+
+def hub_card(slug: str, code: str, name: str, line: str, value: tuple[str, str] | None) -> str:
+    """One row on the indicator hub: a link to the report viewer with the report's header value and its date when
+    the page is built, else marked Coming."""
     e = lambda s: html.escape(s, quote=False)
-    inner = f'<span class="code">{e(code)}</span><h3>{e(name)}</h3><p>{e(line)}</p>'
-    if built:
-        return f'    <a class="card ind" href="{VIEWER}{slug}">{inner}<span class="more">Read the report</span></a>'
-    return f'    <div class="card ind soon">{inner}<span class="coming">Coming</span></div>'
+    head = f'<span class="ih"><span class="code">{e(code)}</span><h3>{e(name)}</h3></span>'
+    if value:
+        val = f'<span class="val"><b>{e(value[0])}</b> <span class="vd">{e(value[1])}</span></span>'
+        return (f'    <a class="card ind" href="{VIEWER}{slug}">{head}{val}<p>{e(line)}</p>'
+                f'<span class="more">Read the report</span></a>')
+    return f'    <div class="card ind soon">{head}<span class="val"><span class="coming">Coming</span></span><p>{e(line)}</p></div>'
 
 
 def write_hub(t: str, repo: str) -> str:
     """The hub page t with its card block rewritten: every INDICATOR_HUB card, linked when its page is built.
     ValueError when a built page is not on the hub or the marker is missing."""
-    built = {rd.slug_of(p) for p in rd.family_reports('indicators', repo)}
+    paths = {rd.slug_of(p): p for p in rd.family_reports('indicators', repo)}
+    built = set(paths)
     listed = {c[0] for _, _, cards in INDICATOR_HUB for c in cards}
     if built - listed:
         raise ValueError(f'add {sorted(built - listed)} to INDICATOR_HUB in tools/asset_cards.py')
+    values = {}
+    for slug, p in paths.items():
+        try:
+            values[slug] = indicator_value(rl.read_text(p))
+        except ValueError as err:
+            raise ValueError(f'{os.path.relpath(p, repo)}: {err}') from err
     groups = []
     for head, note, cards in INDICATOR_HUB:
         gid = 'g-' + re.sub(r'[^a-z]+', '-', head.lower()).strip('-')
         groups.append(f'<section class="igroup" aria-labelledby="{gid}">\n'
                       f'  <h2 class="ghead" id="{gid}">{html.escape(head)}</h2>\n'
                       f'  <p class="gnote">{html.escape(note)}</p>\n  <div class="cards icards">\n'
-                      + '\n'.join(hub_card(*c, built=c[0] in built) for c in cards) + '\n  </div>\n</section>')
+                      + '\n'.join(hub_card(*c, value=values.get(c[0])) for c in cards) + '\n  </div>\n</section>')
     block = ('<!-- indicator-cards (written by tools/asset_cards.py) -->\n' + '\n'.join(groups)
              + '\n<!-- /indicator-cards -->')
     t, n = re.subn(r'<!-- indicator-cards .*?<!-- /indicator-cards -->', lambda _: block, t, flags=re.S)

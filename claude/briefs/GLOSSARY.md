@@ -26,6 +26,7 @@ The tool fails when a recurring tear-sheet label has no entry (see "Coverage" be
     "term": "P/E ratio",
     "aka": ["Trailing P/E", "Price-to-earnings ratio"],
     "group": "metrics",
+    "why": "Optional, one line ≤ 15 words: why the reader should care. Shown under the name (Oki, 10 Oct 2026).",
     "def": "Plain-English meaning, ≤ 45 words.",
     "formula": "Optional. Share price ÷ EPS (TTM)",
     "example": "Optional, round numbers, ≤ 30 words.",

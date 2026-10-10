@@ -32,7 +32,7 @@ FIXED_LABELS = ['Mkt Cap', 'Mkt Cap Ranking', 'Next Earnings', 'Static data as o
 NOT_TERMS = {'metric'}     # the metrics table's first column header names the rows; it is not a term
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261008'         # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261010'       # ?v= on glossary.css / glossary.js: bump when either changes
 
 HEAD = {
     'finance': dict(
@@ -98,7 +98,7 @@ def problems(doc: dict[str, Any], required: list[str]) -> list[str]:
         if t.get('group') not in groups:
             out.append(f'{name}: unknown group {t.get("group")!r}')
         out += [f'{name}: see-also {s!r} is not a term' for s in t.get('see', []) if s not in ids]
-        out += [f'{name}: {f} holds HTML' for f in ('term', 'def', 'formula', 'example', 'sheet', 'lens')
+        out += [f'{name}: {f} holds HTML' for f in ('term', 'why', 'def', 'formula', 'example', 'sheet', 'lens')
                 if re.search(r'<[a-z/]', t.get(f) or '')]
     covered = {lab.lower() for t in doc.get('terms', []) for lab in t.get('labels', [])}
     out += [f'tear-sheet label {lab!r} has no term' for lab in required if lab.lower() not in covered]
@@ -110,19 +110,25 @@ def e(s: str) -> str:
     return html.escape(s, quote=True)
 
 
-def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str) -> str:
+def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, group_title: str) -> str:
+    """One entry, in reading order: name (and other names), why it matters, definition, formula and example,
+    where it sits on the tear sheet, the lens, then its section tag and see-also links. Desktop shows it as a
+    narrow row in two columns, phones as a card (glossary.css)."""
     search = ' '.join([t['term'], *t.get('aka', []), *t.get('labels', [])]).lower()
     parts = [f'  <article class="term" id="{t["id"]}" data-g="{t["group"]}" data-s="{e(search)}">',
-             f'    <h3><a href="#{t["id"]}">{e(t["term"])}</a></h3>']
+             f'    <div class="th"><h3><a href="#{t["id"]}">{e(t["term"])}</a></h3>']
     if t.get('aka'):
         parts.append(f'    <p class="aka">Also: {" &middot; ".join(e(a) for a in t["aka"])}</p>')
+    parts.append('    </div>')
+    if t.get('why'):
+        parts.append(f'    <p class="why">{e(t["why"])}</p>')
     parts.append(f'    <p class="def">{e(t["def"])}</p>')
     for key, label in (('formula', 'Formula'), ('example', 'Example'), ('sheet', 'On the tear sheet'), ('lens', lens_label)):
         if t.get(key):
             parts.append(f'    <p class="x x-{key}"><span class="k">{label}</span>{e(t[key])}</p>')
-    if t.get('see'):
-        links = ', '.join(f'<a href="#{s}">{e(names[s])}</a>' for s in t['see'])
-        parts.append(f'    <p class="see">See also: {links}</p>')
+    tag = f'<a class="tag" href="#g-{t["group"]}">{e(group_title)}</a>'
+    links = ', '.join(f'<a href="#{s}">{e(names[s])}</a>' for s in t.get('see', []))
+    parts.append(f'    <p class="see">{tag}{" See also: " + links if links else ""}</p>')
     parts.append('  </article>')
     return '\n'.join(parts)
 
@@ -141,7 +147,7 @@ def page_html(page: str, doc: dict[str, Any]) -> str:
     for g in doc['groups']:
         mine = [t for t in terms if t['group'] == g['id']]
         chips.append(f'<button class="chip" type="button" data-g="{g["id"]}">{e(g["title"])} <span>{len(mine)}</span></button>')
-        body = '\n'.join(term_html(t, names, h['lens']) for t in mine)
+        body = '\n'.join(term_html(t, names, h['lens'], g['title']) for t in mine)
         intro = f'\n  <p class="gintro">{e(g["intro"])}</p>' if g.get('intro') else ''
         sections.append(f'<section class="grp" id="g-{g["id"]}" data-g="{g["id"]}">\n  <h2>{e(g["title"])}</h2>{intro}\n'
                         f'  <div class="terms">\n{body}\n  </div>\n</section>')

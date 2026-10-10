@@ -29,6 +29,18 @@ class AssetCards(unittest.TestCase):
            'in one fund. Cheap.</p></section></body></html>')
 
     HUB = '<main>\n<!-- indicator-cards old -->x<!-- /indicator-cards -->\n</main>'
+    SOFR = ('<div class="price-block"><div class="price-current">3.88%</div><div class="price-change">+0.01 pp</div>'
+            '<div class="price-date">SOFR, Friday October 2, 2026 · Federal Reserve Bank of New York</div></div>')
+
+    def test_the_hub_value_and_date_come_from_the_report_header(self):
+        self.assertEqual(asset_cards.indicator_value(self.SOFR), ('3.88%', 'Oct 2, 2026'))
+        self.assertEqual(asset_cards.indicator_value('<div class="price-current" data-value="4.00">3.75–4.00%</div>'
+                                                     '<div class="price-date">12-month change, August 2026</div>'),
+                         ('3.75–4.00%', 'Aug 2026'))
+        with self.assertRaisesRegex(ValueError, 'price-current'):
+            asset_cards.indicator_value('x')
+        with self.assertRaisesRegex(ValueError, 'no date'):
+            asset_cards.indicator_value('<div class="price-current">4.2%</div><div class="price-date">soon</div>')
 
     def repo_with(self, repo: str, index: str, hub: str | None = None) -> None:
         os.makedirs(os.path.join(repo, 'reports', 'etf'))
@@ -41,13 +53,14 @@ class AssetCards(unittest.TestCase):
     def test_the_indicator_hub_links_built_pages_and_marks_the_rest_coming(self):
         with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
             self.repo_with(repo, self.INDEX)
-            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'sofr_analysis.html'), 'x')
+            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'sofr_analysis.html'), self.SOFR)
             rl.write_text(os.path.join(repo, 'reports', 'fixed', 'sofr_analysis.html'), 'stub')   # a moved report's stub
             self.assertEqual(asset_cards.main(['--repo', repo]), 0)
             hub = rl.read_text(os.path.join(repo, asset_cards.HUB))
             index = rl.read_text(os.path.join(repo, 'reports', 'index.html'))
-        self.assertIn('<a class="card ind" href="/reports/view.html?r=indicators/sofr"><span class="code">SOFR</span>', hub)
-        self.assertIn('<div class="card ind soon"><span class="code">CPI</span>', hub)
+        self.assertIn('<a class="card ind" href="/reports/view.html?r=indicators/sofr"><span class="ih"><span class="code">SOFR</span>', hub)
+        self.assertIn('<span class="val"><b>3.88%</b> <span class="vd">Oct 2, 2026</span></span>', hub)
+        self.assertIn('<div class="card ind soon"><span class="ih"><span class="code">CPI</span>', hub)
         self.assertEqual(hub.count('class="card ind'), sum(len(cards) for _, _, cards in asset_cards.INDICATOR_HUB))
         self.assertEqual(hub.count('<span class="coming">Coming</span>'), hub.count('class="card ind soon"'))
         for gid in ('g-rates', 'g-inflation', 'g-jobs'):   # learn/index.html links to these anchors
@@ -58,7 +71,7 @@ class AssetCards(unittest.TestCase):
     def test_an_indicator_page_missing_from_the_hub_stops_the_script(self):
         with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
             self.repo_with(repo, self.INDEX)
-            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'gdp_analysis.html'), 'x')
+            rl.write_text(os.path.join(repo, 'reports', 'indicators', 'gdp_analysis.html'), self.SOFR)
             self.assertIn("add ['gdp'] to INDICATOR_HUB", str(asset_cards.main(['--repo', repo])))
         with tempfile.TemporaryDirectory() as repo, contextlib.redirect_stdout(io.StringIO()):
             self.repo_with(repo, self.INDEX, hub='<main></main>')
