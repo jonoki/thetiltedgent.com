@@ -29,7 +29,7 @@ The tool fails when a recurring tear-sheet label has no entry (see "Coverage" be
     "why": "Optional, one line ≤ 15 words: why the reader should care. Shown under the name (Oki, 10 Oct 2026).",
     "def": "Plain-English meaning, ≤ 45 words.",
     "formula": "Optional. Share price ÷ EPS (TTM)",
-    "example": "Optional, round numbers, ≤ 30 words.",
+    "example": "Optional, ≤ 30 words. For a term with a formula, the calculation on a well-known company using only figures printed in our own report for it, named with that report's banner date ('Coca-Cola, Aug 12, 2026: $86.71 share price ÷ $3.33 EPS over the last 12 months ≈ 26.0×.'); the result must match the report's printed figure and the term's own formula basis, checked against the report (Oki, 10 Oct 2026). Otherwise round numbers.",
     "sheet": "Finance only, optional: where it shows on the tear sheet and how to read it there, ≤ 40 words.",
     "lens": "Optional, ≤ 25 words: the poker parallel (finance page) or the money parallel (poker page). Only where it truly clarifies; at most one term in four.",
     "labels": ["Trailing P/E"],
