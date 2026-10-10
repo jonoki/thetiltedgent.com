@@ -24,6 +24,15 @@
   chips.forEach(function(c){ c.addEventListener('click',function(){ setGroup(c.getAttribute('data-g')); }); });
   setGroup('');
   q.addEventListener('input',apply);
+  // the browser jumps to #term before the web fonts reflow the columns; jump again once they are in, unless the
+  // reader has scrolled since
+  if(location.hash&&document.fonts){
+    var y0=scrollY;
+    document.fonts.ready.then(function(){
+      var t=document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if(t&&Math.abs(scrollY-y0)<2) t.scrollIntoView();
+    });
+  }
   // a link to a hidden term clears the filters that hide it
   addEventListener('hashchange',function(){
     var t=document.getElementById(decodeURIComponent(location.hash.slice(1)));

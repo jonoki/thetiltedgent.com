@@ -32,7 +32,7 @@ FIXED_LABELS = ['Mkt Cap', 'Mkt Cap Ranking', 'Next Earnings', 'Static data as o
 NOT_TERMS = {'metric'}     # the metrics table's first column header names the rows; it is not a term
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261010'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261010d'       # ?v= on glossary.css / glossary.js: bump when either changes
 
 HEAD = {
     'finance': dict(

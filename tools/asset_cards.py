@@ -102,6 +102,21 @@ INDICATOR_HUB: list[tuple[str, str, list[tuple[str, str, str, str]]]] = [
         ('payrolls', 'PAYROLLS', 'US nonfarm payrolls',
          'How many jobs US employers added or cut last month, from the monthly survey of businesses.')]),
 ]
+# slug: the "why it matters" line under the name on the hub, plain text, ≤ 15 words (Oki, 10 Oct 2026). Checked by an
+# independent fact-checker before it is added, like the glossary's.
+INDICATOR_WHY: dict[str, str] = {
+    'sofr': 'The dominant US dollar benchmark rate, and close to what cash funds pay savers.',
+    'effr': 'The market rate the Fed targets, and an anchor for other short-term rates.',
+    'corra': "Canada's risk-free benchmark, and the rate that replaced CDOR in Canadian contracts.",
+    'fedtarget': 'The rate behind US rates: prime, money market yields and variable-rate loans move with it.',
+    'bocrate': 'Canadian prime moves with it, and so do variable-rate loans and what new GICs pay.',
+    'prime': 'Many business loans, credit cards and home equity lines charge prime plus a margin.',
+    'hqm10y': 'What highly rated companies pay to borrow, from the curve US pension plans use.',
+    'cpi': 'Shows how fast money loses buying power, and drives what TIPS and I bonds pay.',
+    'corepce': 'Closely watched by the Fed when it sets rates, as a guide to underlying inflation.',
+    'unrate': 'Tracks how hard jobs are to find and keep; maximum employment is a Fed goal.',
+    'payrolls': 'Shows whether employers are hiring, and bonds and stocks react as traders rethink the Fed.',
+}
 HUB = os.path.join('learn', 'indicators', 'index.html')
 VIEWER = '/reports/view.html?r=indicators/'
 
@@ -203,11 +218,12 @@ def hub_card(slug: str, code: str, name: str, line: str, value: tuple[str, str] 
     the page is built, else marked Coming."""
     e = lambda s: html.escape(s, quote=False)
     head = f'<span class="ih"><span class="code">{e(code)}</span><h3>{e(name)}</h3></span>'
+    body = (f'<span class="why">{e(INDICATOR_WHY[slug])}</span>' if slug in INDICATOR_WHY else '') + f'<p>{e(line)}</p>'
     if value:
         val = f'<span class="val"><b>{e(value[0])}</b> <span class="vd">{e(value[1])}</span></span>'
-        return (f'    <a class="card ind" href="{VIEWER}{slug}">{head}{val}<p>{e(line)}</p>'
+        return (f'    <a class="card ind" href="{VIEWER}{slug}">{head}{val}{body}'
                 f'<span class="more">Read the report</span></a>')
-    return f'    <div class="card ind soon">{head}<span class="val"><span class="coming">Coming</span></span><p>{e(line)}</p></div>'
+    return f'    <div class="card ind soon">{head}<span class="val"><span class="coming">Coming</span></span>{body}</div>'
 
 
 def write_hub(t: str, repo: str) -> str:
