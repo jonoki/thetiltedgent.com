@@ -489,7 +489,7 @@
     'iron-condor':{s:[85,95,105,115],legs:[['p',0,1],['p',1,-1],['c',2,-1],['c',3,1]]},
     'iron-butterfly':{s:[90,100,110],legs:[['p',0,1],['p',1,-1],['c',1,-1],['c',2,1]]},
     'collar':{s:[90,110],stock:1,legs:[['p',0,1],['c',1,-1]]},
-    'calendar':{s:[100],legs:[['c',0,-1],['c',0,1,'back']]}
+    'calendar':{s:[100],days:30,legs:[['c',0,-1],['c',0,1,'back']]}
   };
   function greeks(kind,S,K,T,r,v){ // per share: delta, theta per day, vega per volatility point
     var sq=Math.sqrt(T), d1=(Math.log(S/K)+(r+v*v/2)*T)/(v*sq), d2=d1-v*sq, pdf=Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI);
@@ -500,7 +500,7 @@
     var svg=$(root,'svg.chart'), out=$(root,'.out'), sel=$(root,'[name=preset]'), bet=$(root,'.bet');
     var ks=[].slice.call(root.querySelectorAll('[name^=k]')), backWrap=$(root,'.back');
     function setDefaults(){ var p=PRESETS[sel.value]; ks.forEach(function(inp,i){ var on=i<p.s.length; inp.closest('label').hidden=!on; if(on) inp.value=p.s[i]; });
-      backWrap.hidden=sel.value!=='calendar'; }
+      backWrap.hidden=sel.value!=='calendar'; $(root,'[name=days]').value=p.days||90; }
     sel.addEventListener('change',setDefaults); setDefaults();
     wire(root,function(){
       var p=PRESETS[sel.value], o=vals(root), S0=Math.max(1,o.spot||100), v=Math.max(0.01,(o.vol||25)/100), r=(o.rate||0)/100;
@@ -526,7 +526,7 @@
       // per contract: a delta under 20 shares or a vega under $5 a point is too small to call a bet on it
       var d=Math.round(g[0]*100), dir=d>=20?'the stock rising':d<=-20?'the stock falling':'no particular direction';
       var vg=g[2]*100, mv=vg>=5?'the volatility priced into options rising':vg<=-5?'the volatility priced into options falling':'little exposure to volatility';
-      bet.innerHTML='<span>Delta: <b>'+(d>=0?'+':'')+d+(Math.abs(d)===1?' share':' shares')+'</b></span><span>Theta: <b class="'+(g[1]>=0?'up':'down')+'">'+(g[1]>=0?'+':'')+money(g[1]*100,2)+'</b> a day</span>'+
+      bet.innerHTML='<span>Delta: <b>'+(d>=0?'+':'−')+Math.abs(d)+(Math.abs(d)===1?' share':' shares')+'</b></span><span>Theta: <b class="'+(g[1]>=0?'up':'down')+'">'+(g[1]>=0?'+':'')+money(g[1]*100,2)+'</b> a day</span>'+
         '<span>Vega: <b>'+(vg>=0?'+':'')+money(vg,2)+'</b> per volatility point</span><span>A bet on: <b>'+dir+'</b>; <b>'+mv+'</b>; time passing <b>'+(g[1]>=0?'helps':'hurts')+'</b>.</span>';
     });
   }
