@@ -2,6 +2,11 @@
 // widgets are hidden and a short note says what they do.
 //   #fut-sim  futures: a position marked to market over five days, with margin calls (futures.html)
 //   #opt-sim  options: profit at expiry and value today for a call, put or simple strategy (options.html)
+//   #stk-sim  stocks: $10,000 with and without dividends reinvested           #bond-sim  bonds: price against yield
+//   #cash-sim cash: interest against inflation, in today's dollars            #etf-sim   ETFs: what fees cost over time
+//   #mf-sim   mutual funds: an active fund's fees and load against an index    #reit-sim  REITs: cap rate and share value
+//   #pref-sim preferred shares: price against yield, with the call price      #cry-sim   crypto: $1,000 in BTC, ETH, S&P 500
+//   The last one reads data/crypto.json, written from our own reports by tools/lesson_data.py.
 (function(){
   var NS='http://www.w3.org/2000/svg';
   function $(root,sel){ return root.querySelector(sel); }
@@ -165,6 +170,185 @@
     run();
   }
 
-  var fs=document.getElementById('fut-sim'); if(fs) futures(fs);
-  var os=document.getElementById('opt-sim'); if(os) options(os);
+  // ---------- a shared line chart for the other lessons ----------
+  // spec: {x:[numbers], series:[{v:[numbers], color, dash, w}], yfmt, xfmt, xticks:[{x,label}]|null, refs:[{y,color,dash}],
+  //        mark:{x,y}, ratio, minH, label}
+  function line(svg,spec){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var wh=size(svg,spec.ratio||0.42,spec.minH||210), W=wh[0], H=wh[1], L=spec.left||64, R=16, T=14, B=30;
+    var ys=[]; spec.series.forEach(function(s){ s.v.forEach(function(v){ if(isFinite(v)) ys.push(v); }); });
+    (spec.refs||[]).forEach(function(r){ ys.push(r.y); });
+    var lo=spec.ymin!=null?spec.ymin:Math.min.apply(null,ys), hi=Math.max.apply(null,ys), pad=(hi-lo)*0.08||1;
+    if(spec.ymin==null) lo-=pad; hi+=pad;
+    var x0=spec.x[0], x1=spec.x[spec.x.length-1];
+    var x=function(v){return L+(W-L-R)*(v-x0)/((x1-x0)||1);}, y=function(v){return T+(H-T-B)*(hi-v)/((hi-lo)||1);};
+    ticks(lo,hi,4).forEach(function(v){
+      el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:css('--line'),'stroke-width':1},svg);
+      el('text',{x:L-8,y:y(v)+4,'text-anchor':'end'},svg).textContent=spec.yfmt(v); });
+    (spec.xticks||ticks(x0,x1,W<480?3:5).map(function(v){return {x:v,label:spec.xfmt(v)};})).forEach(function(t){
+      el('text',{x:x(t.x),y:H-8,'text-anchor':'middle'},svg).textContent=t.label; });
+    (spec.refs||[]).forEach(function(r){
+      el('line',{x1:L,x2:W-R,y1:y(r.y),y2:y(r.y),stroke:r.color||css('--dim2'),'stroke-width':1.3,'stroke-dasharray':r.dash||'5 5'},svg); });
+    spec.series.forEach(function(s){
+      var d=''; s.v.forEach(function(v,i){ if(isFinite(v)) d+=(d?' L':'M')+x(spec.x[i]).toFixed(1)+' '+y(v).toFixed(1); });
+      el('path',{d:d,fill:'none',stroke:s.color,'stroke-width':s.w||2.5,'stroke-dasharray':s.dash||'','stroke-linejoin':'round'},svg); });
+    if(spec.mark){ el('line',{x1:x(spec.mark.x),x2:x(spec.mark.x),y1:T,y2:H-B,stroke:css('--dim2'),'stroke-width':1,'stroke-dasharray':'3 4'},svg);
+      el('circle',{cx:x(spec.mark.x),cy:y(spec.mark.y),r:4.5,fill:css('--gold-hi')},svg); }
+    svg.setAttribute('aria-label',spec.label||'Chart');
+  }
+  function years(n){ var a=[]; for(var i=0;i<=n;i++) a.push(i); return a; }
+  function pct(v,dp){ return (v>=0?'':'−')+Math.abs(v).toFixed(dp==null?1:dp)+'%'; }
+  function kfmt(v){ // $500, $1.5k, $75k, $1.2M: one decimal only where whole units would merge two ticks
+    var a=Math.abs(v), s;
+    if(a>=1e6) s=(a/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+    else if(a>=1e3) s=(a<1e4?(a/1e3).toFixed(1).replace(/\.0$/,''):Math.round(a/1e3))+'k';
+    else s=String(Math.round(a));
+    return (v<0?'−$':'$')+s;
+  }
+  function wire(root,run){ root.addEventListener('input',run); root.addEventListener('change',run); redraw.push(run); run(); }
+  function vals(root){ var o={}; [].forEach.call(root.querySelectorAll('[name]'),function(e){ o[e.name]=e.type==='checkbox'?e.checked:parseFloat(e.value); }); return o; }
+  function show(root,name,text){ var e=$(root,'.v-'+name); if(e) e.textContent=text; }
+
+  // stocks: price growth alone, against price growth plus dividends reinvested (total return = growth + yield)
+  function stocks(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), g=(o.growth||0)/100, dy=(o.yield||0)/100, n=Math.max(1,Math.round(o.years||30)), p0=o.amount||10000;
+      show(root,'years',n+' years');
+      var xs=years(n), price=xs.map(function(t){return p0*Math.pow(1+g,t);}), tot=xs.map(function(t){return p0*Math.pow(1+g+dy,t);});
+      var share=1-price[n]/tot[n];
+      line(svg,{x:xs,series:[{v:tot,color:css('--gold')},{v:price,color:css('--cream'),dash:'6 5',w:1.8}],yfmt:kfmt,
+        xfmt:function(v){return 'Yr '+Math.round(v);},ymin:0,label:'Growth of '+money(p0)+' over '+n+' years'});
+      out.innerHTML='<span>Price growth alone: <b>'+money(price[n])+'</b></span><span>With dividends reinvested: <b class="up">'+money(tot[n])+
+        '</b></span><span>Share of the final value owed to dividends: <b>'+Math.round(share*100)+'%</b></span>';
+    });
+  }
+
+  // bonds: price of a fixed-coupon bond across yields, with the duration estimate at the chosen yield
+  function bondPrice(cpn,yrs,ytm){ var n=Math.max(1,Math.round(yrs*2)), c=1000*cpn/2, y=ytm/2, p=0;
+    for(var k=1;k<=n;k++) p+=c/Math.pow(1+y,k); return p+1000/Math.pow(1+y,n); }
+  function bonds(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), cpn=(o.coupon||4)/100, yrs=Math.max(1,o.maturity||10), y0=(o.ytm||4)/100;
+      show(root,'ytm',(y0*100).toFixed(1)+'%'); show(root,'maturity',Math.round(yrs)+' years');
+      var xs=[],ps=[]; for(var i=0;i<=95;i++){ var y=0.005+i*0.001; xs.push(y*100); ps.push(bondPrice(cpn,yrs,y)); }
+      var p0=bondPrice(cpn,yrs,y0), h=1e-5, md=-(bondPrice(cpn,yrs,y0+h)-bondPrice(cpn,yrs,y0-h))/(2*h)/p0;
+      var tan=xs.map(function(yp){ return p0*(1-md*(yp/100-y0)); });
+      var up=bondPrice(cpn,yrs,y0+0.01);
+      line(svg,{x:xs,series:[{v:ps,color:css('--gold')},{v:tan,color:css('--cream'),dash:'6 5',w:1.4}],refs:[{y:1000}],
+        yfmt:function(v){return '$'+Math.round(v);},xfmt:function(v){return v.toFixed(0)+'%';},mark:{x:y0*100,y:p0},
+        label:'Price of a $1,000 bond against its yield'});
+      out.innerHTML='<span>Price at '+(y0*100).toFixed(1)+'%: <b>'+money(p0,2)+'</b></span><span>Duration: <b>'+md.toFixed(2)+'</b></span>'+
+        '<span>If yields rise 1 point: <b class="down">'+money(up,2)+'</b> ('+pct((up/p0-1)*100,1)+'; duration says '+pct(-md,1)+')</span>';
+    });
+  }
+
+  // cash: a balance growing at the interest rate, and the same balance in today's dollars after inflation
+  function cash(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), r=(o.rate||0)/100, inf=(o.inflation||0)/100, n=Math.max(1,Math.round(o.years||10)), a=o.amount||10000;
+      show(root,'years',n+' years');
+      var xs=years(n), nom=xs.map(function(t){return a*Math.pow(1+r,t);}), real=xs.map(function(t){return nom[t]/Math.pow(1+inf,t);});
+      var rr=(1+r)/(1+inf)-1;
+      line(svg,{x:xs,series:[{v:nom,color:css('--gold')},{v:real,color:css('--cream'),dash:'6 5',w:1.8}],refs:[{y:a}],yfmt:kfmt,
+        xfmt:function(v){return 'Yr '+Math.round(v);},label:'Balance and its buying power over '+n+' years'});
+      out.innerHTML='<span>Balance: <b>'+money(nom[n])+'</b></span><span>In today&rsquo;s dollars: <b class="'+(real[n]>=a?'up':'down')+'">'+money(real[n])+
+        '</b></span><span>Real return: <b class="'+(rr>=0?'up':'down')+'">'+pct(rr*100,2)+'</b> a year</span>';
+    });
+  }
+
+  // ETFs: the same market return, less two different yearly fees
+  function etf(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), g=(o.ret||7)/100, fa=(o.feea||0)/100, fb=(o.feeb||0)/100, n=Math.max(1,Math.round(o.years||30)), a=o.amount||10000;
+      show(root,'years',n+' years');
+      var xs=years(n), A=xs.map(function(t){return a*Math.pow(1+g-fa,t);}), B=xs.map(function(t){return a*Math.pow(1+g-fb,t);});
+      var gap=A[n]-B[n], gainA=A[n]-a;
+      line(svg,{x:xs,series:[{v:A,color:css('--gold')},{v:B,color:css('--cream'),dash:'6 5',w:1.8}],yfmt:kfmt,ymin:0,
+        xfmt:function(v){return 'Yr '+Math.round(v);},label:'Growth of '+money(a)+' at two fee levels'});
+      out.innerHTML='<span>At '+(fa*100).toFixed(2)+'% a year: <b>'+money(A[n])+'</b></span><span>At '+(fb*100).toFixed(2)+'% a year: <b>'+money(B[n])+
+        '</b></span><span>Difference: <b class="down">'+money(gap)+'</b>'+(gainA>0?' ('+Math.round(100*gap/gainA)+'% of the cheaper fund&rsquo;s gain)':'')+'</span>';
+    });
+  }
+
+  // mutual funds: an index fund against an active fund with a front-end load, a higher fee and some skill
+  function mfund(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), g=(o.ret||7)/100, fi=(o.feei||0)/100, fa=(o.feea||0)/100, load=(o.load||0)/100, sk=(o.skill||0)/100,
+          n=Math.max(1,Math.round(o.years||25)), a=o.amount||10000;
+      show(root,'years',n+' years'); show(root,'skill',(sk>=0?'+':'')+(sk*100).toFixed(1)+'%');
+      var xs=years(n), I=xs.map(function(t){return a*Math.pow(1+g-fi,t);}), A=xs.map(function(t){return a*(1-load)*Math.pow(1+g+sk-fa,t);});
+      var lo=-0.1, hi=0.2, mid; for(var k=0;k<60;k++){ mid=(lo+hi)/2; if(a*(1-load)*Math.pow(1+g+mid-fa,n)<I[n]) lo=mid; else hi=mid; }
+      line(svg,{x:xs,series:[{v:I,color:css('--gold')},{v:A,color:css('--cream'),dash:'6 5',w:1.8}],yfmt:kfmt,ymin:0,
+        xfmt:function(v){return 'Yr '+Math.round(v);},label:'Index fund against active fund over '+n+' years'});
+      out.innerHTML='<span>Index fund: <b>'+money(I[n])+'</b></span><span>Active fund: <b class="'+(A[n]>=I[n]?'up':'down')+'">'+money(A[n])+
+        '</b></span><span>Skill needed just to tie: <b>'+(mid*100).toFixed(2)+'%</b> a year before fees</span>';
+    });
+  }
+
+  // REITs: value per share of a leveraged property company as the cap rate changes
+  function reit(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), noi=(o.noi||1)*1e6, debt=(o.debt||0)*1e6, sh=Math.max(0.01,o.shares||1)*1e6, cap=(o.cap||5)/100;
+      show(root,'cap',(cap*100).toFixed(2)+'%');
+      function per(c){ return (noi/c-debt)/sh; }
+      var xs=[],v=[]; for(var i=0;i<=70;i++){ var c=0.03+i*0.001; xs.push(c*100); v.push(per(c)); }
+      var now=per(cap), next=per(cap+0.005);
+      line(svg,{x:xs,series:[{v:v,color:css('--gold')}],refs:[{y:0,color:css('--red')}],yfmt:function(x){return (x<0?'−$':'$')+Math.abs(x).toFixed(0);},
+        xfmt:function(x){return x.toFixed(0)+'%';},mark:{x:cap*100,y:now},label:'Equity value per share against the cap rate'});
+      out.innerHTML='<span>Property value: <b>'+money(noi/cap)+'</b></span><span>Equity per share: <b>'+money(now,2)+'</b></span>'+
+        '<span>If the cap rate rises half a point: <b class="down">'+money(next,2)+'</b> ('+pct((next/now-1)*100,0)+')</span>';
+    });
+  }
+
+  // preferred shares: a perpetual dividend priced at the market's yield, and the cap a call price puts on it
+  function pref(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), d=o.div||1.5, call=o.call||25, y0=(o.yld||6)/100, callable=$(root,'[name=callable]').checked;
+      show(root,'yld',(y0*100).toFixed(1)+'%');
+      var xs=[],perp=[],cap=[]; for(var i=0;i<=90;i++){ var y=0.03+i*0.001; xs.push(y*100); perp.push(d/y); cap.push(Math.min(d/y,call)); }
+      var p=callable?Math.min(d/y0,call):d/y0;
+      var series=[{v:perp,color:callable?css('--cream'):css('--gold'),dash:callable?'6 5':'',w:callable?1.4:2.5}];
+      if(callable) series.push({v:cap,color:css('--gold')});
+      line(svg,{x:xs,series:series,refs:[{y:call}],yfmt:function(v){return '$'+Math.round(v);},xfmt:function(v){return v.toFixed(0)+'%';},
+        mark:{x:y0*100,y:p},label:'Preferred share price against the market yield'});
+      out.innerHTML='<span>Price at '+(y0*100).toFixed(1)+'%: <b>'+money(p,2)+'</b></span><span>Yield on that price: <b>'+(100*d/p).toFixed(2)+'%</b></span>'+
+        (callable&&d/y0>call?'<span>Held near the call price: the issuer can redeem at <b>'+money(call,2)+'</b></span>':'');
+    });
+  }
+
+  // crypto: $1,000 from a chosen month in bitcoin, ether and the S&P 500, from our reports' month-end closes
+  function crypto(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out'), sel=$(root,'[name=start]'), note=$(root,'.asof');
+    fetch('/learn/lessons/data/crypto.json?v=20261011').then(function(r){return r.ok?r.json():null;}).then(function(d){
+      if(!d){ out.textContent='The price data did not load.'; return; }
+      sel.innerHTML=d.labels.slice(0,-12).map(function(l,i){return '<option value="'+i+'">'+l.replace(/ (\d\d)$/,' 20$1')+'</option>';}).join('');
+      note.textContent='Month-end closes from our reports: bitcoin and ether as of '+d.as_of.btc+'; the S&P 500 (VOO, dividends reinvested) as of '+d.as_of.voo+'.';
+      var keys=['btc','eth','voo'], colors={btc:css('--gold'),eth:css('--pink-neon'),voo:css('--cream')};
+      wire(root,function(){
+        var s=Math.max(0,parseInt(sel.value,10)||0), lab=d.labels.slice(s), xs=lab.map(function(_,i){return i;}), res={};
+        var series=keys.map(function(k){
+          var v=d.series[k].slice(s), base=v[0], peak=v[0], dd=0;
+          var path=v.map(function(p){ peak=Math.max(peak,p); dd=Math.min(dd,p/peak-1); return 1000*p/base; });
+          res[k]={end:path[path.length-1],dd:dd};
+          return {v:path,color:colors[k],dash:k==='voo'?'6 5':'',w:k==='voo'?1.8:2.4};
+        });
+        var step=Math.max(1,Math.ceil(lab.length/(svg.getBoundingClientRect().width<480?3:6)));
+        var xt=[]; for(var i=0;i<lab.length;i+=step) xt.push({x:i,label:lab[i].replace(/ (\d\d)$/,' ’$1')});
+        line(svg,{x:xs,series:series,refs:[{y:1000}],yfmt:kfmt,xticks:xt,label:'Value of $1,000 from '+lab[0]});
+        out.innerHTML=keys.map(function(k){ return '<span>'+d.names[k].replace(/ \(.*/,'')+': <b class="'+(res[k].end>=1000?'up':'down')+'">'+money(res[k].end)+
+          '</b>, worst fall <b class="down">'+pct(res[k].dd*100,0)+'</b></span>'; }).join('');
+      });
+    }).catch(function(){ out.textContent='The price data did not load.'; });
+  }
+
+  var MODS={'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
+            'reit-sim':reit,'pref-sim':pref,'cry-sim':crypto};
+  for(var id in MODS){ var node=document.getElementById(id); if(node) MODS[id](node); }
 })();

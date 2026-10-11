@@ -39,8 +39,12 @@ class NavMenu(NamedTuple):
 NAV: list[NavLink | NavMenu] = [
     NavMenu('learn', 'Learn', [
         ('Learn', [('Learn home', '/learn/')]),
-        ('Lessons', [('Futures', '/learn/lessons/futures.html'),          # Oki, 11 Oct 2026
-                     ('Options', '/learn/lessons/options.html')]),
+        ('Lessons', [('All lessons', '/learn/lessons/'),                   # Oki, 11 Oct 2026
+                     ('Stocks', '/learn/lessons/stocks.html'), ('Bonds', '/learn/lessons/bonds.html'),
+                     ('Cash &amp; T-bills', '/learn/lessons/cash.html'), ('ETFs', '/learn/lessons/etfs.html'),
+                     ('Mutual funds', '/learn/lessons/mutual-funds.html'), ('REITs', '/learn/lessons/reits.html'),
+                     ('Preferred shares', '/learn/lessons/preferred-shares.html'), ('Crypto', '/learn/lessons/crypto.html'),
+                     ('Futures', '/learn/lessons/futures.html'), ('Options', '/learn/lessons/options.html')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
                         ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
         ('Economic Indicators', [('Rates, inflation &amp; jobs', '/learn/indicators/')])]),   # Oki, 8 Oct 2026
@@ -92,8 +96,9 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
     ('learn/table-talk/poker.html', 'learn', True),
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
-    ('learn/lessons/futures.html', 'learn', True),
-    ('learn/lessons/options.html', 'learn', True),
+    ('learn/lessons/index.html', 'learn', True),
+    *[(f'learn/lessons/{p}.html', 'learn', True) for p in ('stocks', 'bonds', 'cash', 'etfs', 'mutual-funds', 'reits',
+                                                          'preferred-shares', 'crypto', 'futures', 'options')],
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]
 
