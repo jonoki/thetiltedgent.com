@@ -558,17 +558,17 @@
     var svg=$(root,'svg.chart'), out=$(root,'.out');
     wire(root,function(){
       var o=vals(root), S0=Math.max(1,o.spot||70), c=(o.carry||0)/100, chg=(o.chg||0)/100, n=Math.max(1,Math.round(o.months||12)), r=(o.rate||0)/100;
-      show(root,'carry',(c>0?'+':'')+(c*100).toFixed(1)+'% a month'); show(root,'months',n+' months');
+      show(root,'carry',(c>0?'+':c<0?'−':'')+Math.abs(c*100).toFixed(1)+'% a month'+(c>0?' (contango)':c<0?' (backwardation)':' (flat)')); show(root,'months',n+' months');
       var xs=[], S=[], F=[], v=1000;
       for(var t=0;t<=n;t++){ var s=S0*(1+chg*t/n); xs.push(t); S.push(1000*s/S0);
         if(t>0) v*=s/(S0*(1+chg*(t-1)/n)*(1+c))*(1+r/12); F.push(v); }
       line(svg,{x:xs,series:[{v:F,color:css('--gold')},{v:S,color:css('--cream'),dash:'6 5',w:1.8}],refs:[{y:1000}],yfmt:kfmt,
-        xfmt:function(v){return 'Mo '+Math.round(v);},label:'$1,000 in rolled futures against the spot price'});
+        xfmt:function(v){return 'Mo '+Math.round(v);},label:'$1,000 in rolled futures against the headline oil price'});
       var curve=[1,6,12].map(function(m){ return m+'-month <b>'+money(S0*Math.pow(1+c,m),2)+'</b>'; }).join(' · ');
       out.innerHTML='<span>The curve today: spot <b>'+money(S0,2)+'</b> · '+curve+'</span>'+
-        '<span>Spot price: <b class="'+(chg>=0?'up':'down')+'">'+spct(chg*100)+'</b></span>'+
+        '<span>Oil price: <b class="'+(chg>=0?'up':'down')+'">'+spct(chg*100)+'</b></span>'+
         '<span>Futures holder: <b class="'+(v>=1000?'up':'down')+'">'+spct((v/1000-1)*100)+'</b></span>'+
-        '<span>Futures minus spot: <b class="'+(v>=S[n]?'up':'down')+'">'+signed(v-S[n])+'</b> on the $1,000</span>';
+        '<span>Futures minus oil: <b class="'+(v>=S[n]?'up':'down')+'">'+signed(v-S[n])+'</b> on the $1,000</span>';
     });
   }
   // rates: % price change against a rate move. Bonds priced at par before the move; stocks as growing payouts,
@@ -576,10 +576,11 @@
   function rates(root){
     var svg=$(root,'svg.chart'), out=$(root,'.out');
     wire(root,function(){
-      var o=vals(root), y0=(o.start||4)/100, dr=(o.move||0)/100, m0=(o.mortgage||6)/100;
+      var o=vals(root), y0=Math.max(2.5,o.start||4)/100, dr=(o.move||0)/100, m0=(o.mortgage||6)/100;
+      var st=$(root,'[name=start]'); if(document.activeElement!==st&&parseFloat(st.value)<2.5) st.value=2.5;   // the stock model needs r − g > 0
       show(root,'move',(dr>0?'+':dr<0?'−':'')+Math.abs(dr*100).toFixed(2)+' points');
       var b=function(yrs,d){ return bondPrice(y0,yrs,y0+d)/bondPrice(y0,yrs,y0)-1; };
-      var s=function(g,d){ var rr=y0+0.05; return (rr-g)/(rr+d-g)-1; };
+      var s=function(g,d){ var rr=y0+0.05; return rr+d-g>0.004?(rr-g)/(rr+d-g)-1:NaN; };   // the model breaks once r − g nears zero
       var xs=[], b2=[], b30=[], sv=[], sg=[];
       for(var i=0;i<=50;i++){ var d=-0.02+0.05*i/50; xs.push(d*100); b2.push(100*b(2,d)); b30.push(100*b(30,d)); sv.push(100*s(0.01,d)); sg.push(100*s(0.04,d)); }
       line(svg,{x:xs,series:[{v:sg,color:css('--cream'),w:2.2},{v:sv,color:css('--cream'),dash:'6 5',w:1.8},{v:b30,color:css('--gold')},{v:b2,color:css('--gold'),dash:'6 5',w:1.8}],
