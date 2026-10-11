@@ -446,7 +446,11 @@
   function linked(root){
     var amt=$(root,'[name=amount]'), btns=$(root,'.txbtns'), log=$(root,'.txlog'), out=$(root,'.out'), st;
     function fresh(){ st={cash:0,ar:0,inv:0,ppe:0,ap:0,loan:0,paidin:0,divs:0,rev:0,cogs:0,opex:0,dep:0,cf:{op:0,inv:0,fin:0}}; log.innerHTML=''; }
-    btns.innerHTML=TX.map(function(t){return '<button type="button" data-tx="'+t[0]+'">'+t[1]+'</button>';}).join('')+'<button type="button" class="reset">Start over</button>';
+    btns.innerHTML='<button type="button" class="seq">Post the opening sequence</button>'+
+      TX.map(function(t){return '<button type="button" data-tx="'+t[0]+'">'+t[1]+'</button>';}).join('')+'<button type="button" class="reset">Start over</button>';
+    var OPENING=[['invest',30000],['borrow',50000],['oven',60000],['stock',6000],['sell',10000],['cater',5000],['dep',12000]];
+    function post(id,a){ var t=TX.filter(function(x){return x[0]===id;})[0]; if(!t||!a) return;
+      var used=t[2](st,a); used=(typeof used==='number')?used:a; log.insertAdjacentHTML('afterbegin','<li>'+t[1]+': '+money(used)+'</li>'); }
     function row(k,v,cls){ return '<tr'+(cls?' class="'+cls+'"':'')+'><td>'+k+'</td><td class="num">'+money(v)+'</td></tr>'; }
     function render(){
       var s=st, ni=s.rev-s.cogs-s.opex-s.dep, re=ni-s.divs, ta=s.cash+s.ar+s.inv+s.ppe, tl=s.ap+s.loan, te=s.paidin+re;
@@ -454,7 +458,9 @@
       $(root,'.is tbody').innerHTML=row('Revenue',s.rev)+row('Cost of ingredients',-s.cogs)+row('Wages',-s.opex)+row('Depreciation',-s.dep)+row('Net income',ni,'tot');
       $(root,'.bs tbody').innerHTML=row('Cash',s.cash)+row('Receivables',s.ar)+row('Inventory',s.inv)+row('Equipment',s.ppe)+row('Total assets',ta,'tot')+
         row('Payables',s.ap)+row('Loan',s.loan)+row('Owners&rsquo; money in',s.paidin)+row('Retained earnings',re)+row('Liabilities + equity',tl+te,'tot');
-      $(root,'.cf tbody').innerHTML=row('Operating',cfo)+row('Investing',s.cf.inv)+row('Financing',s.cf.fin)+row('Change in cash',chg,'tot');
+      // operating cash shown the indirect way, the bridge from the cash flow lesson: the balances started at zero, so they are the changes
+      $(root,'.cf tbody').innerHTML=row('Net income',ni)+row('+ Depreciation',s.dep)+row('&minus; Receivables up',-s.ar)+row('&minus; Inventory up',-s.inv)+
+        row('+ Payables up',s.ap)+row('Operating',cfo,'tot')+row('Investing',s.cf.inv)+row('Financing',s.cf.fin)+row('Change in cash',chg,'tot');
       var okB=Math.abs(ta-tl-te)<0.005, okC=Math.abs(chg-s.cash)<0.005;
       out.innerHTML='<span>Assets = liabilities + equity: <b class="'+(okB?'up':'down')+'">'+(okB?'balances':'off')+'</b></span>'+
         '<span>Cash flow total = cash on the balance sheet: <b class="'+(okC?'up':'down')+'">'+(okC?'matches':'off')+'</b></span>'+
@@ -463,9 +469,8 @@
     btns.addEventListener('click',function(e){
       var b=e.target.closest('button'); if(!b) return;
       if(b.classList.contains('reset')){ fresh(); render(); return; }
-      var t=TX.filter(function(x){return x[0]===b.getAttribute('data-tx');})[0], a=Math.max(0,parseFloat(amt.value)||0); if(!t||!a) return;
-      var used=t[2](st,a); used=(typeof used==='number')?used:a;
-      log.insertAdjacentHTML('afterbegin','<li>'+t[1]+': '+money(used)+'</li>');
+      if(b.classList.contains('seq')){ fresh(); OPENING.forEach(function(o){ post(o[0],o[1]); }); render(); return; }
+      post(b.getAttribute('data-tx'),Math.max(0,parseFloat(amt.value)||0));
       render();
     });
     fresh(); render();
