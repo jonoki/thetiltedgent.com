@@ -59,7 +59,8 @@
       out.innerHTML='<span>Gain or loss: <b class="'+(pnl>=0?'up':'down')+'">'+signed(pnl)+'</b></span>'+
         '<span>Cash added by margin calls: <b>'+money(added)+'</b></span>'+
         '<span>Contract value at entry: <b>'+money(entry*mult*qty)+'</b></span>'+
-        '<span>Return on the margin you posted: <b class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+(100*pnl/(init+added)).toFixed(1)+'%</b></span>';
+        '<span>Return: <b class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+(100*pnl/(entry*mult*qty)).toFixed(1)+'%</b> on the contract&rsquo;s value, '+
+        '<b class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+(100*pnl/(init+added)).toFixed(1)+'%</b> on the cash you put up</span>';
       draw(path,init,maint);
     }
     function draw(path,init,maint){
