@@ -12,7 +12,7 @@ The prevention rules only. The full log with examples and run tallies is `claude
 
 **E. Entity facts.** Executives, deal status, ownership: the company's own site or latest filing, dated. Facts carried over from the previous edition are re-verified, not inherited. S&P add date from the S&P DJI release when findable; Wikipedia dates labelled.
 
-**F. Arithmetic, counts, superlatives.** Recompute every count, streak, superlative and % change from the page's data or a fetched series before writing it; if you can't compute it, don't claim it. Trailing P/E = header price ÷ the page's EPS (TTM) cell, never a data site's P/E field.
+**F. Arithmetic, counts, superlatives.** Recompute every count, streak, superlative and % change from the page's data or a fetched series before writing it; if you can't compute it, don't claim it. Trailing P/E = header price ÷ the page's EPS (TTM) cell, never a data site's P/E field. A drawdown or multi-year return uses one basis and names it (closing vs intraday; price vs total return with dividends reinvested), with its start and end dates.
 
 **G. Basis.** State the basis (GAAP/adjusted, fiscal year, source) beside every estimate; if sources disagree, show both or pick the primary and say why.
 
