@@ -2,7 +2,7 @@
 
 Pages: `learn/table-talk/finance.html` and `learn/table-talk/poker.html` (Learn · Table Talk; the old `glossary/` URLs redirect), written by `py -3 tools/glossary.py` from
 `data/glossary_finance.json` and `data/glossary_poker.json`. Edit the JSON and rebuild; never hand-edit the pages.
-The tool fails when a recurring tear-sheet label has no entry (see "Coverage" below).
+The tool fails when a recurring tear-sheet label has neither an entry nor a report tooltip (see "Coverage" below).
 
 ## Reader and voice (from CLAUDE.md, binding)
 
@@ -46,10 +46,19 @@ The tool fails when a recurring tear-sheet label has no entry (see "Coverage" be
 
 ## Coverage (finance; the tool enforces it)
 
-Every label printed on at least ~10% of the stock tear sheets needs an entry whose `labels` include it: every
-first-column row of the Key Financial Metrics table, every column header of that table, and these fixed labels:
-`Mkt Cap`, `Mkt Cap Ranking`, `Next Earnings`, `Static data as of`, `Consensus Rating`, `Rating Breakdown`,
-`Average Price Target`, `Target Range`, `Key Institutional Investors`, `RSI`, `50-day`, `200-day`.
+Every label printed on at least ~10% of the stock tear sheets needs an explanation: an entry whose `labels` include
+it, or a tooltip in `data/report_labels.json` (shown by the report viewer). That covers every first-column row of the
+Key Financial Metrics table, every column header of that table, and these fixed labels: `Mkt Cap`, `Mkt Cap Ranking`,
+`Next Earnings`, `Static data as of`, `Consensus Rating`, `Rating Breakdown`, `Average Price Target`, `Target Range`,
+`Key Institutional Investors`, `RSI`, `50-day`, `200-day`.
+
+What belongs where (Oki, 10 Oct 2026):
+- Glossary: finance and investing terms a reader meets anywhere (P/E, beta, duration, buyback, the S&P 500).
+- Report tooltip (`data/report_labels.json`, ≤ 30 words, plain text): how TTG's own page works (the banner date, our
+  columns, our rank rows, the marks). When a glossary entry also covers the label, the tooltip names it in `term`.
+- Card tooltips (`tools/style_tags.py`, `reports/index.js`): the report cards' tags, each stating its rule.
+- Nothing: words every adult knows (all-time high, a fund's holdings).
+A removed entry's id goes in `RETIRED` in `tools/glossary.py`, with a successor id or where it is explained now.
 
 ## Accuracy
 

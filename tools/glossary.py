@@ -30,6 +30,28 @@ FIXED_LABELS = ['Mkt Cap', 'Mkt Cap Ranking', 'Next Earnings', 'Static data as o
                 'Rating Breakdown', 'Average Price Target', 'Target Range', 'Key Institutional Investors',
                 'RSI', '50-day', '200-day']
 NOT_TERMS = {'metric'}     # the metrics table's first column header names the rows; it is not a term
+# Report labels explained by a tooltip in the report viewer instead of a glossary entry (Oki, 10 Oct 2026): a required
+# label is covered by a glossary term's `labels` or by an entry here. Read by reports/tips.js too.
+TIPS = os.path.join('data', 'report_labels.json')
+TIP_WORDS = 30
+# Entries taken out of the finance glossary because they describe TTG's own pages or are too basic (Oki, 10 Oct 2026).
+# Old links keep working: glossary.js sends an id to its successor term, or says where it is explained now
+# ('report': a tooltip on the reports; 'cards': the report cards' own tooltips). Never reuse a retired id.
+RETIRED: dict[str, dict[str, str]] = {'finance': {
+    **{i: 'report' for i in ('static-data', 'price-change', 'mkt-cap-ranking', 'next-earnings', 'metric-column',
+                             'industry-avg', 'context-column', 'estimate-marks', '52-week-range',
+                             'rating-breakdown', 'target-range')},
+    **{i: 'cards' for i in ('their-hand', 'index-badges', 'style-tags', 'tag-value', 'tag-growth', 'tag-income',
+                            'tag-quality', 'tag-cash-machine', 'tag-steady', 'tag-giant', 'tag-beaten-down',
+                            'tag-not-yet-profitable', 'tag-dividend', 'tag-head-office', 'tag-updated',
+                            'tag-new-results', 'hand-tags', 'key-people-tags')},
+    'monthly-closes': 'moving-average', 'all-time-high': 'drawdown', 'holdings': 'etf', 'ticker': 'exchange',
+    'market-share': 'segment', 'index-column': 'sp-500',
+}, 'poker': {}}
+MOVED_NOTE = {   # what glossary.js says when a link names a retired entry with no successor
+    'report': 'That entry now lives on the reports themselves: hover over or tap the label to read it.',
+    'cards': 'That entry now lives on the report cards: hover over or tap the tag to read it.',
+}
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 STAMP = '20261010d'       # ?v= on glossary.css / glossary.js: bump when either changes
@@ -83,9 +105,46 @@ def clean(s: str) -> str:
     return html.unescape(re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', s))).strip()
 
 
-def problems(doc: dict[str, Any], required: list[str]) -> list[str]:
+def tip_covers(tip: dict[str, Any], label: str) -> bool:
+    """Whether a report_labels.json entry explains a label: its match rule, ignoring case."""
+    want, got = tip['label'].lower(), label.lower()
+    how = tip.get('match', 'exact')
+    return got == want or (how == 'prefix' and got.startswith(want)) or (how == 'contains' and want in got)
+
+
+def tip_problems(tips: list[dict[str, Any]], doc: dict[str, Any]) -> list[str]:
+    """Everything wrong with the report tooltips: missing or over-long text, HTML, an unknown match rule or glossary
+    term, a repeated label, and a label the glossary also explains without the tip linking to that entry."""
+    out = []
+    ids = {t['id'] for t in doc.get('terms', [])}
+    by_label = {lab.lower(): t['id'] for t in doc.get('terms', []) for lab in t.get('labels', [])}
+    seen: collections.Counter[str] = collections.Counter(str(t.get('label', '')).lower() for t in tips)
+    out += [f'tooltip label {lab!r} listed {n} times' for lab, n in seen.items() if n > 1]
+    for t in tips:
+        lab = t.get('label') or '?'
+        if not t.get('label') or not t.get('tip'):
+            out.append(f'tooltip {lab}: needs a label and a tip')
+            continue
+        if t.get('match', 'exact') not in ('exact', 'prefix', 'contains'):
+            out.append(f'tooltip {lab}: unknown match {t["match"]!r}')
+        if len(t['tip'].split()) > TIP_WORDS:
+            out.append(f'tooltip {lab}: {len(t["tip"].split())} words, over {TIP_WORDS}')
+        if re.search(r'<[a-z/]', t['tip']):
+            out.append(f'tooltip {lab}: tip holds HTML')
+        if t.get('term') and t['term'] not in ids:
+            out.append(f'tooltip {lab}: term {t["term"]!r} is not a glossary entry')
+        owner = by_label.get(lab.lower())
+        if owner and t.get('term') != owner:
+            out.append(f'tooltip {lab}: the glossary entry {owner!r} explains this label, so the tip must link it (term)')
+    return out
+
+
+def problems(doc: dict[str, Any], required: list[str], tips: list[dict[str, Any]] | None = None,
+             retired: dict[str, str] | None = None) -> list[str]:
     """Everything wrong with one glossary: missing fields, bad or repeated ids, unknown groups or see-also ids,
-    and required tear-sheet labels no term explains."""
+    required tear-sheet labels that neither a term nor a report tooltip explains, and retired ids that are live
+    again or point at a missing successor."""
+    tips, retired = tips or [], retired or {}
     out = []
     groups = [g.get('id') for g in doc.get('groups', [])]
     ids: collections.Counter[str] = collections.Counter(t.get('id', '') for t in doc.get('terms', []))
@@ -101,7 +160,11 @@ def problems(doc: dict[str, Any], required: list[str]) -> list[str]:
         out += [f'{name}: {f} holds HTML' for f in ('term', 'why', 'def', 'formula', 'example', 'sheet', 'lens')
                 if re.search(r'<[a-z/]', t.get(f) or '')]
     covered = {lab.lower() for t in doc.get('terms', []) for lab in t.get('labels', [])}
-    out += [f'tear-sheet label {lab!r} has no term' for lab in required if lab.lower() not in covered]
+    out += [f'tear-sheet label {lab!r} has no term or report tooltip ({TIPS})' for lab in required
+            if lab.lower() not in covered and not any(tip_covers(t, lab) for t in tips if t.get('label'))]
+    out += [f'retired id {i!r} is a live term again' for i in retired if i in ids]
+    out += [f'retired id {i!r} points at {s!r}, which is not a term' for i, s in retired.items()
+            if s not in MOVED_NOTE and s not in ids]
     out += [f'group {g!r} has no terms' for g in groups if not any(t.get('group') == g for t in doc.get('terms', []))]
     return out
 
@@ -136,6 +199,12 @@ def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, group_t
 def az_key(name: str) -> str:
     c = re.sub(r'^[^A-Za-z0-9]+', '', name)[:1].upper()
     return c if c.isalpha() else '#'
+
+
+def moved_json(page: str) -> str:
+    """The retired ids for glossary.js: id -> successor id, or the note saying where it is explained now."""
+    out = {i: ({'note': MOVED_NOTE[s]} if s in MOVED_NOTE else {'to': s}) for i, s in sorted(RETIRED[page].items())}
+    return json.dumps(out, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
 
 
 def page_html(page: str, doc: dict[str, Any]) -> str:
@@ -209,6 +278,7 @@ def page_html(page: str, doc: dict[str, Any]) -> str:
 
 <div class="callout">{h['callout']}</div>
 </main>
+<script type="application/json" id="moved">{moved_json(page)}</script>
 
 {chrome.footer(chrome.SITE_FINE)}
 
@@ -230,13 +300,23 @@ def with_counts(text: str, counts: dict[str, int]) -> str:
     return text
 
 
+def load_tips(repo: str) -> list[dict[str, Any]]:
+    with open(os.path.join(repo, TIPS), encoding='utf-8') as fh:
+        return json.load(fh)['labels']
+
+
 def build(repo: str, check: bool) -> int | str:
     required = {'finance': tear_sheet_labels(repo) + FIXED_LABELS, 'poker': []}
+    try:
+        tips = load_tips(repo)
+    except (OSError, ValueError, KeyError) as err:
+        return f'{TIPS}: {err}'
     stale = []
     counts = {}
     for page in PAGES:
         doc = load(repo, page)
-        bad = problems(doc, required[page])
+        mine = tips if page == 'finance' else []
+        bad = problems(doc, required[page], mine, RETIRED[page]) + (tip_problems(tips, doc) if page == 'finance' else [])
         if bad:
             return f'data/glossary_{page}.json:\n  ' + '\n  '.join(bad)
         counts[page] = len(doc['terms'])

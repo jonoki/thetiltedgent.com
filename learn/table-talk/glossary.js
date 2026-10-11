@@ -24,6 +24,16 @@
   chips.forEach(function(c){ c.addEventListener('click',function(){ setGroup(c.getAttribute('data-g')); }); });
   setGroup('');
   q.addEventListener('input',apply);
+  // a link to a retired entry (tools/glossary.py RETIRED) goes to its successor, or says where it is explained now
+  var moved={}; try{ moved=JSON.parse(document.getElementById('moved').textContent); }catch(e){}
+  function forward(){
+    var mv=moved[decodeURIComponent(location.hash.slice(1))];
+    if(!mv) return;
+    if(mv.to){ location.replace('#'+mv.to); return; }
+    count.textContent=mv.note; scrollTo(0,0);
+  }
+  forward();
+  addEventListener('hashchange',forward);
   // the browser jumps to #term before the web fonts reflow the columns; jump again once they are in, unless the
   // reader has scrolled since
   if(location.hash&&document.fonts){

@@ -205,7 +205,7 @@ def rank_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> list[l
     if d['yield'] and d['yield'] >= th['income_yield_min']:
         tags.append(['Income', f"Pays a {d['yield']:.2f}% dividend yield, about ${d['yield']:.2f} a year per $100 invested. That beats {pct_rank(d['yield'], u['yield'])}% of S&P 500 dividend payers; the median pays {th['yield_median']:.2f}%. Income means the top 20% of payers." + when])
     if d['fcf_yield'] is not None and d['fcf_yield'] >= th['cash_fcfy_min']:
-        tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], u['fcf_yield'])}% of S&P 500 companies (median {th['fcfy_median']:.1f}%)." + when])
+        tags.append(['Cash machine', f"Free cash flow, the cash left after running and investing in the business, was {d['fcf_yield']:.1f}% of the company's stock-market value, more than {pct_rank(d['fcf_yield'], u['fcf_yield'])}% of S&P 500 companies (median {th['fcfy_median']:.1f}%). Cash machine means the top {PCT:.0%}." + when])
     return tags
 
 
@@ -213,9 +213,11 @@ def size_and_price_tags(d: rd.TagInputs, th: Thresholds, when: str) -> list[list
     """Giant (market cap over the cut-off) and Beaten down (price at or under the ratio of its 52-week high)."""
     tags = []
     if d['mcap'] and d['mcap'] >= th['giant_mcap_min']:
-        tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies." + when])
+        tags.append(['Giant', f"Worth about {d['raw']['market_cap']} on the stock market, one of the world's largest companies. "
+                              f"Giant means ${th['giant_mcap_min'] / 1e9:,.0f} billion or more." + when])
     if d['price'] and d['w52_high'] and d['price'] <= th['beaten_down_ratio'] * d['w52_high']:
-        tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}." + when])
+        tags.append(['Beaten down', f"Trading {100 * (1 - d['price'] / d['w52_high']):.0f}% below its 52-week high of ${d['w52_high']:,.2f}. "
+                                    f"Beaten down means at least {1 - th['beaten_down_ratio']:.0%} below that high." + when])
     return tags
 
 
@@ -236,7 +238,8 @@ def quality_tags(d: rd.TagInputs, th: Thresholds, u: Universe, when: str) -> lis
     if (roic is None or de is None or NO_QUALITY.search(d['industry'] or '') or roic < th['quality_roic_min']
             or not 0 <= de < th['quality_de_max']):
         return []
-    return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f})." + when]]
+    return [['Quality', f"Earns {roic:.1f}% a year on the money invested in the business, better than {pct_rank(roic, u['roic'])}% of S&P 500 companies outside banks, insurers and REITs, while carrying little debt (debt-to-equity {de:.2f}). Quality means the top {PCT:.0%} on that return, with debt-to-equity "
+                        f"under {th['quality_de_max']:g}." + when]]
 
 
 def main(argv: list[str] | None = None) -> int | str:

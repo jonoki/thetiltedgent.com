@@ -31,6 +31,39 @@ class Problems(unittest.TestCase):
         doc = {**DOC, 'groups': DOC['groups'] + [{'id': 'chart', 'title': 'Chart'}]}
         self.assertIn("group 'chart' has no terms", glossary.problems(doc, []))
 
+    def test_a_report_tooltip_covers_a_label_by_its_match_rule(self):
+        tips = [{'label': 'Static data as of', 'match': 'prefix', 'tip': 'x'},
+                {'label': 'Industry Avg', 'match': 'contains', 'tip': 'x'}, {'label': 'Context', 'tip': 'x'}]
+        self.assertEqual(glossary.problems(DOC, ['Static data as of', 'Beverage Industry Avg', 'context'], tips), [])
+        self.assertTrue(glossary.problems(DOC, ['Contextual'], tips))   # exact means exact
+
+    def test_retired_ids_stay_retired_and_point_somewhere_real(self):
+        self.assertEqual(glossary.problems(DOC, [], retired={'old': 'eps', 'gone': 'report'}), [])
+        out = glossary.problems(DOC, [], retired={'eps': 'report', 'old': 'ghost'})
+        self.assertIn("retired id 'eps' is a live term again", out)
+        self.assertIn("retired id 'old' points at 'ghost', which is not a term", out)
+
+
+class Tips(unittest.TestCase):
+    def test_clean_tips_have_no_problems(self):
+        tips = [{'label': 'Context', 'tip': 'A note on each figure.'},
+                {'label': 'Trailing P/E', 'tip': 'Price over profit.', 'term': 'pe-ratio'}]
+        self.assertEqual(glossary.tip_problems(tips, DOC), [])
+
+    def test_every_kind_of_tip_problem_is_named(self):
+        tips = [{'label': 'Context', 'tip': ' '.join(['word'] * 31)}, {'label': 'context', 'tip': '<b>x</b>'},
+                {'label': 'Odd', 'tip': 'x', 'match': 'fuzzy'}, {'label': 'Ghost', 'tip': 'x', 'term': 'ghost'},
+                {'label': 'Trailing P/E', 'tip': 'x'}, {'label': 'Empty'}]
+        out = glossary.tip_problems(tips, DOC)
+        for needle in ("tooltip label 'context' listed 2 times", 'Context: 31 words', 'context: tip holds HTML',
+                       "Odd: unknown match 'fuzzy'", "Ghost: term 'ghost' is not a glossary entry",
+                       "Trailing P/E: the glossary entry 'pe-ratio' explains this label", 'Empty: needs a label and a tip'):
+            self.assertTrue(any(needle in p for p in out), needle)
+
+    def test_the_live_tips_file_passes(self):
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.assertEqual(glossary.tip_problems(glossary.load_tips(root), glossary.load(root, 'finance')), [])
+
 
 class Page(unittest.TestCase):
     def test_terms_anchors_and_a_to_z(self):
@@ -41,6 +74,8 @@ class Page(unittest.TestCase):
         self.assertIn('Share price ÷ EPS (TTM)', out)
         self.assertIn('nav class="site"', out)
         self.assertIn('glossary.js?v=' + glossary.STAMP, out)
+        self.assertIn('"ticker":{"to":"exchange"}', out)                 # retired anchors, read by glossary.js
+        self.assertIn('"static-data":{"note":"That entry now lives on the reports', out)
 
     def test_text_is_escaped(self):
         doc = {**DOC, 'terms': [{**DOC['terms'][1], 'def': 'R&D < revenue'}]}
