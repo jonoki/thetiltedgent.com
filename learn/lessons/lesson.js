@@ -348,7 +348,130 @@
     }).catch(function(){ out.textContent='The price data did not load.'; });
   }
 
-  var MODS={'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
+  // ---------- financial statements ----------
+  // a horizontal waterfall: rows {label, v, kind:'start'|'delta'|'total'}; deltas float from the running total
+  function waterfall(svg,rows){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var W=Math.max(300,Math.round(svg.getBoundingClientRect().width)||640), rowH=26, T=8, B=26, H=T+B+rows.length*rowH;
+    svg.setAttribute('viewBox','0 0 '+W+' '+H); svg.style.height=H+'px';
+    var L=Math.min(190,Math.round(W*0.38)), R=64, run=0, spans=[];
+    rows.forEach(function(r){
+      if(r.kind==='delta'){ spans.push([run,run+r.v]); run+=r.v; }
+      else { run=r.v; spans.push([0,r.v]); }
+    });
+    var all=[0]; spans.forEach(function(s){all.push(s[0],s[1]);});
+    var lo=Math.min.apply(null,all), hi=Math.max.apply(null,all); if(hi===lo) hi=lo+1;
+    var x=function(v){return L+(W-L-R)*(v-lo)/(hi-lo);};
+    el('line',{x1:x(0),x2:x(0),y1:T,y2:H-B,stroke:css('--dim2'),'stroke-width':1},svg);
+    ticks(lo,hi,W<480?2:4).forEach(function(v){ el('text',{x:x(v),y:H-8,'text-anchor':'middle'},svg).textContent=kfmt(v); });
+    rows.forEach(function(r,i){
+      var y=T+i*rowH, s=spans[i], a=Math.min(s[0],s[1]), b=Math.max(s[0],s[1]);
+      var col=r.kind==='delta'?(r.v>=0?css('--green'):css('--red')):css('--gold');
+      el('rect',{x:x(a),y:y+5,width:Math.max(1.5,x(b)-x(a)),height:rowH-10,rx:2,fill:col,'fill-opacity':r.kind==='delta'?0.75:0.95},svg);
+      var t=el('text',{x:L-8,y:y+rowH/2+4,'text-anchor':'end'},svg); t.textContent=r.label;
+      if(r.kind!=='delta') t.setAttribute('style','fill:'+css('--cream'));
+      el('text',{x:x(b)+6,y:y+rowH/2+4,'text-anchor':'start'},svg).textContent=(r.kind==='delta'&&r.v>0?'+':'')+kfmt(r.v);   // R keeps room for it
+    });
+  }
+
+  // income statement: from revenue down to net income
+  function income(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), rev=o.revenue||0, cogs=rev*(o.cogspct||0)/100, gp=rev-cogs, opx=(o.wages||0)+(o.rent||0)+(o.other||0)+(o.dep||0);
+      var oi=gp-opx, it=o.interest||0, pre=oi-it, tax=Math.max(0,pre)*(o.taxrate||0)/100, ni=pre-tax;
+      show(root,'cogspct',(o.cogspct||0)+'%');
+      waterfall(svg,[{label:'Revenue',v:rev,kind:'start'},{label:'Ingredients',v:-cogs,kind:'delta'},{label:'Gross profit',v:gp,kind:'total'},
+        {label:'Wages',v:-(o.wages||0),kind:'delta'},{label:'Rent',v:-(o.rent||0),kind:'delta'},{label:'Other costs',v:-(o.other||0),kind:'delta'},
+        {label:'Depreciation',v:-(o.dep||0),kind:'delta'},{label:'Operating income',v:oi,kind:'total'},{label:'Interest',v:-it,kind:'delta'},
+        {label:'Tax',v:-tax,kind:'delta'},{label:'Net income',v:ni,kind:'total'}]);
+      svg.setAttribute('aria-label','From revenue of '+money(rev)+' to net income of '+money(ni));
+      function m(v){ return rev?pct(100*v/rev,1):'—'; }
+      out.innerHTML='<span>Gross margin: <b>'+m(gp)+'</b></span><span>Operating margin: <b>'+m(oi)+'</b></span><span>Net margin: <b class="'+(ni>=0?'up':'down')+'">'+m(ni)+'</b></span>';
+    });
+  }
+
+  // balance sheet: what it owns against what it owes; equity is whatever is left
+  function balance(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), A=[['Cash',o.cash||0,'--gold-hi'],['Receivables',o.ar||0,'--gold'],['Inventory',o.inv||0,'--gold-deep'],['Equipment',o.ppe||0,'--dim']];
+      var Lb=[['Payables',o.ap||0,'--red-neon'],['Loan',o.loan||0,'--red']], ta=A.reduce(function(s,a){return s+a[1];},0), tl=Lb.reduce(function(s,a){return s+a[1];},0), eq=ta-tl;
+      while(svg.firstChild) svg.removeChild(svg.firstChild);
+      var wh=size(svg,0.5,240), W=wh[0], H=wh[1], T=14, B=34, top=Math.max(ta,tl,1), y=function(v){return T+(H-T-B)*(1-v/top);}, bw=Math.min(150,W*0.26);
+      function stack(xc,items,label){ var base=0; items.forEach(function(it){ if(it[1]<=0) return;
+          el('rect',{x:xc-bw/2,y:y(base+it[1]),width:bw,height:y(base)-y(base+it[1]),fill:css(it[2]),'fill-opacity':0.85,stroke:css('--bg'),'stroke-width':1},svg);
+          if(y(base)-y(base+it[1])>16) el('text',{x:xc,y:(y(base)+y(base+it[1]))/2+4,'text-anchor':'middle',style:'fill:'+css('--bg')+';font-weight:700'},svg).textContent=it[0];
+          base+=it[1]; });
+        el('text',{x:xc,y:H-12,'text-anchor':'middle',style:'fill:'+css('--cream')},svg).textContent=label; }
+      stack(W*0.3,A,'What it owns '+kfmt(ta));
+      stack(W*0.7,Lb.concat(eq>0?[['Equity',eq,'--violet-neon']]:[]),'Owes + owners '+kfmt(Math.max(ta,tl)));
+      svg.setAttribute('aria-label','Assets of '+money(ta)+' against liabilities of '+money(tl)+' and equity of '+money(eq));
+      out.innerHTML='<span>Total assets: <b>'+money(ta)+'</b></span><span>Total liabilities: <b>'+money(tl)+'</b></span>'+
+        '<span>Equity, what&rsquo;s left for the owners: <b class="'+(eq>=0?'up':'down')+'">'+money(eq)+'</b></span>'+
+        (eq<0?'<span><b class="down">It owes more than it owns.</b></span>':'<span>Debt-to-equity: <b>'+(eq?((o.loan||0)/eq).toFixed(2):'—')+'</b></span>');
+    });
+  }
+
+  // cash flow: from net income to the cash the business actually produced, then free cash flow
+  function cashflow(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), ni=o.ni||0, dep=o.dep||0, dar=o.dar||0, dinv=o.dinv||0, dap=o.dap||0, capex=o.capex||0;
+      var cfo=ni+dep-dar-dinv+dap, fcf=cfo-capex;
+      waterfall(svg,[{label:'Net income',v:ni,kind:'start'},{label:'+ Depreciation',v:dep,kind:'delta'},{label:'Receivables up',v:-dar,kind:'delta'},
+        {label:'Inventory up',v:-dinv,kind:'delta'},{label:'Payables up',v:dap,kind:'delta'},{label:'Operating cash flow',v:cfo,kind:'total'},
+        {label:'Capital spending',v:-capex,kind:'delta'},{label:'Free cash flow',v:fcf,kind:'total'}]);
+      svg.setAttribute('aria-label','From net income of '+money(ni)+' to free cash flow of '+money(fcf));
+      out.innerHTML='<span>Operating cash flow: <b>'+money(cfo)+'</b></span><span>Free cash flow: <b class="'+(fcf>=0?'up':'down')+'">'+money(fcf)+'</b></span>'+
+        '<span>Cash per $1 of profit: <b>'+(ni?(cfo/ni).toFixed(2):'—')+'</b></span>';
+    });
+  }
+
+  // how the three connect: post transactions and watch every statement move, and both checks hold
+  var TX=[
+    ['invest','Owners put in cash',function(s,a){s.cash+=a;s.paidin+=a;s.cf.fin+=a;}],
+    ['borrow','Borrow from the bank',function(s,a){s.cash+=a;s.loan+=a;s.cf.fin+=a;}],
+    ['oven','Buy an oven (cash)',function(s,a){s.cash-=a;s.ppe+=a;s.cf.inv-=a;}],
+    ['stock','Buy ingredients on credit',function(s,a){s.inv+=a;s.ap+=a;}],
+    ['sell','Sell pizzas for cash',function(s,a){var c=Math.min(s.inv,a*0.3);s.rev+=a;s.cogs+=c;s.inv-=c;s.cash+=a;s.cf.op+=a;}],
+    ['cater','Cater an event, invoice later',function(s,a){var c=Math.min(s.inv,a*0.3);s.rev+=a;s.cogs+=c;s.inv-=c;s.ar+=a;}],
+    ['collect','Collect an invoice',function(s,a){a=Math.min(a,s.ar);s.ar-=a;s.cash+=a;s.cf.op+=a;return a;}],
+    ['paysup','Pay the supplier',function(s,a){a=Math.min(a,s.ap);s.ap-=a;s.cash-=a;s.cf.op-=a;return a;}],
+    ['wages','Pay wages',function(s,a){s.opex+=a;s.cash-=a;s.cf.op-=a;}],
+    ['dep','Record a year of depreciation',function(s,a){a=Math.min(a,s.ppe);s.dep+=a;s.ppe-=a;return a;}],
+    ['div','Pay the owners a dividend',function(s,a){s.cash-=a;s.divs+=a;s.cf.fin-=a;}],
+    ['repay','Repay part of the loan',function(s,a){a=Math.min(a,s.loan);s.loan-=a;s.cash-=a;s.cf.fin-=a;return a;}]
+  ];
+  function linked(root){
+    var amt=$(root,'[name=amount]'), btns=$(root,'.txbtns'), log=$(root,'.txlog'), out=$(root,'.out'), st;
+    function fresh(){ st={cash:0,ar:0,inv:0,ppe:0,ap:0,loan:0,paidin:0,divs:0,rev:0,cogs:0,opex:0,dep:0,cf:{op:0,inv:0,fin:0}}; log.innerHTML=''; }
+    btns.innerHTML=TX.map(function(t){return '<button type="button" data-tx="'+t[0]+'">'+t[1]+'</button>';}).join('')+'<button type="button" class="reset">Start over</button>';
+    function row(k,v,cls){ return '<tr'+(cls?' class="'+cls+'"':'')+'><td>'+k+'</td><td class="num">'+money(v)+'</td></tr>'; }
+    function render(){
+      var s=st, ni=s.rev-s.cogs-s.opex-s.dep, re=ni-s.divs, ta=s.cash+s.ar+s.inv+s.ppe, tl=s.ap+s.loan, te=s.paidin+re;
+      var cfo=s.cf.op, chg=s.cf.op+s.cf.inv+s.cf.fin;
+      $(root,'.is tbody').innerHTML=row('Revenue',s.rev)+row('Cost of ingredients',-s.cogs)+row('Wages',-s.opex)+row('Depreciation',-s.dep)+row('Net income',ni,'tot');
+      $(root,'.bs tbody').innerHTML=row('Cash',s.cash)+row('Receivables',s.ar)+row('Inventory',s.inv)+row('Equipment',s.ppe)+row('Total assets',ta,'tot')+
+        row('Payables',s.ap)+row('Loan',s.loan)+row('Owners&rsquo; money in',s.paidin)+row('Retained earnings',re)+row('Liabilities + equity',tl+te,'tot');
+      $(root,'.cf tbody').innerHTML=row('Operating',cfo)+row('Investing',s.cf.inv)+row('Financing',s.cf.fin)+row('Change in cash',chg,'tot');
+      var okB=Math.abs(ta-tl-te)<0.005, okC=Math.abs(chg-s.cash)<0.005;
+      out.innerHTML='<span>Assets = liabilities + equity: <b class="'+(okB?'up':'down')+'">'+(okB?'balances':'off')+'</b></span>'+
+        '<span>Cash flow total = cash on the balance sheet: <b class="'+(okC?'up':'down')+'">'+(okC?'matches':'off')+'</b></span>'+
+        '<span>Net income vs operating cash flow: <b>'+money(ni)+'</b> vs <b>'+money(cfo)+'</b></span>';
+    }
+    btns.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      if(b.classList.contains('reset')){ fresh(); render(); return; }
+      var t=TX.filter(function(x){return x[0]===b.getAttribute('data-tx');})[0], a=Math.max(0,parseFloat(amt.value)||0); if(!t||!a) return;
+      var used=t[2](st,a); used=(typeof used==='number')?used:a;
+      log.insertAdjacentHTML('afterbegin','<li>'+t[1]+': '+money(used)+'</li>');
+      render();
+    });
+    fresh(); render();
+  }
+
+  var MODS={'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
             'reit-sim':reit,'pref-sim':pref,'cry-sim':crypto};
   for(var id in MODS){ var node=document.getElementById(id); if(node) MODS[id](node); }
 })();
