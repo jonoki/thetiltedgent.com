@@ -6,7 +6,9 @@
 //   #cash-sim cash: interest against inflation, in today's dollars            #etf-sim   ETFs: what fees cost over time
 //   #mf-sim   mutual funds: an active fund's fees and load against an index    #reit-sim  REITs: cap rate and share value
 //   #pref-sim preferred shares: price against yield, with the call price      #cry-sim   crypto: $1,000 in BTC, ETH, S&P 500
-//   The last one reads data/crypto.json, written from our own reports by tools/lesson_data.py.
+//   #dil-sim  dilution: price after an issue or buyback      #curve-sim contango: rolled futures against spot
+//   #rate-sim rates: bonds, stocks, a mortgage and savings after a rate move
+//   The crypto one reads data/crypto.json, written from our own reports by tools/lesson_data.py.
 (function(){
   var NS='http://www.w3.org/2000/svg';
   function $(root,sel){ return root.querySelector(sel); }
@@ -200,6 +202,7 @@
   }
   function years(n){ var a=[]; for(var i=0;i<=n;i++) a.push(i); return a; }
   function pct(v,dp){ return (v>=0?'':'−')+Math.abs(v).toFixed(dp==null?1:dp)+'%'; }
+  function spct(v){ return (v>=0.05?'+':'')+pct(v,1); }   // signed, one decimal; 0.0% stays unsigned
   function kfmt(v){ // $500, $1.5k, $75k, $1.2M: one decimal only where whole units would merge two ticks
     var a=Math.abs(v), s;
     if(a>=1e6) s=(a/1e6).toFixed(1).replace(/\.0$/,'')+'M';
@@ -531,7 +534,67 @@
     });
   }
 
-  var MODS={'strat-sim':strategy,'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
+  // ---------- how markets move ----------
+  // dilution: sell (or buy back) shares at a chosen price; value after = value before + cash in (or − cash out)
+  function dilution(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), V=Math.max(1,o.value||100)*1e6, N=Math.max(0.01,o.shares||10)*1e6, mine=Math.max(0,o.mine||0);
+      var buy=$(root,'[name=action]').value==='buy', q=Math.max(0,o.qty||0)*1e6*(buy?-1:1), px=Math.max(0,o.price||0), prof=(o.profit||0)*1e6;
+      if(N+q<=0.01e6) q=-(N-0.01e6);
+      var P0=V/N, after=function(p){ return Math.max(0,V+q*p)/(N+q); }, P1=after(px);
+      var xs=[], ys=[]; for(var i=0;i<=80;i++){ var p=2*P0*i/80; xs.push(p); ys.push(after(p)); }
+      line(svg,{x:xs,series:[{v:ys,color:css('--gold')}],refs:[{y:P0}],ymin:0,yfmt:function(v){return '$'+(v<10&&v%1?v.toFixed(1):Math.round(v));},
+        xfmt:function(v){return '$'+Math.round(v);},mark:{x:px,y:P1},label:'Share price after the '+(buy?'buyback':'issue')+', against the price per share'});
+      var e0=prof/N, e1=prof/(N+q), d=P1/P0-1;
+      out.innerHTML='<span>Share price: <b>'+money(P0,2)+'</b> &rarr; <b class="'+(d>=-1e-9?'up':'down')+'">'+money(P1,2)+'</b> ('+spct(d*100)+')</span>'+
+        '<span>Market cap: <b>'+kfmt(V)+'</b> &rarr; <b>'+kfmt(P1*(N+q))+'</b></span>'+
+        '<span>You own: <b>'+(100*mine/N).toFixed(2)+'%</b> &rarr; <b>'+(100*mine/(N+q)).toFixed(2)+'%</b>, worth <b>'+money(mine*P1)+'</b></span>'+
+        '<span>Earnings per share: <b>'+money(e0,2)+'</b> &rarr; <b>'+money(e1,2)+'</b>'+(buy||!px?'':' before the new cash earns anything')+'</span>';
+    });
+  }
+  // contango: hold the one-month future and roll it monthly; futures = spot × (1 + carry), cash behind it earns interest
+  function contango(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), S0=Math.max(1,o.spot||70), c=(o.carry||0)/100, chg=(o.chg||0)/100, n=Math.max(1,Math.round(o.months||12)), r=(o.rate||0)/100;
+      show(root,'carry',(c>0?'+':'')+(c*100).toFixed(1)+'% a month'); show(root,'months',n+' months');
+      var xs=[], S=[], F=[], v=1000;
+      for(var t=0;t<=n;t++){ var s=S0*(1+chg*t/n); xs.push(t); S.push(1000*s/S0);
+        if(t>0) v*=s/(S0*(1+chg*(t-1)/n)*(1+c))*(1+r/12); F.push(v); }
+      line(svg,{x:xs,series:[{v:F,color:css('--gold')},{v:S,color:css('--cream'),dash:'6 5',w:1.8}],refs:[{y:1000}],yfmt:kfmt,
+        xfmt:function(v){return 'Mo '+Math.round(v);},label:'$1,000 in rolled futures against the spot price'});
+      var curve=[1,6,12].map(function(m){ return m+'-month <b>'+money(S0*Math.pow(1+c,m),2)+'</b>'; }).join(' · ');
+      out.innerHTML='<span>The curve today: spot <b>'+money(S0,2)+'</b> · '+curve+'</span>'+
+        '<span>Spot price: <b class="'+(chg>=0?'up':'down')+'">'+spct(chg*100)+'</b></span>'+
+        '<span>Futures holder: <b class="'+(v>=1000?'up':'down')+'">'+spct((v/1000-1)*100)+'</b></span>'+
+        '<span>Futures minus spot: <b class="'+(v>=S[n]?'up':'down')+'">'+signed(v-S[n])+'</b> on the $1,000</span>';
+    });
+  }
+  // rates: % price change against a rate move. Bonds priced at par before the move; stocks as growing payouts,
+  // P = D / (r − g) with r = the starting yield + 5 points, value g = 1%, growth g = 4%
+  function rates(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), y0=(o.start||4)/100, dr=(o.move||0)/100, m0=(o.mortgage||6)/100;
+      show(root,'move',(dr>0?'+':dr<0?'−':'')+Math.abs(dr*100).toFixed(2)+' points');
+      var b=function(yrs,d){ return bondPrice(y0,yrs,y0+d)/bondPrice(y0,yrs,y0)-1; };
+      var s=function(g,d){ var rr=y0+0.05; return (rr-g)/(rr+d-g)-1; };
+      var xs=[], b2=[], b30=[], sv=[], sg=[];
+      for(var i=0;i<=50;i++){ var d=-0.02+0.05*i/50; xs.push(d*100); b2.push(100*b(2,d)); b30.push(100*b(30,d)); sv.push(100*s(0.01,d)); sg.push(100*s(0.04,d)); }
+      line(svg,{x:xs,series:[{v:sg,color:css('--cream'),w:2.2},{v:sv,color:css('--cream'),dash:'6 5',w:1.8},{v:b30,color:css('--gold')},{v:b2,color:css('--gold'),dash:'6 5',w:1.8}],
+        refs:[{y:0}],yfmt:function(v){return (v>0?'+':'')+pct(v,0);},xfmt:function(v){return (v>0?'+':'')+(Math.abs(v)<1e-9?'0':v.toFixed(0))+' pt';},
+        mark:{x:dr*100,y:100*b(30,dr)},label:'Price change against a change in interest rates'});
+      var pay=function(rt){ var mr=rt/12, n=360; return mr?400000*mr/(1-Math.pow(1+mr,-n)):400000/n; };
+      var cls=function(v){ return v>=0?'up':'down'; };
+      out.innerHTML=[['30-year bond',b(30,dr)],['2-year bond',b(2,dr)],['Growth stock',s(0.04,dr)],['Value stock',s(0.01,dr)]].map(function(a){
+          return '<span>'+a[0]+': <b class="'+cls(a[1])+'">'+(a[1]>0?'+':'')+pct(a[1]*100,1)+'</b></span>'; }).join('')+
+        '<span>Payment on a $400,000, 30-year mortgage: <b>'+money(pay(m0))+'</b> &rarr; <b>'+money(pay(Math.max(0,m0+dr)))+'</b> a month</span>'+
+        '<span>Interest on $10,000 in savings: <b>'+money(10000*y0)+'</b> &rarr; <b>'+money(10000*Math.max(0,y0+dr))+'</b> a year</span>';
+    });
+  }
+
+  var MODS={'dil-sim':dilution,'curve-sim':contango,'rate-sim':rates,'strat-sim':strategy,'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
             'reit-sim':reit,'pref-sim':pref,'cry-sim':crypto};
   for(var id in MODS){ var node=document.getElementById(id); if(node) MODS[id](node); }
 })();
