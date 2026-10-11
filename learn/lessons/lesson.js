@@ -219,8 +219,8 @@
       var share=1-price[n]/tot[n];
       line(svg,{x:xs,series:[{v:tot,color:css('--gold')},{v:price,color:css('--cream'),dash:'6 5',w:1.8}],yfmt:kfmt,
         xfmt:function(v){return 'Yr '+Math.round(v);},ymin:0,label:'Growth of '+money(p0)+' over '+n+' years'});
-      out.innerHTML='<span>Price growth alone: <b>'+money(price[n])+'</b></span><span>With dividends reinvested: <b class="up">'+money(tot[n])+
-        '</b></span><span>Share of the final value owed to dividends: <b>'+Math.round(share*100)+'%</b></span>';
+      out.innerHTML='<span>Shares alone, dividends spent: <b>'+money(price[n])+'</b></span><span>Dividends reinvested: <b class="up">'+money(tot[n])+
+        '</b></span><span>Part of that from reinvesting: <b>'+Math.round(share*100)+'%</b></span>';
     });
   }
 
