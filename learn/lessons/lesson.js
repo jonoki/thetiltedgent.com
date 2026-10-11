@@ -595,7 +595,78 @@
     });
   }
 
-  var MODS={'dil-sim':dilution,'curve-sim':contango,'rate-sim':rates,'strat-sim':strategy,'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
+  // ---------- reading the market ----------
+  // FOMC: a fed funds futures price settles at 100 − the month's average overnight rate; with the meeting on day d of
+  // an n-day month, average = (d × rate before + (n − d) × rate after) ÷ n, so rate after = (n × average − d × before) ÷ (n − d)
+  function fomc(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), r0=o.rate||0, n=Math.max(28,Math.min(31,Math.round(o.mdays||30))), d=Math.max(1,Math.min(n-1,Math.round(o.meet||17)));
+      var avg=100-(o.price||100), r1=(n*avg-d*r0)/(n-d), mv=r1-r0, q=Math.abs(mv)/0.25, dir=mv>=0?'hike':'cut';
+      var xs=[], step=[], flat=[]; for(var i=1;i<=n;i++){ xs.push(i); step.push(i<=d?r0:r1); flat.push(avg); }
+      line(svg,{x:xs,series:[{v:step,color:css('--gold')},{v:flat,color:css('--cream'),dash:'6 5',w:1.8}],yfmt:function(v){return v.toFixed(2)+'%';},
+        xfmt:function(v){return 'Day '+Math.round(v);},label:'Overnight rate through the month, before and after the meeting'});
+      var odds = Math.abs(mv)<0.005 ? 'no change priced' :
+        q<=1 ? Math.round(q*100)+'% chance of a quarter-point '+dir+', '+Math.round((1-q)*100)+'% no change' :
+        q<=2 ? 'a quarter-point '+dir+' fully priced, plus a '+Math.round((q-1)*100)+'% chance of a half point' : 'more than a half-point '+dir+' priced';
+      out.innerHTML='<span>Month\'s average rate the price implies: <b>'+avg.toFixed(3)+'%</b></span><span>Implied rate after the meeting: <b>'+r1.toFixed(3)+'%</b></span>'+
+        '<span>The market is pricing: <b class="'+(Math.abs(mv)<0.005?'':(mv>0?'up':'down'))+'">'+odds+'</b></span>';
+    });
+  }
+  // VIX: the 30-day volatility S&P 500 options imply, as an annual %. One standard deviation over a horizon ≈ VIX ÷ √(periods a year)
+  function vix(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out'), AVG=parseFloat(root.getAttribute('data-avg'))||19.5;
+    var H={day:[252,'a day'],week:[52,'a week'],month:[12,'a month'],year:[1,'a year']};
+    wire(root,function(){
+      var o=vals(root), v=Math.max(5,o.vix||20), L=Math.max(1,o.level||6000), h=H[$(root,'[name=horizon]').value]||H.month;
+      show(root,'vix',Math.round(v));
+      var sd=v/100/Math.sqrt(h[0]), sa=AVG/100/Math.sqrt(h[0]), w=3*Math.max(sd,sa), xs=[], c=[], band=[], a=[];
+      var pdf=function(x,s){ var z=(x/L-1)/s; return Math.exp(-z*z/2)/s; };
+      for(var i=0;i<=160;i++){ var x=L*(1-w+2*w*i/160); xs.push(x); c.push(pdf(x,sd)); a.push(pdf(x,sa)); band.push(Math.abs(x/L-1)<=sd?pdf(x,sd):NaN); }
+      line(svg,{x:xs,series:[{v:a,color:css('--cream'),dash:'6 5',w:1.6},{v:c,color:css('--gold')},{v:band,color:css('--gold-hi'),w:5}],ymin:0,yfmt:function(){return '';},left:16,
+        xfmt:function(x){return Math.round(x).toLocaleString('en-US');},label:'Range the options market is pricing for the index over '+h[1]});
+      var r=function(k){ return Math.round(L*(1-k*sd)).toLocaleString('en-US')+'–'+Math.round(L*(1+k*sd)).toLocaleString('en-US'); };
+      out.innerHTML='<span>One standard deviation over '+h[1]+': <b>&plusmn;'+(sd*100).toFixed(1)+'%</b> (&plusmn;'+Math.round(L*sd).toLocaleString('en-US')+' points)</span>'+
+        '<span>Priced to stay inside about two times in three: <b>'+r(1)+'</b></span><span>About nineteen times in twenty: <b>'+r(2)+'</b></span>';
+    });
+  }
+  // dollar index: ICE's formula is a geometric average, so each currency's % move enters with its weight as the exponent
+  var USDX=[['eur',0.576,'Euro'],['jpy',0.136,'Yen'],['gbp',0.119,'Pound'],['cad',0.091,'Canadian dollar'],['sek',0.042,'Krona'],['chf',0.036,'Franc']];
+  function dxy(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), L=Math.max(1,o.level||100), mv={};
+      USDX.forEach(function(c){ mv[c[0]]=(o[c[0]]||0)/100; show(root,c[0],(mv[c[0]]>0?'+':mv[c[0]]<0?'−':'')+Math.abs(mv[c[0]]*100).toFixed(1)+'%'); });
+      var f=function(m){ return USDX.reduce(function(p,c){ return p*Math.pow(1+m[c[0]],-c[1]); },1); };
+      var xs=[], e=[], all=[]; for(var i=0;i<=40;i++){ var x=-0.1+0.2*i/40, m={}; USDX.forEach(function(c){ m[c[0]]=c[0]==='eur'?x:mv[c[0]]; }); xs.push(x*100); e.push(L*f(m));
+        var m2={}; USDX.forEach(function(c){ m2[c[0]]=x; }); all.push(L*f(m2)); }
+      line(svg,{x:xs,series:[{v:all,color:css('--cream'),dash:'6 5',w:1.6},{v:e,color:css('--gold')}],refs:[{y:L}],yfmt:function(v){return v.toFixed(0);},
+        xfmt:function(v){return (v>0?'+':'')+v.toFixed(0)+'%';},mark:{x:mv.eur*100,y:L*f(mv)},label:'Dollar index against the euro\'s move'});
+      var D=L*f(mv), tot=Math.log(f(mv)), eu=-0.576*Math.log(1+mv.eur);
+      out.innerHTML='<span>Dollar index: <b>'+L.toFixed(2)+'</b> &rarr; <b class="'+(D>=L?'up':'down')+'">'+D.toFixed(2)+'</b> ('+spct((D/L-1)*100)+')</span>'+
+        (Math.abs(tot)>1e-9?'<span>Share of the move from the euro: <b>'+Math.round(100*eu/tot)+'%</b></span>':'');
+    });
+  }
+  // dealer hedging: a dealer holding q option contracts (q < 0 when short) keeps −q × 100 × delta shares to stay neutral; when the
+  // stock rises $1 the delta changes by gamma, so the dealer trades −q × 100 × gamma shares (positive = buy)
+  function gammaN(S,K,T,v){ var sq=Math.sqrt(T), d1=(Math.log(S/K)+(v*v/2)*T)/(v*sq); return Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI)/(S*v*sq); }
+  function hedging(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out');
+    wire(root,function(){
+      var o=vals(root), S0=Math.max(1,o.spot||100), K=Math.max(1,o.strike||100), v=Math.max(0.05,(o.vol||30)/100), n=Math.max(0,o.contracts||0);
+      var days=Math.max(0.25,o.days||30), short=$(root,'[name=side]').value==='short', q=short?-n:n;
+      show(root,'days',days<1?'a few hours':Math.round(days)+(Math.round(days)===1?' day':' days'));
+      var flow=function(S,T){ return -q*100*gammaN(S,K,T,v); }, xs=[], a=[], b=[];
+      for(var i=0;i<=120;i++){ var S=K*(0.8+0.4*i/120); xs.push(S); a.push(flow(S,days/365)/1000); b.push(flow(S,30/365)/1000); }   // dashed: the same book 30 days out, for comparison
+      line(svg,{x:xs,series:[{v:b,color:css('--cream'),dash:'6 5',w:1.6},{v:a,color:css('--gold')}],refs:[{y:0}],yfmt:function(v){return (v>0?'+':'')+Math.round(v)+'k';},
+        xfmt:function(v){return '$'+Math.round(v);},mark:{x:S0,y:flow(S0,days/365)/1000},label:'Shares dealers must trade for each $1 rise in the stock'});
+      var f=flow(S0,days/365), sh=Math.round(Math.abs(f));
+      out.innerHTML='<span>If the stock rises $1 from '+money(S0)+', dealers must <b class="'+(f>=0?'up':'down')+'">'+(f>=0?'buy':'sell')+' '+sh.toLocaleString('en-US')+' shares</b> (about '+kfmt(sh*S0)+')</span>'+
+        '<span>That '+(f>=0?'<b>pushes the price further</b>: dealers short options chase the move':'<b>leans against the move</b>: dealers long options sell rallies and buy dips')+'</span>';
+    });
+  }
+
+  var MODS={'fomc-sim':fomc,'vix-sim':vix,'dxy-sim':dxy,'gamma-sim':hedging,'dil-sim':dilution,'curve-sim':contango,'rate-sim':rates,'strat-sim':strategy,'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
             'reit-sim':reit,'pref-sim':pref,'cry-sim':crypto};
   for(var id in MODS){ var node=document.getElementById(id); if(node) MODS[id](node); }
 })();

@@ -47,7 +47,8 @@ NAV: list[NavLink | NavMenu] = [
                      ('Futures', '/learn/lessons/futures.html'), ('Options', '/learn/lessons/options.html'),
                      ('Options strategies', '/learn/lessons/options-strategies.html'),
                      ('Financial statements', '/learn/lessons/income-statement.html'),
-                     ('How markets move', '/learn/lessons/#g-moves')]),
+                     ('How markets move', '/learn/lessons/#g-moves'),
+                     ('Reading the market', '/learn/lessons/#g-market')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
                         ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
         ('Economic Indicators', [('Rates, inflation &amp; jobs', '/learn/indicators/')])]),   # Oki, 8 Oct 2026
@@ -103,7 +104,8 @@ PAGES = [  # (path, active nav key or None, has a footer)
     *[(f'learn/lessons/{p}.html', 'learn', True) for p in ('stocks', 'bonds', 'cash', 'etfs', 'mutual-funds', 'reits',
                                                           'preferred-shares', 'crypto', 'futures', 'options', 'options-strategies', 'income-statement',
                                                           'balance-sheet', 'cash-flow', 'statements-together',
-                                                          'dilution', 'contango', 'interest-rates')],
+                                                          'dilution', 'contango', 'interest-rates',
+                                                          'fomc', 'vix', 'futures-dashboard', 'options-positioning')],
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]
 
