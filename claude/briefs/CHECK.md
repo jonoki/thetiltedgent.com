@@ -20,6 +20,7 @@ PRIVACY: never put the user's email, name or any personal data in any request (h
 
 ## Return (short, no file contents), one block per report
 - PITFALLS: one tag per correction you made, `<letter>:<short example>` using the letters in PITFALL_RULES.md (new class → `NEW:<description>`). Required — the orchestrator tallies these into the log.
+- A correction to a live report that keeps its banner date (same edition) gets **no note on the page**; return old → new for each change so the orchestrator can add it to `claude/CORRECTIONS.md` (Oki, 10 Oct 2026).
 - VERDICT: PUBLISH or HOLD (+ one-line reason for HOLD)
 - verify line
 - what you changed (one line each)

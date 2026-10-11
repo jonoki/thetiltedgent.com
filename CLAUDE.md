@@ -69,6 +69,8 @@ The chrome pages are `index.html`, `brand.html`, `reports/index.html`, `reports/
 - Earnings refreshes wait for the T+2 settled close (second full session after the release) so the call, day-2 follow-through and analyst revisions are in; news-driven updates wait for the first full session after the news. Details in `claude/briefs/REFRESH.md`.
 - The refresh queue (`tools/refresh_queue.py`) reads Nasdaq's earnings calendar plus `tools/global_calendar.py` for the global names Nasdaq does not list: stockanalysis.com statistics pages (once a day, robots.txt obeyed), HKEX board meetings, and `data/ir_calendar.json`, kept by hand from the companies' own IR calendars for revenue-only updates — add a row only from the company's page (Oki, 8 Oct 2026).
 - `py -3 tools/chart_audit.py <slug>` must show 0 wrong chart points before anything publishes.
+- A correction to a live report that keeps its banner date is not shown on the page: each one is a row in `claude/CORRECTIONS.md` (date, report, was, now, why, pitfall class), tallied into `REPORT_PITFALLS.md` so builders learn from it (Oki, 10 Oct 2026). A refresh that corrects its previous edition keeps its "Corrected in this edition" box.
+- The S&P 500 / Nasdaq-100 columns are re-run library-wide once a quarter, after every company has reported (`py -3 tools/index_stats.py`, then `--check`); between those runs each page keeps the figures computed on its own date, and only a report being built or refreshed gets a fresh run (Oki, 10 Oct 2026).
 
 ## Working agreements
 
