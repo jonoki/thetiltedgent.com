@@ -45,6 +45,7 @@ NAV: list[NavLink | NavMenu] = [
                      ('Mutual funds', '/learn/lessons/mutual-funds.html'), ('REITs', '/learn/lessons/reits.html'),
                      ('Preferred shares', '/learn/lessons/preferred-shares.html'), ('Crypto', '/learn/lessons/crypto.html'),
                      ('Futures', '/learn/lessons/futures.html'), ('Options', '/learn/lessons/options.html'),
+                     ('Options strategies', '/learn/lessons/options-strategies.html'),
                      ('Financial statements', '/learn/lessons/income-statement.html')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
                         ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
@@ -99,7 +100,7 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
     ('learn/lessons/index.html', 'learn', True),
     *[(f'learn/lessons/{p}.html', 'learn', True) for p in ('stocks', 'bonds', 'cash', 'etfs', 'mutual-funds', 'reits',
-                                                          'preferred-shares', 'crypto', 'futures', 'options', 'income-statement',
+                                                          'preferred-shares', 'crypto', 'futures', 'options', 'options-strategies', 'income-statement',
                                                           'balance-sheet', 'cash-flow', 'statements-together')],
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]

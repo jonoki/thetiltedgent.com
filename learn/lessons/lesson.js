@@ -109,6 +109,32 @@
     'bull-spread':   {name:'Bull call spread',legs:function(K,K2){return [['call',K,1],['call',K2,-1]];}, two:true},
     'straddle':      {name:'Long straddle',  legs:function(K,K2){return [['call',K,1],['put',K,1]];}}
   };
+  // profit at expiry (gold, green/red shading) and value today (dashed) against the stock price; pts = [S, expiry, today]
+  function payoff(svg,pts,S0){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var wh=size(svg,0.44,220), W=wh[0], H=wh[1], L=50, R=18, T=14, B=30;
+    var ys=[];pts.forEach(function(p){ys.push(p[1],p[2]);});
+    var lo=Math.min.apply(null,ys.concat([0])), hi=Math.max.apply(null,ys.concat([0])), pad=(hi-lo)*0.1||1; lo-=pad; hi+=pad;
+    var x0=pts[0][0], x1=pts[pts.length-1][0];
+    var x=function(s){return L+(W-L-R)*(s-x0)/(x1-x0);}, y=function(v){return T+(H-T-B)*(hi-v)/(hi-lo);};
+    ticks(lo,hi,4).forEach(function(gv){
+      el('line',{x1:L,x2:W-R,y1:y(gv),y2:y(gv),stroke:css('--line'),'stroke-width':1},svg);
+      el('text',{x:L-8,y:y(gv)+4,'text-anchor':'end'},svg).textContent=(gv<0?'−$':'$')+Math.abs(gv).toFixed(0); });
+    ticks(x0,x1,W<480?3:5).forEach(function(sv){ el('text',{x:x(sv),y:H-8,'text-anchor':'middle'},svg).textContent='$'+sv.toFixed(0); });
+    // shade profit green and loss red at expiry
+    var up='M'+x(x0)+' '+y(0), dn='M'+x(x0)+' '+y(0);
+    pts.forEach(function(p){ up+=' L'+x(p[0]).toFixed(1)+' '+y(Math.max(p[1],0)).toFixed(1); dn+=' L'+x(p[0]).toFixed(1)+' '+y(Math.min(p[1],0)).toFixed(1); });
+    up+=' L'+x(x1)+' '+y(0)+' Z'; dn+=' L'+x(x1)+' '+y(0)+' Z';
+    el('path',{d:up,fill:css('--green'),'fill-opacity':0.16},svg);
+    el('path',{d:dn,fill:css('--red'),'fill-opacity':0.16},svg);
+    el('line',{x1:L,x2:W-R,y1:y(0),y2:y(0),stroke:css('--dim2'),'stroke-width':1.2},svg);
+    el('line',{x1:x(S0),x2:x(S0),y1:T,y2:H-B,stroke:css('--dim2'),'stroke-width':1,'stroke-dasharray':'3 4'},svg);
+    el('text',{x:x(S0)+4,y:T+12},svg).textContent='today $'+S0.toFixed(0);
+    var line=function(k){return pts.map(function(p,i){return (i?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[k]).toFixed(1);}).join(' ');};
+    el('path',{d:line(2),fill:'none',stroke:css('--cream'),'stroke-width':1.6,'stroke-dasharray':'6 5','stroke-opacity':0.85},svg);
+    el('path',{d:line(1),fill:'none',stroke:css('--gold'),'stroke-width':2.6,'stroke-linejoin':'round'},svg);
+    }
+
   function options(root){
     var f={strat:$(root,'[name=strat]'),S:$(root,'[name=spot]'),K:$(root,'[name=k1]'),K2:$(root,'[name=k2]'),
            vol:$(root,'[name=vol]'),days:$(root,'[name=days]'),rate:$(root,'[name=rate]')};
@@ -139,32 +165,8 @@
         '<span>Breakeven at expiry: <b>'+(be.length?be.map(function(b){return '$'+b.toFixed(2);}).join(' and '):'none')+'</b></span>'+
         '<span>Best case: <b class="up">'+(maxG==='Unlimited'?maxG:'+'+maxG)+'</b></span>'+
         '<span>Worst case: <b class="down">'+maxL+'</b></span>';
-      draw(pts,S0,legs);
+      payoff(svg,pts,S0);
       svg.setAttribute('aria-label',st.name+': profit or loss per share against the stock price at expiry, from $'+lo.toFixed(0)+' to $'+hi.toFixed(0)+'.');
-    }
-    function draw(pts,S0,legs){
-      while(svg.firstChild) svg.removeChild(svg.firstChild);
-      var wh=size(svg,0.44,220), W=wh[0], H=wh[1], L=50, R=18, T=14, B=30;
-      var ys=[];pts.forEach(function(p){ys.push(p[1],p[2]);});
-      var lo=Math.min.apply(null,ys.concat([0])), hi=Math.max.apply(null,ys.concat([0])), pad=(hi-lo)*0.1||1; lo-=pad; hi+=pad;
-      var x0=pts[0][0], x1=pts[pts.length-1][0];
-      var x=function(s){return L+(W-L-R)*(s-x0)/(x1-x0);}, y=function(v){return T+(H-T-B)*(hi-v)/(hi-lo);};
-      ticks(lo,hi,4).forEach(function(gv){
-        el('line',{x1:L,x2:W-R,y1:y(gv),y2:y(gv),stroke:css('--line'),'stroke-width':1},svg);
-        el('text',{x:L-8,y:y(gv)+4,'text-anchor':'end'},svg).textContent=(gv<0?'−$':'$')+Math.abs(gv).toFixed(0); });
-      ticks(x0,x1,W<480?3:5).forEach(function(sv){ el('text',{x:x(sv),y:H-8,'text-anchor':'middle'},svg).textContent='$'+sv.toFixed(0); });
-      // shade profit green and loss red at expiry
-      var up='M'+x(x0)+' '+y(0), dn='M'+x(x0)+' '+y(0);
-      pts.forEach(function(p){ up+=' L'+x(p[0]).toFixed(1)+' '+y(Math.max(p[1],0)).toFixed(1); dn+=' L'+x(p[0]).toFixed(1)+' '+y(Math.min(p[1],0)).toFixed(1); });
-      up+=' L'+x(x1)+' '+y(0)+' Z'; dn+=' L'+x(x1)+' '+y(0)+' Z';
-      el('path',{d:up,fill:css('--green'),'fill-opacity':0.16},svg);
-      el('path',{d:dn,fill:css('--red'),'fill-opacity':0.16},svg);
-      el('line',{x1:L,x2:W-R,y1:y(0),y2:y(0),stroke:css('--dim2'),'stroke-width':1.2},svg);
-      el('line',{x1:x(S0),x2:x(S0),y1:T,y2:H-B,stroke:css('--dim2'),'stroke-width':1,'stroke-dasharray':'3 4'},svg);
-      el('text',{x:x(S0)+4,y:T+12},svg).textContent='today $'+S0.toFixed(0);
-      var line=function(k){return pts.map(function(p,i){return (i?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[k]).toFixed(1);}).join(' ');};
-      el('path',{d:line(2),fill:'none',stroke:css('--cream'),'stroke-width':1.6,'stroke-dasharray':'6 5','stroke-opacity':0.85},svg);
-      el('path',{d:line(1),fill:'none',stroke:css('--gold'),'stroke-width':2.6,'stroke-linejoin':'round'},svg);
     }
     root.addEventListener('input',run); root.addEventListener('change',run); redraw.push(run);
     run();
@@ -476,7 +478,60 @@
     fresh(); render();
   }
 
-  var MODS={'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
+  // ---------- options strategies: legs priced by Black-Scholes, with the position's Greeks ----------
+  // a leg is [kind 'c'|'p', strike slot, quantity, 'back' for the calendar's longer-dated leg]
+  var PRESETS={
+    'bull-call':{s:[100,110],legs:[['c',0,1],['c',1,-1]]},       'bear-put':{s:[90,100],legs:[['p',1,1],['p',0,-1]]},
+    'bull-put':{s:[90,100],legs:[['p',1,-1],['p',0,1]]},         'bear-call':{s:[100,110],legs:[['c',0,-1],['c',1,1]]},
+    'long-straddle':{s:[100],legs:[['c',0,1],['p',0,1]]},         'short-straddle':{s:[100],legs:[['c',0,-1],['p',0,-1]]},
+    'long-strangle':{s:[90,110],legs:[['p',0,1],['c',1,1]]},      'short-strangle':{s:[90,110],legs:[['p',0,-1],['c',1,-1]]},
+    'butterfly':{s:[90,100,110],legs:[['c',0,1],['c',1,-2],['c',2,1]]},
+    'iron-condor':{s:[85,95,105,115],legs:[['p',0,1],['p',1,-1],['c',2,-1],['c',3,1]]},
+    'iron-butterfly':{s:[90,100,110],legs:[['p',0,1],['p',1,-1],['c',1,-1],['c',2,1]]},
+    'collar':{s:[90,110],stock:1,legs:[['p',0,1],['c',1,-1]]},
+    'calendar':{s:[100],legs:[['c',0,-1],['c',0,1,'back']]}
+  };
+  function greeks(kind,S,K,T,r,v){ // per share: delta, theta per day, vega per volatility point
+    var sq=Math.sqrt(T), d1=(Math.log(S/K)+(r+v*v/2)*T)/(v*sq), d2=d1-v*sq, pdf=Math.exp(-d1*d1/2)/Math.sqrt(2*Math.PI);
+    var th=-S*pdf*v/(2*sq)+(kind==='c'?-r*K*Math.exp(-r*T)*ncdf(d2):r*K*Math.exp(-r*T)*ncdf(-d2));
+    return [kind==='c'?ncdf(d1):ncdf(d1)-1, th/365, S*pdf*sq/100];
+  }
+  function strategy(root){
+    var svg=$(root,'svg.chart'), out=$(root,'.out'), sel=$(root,'[name=preset]'), bet=$(root,'.bet');
+    var ks=[].slice.call(root.querySelectorAll('[name^=k]')), backWrap=$(root,'.back');
+    function setDefaults(){ var p=PRESETS[sel.value]; ks.forEach(function(inp,i){ var on=i<p.s.length; inp.closest('label').hidden=!on; if(on) inp.value=p.s[i]; });
+      backWrap.hidden=sel.value!=='calendar'; }
+    sel.addEventListener('change',setDefaults); setDefaults();
+    wire(root,function(){
+      var p=PRESETS[sel.value], o=vals(root), S0=Math.max(1,o.spot||100), v=Math.max(0.01,(o.vol||25)/100), r=(o.rate||0)/100;
+      var days=Math.max(1,Math.round(o.days||90)), gap=Math.max(1,Math.round(o.gap||60)), Tf=days/365, Tb=(days+gap)/365, K=p.s.map(function(_,i){return Math.max(1,ks[i]?parseFloat(ks[i].value)||p.s[i]:p.s[i]);});
+      show(root,'vol',Math.round(v*100)+'%'); show(root,'days',days+' days'); show(root,'gap',gap+' more days');
+      var legs=p.legs.map(function(l){ var T=l[3]==='back'?Tb:Tf, kind=l[0]==='c'?'call':'put'; return {kind:kind,k:l[0],K:K[l[1]],q:l[2],T:T,prem:bs(kind,S0,K[l[1]],T,r,v)}; });
+      var stock=p.stock||0;
+      function at(S,today){ return legs.reduce(function(s,l){ var left=today?l.T:l.T-Tf;
+          return s+l.q*((left>1e-9?bs(l.kind,S,l.K,left,r,v):Math.max(l.kind==='call'?S-l.K:l.K-S,0))-l.prem); },0)+stock*(S-S0); }
+      var lo=S0*0.6, hi=S0*1.4, pts=[], i, S;
+      for(i=0;i<=160;i++){ S=lo+(hi-lo)*i/160; pts.push([S,at(S,false),at(S,true)]); }
+      var be=[], wide=[], ps=null, pp=null;
+      for(i=0;i<=3000;i++){ S=S0*3*i/3000; var pv=at(S,false); wide.push(pv);
+        if(ps!==null&&(pp<0)!==(pv<0)&&pv!==pp) be.push(ps+(S-ps)*(-pp)/(pv-pp)); ps=S; pp=pv; }
+      var slope=at(S0*3+1,false)-at(S0*3,false), top=Math.max.apply(null,wide), bot=Math.min.apply(null,wide);
+      var net=legs.reduce(function(s,l){return s+l.q*l.prem;},0);
+      var g=[0,0,0]; legs.forEach(function(l){ var x=greeks(l.k,S0,l.K,l.T,r,v); for(var j=0;j<3;j++) g[j]+=l.q*x[j]; }); g[0]+=stock;
+      payoff(svg,pts,S0);
+      svg.setAttribute('aria-label','Profit or loss per share at '+(sel.value==='calendar'?'the near expiry':'expiry')+', and today, against the stock price');
+      out.innerHTML='<span>'+(net>=0?'Net cost':'Net credit')+' per contract: <b>'+money(Math.abs(net)*100)+'</b></span>'+
+        '<span>Breakeven'+(be.length>1?'s':'')+': <b>'+(be.length?be.map(function(b){return '$'+b.toFixed(2);}).join(' and '):'none')+'</b></span>'+
+        '<span>Best case: <b class="up">'+(slope>1e-9?'Unlimited':'+'+money(top*100))+'</b></span><span>Worst case: <b class="down">'+(slope<-1e-9?'Unlimited':money(bot*100))+'</b></span>';
+      // per contract: a delta under 20 shares or a vega under $5 a point is too small to call a bet on it
+      var d=Math.round(g[0]*100), dir=d>=20?'the stock rising':d<=-20?'the stock falling':'no particular direction';
+      var vg=g[2]*100, mv=vg>=5?'the volatility priced into options rising':vg<=-5?'the volatility priced into options falling':'little exposure to volatility';
+      bet.innerHTML='<span>Delta: <b>'+(d>=0?'+':'')+d+(Math.abs(d)===1?' share':' shares')+'</b></span><span>Theta: <b class="'+(g[1]>=0?'up':'down')+'">'+(g[1]>=0?'+':'')+money(g[1]*100,2)+'</b> a day</span>'+
+        '<span>Vega: <b>'+(vg>=0?'+':'')+money(vg,2)+'</b> per volatility point</span><span>A bet on: <b>'+dir+'</b>; <b>'+mv+'</b>; time passing <b>'+(g[1]>=0?'helps':'hurts')+'</b>.</span>';
+    });
+  }
+
+  var MODS={'strat-sim':strategy,'is-sim':income,'bs-sim':balance,'cf-sim':cashflow,'link-sim':linked,'fut-sim':futures,'opt-sim':options,'stk-sim':stocks,'bond-sim':bonds,'cash-sim':cash,'etf-sim':etf,'mf-sim':mfund,
             'reit-sim':reit,'pref-sim':pref,'cry-sim':crypto};
   for(var id in MODS){ var node=document.getElementById(id); if(node) MODS[id](node); }
 })();
