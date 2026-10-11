@@ -39,6 +39,8 @@ class NavMenu(NamedTuple):
 NAV: list[NavLink | NavMenu] = [
     NavMenu('learn', 'Learn', [
         ('Learn', [('Learn home', '/learn/')]),
+        ('Lessons', [('Futures', '/learn/lessons/futures.html'),          # Oki, 11 Oct 2026
+                     ('Options', '/learn/lessons/options.html')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
                         ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
         ('Economic Indicators', [('Rates, inflation &amp; jobs', '/learn/indicators/')])]),   # Oki, 8 Oct 2026
@@ -90,6 +92,8 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
     ('learn/table-talk/poker.html', 'learn', True),
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
+    ('learn/lessons/futures.html', 'learn', True),
+    ('learn/lessons/options.html', 'learn', True),
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]
 
