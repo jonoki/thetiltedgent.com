@@ -71,14 +71,15 @@
       var entry=num(f.entry,6000), init=num(f.init,22000)*qty, maint=Math.min(num(f.maint,20000)*qty,init);
       var bal=init, prev=entry, added=0, path=[{d:0,bal:bal}];
       // columns: day, settlement price, outlay (cash put in: the initial margin, then any margin call paid that day),
-      // position value at the settlement (before any top-up), the day's profit or loss, and the margin call
+      // account value at the settlement (before any top-up), PnL to date, and the margin call.
+      // Account value = outlay before today + PnL to date; a top-up paid today counts from tomorrow
       var html='<tr><td>Start</td><td class="num">'+entry.toLocaleString('en-US')+'</td><td class="num">'+money(init)+'</td><td class="num">'+money(init)+'</td><td class="num">—</td><td>—</td></tr>';
       days.forEach(function(inp,i){
-        var px=num(inp,prev), chg=dir*(px-prev)*mult*qty, call=0;
+        var px=num(inp,prev), chg=dir*(px-prev)*mult*qty, call=0, cum=dir*(px-entry)*mult*qty;
         bal+=chg;
         if(bal<maint){ call=init-bal; }
         html+='<tr><td>Day '+(i+1)+'</td><td class="num">'+px.toLocaleString('en-US')+'</td><td class="num">'+(call?money(call):'—')+'</td><td class="num">'+money(bal)+
-              '</td><td class="num '+(chg>=0?'up':'down')+'">'+signed(chg)+'</td><td>'+(call?'<span class="down">Below '+money(maint)+': add '+money(call)+'</span>':'—')+'</td></tr>';
+              '</td><td class="num '+(cum>=0?'up':'down')+'">'+signed(cum)+'</td><td>'+(call?'<span class="down">Below '+money(maint)+': add '+money(call)+'</span>':'—')+'</td></tr>';
         path.push({d:i+1,bal:bal});
         bal+=call; added+=call; prev=px;
         if(call) path.push({d:i+1,bal:bal,topup:true});
@@ -106,7 +107,7 @@
       var dpath=path.map(function(p,i){return (i?'L':'M')+x(p.d).toFixed(1)+' '+y(p.bal).toFixed(1);}).join(' ');
       el('path',{d:dpath,fill:'none',stroke:css('--gold'),'stroke-width':2.5,'stroke-linejoin':'round'},svg);
       path.forEach(function(p){ el('circle',{cx:x(p.d),cy:y(p.bal),r:p.topup?4:3.5,fill:p.topup?css('--red'):css('--gold-hi')},svg); });
-      svg.setAttribute('aria-label','Position value over five days, starting at '+money(init)+', with the maintenance level at '+money(maint)+'.');
+      svg.setAttribute('aria-label','Account value over five days, starting at '+money(init)+', with the maintenance level at '+money(maint)+'.');
     }
     root.addEventListener('input',run); root.addEventListener('change',run); redraw.push(run);
     run();
