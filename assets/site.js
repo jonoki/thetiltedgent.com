@@ -120,9 +120,10 @@
           if(!by[p]){ by[p] = []; phrases.push(m[0]); }
           by[p].push(m);
         });
-        Object.keys(by).forEach(function(p){   // poker first at the casino and in the boxes, finance first elsewhere
-          by[p].sort(function(a, b){ return ((a[1].charAt(0) === 'p') === pokerFirst ? 0 : 1) - ((b[1].charAt(0) === 'p') === pokerFirst ? 0 : 1); });
-        });
+        // poker first at the casino and in the boxes, finance first elsewhere; then a phrase tied to this page's context
+        // (e.g. "credit spread" on an options page) before the same phrase's everyday sense
+        function rank(m){ return ((m[1].charAt(0) === 'p') === pokerFirst ? 0 : 2) + (m[2] ? 0 : 1); }
+        Object.keys(by).forEach(function(p){ by[p].sort(function(a, b){ return rank(a) - rank(b); }); });
         phrases.sort(function(a, b){ return b.length - a.length; });
         return phrases.length ? {by: by, re: new RegExp('(?<![\\w-])(' + phrases.map(esc).join('|') + ')(?![\\w-])', 'gi')} : null;
       }
