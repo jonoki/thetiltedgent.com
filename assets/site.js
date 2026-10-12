@@ -52,8 +52,9 @@
     }).catch(function(){});
   }
   var SKIP = 'h1,h2,h3,h4,h5,h6,a,button,input,select,textarea,label,option,script,style,svg,code,pre,nav,header,footer,' +
-             'table,summary,aside,details,.widget,.formula,.tt,.toc,.next,.callout,.legend,.out,[data-no-terms]';
-  function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+             'table,summary,aside,details,.widget,.formula,.tt,.toc,.next,.callout,.legend,.out,.tg-tipl,.tg-tip,[data-no-terms]';
+  // escape for a RegExp; a straight apostrophe in a phrase also matches the pages' curly one
+  function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "['\u2019]"); }
   function place(t){
     var tip = t.querySelector('.tt-tip'); if(!tip) return;
     var w = t.ownerDocument.documentElement.clientWidth;
