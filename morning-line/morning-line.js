@@ -406,6 +406,7 @@
     renderEarnings(b, st);
     renderLevels(b);
     renderHeadlines(heads);
+    if (window.tgTerms) window.tgTerms(document);   // concept tooltips on the new text (assets/site.js)
   }
 
   function renderFailed(){

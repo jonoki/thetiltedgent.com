@@ -8,6 +8,12 @@ Brief and schema: claude/briefs/GLOSSARY.md. The pages carry the site nav and fo
 also keeps them current when the nav changes. The finance glossary must explain every label the stock tear
 sheets print often (COVERAGE_MIN reports or more): every Key Financial Metrics row and column, plus FIXED_LABELS.
 The old URLs (glossary/finance.html, glossary/poker.html) are hand-written redirect stubs that keep the #term anchor.
+
+The glossaries are also the site's one source of definitions for the concept tooltips (Oki, 12 Oct 2026): each term's
+`short` line (a dictionary-style definition, <= SHORT_WORDS words), optional `senses` (the same term's meaning in a
+given context, picked by a page's data-ctx) and `match` phrases (what calls the tooltip up in running text; an
+{"phrase", "ctx"} object matches only on pages that declare that context) are written to data/terms.json, which
+assets/site.js reads on every site page and the report viewer passes each report through.
 """
 import collections
 import glob
@@ -54,7 +60,12 @@ MOVED_NOTE = {   # what glossary.js says when a link names a retired entry with 
 }
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261010d'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261012a'       # ?v= on glossary.css / glossary.js: bump when either changes
+TERMS_JSON = os.path.join('data', 'terms.json')
+SHORT_WORDS, EXAMPLE_WORDS = 20, 25
+CTX_LABEL = {'futures': 'In futures', 'options': 'In options', 'bonds': 'In bonds', 'stocks': 'In stocks',
+             'statements': 'In financial statements', 'funds': 'In funds', 'crypto': 'In crypto', 'rates': 'In interest rates',
+             'fed': 'At the Fed', 'tables': 'At the casino', 'poker': 'At the poker table'}
 
 HEAD = {
     'finance': dict(
@@ -157,8 +168,18 @@ def problems(doc: dict[str, Any], required: list[str], tips: list[dict[str, Any]
         if t.get('group') not in groups:
             out.append(f'{name}: unknown group {t.get("group")!r}')
         out += [f'{name}: see-also {s!r} is not a term' for s in t.get('see', []) if s not in ids]
-        out += [f'{name}: {f} holds HTML' for f in ('term', 'why', 'def', 'formula', 'example', 'sheet', 'lens')
+        out += [f'{name}: {f} holds HTML' for f in ('term', 'why', 'def', 'formula', 'example', 'sheet', 'lens', 'short')
                 if re.search(r'<[a-z/]', t.get(f) or '')]
+        if t.get('short') and len(t['short'].split()) > SHORT_WORDS:
+            out.append(f'{name}: short is {len(t["short"].split())} words, over {SHORT_WORDS}')
+        for s in t.get('senses', []):
+            if s.get('ctx') not in CTX_LABEL or not s.get('short'):
+                out.append(f'{name}: a sense needs a known ctx and a short line')
+            elif len(s['short'].split()) > SHORT_WORDS or len(s.get('example', '').split()) > EXAMPLE_WORDS:
+                out.append(f'{name}: sense {s["ctx"]!r} is too long')
+        for m in t.get('match', []):
+            if not (isinstance(m, str) and m.strip()) and not (isinstance(m, dict) and m.get('phrase') and m.get('ctx') in CTX_LABEL):
+                out.append(f'{name}: bad match entry {m!r}')
     covered = {lab.lower() for t in doc.get('terms', []) for lab in t.get('labels', [])}
     out += [f'tear-sheet label {lab!r} has no term or report tooltip ({TIPS})' for lab in required
             if lab.lower() not in covered and not any(tip_covers(t, lab) for t in tips if t.get('label'))]
@@ -189,11 +210,38 @@ def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, group_t
     for key, label in (('formula', 'Formula'), ('example', 'Example'), ('sheet', 'On the tear sheet'), ('lens', lens_label)):
         if t.get(key):
             parts.append(f'    <p class="x x-{key}"><span class="k">{label}</span>{e(t[key])}</p>')
+    for s in t.get('senses', []):   # the same word in another context (Oki, 12 Oct 2026)
+        ex = f' <i>{e(s["example"])}</i>' if s.get('example') else ''
+        parts.append(f'    <p class="x x-sense"><span class="k">{CTX_LABEL[s["ctx"]]}</span>{e(s["short"])}{ex}</p>')
     tag = f'<a class="tag" href="#g-{t["group"]}">{e(group_title)}</a>'
     links = ', '.join(f'<a href="#{s}">{e(names[s])}</a>' for s in t.get('see', []))
     parts.append(f'    <p class="see">{tag}{" See also: " + links if links else ""}</p>')
     parts.append('  </article>')
     return '\n'.join(parts)
+
+
+def short(t: dict[str, Any]) -> str:
+    """The term's tooltip line: its `short`, else the first sentence of its definition."""
+    if t.get('short'):
+        return t['short']
+    m = re.search(r'^(.+?[.!?])(\s|$)', t['def'])
+    return (m.group(1) if m else t['def']).strip()
+
+
+def terms_json(docs: dict[str, dict[str, Any]]) -> str:
+    """data/terms.json for assets/site.js: terms keyed 'f:<id>' / 'p:<id>' -> [name, short, {ctx: short}], and the
+    match list [phrase, key, ctx or '']."""
+    terms: dict[str, list[Any]] = {}
+    match: list[list[str]] = []
+    for page, doc in docs.items():
+        for t in doc['terms']:
+            key = page[0] + ':' + t['id']
+            senses = {s['ctx']: s['short'] for s in t.get('senses', [])}
+            terms[key] = [re.sub(r'\s*\(.*?\)$', '', t['term']), short(t)] + ([senses] if senses else [])
+            for m in t.get('match', []):
+                match.append([m, key, ''] if isinstance(m, str) else [m['phrase'], key, m['ctx']])
+    out = {'v': STAMP, 'terms': terms, 'match': match}
+    return json.dumps(out, ensure_ascii=False, separators=(',', ':'), sort_keys=True) + '\n'
 
 
 def az_key(name: str) -> str:
@@ -226,7 +274,8 @@ def page_html(page: str, doc: dict[str, Any]) -> str:
     letters = sorted(by_letter, key=lambda c: (c == '#', c))
     bar = ''.join(f'<a href="#az-{"0" if c == "#" else c}">{c}</a>' for c in letters)
     az = '\n'.join(f'  <div class="azl" id="az-{"0" if c == "#" else c}"><h3>{c}</h3><ul>'
-                   + ''.join(f'<li><a href="#{t["id"]}">{e(t["term"])}</a></li>' for t in by_letter[c]) + '</ul></div>'
+                   + ''.join(f'<li><a href="#{t["id"]}">{e(t["term"])}</a> <span>{e(short(t))}</span></li>' for t in by_letter[c])
+                   + '</ul></div>'
                    for c in letters)
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -331,6 +380,15 @@ def build(repo: str, check: bool) -> int | str:
         if current != out:
             rl.write_text(path, out)
         print(f'{"updated" if current != out else "unchanged"} {OUT_DIR}/{page}.html ({len(doc["terms"])} terms)'.replace(os.sep, '/'))
+    docs = {page: load(repo, page) for page in PAGES}
+    path = os.path.join(repo, TERMS_JSON)
+    out = terms_json(docs)
+    current = rl.read_text(path) if os.path.exists(path) else None
+    if check and current != out:
+        stale.append(path)
+    elif not check and current != out:
+        rl.write_text(path, out)
+        print(f'updated {TERMS_JSON} ({sum(len(d["terms"]) for d in docs.values())} terms)'.replace(os.sep, '/'))
     landing = os.path.join(repo, LANDING)
     try:
         current = rl.read_text(landing)

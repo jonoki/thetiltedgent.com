@@ -38,25 +38,6 @@
     for(var v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step) out.push(Math.abs(v)<step/1e6?0:v);
     return out;
   }
-  // key-term tooltips (tools/lesson_terms.py): CSS shows them on hover and focus; this keeps them on screen and lets
-  // a tap open and close them
-  (function(){
-    var terms=[].slice.call(document.querySelectorAll('.term'));
-    function place(t){ var tip=$(t,'.tip'); if(!tip) return; tip.style.left='0px'; tip.classList.remove('below');
-      // clamp the tip's own measured box into the viewport (a term that wraps onto two lines has a full-width box)
-      var r=tip.getBoundingClientRect(), w=document.documentElement.clientWidth, want=Math.max(12,Math.min(r.left,w-12-r.width));
-      tip.style.left=(want-r.left)+'px';
-      if(r.top<84) tip.classList.add('below'); }
-    function close(except){ terms.forEach(function(t){ if(t!==except) t.classList.remove('open'); }); }
-    terms.forEach(function(t){
-      t.addEventListener('mouseenter',function(){ place(t); });
-      t.addEventListener('focus',function(){ place(t); });
-      t.addEventListener('click',function(e){ e.stopPropagation(); close(t); t.classList.toggle('open'); if(t.classList.contains('open')) place(t); });
-      t.addEventListener('keydown',function(e){ if(e.key==='Escape'){ t.classList.remove('open'); t.blur(); } });
-    });
-    document.addEventListener('click',function(){ close(null); });
-  })();
-
   var redraw=[];
   addEventListener('resize',function(){ clearTimeout(redraw.t); redraw.t=setTimeout(function(){ redraw.forEach(function(f){f();}); },150); });
 

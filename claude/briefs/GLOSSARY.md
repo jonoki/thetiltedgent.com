@@ -42,6 +42,24 @@ The tool fails when a recurring tear-sheet label has neither an entry nor a repo
 - `aka`: other names and abbreviations a reader might search for.
 - `labels` (finance only): the exact strings the tear sheets print that this term explains. Matched case-insensitively.
 - `see`: ids of related terms on the same page. Every id must exist.
+- `short` (Oki, 12 Oct 2026): the tooltip line, a dictionary-style definition of 20 words or fewer that is accurate
+  on its own (it doesn't repeat the term's name; the tooltip shows the name above it). Every term should have one.
+- `match`: the phrases in running text that call up the tooltip, as a reader sees them ("P/E", "P/E ratio";
+  list singular and plural separately). Leave out everyday words and words with another common meaning; a wrong
+  tooltip is worse than none. A phrase that is right only in one context is an object: {"phrase": "margin",
+  "ctx": "futures"}, matched only on pages whose <main data-ctx> includes that word. Contexts: futures, options,
+  bonds, stocks, statements, funds, crypto, rates, fed, tables, poker.
+- `senses` (optional): [{"ctx": "futures", "short": "...", "example": "..."}] where the same term means something
+  different in a context; a page in that context shows that sense's short line. Shown on the glossary page too.
+
+## Tooltips, site-wide (Oki, 12 Oct 2026)
+
+The glossaries are the site's one source of definitions. `tools/glossary.py` writes `data/terms.json` (each term's
+name, short line and senses, and the match list); `assets/site.js` reads it on every site page and puts a tooltip on
+the first appearance of each matched phrase in the page's running text (not headings, links other than glossary
+links, tables, widgets or the lesson sidebars); `reports/view.html` runs it on each report. Poker terms apply on The
+Tables and in the lessons' "At the table" boxes. Table Talk itself gets none. The lessons' "Concepts in this lesson"
+sidebars (3-8 core terms) and their contexts come from `data/lesson_terms.json` via `tools/lesson_terms.py`.
 - Order terms inside a group the way a reader meets them on the page; the page also offers A–Z.
 
 ## Coverage (finance; the tool enforces it)
