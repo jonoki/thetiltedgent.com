@@ -38,6 +38,25 @@
     for(var v=Math.ceil(lo/step)*step;v<=hi+1e-9;v+=step) out.push(Math.abs(v)<step/1e6?0:v);
     return out;
   }
+  // key-term tooltips (tools/lesson_terms.py): CSS shows them on hover and focus; this keeps them on screen and lets
+  // a tap open and close them
+  (function(){
+    var terms=[].slice.call(document.querySelectorAll('.term'));
+    function place(t){ var tip=$(t,'.tip'); if(!tip) return; tip.style.left='0px'; tip.classList.remove('below');
+      // clamp the tip's own measured box into the viewport (a term that wraps onto two lines has a full-width box)
+      var r=tip.getBoundingClientRect(), w=document.documentElement.clientWidth, want=Math.max(12,Math.min(r.left,w-12-r.width));
+      tip.style.left=(want-r.left)+'px';
+      if(r.top<84) tip.classList.add('below'); }
+    function close(except){ terms.forEach(function(t){ if(t!==except) t.classList.remove('open'); }); }
+    terms.forEach(function(t){
+      t.addEventListener('mouseenter',function(){ place(t); });
+      t.addEventListener('focus',function(){ place(t); });
+      t.addEventListener('click',function(e){ e.stopPropagation(); close(t); t.classList.toggle('open'); if(t.classList.contains('open')) place(t); });
+      t.addEventListener('keydown',function(e){ if(e.key==='Escape'){ t.classList.remove('open'); t.blur(); } });
+    });
+    document.addEventListener('click',function(){ close(null); });
+  })();
+
   var redraw=[];
   addEventListener('resize',function(){ clearTimeout(redraw.t); redraw.t=setTimeout(function(){ redraw.forEach(function(f){f();}); },150); });
 
@@ -50,13 +69,16 @@
     function run(){
       var dir=f.side.value==='short'?-1:1, mult=num(f.mult,50), qty=Math.max(1,Math.round(num(f.qty,1)));
       var entry=num(f.entry,6000), init=num(f.init,22000)*qty, maint=Math.min(num(f.maint,20000)*qty,init);
-      var bal=init, prev=entry, added=0, path=[{d:0,bal:bal}], html='';
+      var bal=init, prev=entry, added=0, path=[{d:0,bal:bal}];
+      // columns: day, settlement price, outlay (cash put in: the initial margin, then any margin call paid that day),
+      // position value at the settlement (before any top-up), the day's profit or loss, and the margin call
+      var html='<tr><td>Start</td><td class="num">'+entry.toLocaleString('en-US')+'</td><td class="num">'+money(init)+'</td><td class="num">'+money(init)+'</td><td class="num">—</td><td>—</td></tr>';
       days.forEach(function(inp,i){
         var px=num(inp,prev), chg=dir*(px-prev)*mult*qty, call=0;
         bal+=chg;
         if(bal<maint){ call=init-bal; }
-        html+='<tr><td>Day '+(i+1)+'</td><td class="num">'+px.toLocaleString('en-US')+'</td><td class="num '+(chg>=0?'up':'down')+'">'+
-              signed(chg)+'</td><td class="num">'+money(bal)+'</td><td>'+(call?'<span class="down">Margin call: add '+money(call)+'</span>':'—')+'</td></tr>';
+        html+='<tr><td>Day '+(i+1)+'</td><td class="num">'+px.toLocaleString('en-US')+'</td><td class="num">'+(call?money(call):'—')+'</td><td class="num">'+money(bal)+
+              '</td><td class="num '+(chg>=0?'up':'down')+'">'+signed(chg)+'</td><td>'+(call?'<span class="down">Below '+money(maint)+': add '+money(call)+'</span>':'—')+'</td></tr>';
         path.push({d:i+1,bal:bal});
         bal+=call; added+=call; prev=px;
         if(call) path.push({d:i+1,bal:bal,topup:true});
@@ -64,7 +86,7 @@
       rows.innerHTML=html;
       var pnl=dir*(prev-entry)*mult*qty;
       out.innerHTML='<span>Gain or loss: <b class="'+(pnl>=0?'up':'down')+'">'+signed(pnl)+'</b></span>'+
-        '<span>Cash added by margin calls: <b>'+money(added)+'</b></span>'+
+        '<span>Total outlay: <b>'+money(init+added)+'</b> ('+money(init)+' initial margin'+(added?' + '+money(added)+' in margin calls':'')+')</span>'+
         '<span>Contract value at entry: <b>'+money(entry*mult*qty)+'</b></span>'+
         '<span>Return: <b class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+(100*pnl/(entry*mult*qty)).toFixed(1)+'%</b> on the contract&rsquo;s value, '+
         '<b class="'+(pnl>=0?'up':'down')+'">'+(pnl>=0?'+':'')+(100*pnl/(init+added)).toFixed(1)+'%</b> on the cash you put up</span>';
@@ -84,7 +106,7 @@
       var dpath=path.map(function(p,i){return (i?'L':'M')+x(p.d).toFixed(1)+' '+y(p.bal).toFixed(1);}).join(' ');
       el('path',{d:dpath,fill:'none',stroke:css('--gold'),'stroke-width':2.5,'stroke-linejoin':'round'},svg);
       path.forEach(function(p){ el('circle',{cx:x(p.d),cy:y(p.bal),r:p.topup?4:3.5,fill:p.topup?css('--red'):css('--gold-hi')},svg); });
-      svg.setAttribute('aria-label','Account balance over five days, starting at '+money(init)+', with the maintenance level at '+money(maint)+'.');
+      svg.setAttribute('aria-label','Position value over five days, starting at '+money(init)+', with the maintenance level at '+money(maint)+'.');
     }
     root.addEventListener('input',run); root.addEventListener('change',run); redraw.push(run);
     run();
