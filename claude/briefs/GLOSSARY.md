@@ -60,6 +60,12 @@ the first appearance of each matched phrase in the page's running text (not head
 links, tables, widgets or the lesson sidebars); `reports/view.html` runs it on each report. Poker terms apply on The
 Tables and in the lessons' "At the table" boxes. Table Talk itself gets none. The lessons' "Concepts in this lesson"
 sidebars (3-8 core terms) and their contexts come from `data/lesson_terms.json` via `tools/lesson_terms.py`.
+Matching rules: one tooltip per term per page; the longest phrase wins; a phrase tied to the page's context (`{"phrase": ..., "ctx": ...}`,
+contexts from `<main data-ctx>`) beats the same phrase's plain entry; matching ignores case except for acronyms (`GICs` never
+matches `GICS`); The Tables use the poker glossary only, poker-table words (ctx `poker`) only on the poker games, and the trainers get
+none; the lessons' "At the table" boxes get poker-table words only. Before adding a match phrase, check it can't mean something else
+on a page (plain "hedge" fires in "hedge fund"; "face value" on chips): tag it with a context, or leave it out. A word used in its
+everyday sense where a tooltip would mislead is wrapped in `<span data-no-terms>`.
 - Order terms inside a group the way a reader meets them on the page; the page also offers A–Z.
 
 ## Coverage (finance; the tool enforces it)

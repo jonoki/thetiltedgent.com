@@ -79,6 +79,12 @@
       if(e.key === 'Escape') Array.prototype.forEach.call(doc.querySelectorAll('.tt.open'), function(o){ o.classList.remove('open'); });
     });
   }
+  // matching ignores case, except that an acronym in a phrase must appear in its own capitals: GICs, not GICS
+  function acronymsMatch(phrase, text){
+    var p = phrase.split(' '), t = text.split(' ');
+    for(var i = 0; i < p.length; i++) if(/[A-Z]{2}/.test(p[i]) && p[i] !== t[i]) return false;
+    return true;
+  }
   function tipFor(d, key, ctx){
     var t = d.terms[key]; if(!t) return null;
     var s = t[1], senses = t[2] || {};
@@ -111,7 +117,7 @@
         if(!text || used[key]) return;
         used[key] = 1; a.classList.add('tt'); a.setAttribute('data-tt', key); a.appendChild(tipNode(doc, text));
       });
-      // two matchers: the page's own contexts, and, for the "At the table" boxes, the poker contexts as well
+      // two matchers: the page's own contexts, and, for the lessons' "At the table" boxes, the poker table's words only
       function matcher(cx, pokerFirst){
         var by = {}, phrases = [];
         d.match.forEach(function(m){
@@ -127,9 +133,12 @@
         phrases.sort(function(a, b){ return b.length - a.length; });
         return phrases.length ? {by: by, re: new RegExp('(?<![\\w-])(' + phrases.map(esc).join('|') + ')(?![\\w-])', 'gi')} : null;
       }
-      var pageM = matcher(ctx, tables), lensM = matcher(ctx.concat(['poker', 'tables']), true);
+      var pageM = matcher(ctx, tables), lensM = matcher(['poker'], true);
       var walker = doc.createTreeWalker(root, 4, null), nodes = [], n;
-      while((n = walker.nextNode())) if(n.nodeValue.trim() && !(n.parentElement && n.parentElement.closest(SKIP))) nodes.push(n);
+      var view = doc.defaultView || window;
+      // skip text set straight in a flex or grid box (report section titles): a span there becomes its own item and breaks the line
+      function laidOut(el){ var s = view.getComputedStyle(el).display; return /flex|grid/.test(s); }
+      while((n = walker.nextNode())) if(n.nodeValue.trim() && !(n.parentElement && (n.parentElement.closest(SKIP) || laidOut(n.parentElement)))) nodes.push(n);
       nodes.forEach(function(node){
         var lens = !!(node.parentElement && node.parentElement.closest('.lens')), M = lens ? lensM : pageM;
         if(!M) return;
@@ -140,7 +149,8 @@
           for(var i = 0; i < cands.length && !pick; i++){
             var c = cands[i], poker = c[1].charAt(0) === 'p';
             if(used[c[1]]) continue;
-            if(poker ? (tables || lens) : !tables) pick = c;   // The Tables use the poker glossary only
+            if(!acronymsMatch(c[0], m[1])) continue;
+            if(poker ? (tables || lens) : !(tables || lens)) pick = c;   // The Tables and the boxes use the poker glossary only
           }
           if(!pick) continue;
           var label = tipFor(d, pick[1], ctx); if(!label) continue;
