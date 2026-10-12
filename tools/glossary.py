@@ -94,9 +94,19 @@ HEAD = {
 }
 
 
+def _no_dupes(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """json object hook: a key given twice would silently keep only the last value, so refuse it."""
+    keys = [k for k, _ in pairs]
+    dup = sorted({k for k in keys if keys.count(k) > 1})
+    if dup:
+        ident = dict(pairs).get('id', '?')
+        raise ValueError(f'duplicate key(s) {", ".join(dup)} in entry {ident}')
+    return dict(pairs)
+
+
 def load(repo: str, page: str) -> dict[str, Any]:
     with open(os.path.join(repo, 'data', f'glossary_{page}.json'), encoding='utf-8') as fh:
-        return json.load(fh)
+        return json.load(fh, object_pairs_hook=_no_dupes)
 
 
 def tear_sheet_labels(repo: str, min_reports: int = COVERAGE_MIN) -> list[str]:

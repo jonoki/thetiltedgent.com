@@ -146,9 +146,11 @@
         re.lastIndex = 0;
         while((m = re.exec(text))){
           var cands = by[m[1].toLowerCase()] || [], pick = null;
+          // a phrase with a sense for this page's context never falls back to its everyday sense once that one is used
+          var tagged = cands.some(function(c){ return c[2]; });
           for(var i = 0; i < cands.length && !pick; i++){
             var c = cands[i], poker = c[1].charAt(0) === 'p';
-            if(used[c[1]]) continue;
+            if(used[c[1]] || (tagged && !c[2])) continue;
             if(!acronymsMatch(c[0], m[1])) continue;
             if(poker ? (tables || lens) : !(tables || lens)) pick = c;   // The Tables and the boxes use the poker glossary only
           }
