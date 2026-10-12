@@ -52,7 +52,7 @@
     }).catch(function(){});
   }
   var SKIP = 'h1,h2,h3,h4,h5,h6,a,button,input,select,textarea,label,option,script,style,svg,code,pre,nav,header,footer,' +
-             'table,summary,aside,details,.widget,.formula,.tt,.toc,.next,.callout,.legend,.out,.tg-tipl,.tg-tip,[data-no-terms]';
+             'table,summary,aside,details,.ticker,.widget,.formula,.tt,.toc,.next,.callout,.legend,.out,.tg-tipl,.tg-tip,[data-no-terms]';
   // escape for a RegExp; a straight apostrophe in a phrase also matches the pages' curly one
   function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/'/g, "['\u2019]"); }
   function place(t){
@@ -91,12 +91,14 @@
   function run(doc, isReport){
     var path = (doc.defaultView || window).location.pathname;
     if(!isReport && /^\/learn\/table-talk\//.test(path)) return;
-    var root = isReport ? doc.body : doc.querySelector('main');
+    if(/^\/tables\/(.*-table|blackjack-trainer)\.html$/.test(path)) return;   // the trainers: the game board is no place for tooltips
+    var root = isReport ? doc.body : (doc.querySelector('main') || doc.body);   // pages without <main>: the body (nav, header and footer are skipped)
     if(!root) return;
     load(function(d){
       var tables = /^\/tables\//.test(path);
       var ctx = (root.getAttribute('data-ctx') || '').split(/\s+/).filter(Boolean);
       if(tables) ctx.push('tables');
+      if(/^\/tables\/(ultimate-texas-holdem|three-card-poker|video-poker)/.test(path)) ctx.push('poker');   // the poker-game pages
       var used = {};
       Array.prototype.forEach.call(root.querySelectorAll('.tt[data-tt]'), function(t){ used[t.getAttribute('data-tt')] = 1; });
       // glossary links: same tooltip, still a link
@@ -107,28 +109,35 @@
         if(!text || used[key]) return;
         used[key] = 1; a.classList.add('tt'); a.setAttribute('data-tt', key); a.appendChild(tipNode(doc, text));
       });
-      var by = {}, phrases = [];
-      d.match.forEach(function(m){
-        var p = m[0].toLowerCase();
-        if(m[2] && ctx.indexOf(m[2]) < 0) return;
-        if(!by[p]){ by[p] = []; phrases.push(m[0]); }
-        by[p].push(m);
-      });
-      if(!phrases.length) return;
-      phrases.sort(function(a, b){ return b.length - a.length; });
-      var re = new RegExp('(?<![\\w-])(' + phrases.map(esc).join('|') + ')(?![\\w-])', 'gi');
+      // two matchers: the page's own contexts, and, for the "At the table" boxes, the poker contexts as well
+      function matcher(cx, pokerFirst){
+        var by = {}, phrases = [];
+        d.match.forEach(function(m){
+          var p = m[0].toLowerCase();
+          if(m[2] && cx.indexOf(m[2]) < 0) return;
+          if(!by[p]){ by[p] = []; phrases.push(m[0]); }
+          by[p].push(m);
+        });
+        Object.keys(by).forEach(function(p){   // poker first at the casino and in the boxes, finance first elsewhere
+          by[p].sort(function(a, b){ return ((a[1].charAt(0) === 'p') === pokerFirst ? 0 : 1) - ((b[1].charAt(0) === 'p') === pokerFirst ? 0 : 1); });
+        });
+        phrases.sort(function(a, b){ return b.length - a.length; });
+        return phrases.length ? {by: by, re: new RegExp('(?<![\\w-])(' + phrases.map(esc).join('|') + ')(?![\\w-])', 'gi')} : null;
+      }
+      var pageM = matcher(ctx, tables), lensM = matcher(ctx.concat(['poker', 'tables']), true);
       var walker = doc.createTreeWalker(root, 4, null), nodes = [], n;
       while((n = walker.nextNode())) if(n.nodeValue.trim() && !(n.parentElement && n.parentElement.closest(SKIP))) nodes.push(n);
       nodes.forEach(function(node){
-        var lens = !!(node.parentElement && node.parentElement.closest('.lens'));
-        var text = node.nodeValue, m, cut = 0, frag = null;
+        var lens = !!(node.parentElement && node.parentElement.closest('.lens')), M = lens ? lensM : pageM;
+        if(!M) return;
+        var re = M.re, by = M.by, text = node.nodeValue, m, cut = 0, frag = null;
         re.lastIndex = 0;
         while((m = re.exec(text))){
           var cands = by[m[1].toLowerCase()] || [], pick = null;
           for(var i = 0; i < cands.length && !pick; i++){
             var c = cands[i], poker = c[1].charAt(0) === 'p';
             if(used[c[1]]) continue;
-            if(poker ? (tables || lens) : !(tables && cands.some(function(x){ return x[1].charAt(0) === 'p'; }))) pick = c;
+            if(poker ? (tables || lens) : !tables) pick = c;   // The Tables use the poker glossary only
           }
           if(!pick) continue;
           var label = tipFor(d, pick[1], ctx); if(!label) continue;
