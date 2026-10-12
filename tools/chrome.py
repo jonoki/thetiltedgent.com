@@ -79,7 +79,7 @@ CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tabl
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
 # Bump ASSET_V whenever site.css or site.js changes: Pages caches for ten minutes, and new nav markup with the old
 # stylesheet shows an unstyled menu. write_chrome replaces any older stamp.
-ASSET_V = '20261012h'
+ASSET_V = '20261012i'
 SITE_CSS = f'<link rel="stylesheet" href="/assets/site.css?v={ASSET_V}">'
 SITE_JS = f'<script src="/assets/site.js?v={ASSET_V}" defer></script>'
 OLD_SITE_CSS = re.compile(r'<link rel="stylesheet" href="/assets/site\.css(?:\?v=[^"]*)?">')

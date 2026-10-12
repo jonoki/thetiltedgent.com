@@ -59,9 +59,11 @@
     var tip = t.querySelector('.tt-tip'); if(!tip) return;
     var w = t.ownerDocument.documentElement.clientWidth;
     tip.style.left = '0px'; tip.classList.remove('below');
+    var shown = tip.style.display; tip.style.display = 'block';   // measure even if it isn't showing yet
     var r = tip.getBoundingClientRect(), want = Math.max(12, Math.min(r.left, w - 12 - r.width));
     tip.style.left = (want - r.left) + 'px';
     if(r.top < 84) tip.classList.add('below');
+    tip.style.display = shown;
   }
   function wire(doc){
     if(doc.__ttWired) return; doc.__ttWired = true;
