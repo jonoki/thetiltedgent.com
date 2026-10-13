@@ -59,7 +59,9 @@ RETIRED: dict[str, dict[str, str]] = {'finance': {
                             'tag-new-results', 'hand-tags', 'key-people-tags')},
     'monthly-closes': 'moving-average', 'all-time-high': 'drawdown', 'holdings': 'etf', 'ticker': 'exchange',
     'market-share': 'segment', 'index-column': 'sp-500',
-}, 'poker': {}}
+    # combined entries split into one card per concept (Oki, 12 Oct 2026)
+    "cpi-pce": "cpi", "ffo-affo": "ffo", "growth-value-stocks": "growth-stocks", "intrinsic-time-value": "intrinsic-value", "long-short": "long-position", "long-term-items": "long-term-assets", "wti-brent": "wti",
+}, 'poker': {"soft-and-hard": "soft-hand", "tcp-ante-play": "tcp-ante", "uth-ante-blind": "uth-ante"}}
 MOVED_NOTE = {   # what glossary.js says when a link names a retired entry with no successor
     'report': 'That entry now lives on the reports themselves: hover over or tap the label to read it.',
     'cards': 'That entry now lives on the report cards: hover over or tap the tag to read it.',
