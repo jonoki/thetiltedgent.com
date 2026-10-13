@@ -76,7 +76,7 @@ TAGS: dict[str, dict[str, str]] = {
 }
 MAX_TAGS = 3
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261012c'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261012d'       # ?v= on glossary.css / glossary.js: bump when either changes
 TERMS_JSON = os.path.join('data', 'terms.json')
 SHORT_WORDS, EXAMPLE_WORDS = 20, 25
 CTX_LABEL = {'futures': 'In futures', 'options': 'In options', 'bonds': 'In bonds', 'stocks': 'In stocks',
@@ -252,7 +252,7 @@ def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, tag_nam
         parts.append(f'    <p class="x x-sense"><span class="k">{CTX_LABEL[s["ctx"]]}</span>{e(s["short"])}{ex}</p>')
     tags = ''.join(f'<a class="tag" href="?tag={g}" data-t="{g}">{e(tag_names[g])}</a>' for g in t['tags'])
     links = ', '.join(f'<a href="#{s}">{e(names[s])}</a>' for s in t.get('see', []))
-    parts.append(f'    <p class="tags">{tags}</p>')
+    parts.append(f'    <p class="tags"><span class="k">Tags</span>{tags}</p>')
     if links:
         parts.append(f'    <p class="see"><span class="k">Related</span> {links}</p>')
     parts.append('  </article>')
