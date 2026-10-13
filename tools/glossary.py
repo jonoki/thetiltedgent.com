@@ -76,7 +76,7 @@ TAGS: dict[str, dict[str, str]] = {
 }
 MAX_TAGS = 3
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261012b'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261012c'       # ?v= on glossary.css / glossary.js: bump when either changes
 TERMS_JSON = os.path.join('data', 'terms.json')
 SHORT_WORDS, EXAMPLE_WORDS = 20, 25
 CTX_LABEL = {'futures': 'In futures', 'options': 'In options', 'bonds': 'In bonds', 'stocks': 'In stocks',
@@ -198,6 +198,9 @@ def problems(doc: dict[str, Any], required: list[str], tips: list[dict[str, Any]
         out += [f'{name}: see-also {s!r} is not a term' for s in t.get('see', []) if s not in ids]
         out += [f'{name}: {f} holds HTML' for f in ('term', 'why', 'def', 'formula', 'example', 'sheet', 'lens', 'short')
                 if re.search(r'<[a-z/]', t.get(f) or '')]
+        for f in ('aka', 'covers'):
+            if not isinstance(t.get(f, []), list) or not all(isinstance(a, str) and a.strip() for a in t.get(f, [])):
+                out.append(f'{name}: {f} must be a list of names')
         if t.get('short') and len(t['short'].split()) > SHORT_WORDS:
             out.append(f'{name}: short is {len(t["short"].split())} words, over {SHORT_WORDS}')
         for s in t.get('senses', []):
@@ -228,11 +231,15 @@ def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, tag_nam
     """One entry, in reading order: name (and other names), why it matters, definition, formula and example,
     where it sits on the tear sheet, the lens, then its tags (each filters the page) and see-also links. Desktop
     shows it as a narrow row in two columns, phones as a card (glossary.css)."""
-    search = ' '.join([t['term'], *t.get('aka', []), *t.get('labels', [])]).lower()
+    search = ' '.join([t['term'], *t.get('aka', []), *t.get('covers', []), *t.get('labels', [])]).lower()
     parts = [f'  <article class="term" id="{t["id"]}" data-t="{" ".join(t["tags"])}" data-s="{e(search)}">',
              f'    <div class="th"><h3><a href="#{t["id"]}">{e(t["term"])}</a></h3>']
+    # 'AKA': other names for the same thing; 'Covers': narrower ideas the entry also explains
     if t.get('aka'):
-        parts.append(f'    <p class="aka">Also: {" &middot; ".join(e(a) for a in t["aka"])}</p>')
+        parts.append(f'    <p class="aka"><span class="k">AKA</span> '
+                     f'{" &middot; ".join(f"<span class=\"same\">{e(a)}</span>" for a in t["aka"])}</p>')
+    if t.get('covers'):
+        parts.append(f'    <p class="aka covers"><span class="k">Covers</span> {" &middot; ".join(e(a) for a in t["covers"])}</p>')
     parts.append('    </div>')
     if t.get('why'):
         parts.append(f'    <p class="why">{e(t["why"])}</p>')
@@ -245,7 +252,9 @@ def term_html(t: dict[str, Any], names: dict[str, str], lens_label: str, tag_nam
         parts.append(f'    <p class="x x-sense"><span class="k">{CTX_LABEL[s["ctx"]]}</span>{e(s["short"])}{ex}</p>')
     tags = ''.join(f'<a class="tag" href="?tag={g}" data-t="{g}">{e(tag_names[g])}</a>' for g in t['tags'])
     links = ', '.join(f'<a href="#{s}">{e(names[s])}</a>' for s in t.get('see', []))
-    parts.append(f'    <p class="see">{tags}{" See also: " + links if links else ""}</p>')
+    parts.append(f'    <p class="tags">{tags}</p>')
+    if links:
+        parts.append(f'    <p class="see"><span class="k">Related</span> {links}</p>')
     parts.append('  </article>')
     return '\n'.join(parts)
 
