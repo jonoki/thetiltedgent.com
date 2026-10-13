@@ -107,7 +107,8 @@
       var ctx = (root.getAttribute('data-ctx') || '').split(/\s+/).filter(Boolean);
       if(tables) ctx.push('tables');
       if(/^\/tables\/(ultimate-texas-holdem|three-card-poker|video-poker)/.test(path)) ctx.push('poker');   // the poker-game pages
-      var used = {};
+      // a lesson's bold (gold) words are its key terms: each gets its definition even if the term had one earlier on the page
+      var lesson = /^\/learn\/lessons\//.test(path), used = {};
       Array.prototype.forEach.call(root.querySelectorAll('.tt[data-tt]'), function(t){ used[t.getAttribute('data-tt')] = 1; });
       // glossary links: same tooltip, still a link
       Array.prototype.forEach.call(root.querySelectorAll('a[href*="/learn/table-talk/"]:not(.tt)'), function(a){
@@ -117,12 +118,14 @@
         if(!text || used[key]) return;
         used[key] = 1; a.classList.add('tt'); a.setAttribute('data-tt', key); a.appendChild(tipNode(doc, text));
       });
-      // two matchers: the page's own contexts, and, for the lessons' "At the table" boxes, the poker table's words only
-      function matcher(cx, pokerFirst){
+      // matchers: the page's own contexts; the same plus the bold-only phrases (an everyday word such as "long" is a
+      // term where a lesson sets it in bold); and, for the lessons' "At the table" boxes, the poker table's words only
+      function matcher(cx, pokerFirst, bold){
         var by = {}, phrases = [];
         d.match.forEach(function(m){
           var p = m[0].toLowerCase();
           if(m[2] && cx.indexOf(m[2]) < 0) return;
+          if(m[3] && !bold) return;
           if(!by[p]){ by[p] = []; phrases.push(m[0]); }
           by[p].push(m);
         });
@@ -133,14 +136,16 @@
         phrases.sort(function(a, b){ return b.length - a.length; });
         return phrases.length ? {by: by, re: new RegExp('(?<![\\w-])(' + phrases.map(esc).join('|') + ')(?![\\w-])', 'gi')} : null;
       }
-      var pageM = matcher(ctx, tables), lensM = matcher(['poker'], true);
+      var pageM = matcher(ctx, tables), boldM = lesson ? matcher(ctx, tables, true) : null, lensM = matcher(['poker'], true);
       var walker = doc.createTreeWalker(root, 4, null), nodes = [], n;
       var view = doc.defaultView || window;
       // skip text set straight in a flex or grid box (report section titles): a span there becomes its own item and breaks the line
       function laidOut(el){ var s = view.getComputedStyle(el).display; return /flex|grid/.test(s); }
       while((n = walker.nextNode())) if(n.nodeValue.trim() && !(n.parentElement && (n.parentElement.closest(SKIP) || laidOut(n.parentElement)))) nodes.push(n);
       nodes.forEach(function(node){
-        var lens = !!(node.parentElement && node.parentElement.closest('.lens')), M = lens ? lensM : pageM;
+        var lens = !!(node.parentElement && node.parentElement.closest('.lens'));
+        var bold = lesson && !lens && !!node.parentElement.closest('strong,b'), seen = bold ? {} : used;   // bold: every bold phrase, once within it
+        var M = lens ? lensM : bold ? boldM : pageM;
         if(!M) return;
         var re = M.re, by = M.by, text = node.nodeValue, m, cut = 0, frag = null;
         re.lastIndex = 0;
@@ -150,13 +155,13 @@
           var tagged = cands.some(function(c){ return c[2]; });
           for(var i = 0; i < cands.length && !pick; i++){
             var c = cands[i], poker = c[1].charAt(0) === 'p';
-            if(used[c[1]] || (tagged && !c[2])) continue;
+            if(seen[c[1]] || (tagged && !c[2])) continue;
             if(!acronymsMatch(c[0], m[1])) continue;
             if(poker ? (tables || lens) : !(tables || lens)) pick = c;   // The Tables and the boxes use the poker glossary only
           }
           if(!pick) continue;
           var label = tipFor(d, pick[1], ctx); if(!label) continue;
-          used[pick[1]] = 1;
+          used[pick[1]] = seen[pick[1]] = 1;
           frag = frag || doc.createDocumentFragment();
           frag.appendChild(doc.createTextNode(text.slice(cut, m.index)));
           var span = doc.createElement('span'); span.className = 'tt'; span.tabIndex = 0; span.setAttribute('data-tt', pick[1]);

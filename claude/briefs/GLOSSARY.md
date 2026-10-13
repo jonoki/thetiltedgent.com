@@ -20,12 +20,11 @@ The tool fails when a recurring tear-sheet label has neither an entry nor a repo
 {
   "v": 1,
   "page": "finance",
-  "groups": [{"id": "metrics", "title": "Key Financial Metrics", "intro": "One or two sentences, ≤ 30 words."}],
   "terms": [{
     "id": "pe-ratio",
     "term": "P/E ratio",
     "aka": ["Trailing P/E", "Price-to-earnings ratio"],
-    "group": "metrics",
+    "tags": ["stocks", "reports"],
     "why": "Optional, one line ≤ 15 words: why the reader should care. Shown under the name (Oki, 10 Oct 2026).",
     "def": "Plain-English meaning, ≤ 45 words.",
     "formula": "Optional. Share price ÷ EPS (TTM)",
@@ -66,7 +65,8 @@ matches `GICS`); The Tables use the poker glossary only, poker-table words (ctx 
 none; the lessons' "At the table" boxes get poker-table words only. Before adding a match phrase, check it can't mean something else
 on a page (plain "hedge" fires in "hedge fund"; "face value" on chips): tag it with a context, or leave it out. A word used in its
 everyday sense where a tooltip would mislead is wrapped in `<span data-no-terms>`.
-- Order terms inside a group the way a reader meets them on the page; the page also offers A–Z.
+- Each page is one A–Z list (Oki, 12 Oct 2026); the build sorts it, ignoring a leading "The". Every term gets 1–3 `tags` from `TAGS` in tools/glossary.py, most relevant first: the topics whose readers need the term. Finance: stocks, bonds, funds, crypto, futures, options, statements, rates, reports (the stock tear sheets: header, metrics rows, analyst consensus, chart and recurring company-section words). Poker: poker, blackjack, craps, roulette, baccarat, machines, carnival, general. Chips filter the page by tag, and `?tag=<id>` links to a filtered page. The old section groups are retired.
+- A match phrase with `"bold": true` (usually with a `ctx`) fires only in a lesson's bold text: an everyday word that is a term where a lesson introduces it ("long", "Hike"). In the lessons every bold phrase that matches gets its tooltip, even when the term had one earlier on the page.
 
 ## Coverage (finance; the tool enforces it)
 

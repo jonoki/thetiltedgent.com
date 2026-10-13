@@ -5,11 +5,21 @@ import unittest
 
 import glossary
 
-DOC = {'v': 1, 'page': 'finance', 'groups': [{'id': 'metrics', 'title': 'Key Financial Metrics', 'intro': 'The table.'}],
-       'terms': [{'id': 'pe-ratio', 'term': 'P/E ratio', 'aka': ['Trailing P/E'], 'group': 'metrics',
+DOC = {'v': 1, 'page': 'finance',
+       'terms': [{'id': 'pe-ratio', 'term': 'P/E ratio', 'aka': ['Trailing P/E'], 'tags': ['stocks', 'reports'],
                   'def': 'Price paid for each $1 of yearly profit per share.', 'formula': 'Share price ÷ EPS (TTM)',
                   'labels': ['Trailing P/E'], 'see': ['eps']},
-                 {'id': 'eps', 'term': 'EPS', 'group': 'metrics', 'def': 'Profit per share.', 'labels': ['EPS (TTM)']}]}
+                 {'id': 'eps', 'term': 'EPS', 'tags': ['reports'], 'def': 'Profit per share.', 'labels': ['EPS (TTM)']}]}
+TAGS = {'finance': {'stocks': 'Stocks', 'reports': 'Stock reports'}}
+
+
+def setUpModule():
+    global _tags
+    _tags, glossary.TAGS = glossary.TAGS, TAGS   # a small tag set, so a clean DOC uses every tag
+
+
+def tearDownModule():
+    glossary.TAGS = _tags
 
 
 class Problems(unittest.TestCase):
@@ -18,18 +28,19 @@ class Problems(unittest.TestCase):
 
     def test_every_kind_of_problem_is_named(self):
         bad = {**DOC, 'terms': DOC['terms'] + [
-            {'id': 'eps', 'term': 'EPS again', 'group': 'metrics', 'def': 'x'},
-            {'id': 'Bad_Id', 'term': '<b>x</b>', 'group': 'nowhere', 'see': ['ghost']},
+            {'id': 'eps', 'term': 'EPS again', 'tags': ['reports'], 'def': 'x'},
+            {'id': 'Bad_Id', 'term': '<b>x</b>', 'tags': ['nowhere', 'stocks', 'stocks'], 'see': ['ghost']},
         ]}
         out = glossary.problems(bad, ['Beta'])
         for needle in ("id 'eps' used 2 times", 'Bad_Id: no def', 'Bad_Id: id is not kebab-case',
-                       "Bad_Id: unknown group 'nowhere'", "Bad_Id: see-also 'ghost' is not a term",
+                       "Bad_Id: unknown tag 'nowhere'", 'Bad_Id: tags must be 1-3 different ones', "Bad_Id: see-also 'ghost' is not a term",
                        'Bad_Id: term holds HTML', "tear-sheet label 'Beta' has no term"):
             self.assertTrue(any(needle in p for p in out), needle)
 
-    def test_a_group_without_terms_is_a_problem(self):
-        doc = {**DOC, 'groups': DOC['groups'] + [{'id': 'chart', 'title': 'Chart'}]}
-        self.assertIn("group 'chart' has no terms", glossary.problems(doc, []))
+    def test_a_tag_without_terms_is_a_problem(self):
+        doc = {**DOC, 'terms': [{**x, 'tags': ['reports']} for x in DOC['terms']]}
+        self.assertIn("tag 'stocks' has no terms", glossary.problems(doc, []))
+        self.assertIn('pe-ratio: no tags', glossary.problems({**DOC, 'terms': [{**DOC['terms'][0], 'tags': []}, DOC['terms'][1]]}, []))
 
     def test_a_report_tooltip_covers_a_label_by_its_match_rule(self):
         tips = [{'label': 'Static data as of', 'match': 'prefix', 'tip': 'x'},
@@ -68,7 +79,11 @@ class Tips(unittest.TestCase):
 class Page(unittest.TestCase):
     def test_terms_anchors_and_a_to_z(self):
         out = glossary.page_html('finance', DOC)
-        self.assertIn('<article class="term" id="pe-ratio" data-g="metrics"', out)
+        self.assertIn('<article class="term" id="pe-ratio" data-t="stocks reports"', out)
+        self.assertLess(out.index('id="eps"'), out.index('id="pe-ratio"'))           # one A-Z list
+        self.assertIn('<section class="grp" id="az-E">', out)
+        self.assertIn('<button class="chip" type="button" data-t="reports">Stock reports <span>2</span></button>', out)
+        self.assertIn('<a class="tag" href="?tag=stocks" data-t="stocks">Stocks</a>', out)
         self.assertIn('See also: <a href="#eps">EPS</a>', out)
         self.assertIn('<a href="#az-E">E</a><a href="#az-P">P</a>', out)
         self.assertIn('Share price ÷ EPS (TTM)', out)
