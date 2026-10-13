@@ -13,6 +13,7 @@ The builder rules are in `claude/briefs/BUILD.md` (and `REFRESH.md` for refreshe
 4. Split/spin/reverse-split history: if the chart mixes adjusted and unadjusted series, fix it so the series is consistent with the header price and label the adjustment in the chart note.
 5. New builds: accent must not be red/red-orange. Existing pages keep their accent (Oki, 25 Sep 2026). Where an existing accent is red, the 200-day MA line and its legend swatch are #cbd5e1 so the price line and the MA stay distinct; never recolour the accent itself.
 5a. Run `py -3 tools/chart_audit.py <slug>` — 0 wrong points required; fix the series (and every claim derived from it) if not.
+6a. Read the prose and card titles as the Reader (rule M): rewrite any sentence that needs market jargon to parse, keeping its claim and numbers exactly (no "most" where the page has no majority figure); tag each `M:<example>`.
 6. Re-run `py -3 tools/verify.py reports/<slug>_analysis.html` (PASS, pe pair within ±0.1) and `node --check` on the extracted script body. LF line endings.
 
 WebFetch needs a domain surfaced by a WebSearch first (one search per new domain). stockanalysis.com blocks curl — use WebFetch.
