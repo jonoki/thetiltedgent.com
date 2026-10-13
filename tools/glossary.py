@@ -76,7 +76,7 @@ TAGS: dict[str, dict[str, str]] = {
 }
 MAX_TAGS = 3
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261012d'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261012h'       # ?v= on glossary.css / glossary.js: bump when either changes
 TERMS_JSON = os.path.join('data', 'terms.json')
 SHORT_WORDS, EXAMPLE_WORDS = 20, 25
 CTX_LABEL = {'futures': 'In futures', 'options': 'In options', 'bonds': 'In bonds', 'stocks': 'In stocks',
