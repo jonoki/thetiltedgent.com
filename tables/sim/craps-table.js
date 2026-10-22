@@ -7,7 +7,7 @@ window.CrapsTable = (function () {
   var CE = window.CrapsEngine;
   var DEFAULTS = { odds: '345', field12: 3, hardOnComeOut: true, buyVig: 'win', layVig: 'upfront', max: 500, placeOnComeOut: false, start: 1000, bank: 1000, stayUp: true, chip: 5 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-crt') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
-  function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) {} }
+  function save(s) { try { localStorage.setItem('ttg-crt', JSON.stringify(s)); } catch (e) { /* storage blocked (private mode): settings last this visit only */ } }
 
   var CHIPS = [1, 5, 25, 100, 500];
   var WORD = { 4: 'FOUR', 5: 'FIVE', 6: 'SIX', 8: 'EIGHT', 9: 'NINE', 10: 'TEN' };
@@ -334,7 +334,7 @@ window.CrapsTable = (function () {
       function end() {
         if (ended) return; ended = true; skipThrow = null;
         timers.forEach(clearTimeout); clearInterval(iv);
-        anims.forEach(function (a) { try { a.cancel(); } catch (e) {} });
+        anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* already finished */ } });
         throwEl.hidden = true; throwEl.style.overflow = ''; throwEl.classList.remove('dim', 'landed'); resultEl.classList.remove('show');
         dice.forEach(function (d) { d.classList.remove('away'); });
         done();

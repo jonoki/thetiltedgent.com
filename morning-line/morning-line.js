@@ -410,7 +410,7 @@
 
   function renderFailed(){
     var lastSeen = null;
-    try { lastSeen = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) {}
+    try { lastSeen = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) { /* storage blocked or unreadable: no last-seen brief */ }
     $('ml-status').innerHTML = '<span class="chip none">Not posted yet</span>';
     $('ml-notice').innerHTML = '<div class="notice"><p class="nh">The line isn’t posted yet.</p>'
       + '<p>The brief posts on weekdays from about 6:25 a.m. ET and updates every 15 minutes until noon, with one more after the 4 p.m. close. This page checks again every five minutes.</p>'
@@ -426,7 +426,7 @@
       .then(function(b){
         if (!b || !b.meta || !/^\d{4}-\d{2}-\d{2}$/.test(b.meta.trading_day || '') || isNaN(Date.parse(b.meta.generated_at_utc))) throw new Error('not a brief');
         brief = b; refreshWarn = '';
-        try { localStorage.setItem(LAST_KEY, JSON.stringify({day: b.meta.trading_day, at: b.meta.generated_at_utc})); } catch (e) {}
+        try { localStorage.setItem(LAST_KEY, JSON.stringify({day: b.meta.trading_day, at: b.meta.generated_at_utc})); } catch (e) { /* storage blocked or full: nothing remembered */ }
         render();
       })
       .catch(function(){
@@ -447,7 +447,7 @@
     slugs = {};
     d.index.forEach(function(row){ slugs[normTicker(row[0])] = row[1]; });
     if (brief) renderEarnings(brief, lineState(brief));
-  }).catch(function(){});
+  }).catch(function(){ /* report list unreachable: earnings tickers stay unlinked */ });
 
   load();
   setInterval(tick, 60 * 1000);

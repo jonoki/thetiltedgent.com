@@ -54,7 +54,7 @@ MOVED_NOTE = {   # what glossary.js says when a link names a retired entry with 
 }
 FIELDS = ('id', 'term', 'group', 'def')
 ID = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
-STAMP = '20261010d'       # ?v= on glossary.css / glossary.js: bump when either changes
+STAMP = '20261022'       # ?v= on glossary.css / glossary.js: bump when either changes
 
 HEAD = {
     'finance': dict(

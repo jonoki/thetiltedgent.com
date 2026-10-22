@@ -25,7 +25,7 @@
   setGroup('');
   q.addEventListener('input',apply);
   // a link to a retired entry (tools/glossary.py RETIRED) goes to its successor, or says where it is explained now
-  var moved={}; try{ moved=JSON.parse(document.getElementById('moved').textContent); }catch(e){}
+  var moved={}; try{ moved=JSON.parse(document.getElementById('moved').textContent); }catch(e){ console.warn('glossary: retired-anchor table unreadable, old #anchors will not forward', e); }
   function forward(){
     var mv=moved[decodeURIComponent(location.hash.slice(1))];
     if(!mv) return;
