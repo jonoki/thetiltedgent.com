@@ -50,6 +50,16 @@ ALLOWED_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch
 ONE_COMMAND = ('Run one command per Bash call: no &&, ; or variable assignments (a chained command is refused in '
                'this unattended run); use absolute paths instead of cd.')
 TIER_ORDER = {'overdue': 0, 'due': 1}
+
+
+def scratch(prefix: str, key: str) -> str:
+    """The prompt's temp-folder sentence. The folder is made here and given as a full path: an unattended agent's
+    command that expands a shell variable ($TEMP) is refused, and two Sonnet builders took that refusal for "no Bash"
+    and stopped before writing (LVMH 16 Oct, TFC 22 Oct 2026)."""
+    path = os.path.join(tempfile.gettempdir(), f'{prefix}_{key}')
+    os.makedirs(path, exist_ok=True)
+    return (f"Temp files only in {path.replace(os.sep, '/')}/ (it exists; type the full path, never $TEMP or another "
+            "shell variable, which this run refuses; it replaces the briefs' $TEMP folder).")
 # The session is started as the agent itself, so it also reads the user's global CLAUDE.md; say which parts apply.
 UNATTENDED = ('You are running as an unattended scheduled job, not an interactive session: the plan-and-wait step, '
               'vault writes, lessons.md upkeep and the four-line close in CLAUDE.md do not apply. Do your one task and '
@@ -160,7 +170,7 @@ def builder_prompt(i: dict, wt: str, data: DataLayer | None = None) -> str:
             f"{i['fiscal_quarter']}. {surprise}{move}{why} The T+2 close ({i['t2']}) has settled; use the most "
             "recent settled close with an Adj. Close row as the new as-of.\n\n"
             "Privacy: never put personal data (names, emails) in any request or User-Agent; read sec.gov with "
-            f"WebFetch only. No git commands. {ONE_COMMAND} Temp files only in $TEMP/ttgref_{i['slug']}/. Run "
+            f"WebFetch only. No git commands. {ONE_COMMAND} {scratch('ttgref', i['slug'])} Run "
             f"`py -3 tools/chart_audit.py {i['slug']}` and `py -3 tools/verify.py reports/{i['slug']}_analysis.html` "
             "and report both outputs verbatim. Return in the format your agent file specifies, including the "
             "REFRESH.md return lines and the flag list." + (data_layer_brief(data) if data else ''))
@@ -192,7 +202,7 @@ def checker_prompt(i: dict, wt: str, builder_result: str, post: str | None = Non
             f"{i['tier']} earnings refresh (previous as-of {i['as_of']}). This is an unattended run: no person will "
             f"answer questions; fix what you can prove, cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
             f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. {ONE_COMMAND} "
-            f"Temp files only in $TEMP/ttgchk_{i['slug']}/.\n\nSpec: claude/PITFALL_RULES.md first, then "
+            f"{scratch('ttgchk', i['slug'])}\n\nSpec: claude/PITFALL_RULES.md first, then "
             "claude/briefs/CHECK.md (which points to REFRESH.md and BUILD.md). Never trust the builder's "
             "\"verified\": re-confirm on pages you fetch yourself. House rules: nothing dated after the banner "
             "date; no user-facing doubt caveats (source it or remove the sentence cleanly); quotes verbatim or "
@@ -236,7 +246,7 @@ def asset_builder_prompt(i: dict, wt: str) -> str:
             "Step 2. If there is nothing newer than "
             f"{i['as_of']}, change nothing and return NO CHANGE.\n\n"
             "Privacy: never put personal data (names, emails) in any request or User-Agent; read sec.gov with "
-            f"WebFetch only. No git commands. {ONE_COMMAND} Temp files only in $TEMP/ttgref_{file_key(i['slug'])}/. "
+            f"WebFetch only. No git commands. {ONE_COMMAND} {scratch('ttgref', file_key(i['slug']))} "
             f"{asset_checks(i)} Return in the format {ASSET_BRIEF} gives, including the flag list.")
 
 
@@ -247,7 +257,7 @@ def asset_checker_prompt(i: dict, wt: str, builder_result: str) -> str:
             f"{i['run_date']}). This is an unattended run: no person will answer questions; fix what you can prove, "
             f"cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
             f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. "
-            f"{ONE_COMMAND} Temp files only in $TEMP/ttgchk_{file_key(i['slug'])}/.\n\nSpec: claude/PITFALL_RULES.md "
+            f"{ONE_COMMAND} {scratch('ttgchk', file_key(i['slug']))}\n\nSpec: claude/PITFALL_RULES.md "
             f"first, then the \"Checker\" section of {ASSET_BRIEF} (the report must satisfy the whole brief). Never "
             "trust the builder's \"verified\": re-confirm on pages you fetch yourself. House rules: nothing dated "
             "after the banner date; no user-facing doubt caveats (source it or remove the sentence cleanly).\n\n"

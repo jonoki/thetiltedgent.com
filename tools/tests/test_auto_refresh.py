@@ -172,7 +172,7 @@ class Assets(unittest.TestCase):
         p = ar.asset_builder_prompt(by['etf/voo'], 'C:/wt')
         for s in (ar.ASSET_BRIEF, 'reports/etf/voo_analysis.html', 'WORKING REPO (overrides the REPO line in the briefs): C:/wt',
                   'claude/PITFALL_RULES.md', 'current as-of 2026-10-05', 'Run date 2026-11-02', 'NO CHANGE',
-                  '`py -3 tools/chart_audit.py etf/voo`', '$TEMP/ttgref_etf_voo/', 'No git commands', ar.UNATTENDED):
+                  '`py -3 tools/chart_audit.py etf/voo`', 'ttgref_etf_voo/', 'never $TEMP', 'No git commands', ar.UNATTENDED):
             self.assertIn(s, p)
         bond = ar.asset_builder_prompt(by['fixed/ust10y'], 'C:/wt')
         self.assertIn('reports/fixed/ust10y_analysis.html', bond)
@@ -185,7 +185,7 @@ class Assets(unittest.TestCase):
         self.assertNotIn('chart_audit', ind)
         c = ar.asset_checker_prompt(by['crypto/btc'], 'C:/wt', 'x' * 20000)
         for s in (ar.ASSET_BRIEF, '"Checker" section', 'reports/crypto/btc_analysis.html', 'VERDICT line', 'PITFALLS:',
-                  '$TEMP/ttgchk_crypto_btc/', 'chart_audit.py crypto/btc'):
+                  'ttgchk_crypto_btc/', 'never $TEMP', 'chart_audit.py crypto/btc'):
             self.assertIn(s, c)
         self.assertLess(c.count('x'), 15100)
 
