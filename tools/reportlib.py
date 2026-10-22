@@ -19,10 +19,12 @@ REPLACE_TRIES = 10   # write_text: attempts at the final replace, 0.2 s apart
 # four-figure price), so a stored series is only flagged when it misses by more than 5 cents and 0.1%.
 PRICE_ROUNDED_ABS, PRICE_ROUNDED_REL = 0.05, 0.001
 
-_FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December']
-MONTHS = {m: i + 1 for i, m in enumerate(_FULL_MONTHS)}
-MONTHS.update({m[:3]: i + 1 for i, m in enumerate(_FULL_MONTHS)})   # 'Aug 12, 2026'
+FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December']
+MON3 = [m[:3] for m in FULL_MONTHS]                                    # 'Jan' ... 'Dec'
+MON = {m.lower(): i + 1 for i, m in enumerate(MON3)}                  # 'jan' -> 1, for lower-cased input
+MONTHS = {m: i + 1 for i, m in enumerate(FULL_MONTHS)}
+MONTHS.update({m: i + 1 for i, m in enumerate(MON3)})   # 'Aug 12, 2026'
 MONTHS['Sept'] = 9
 
 _DASHES = str.maketrans({'\u2212': '-', '\u2013': '-', '\u2014': '-'})   # minus sign, en dash, em dash
@@ -207,7 +209,7 @@ def indicator_range(t: str) -> list[float] | None:
     return [lo, hi] if lo is not None and hi is not None else None
 
 
-_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
+TABLE_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
 _CELL = re.compile(r'<(t[dh])[^>]*>(.*?)</t[dh]>', re.S)
 
 
@@ -217,7 +219,7 @@ def table_rows(t: str) -> list[tuple[str, str]]:
     because metrics labels are often split into tooltip spans ("<span>EPS</span> (<span>TTM</span>)"), and
     whitespace is collapsed. The one reader of report tables: manifest.py, verify.py and style_tags.py use it."""
     rows = []
-    for row in _ROW.findall(t):
+    for row in TABLE_ROW.findall(t):
         cells = _CELL.findall(row)
         if len(cells) >= 2 and cells[1][0] == 'td':
             label, value = (re.sub(r'\s+', ' ', strip_tags(body)) for _, body in cells[:2])

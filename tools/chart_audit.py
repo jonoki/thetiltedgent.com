@@ -77,7 +77,6 @@ LAUNCH = {'etf/arti': (2024, 3)}
 # every prior-edition month-end x 6.665 = Yahoo's real close to the cent (refresh builder, 9 Oct 2026). Oki, 9 Oct 2026.
 SPINOFFS: dict[str, tuple[str, float]] = {'ctva': ('2026-10-01', 6.665)}
 SPIN_LABEL = re.compile(r'(?i)spin(-?off)?[- ]adjusted')   # the page says its chart is on the post-spin basis
-MON = {m: i + 1 for i, m in enumerate('jan feb mar apr may jun jul aug sep oct nov dec'.split())}
 
 TOLERANCE = 0.03          # a point is wrong beyond 3% of both Yahoo's close and its adjusted close
 # Spin-offs and capital returns book on Yahoo as small fractional "splits"; 3:2 and up are real splits.
@@ -139,9 +138,9 @@ def parse_label(s: str) -> tuple[int, int] | None:
     """A chart label ('Sep \\'21', 'Sep 2021', '2021-09') -> (year, month), or None."""
     s = s.strip().strip('\'"`').strip()
     m = re.match(r'([A-Za-z]{3})[a-z]*[\s\'’\-]*(\d{2,4})', s)
-    if m and m.group(1).lower() in MON:
+    if m and m.group(1).lower() in rl.MON:
         y = int(m.group(2))
-        return (y + CENTURY if y < 100 else y, MON[m.group(1).lower()])
+        return (y + CENTURY if y < 100 else y, rl.MON[m.group(1).lower()])
     m = re.match(r'(\d{4})-(\d{2})', s)
     return (int(m.group(1)), int(m.group(2))) if m else None
 

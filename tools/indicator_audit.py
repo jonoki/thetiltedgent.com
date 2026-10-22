@@ -76,7 +76,6 @@ SERIES: dict[str, Series] = {
                        'total nonfarm payrolls, monthly change in thousands, seasonally adjusted, BLS (CES0000000001)'),
 }
 
-MON = {m: i + 1 for i, m in enumerate('jan feb mar apr may jun jul aug sep oct nov dec'.split())}
 Label = tuple[int, int, int | None]          # (year, month, day or None for a month label)
 Observations = dict[str, float]              # ISO date -> value, missing values left out
 
@@ -105,13 +104,13 @@ def parse_label(s: str) -> Label | None:
     'Oct 2 26', 'Oct 2, 2026', '2026-10-02' are days. Two-digit years are 20xx."""
     s = s.strip().strip('\'"`').strip()
     m = re.match(r"([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+['’]?(\d{4}|\d{2})$", s)
-    if m and m.group(1).lower() in MON:
+    if m and m.group(1).lower() in rl.MON:
         y = int(m.group(3))
-        return (y + 2000 if y < 100 else y, MON[m.group(1).lower()], int(m.group(2)))
+        return (y + 2000 if y < 100 else y, rl.MON[m.group(1).lower()], int(m.group(2)))
     m = re.match(r"([A-Za-z]{3})[a-z]*\.?[\s'’\-]*(\d{4}|\d{2})$", s)
-    if m and m.group(1).lower() in MON:
+    if m and m.group(1).lower() in rl.MON:
         y = int(m.group(2))
-        return (y + 2000 if y < 100 else y, MON[m.group(1).lower()], None)
+        return (y + 2000 if y < 100 else y, rl.MON[m.group(1).lower()], None)
     m = re.match(r'(\d{4})-(\d{2})(?:-(\d{2}))?$', s)
     if m:
         return (int(m.group(1)), int(m.group(2)), int(m.group(3)) if m.group(3) else None)

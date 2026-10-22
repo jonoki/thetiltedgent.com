@@ -537,7 +537,7 @@ def stale_patterns(old: Json, new: Json) -> list[tuple[str, re.Pattern[str]]]:
         pats.append((f'old chart-window return {form}%', re.compile(r'(?<![\d.,])' + re.escape(form) + '%')))
     if old.get('as_of') and old['as_of'] != new.get('as_of'):
         d = datetime.date.fromisoformat(old['as_of'])
-        names = [rp.FULL_MONTHS[d.month - 1], rp.MON3[d.month - 1] + r'\.?'] + (['Sept\\.?'] if d.month == 9 else [])
+        names = [rl.FULL_MONTHS[d.month - 1], rl.MON3[d.month - 1] + r'\.?'] + (['Sept\\.?'] if d.month == 9 else [])
         pats.append((f"old as-of date {old['as_of']}", re.compile(
             r'\b(?:' + '|'.join(names) + r')\s+' + str(d.day) + r'\b(?!,?\s*(?!' + str(d.year) + r')\d{4})', re.I)))
     return pats
@@ -567,7 +567,7 @@ def window_return_forms(t: str, pct: float, first_label: str) -> list[str]:
     p = rp.point_label(first_label)
     since = ''
     if p:
-        names = [rp.FULL_MONTHS[p.month - 1], rp.MON3[p.month - 1] + r'\.?'] + (['Sept\\.?'] if p.month == 9 else [])
+        names = [rl.FULL_MONTHS[p.month - 1], rl.MON3[p.month - 1] + r'\.?'] + (['Sept\\.?'] if p.month == 9 else [])
         since = r'|\b(?:' + '|'.join(names) + r")\s+(?:'?" + f'{p.year % 100:02d}|{p.year})' + r'\b'
     ctx = re.compile(_WINDOW_WORDS + since, re.I)
     forms = []
