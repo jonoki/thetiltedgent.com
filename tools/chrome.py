@@ -39,8 +39,16 @@ class NavMenu(NamedTuple):
 NAV: list[NavLink | NavMenu] = [
     NavMenu('learn', 'Learn', [
         ('Learn', [('Learn home', '/learn/')]),
-        ('Lessons', [('Futures', '/learn/lessons/futures.html'),          # Oki, 11 Oct 2026
-                     ('Options', '/learn/lessons/options.html')]),
+        ('Lessons', [('All lessons', '/learn/lessons/'),                   # Oki, 11 Oct 2026
+                     ('Stocks', '/learn/lessons/stocks.html'), ('Bonds', '/learn/lessons/bonds.html'),
+                     ('Cash &amp; T-bills', '/learn/lessons/cash.html'), ('ETFs', '/learn/lessons/etfs.html'),
+                     ('Mutual funds', '/learn/lessons/mutual-funds.html'), ('REITs', '/learn/lessons/reits.html'),
+                     ('Preferred shares', '/learn/lessons/preferred-shares.html'), ('Crypto', '/learn/lessons/crypto.html'),
+                     ('Futures', '/learn/lessons/futures.html'), ('Options', '/learn/lessons/options.html'),
+                     ('Options strategies', '/learn/lessons/options-strategies.html'),
+                     ('Financial statements', '/learn/lessons/income-statement.html'),
+                     ('How markets move', '/learn/lessons/#g-moves'),
+                     ('Reading the market', '/learn/lessons/#g-market')]),
         ('Table Talk', [('Finance &amp; investing terms', '/learn/table-talk/finance.html'),
                         ('Poker &amp; gambling terms', '/learn/table-talk/poker.html')]),
         ('Economic Indicators', [('Rates, inflation &amp; jobs', '/learn/indicators/')])]),   # Oki, 8 Oct 2026
@@ -71,7 +79,7 @@ CTA = ('Take a Seat', '/tables/casino-games.html')   # Oki, 8 Oct 2026: the Tabl
 JS_CLASS = "<script>document.documentElement.classList.add('js');</script>"   # the menu starts closed
 # Bump ASSET_V whenever site.css or site.js changes: Pages caches for ten minutes, and new nav markup with the old
 # stylesheet shows an unstyled menu. write_chrome replaces any older stamp.
-ASSET_V = '20261005'
+ASSET_V = '20261013a'
 SITE_CSS = f'<link rel="stylesheet" href="/assets/site.css?v={ASSET_V}">'
 SITE_JS = f'<script src="/assets/site.js?v={ASSET_V}" defer></script>'
 OLD_SITE_CSS = re.compile(r'<link rel="stylesheet" href="/assets/site\.css(?:\?v=[^"]*)?">')
@@ -92,8 +100,12 @@ PAGES = [  # (path, active nav key or None, has a footer)
     ('learn/table-talk/finance.html', 'learn', True),   # written by tools/glossary.py
     ('learn/table-talk/poker.html', 'learn', True),
     ('learn/indicators/index.html', 'learn', True),   # its cards are written by tools/asset_cards.py
-    ('learn/lessons/futures.html', 'learn', True),
-    ('learn/lessons/options.html', 'learn', True),
+    ('learn/lessons/index.html', 'learn', True),
+    *[(f'learn/lessons/{p}.html', 'learn', True) for p in ('stocks', 'bonds', 'cash', 'etfs', 'mutual-funds', 'reits',
+                                                          'preferred-shares', 'crypto', 'futures', 'options', 'options-strategies', 'income-statement',
+                                                          'balance-sheet', 'cash-flow', 'statements-together',
+                                                          'dilution', 'contango', 'interest-rates',
+                                                          'fomc', 'vix', 'futures-dashboard', 'options-positioning')],
     ('morning-line/index.html', 'morningline', True),   # the live brief is rendered by morning-line/morning-line.js
 ]
 

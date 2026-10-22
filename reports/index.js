@@ -79,8 +79,11 @@
   // that a search, industry or index filter shows.
   var SORTS=['cap','az','updated','old','new'], DEF='cap';
   var SAY={cap:'largest first',az:'by company name',updated:'latest update first',old:'longest in an index first',new:'most recently added first'};
-  var st={q:'',ind:'',idx:'',sort:DEF,sector:'all'};
-  function filtered(){return st.q||st.ind||st.idx;}            // a filter shows one flat list instead of the sectors
+  var st={q:'',ind:'',idx:'',sort:DEF,sector:'all',tag:''};
+  function filtered(){return st.q||st.ind||st.idx||st.tag;}    // a filter shows one flat list instead of the sectors
+  // a card tag as a filter (Oki, 12 Oct 2026): st.tag is its key, family:label, as decorate() writes it below
+  function hasTag(c,k){return [].some.call(c.el.querySelectorAll('.t[data-key]'),function(e){return e.getAttribute('data-key')===k;});}
+  function tagLabel(k){return k.slice(k.indexOf(':')+1);}
   function dirty(){return filtered()||st.sort!==DEF;}
 
   function matches(c){
@@ -90,6 +93,7 @@
     if(st.idx==='dow' && !c.dow) return false;
     if(st.idx==='gl'  && !c.gl)  return false;
     if(st.sector!=='all' && c.sector!==st.sector) return false;
+    if(st.tag && !hasTag(c,st.tag)) return false;
     if(st.q){
       var s=st.q, sc=s.replace(/[^a-z0-9]/g,'');
       if(c.n.indexOf(s)<0 && (!sc || c.tf.toLowerCase().indexOf(sc)<0)) return false;
@@ -189,7 +193,7 @@
       none.textContent='No report matches that. Try a different ticker, industry or index.';
       countEl.textContent='';
     }else if(filtered()||st.sector!=='all'){
-      countEl.innerHTML='Showing <b>'+n+'</b> of '+TOTAL+' reports';
+      countEl.innerHTML='Showing <b>'+n+'</b> of '+TOTAL+' reports'+(st.tag?' tagged <b>'+tagLabel(st.tag).replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</b>':'');
     }else{
       countEl.innerHTML='<b>'+TOTAL+'</b> reports, grouped by sector';
     }
@@ -228,6 +232,7 @@
     if(st.idx) p.push('x='+st.idx);
     if(st.sort!==DEF) p.push('sort='+st.sort);
     if(st.sector!=='all') p.push('s='+st.sector);
+    if(st.tag) p.push('tag='+encodeURIComponent(st.tag));
     try{history.replaceState(null,'',location.pathname+(p.length?'?'+p.join('&'):''));}catch(e){ /* sandboxed frame or file://: the address bar just doesn't update */ }
   }
 
@@ -245,7 +250,7 @@
   fSort.addEventListener('change',function(){st.sort=fSort.value;apply();});
   chips.forEach(function(c){c.addEventListener('click',function(){st.sector=c.getAttribute('data-f');apply();});});
   clearBtn.addEventListener('click',function(){
-    st={q:'',ind:'',idx:'',sort:DEF,sector:'all'};
+    st={q:'',ind:'',idx:'',sort:DEF,sector:'all',tag:''};
     q.value='';fInd.value='';fIdx.value='';fSort.value=DEF;
     apply();q.focus();
   });
@@ -284,6 +289,15 @@
   if(['sp','ndx','dow','gl'].indexOf(p.get('x'))>-1){fIdx.value=p.get('x');st.idx=fIdx.value;}
   if(SORTS.indexOf(p.get('sort'))>0){fSort.value=p.get('sort');st.sort=fSort.value;}
   var s=p.get('s'); if(s&&$('.chip[data-f="'+s.replace(/[^a-z0-9]/g,'')+'"]')) st.sector=s;
+  if(/^[a-z]+:./.test(p.get('tag')||'')) st.tag=p.get('tag');
+  // the tags arrive with card_tags.json: filter again once the cards carry them
+  window.TTG_refilter=function(){ if(st.tag) apply(false); };
+  // from a tag's tooltip: list every report with that tag (an index badge sets the index filter instead)
+  window.TTG_filterTag=function(k){
+    if(k.indexOf('idx:')===0){ fIdx.value=k.slice(4); st.idx=fIdx.value; } else st.tag=k;
+    apply(); foldAll();
+    var top=$('.famwrap')||results; if(top) top.scrollIntoView({block:'start'});
+  };
   // the sort keys arrive with card_tags.json (the card-tags block below); until then, and if it never loads, every
   // cap and as-of is unknown and the cards fall back to company name
   window.TTG_sortKeys=function(data){
@@ -315,7 +329,7 @@
   function icon(f){return '<span class="s" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor">'+ICON[f]+'</svg></span>';}
   function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
   function tagHtml(fam,label,tip){
-    return '<span class="tg t fam-'+fam+'" tabindex="0" role="button" data-label="'+esc(label)+'" data-tip="'+esc(tip)+'" aria-label="'+esc(label+': '+tip)+'">'+icon(fam)+esc(label)+'</span>';
+    return '<span class="tg t fam-'+fam+'" tabindex="0" role="button" data-key="'+esc(fam+':'+label)+'" data-label="'+esc(label)+'" data-tip="'+esc(tip)+'" aria-label="'+esc(label+': '+tip)+'">'+icon(fam)+esc(label)+'</span>';
   }
   var NOW=new Date(), YEAR=NOW.getUTCFullYear();
   var TODAY=new Date(NOW.getTime()-NOW.getTimezoneOffset()*6e4).toISOString().slice(0,10);   // local date
@@ -353,6 +367,7 @@
       ix.classList.add('t','fam-list'); ix.removeAttribute('title');
       ix.setAttribute('tabindex','0'); ix.setAttribute('role','button');
       ix.setAttribute('data-label',ix.textContent.trim()); ix.setAttribute('data-tip',tip);
+      ix.setAttribute('data-key','idx:'+({'S&P 500':'sp',NDX:'ndx',DOW:'dow',GLOBAL:'gl'})[label]);
       ix.setAttribute('aria-label',ix.textContent.trim()+': '+tip);
       ix.insertAdjacentHTML('afterbegin',icon('list'));
     });
@@ -413,7 +428,8 @@
   function show(el){
     cur=el;
     tip.style.setProperty('--tc',getComputedStyle(el).getPropertyValue('--c'));
-    tip.innerHTML='<b>'+esc(el.getAttribute('data-label'))+'</b>'+esc(el.getAttribute('data-tip'));
+    tip.innerHTML='<b>'+esc(el.getAttribute('data-label'))+'</b>'+esc(el.getAttribute('data-tip'))+filterLine(el);
+    tip.classList.toggle('pinned',pinned===el);
     tip.hidden=false;
     var r=el.getBoundingClientRect(), t=tip.getBoundingClientRect();
     var x=Math.min(Math.max(16,r.left+r.width/2-t.width/2),innerWidth-t.width-16);
@@ -421,6 +437,19 @@
     tip.style.left=x+'px'; tip.style.top=y+'px';
   }
   function hide(){tip.hidden=true; cur=null; pinned=null;}
+  // Stocks tab: how many reports share this tag, and, once the tooltip is pinned, a button that lists them
+  function sharing(k){
+    var box=document.getElementById('fam-stocks'); if(!box||!k) return 0;
+    return [].filter.call(box.querySelectorAll('.t[data-key]'),function(e){return e.getAttribute('data-key')===k;}).length;
+  }
+  function filterLine(el){
+    var k=el.getAttribute('data-key'), box=document.getElementById('fam-stocks');
+    if(!k||!box||!box.contains(el)||!window.TTG_filterTag) return '';
+    var n=sharing(k); if(n<2) return '';
+    var what=k.indexOf('idx:')===0?'reports in this index':'reports tagged '+esc(el.getAttribute('data-label'));
+    return pinned===el?'<button type="button" class="tip-go" data-key="'+esc(k)+'">Show all '+n+' '+what+'</button>'
+                      :'<span class="tip-hint">Click the tag to list all '+n+'.</span>';
+  }
   function tagOf(e){return e.target.closest && e.target.closest('.t[data-tip]');}
   document.addEventListener('mouseover',function(e){var el=tagOf(e); if(el&&!pinned) show(el);});
   document.addEventListener('mouseout',function(e){if(tagOf(e)&&!pinned){tip.hidden=true;cur=null;}});
@@ -429,6 +458,8 @@
   function toggleMore(m){ var box=m.parentNode, on=!box.classList.contains('all');
     box.classList.toggle('all',on); m.setAttribute('aria-expanded',on); m.textContent=on?'less':'+'+box.querySelectorAll('.x').length; }
   document.addEventListener('click',function(e){
+    var go=e.target.closest&&e.target.closest('.tip-go');
+    if(go){e.preventDefault(); e.stopPropagation(); var k=go.getAttribute('data-key'); hide(); window.TTG_filterTag(k); return;}
     var m=e.target.closest&&e.target.closest('.tg-more');
     if(m){e.preventDefault(); e.stopPropagation(); toggleMore(m); return;}
     var el=tagOf(e);
@@ -439,7 +470,10 @@
     var m=e.target.closest&&e.target.closest('.tg-more');
     if(m&&(e.key==='Enter'||e.key===' ')){e.preventDefault(); toggleMore(m); return;}
     var el=tagOf(e);
-    if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault(); if(pinned===el) hide(); else {pinned=el; show(el);}}
+    // Enter pins the tooltip; Enter again lists every report with the tag
+    if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();
+      if(pinned===el){ var k=el.getAttribute('data-key'); if(k&&sharing(k)>1&&window.TTG_filterTag&&document.getElementById('fam-stocks').contains(el)){hide(); window.TTG_filterTag(k);} else hide(); }
+      else {pinned=el; show(el);}}
     else if(e.key==='Escape') hide();
   });
   addEventListener('scroll',function(){if(!tip.hidden&&cur) show(cur);},{passive:true});
@@ -452,6 +486,7 @@
       var m=/r=([a-z0-9.\-]+)/.exec(card.getAttribute('href')||'');
       decorate(card,m?cards[m[1]]:null,m?nrs[m[1]]:null);
     });
+    if(window.TTG_refilter) window.TTG_refilter();
   }).catch(function(){
     [].forEach.call(document.querySelectorAll('.rep'),function(card){decorate(card,null);});
   });
