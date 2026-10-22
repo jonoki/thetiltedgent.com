@@ -167,3 +167,7 @@ Brief: `claude/briefs/BUILD_ASSETS.md` (its "Rules from the pilot checker rounds
    Any new or changed rule also goes into `claude/PITFALL_RULES.md` (the short file agents read).
 4. A genuinely new error class gets a new letter.
 5. Log the tally in the vault entry for the run.
+
+## M. Plain language (new class, 13 Oct 2026)
+
+Oki flagged NVDA's ownership card: "Ownership is therefore overwhelmingly index-driven: the marginal price-setter is an active fund trading a very small float slice against a very large passive base." A grep found the same habit in 18 more reports ("index-driven", "price-setter", "Index Complex" card titles, "reflexive", "register", "constituent"). Fixed wording only, each claim kept (rows in CORRECTIONS.md). The first draft of the fix itself overclaimed: "most shares are held by index funds" where the named top holders total 16–30% (MMM, COP, PFE, TRV, LRCX), and "settled" for DIS's 2024 proxy fight (decided by vote); the checker caught both. LRCX's "89% index-driven ownership" was its institutional share (F). Rule M added to PITFALL_RULES.md; CHECK.md step 6a reads the page as the Reader. Tally: M ×31, F ×1 (19 reports).
