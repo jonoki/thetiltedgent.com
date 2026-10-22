@@ -180,5 +180,26 @@ class ReportPage(unittest.TestCase):
             self.assertEqual(slugs(assets=True, archived=True), ['aapl', 'voo', 'skyd', 'wbd'])
 
 
+class WriteText(unittest.TestCase):
+    def test_replaces_the_file_whole_with_lf_and_leaves_no_temp_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'sub', 'out.json')
+            rl.write_text(path, 'first\n')
+            rl.write_text(path, 'a\nb\n')
+            with open(path, 'rb') as fh:
+                self.assertEqual(fh.read(), b'a\nb\n')
+            self.assertEqual(os.listdir(os.path.dirname(path)), ['out.json'])
+
+    def test_a_failed_write_keeps_the_old_file_and_removes_the_temp_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'out.txt')
+            rl.write_text(path, 'old\n')
+            with self.assertRaises(TypeError):
+                rl.write_text(path, None)   # type: ignore[arg-type]
+            with open(path, encoding='utf-8') as fh:
+                self.assertEqual(fh.read(), 'old\n')
+            self.assertEqual(os.listdir(d), ['out.txt'])
+
+
 if __name__ == '__main__':
     unittest.main()

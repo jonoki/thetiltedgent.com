@@ -18,6 +18,7 @@ from http.client import HTTPException
 from typing import Literal, TypedDict
 
 import repodata as rd
+import reportlib as rl
 from chart_audit import YAHOO_SYMBOL   # one slug -> Yahoo symbol map (BRK-B, 0700.HK ...) for the first-session move
 
 Date = datetime.date
@@ -171,8 +172,7 @@ def calendar_day(day: Date, today: Date, cache: str) -> list[Print]:
         if (today - day).days > RECHECK_DAYS:
             return parse_calendar(cached, day.isoformat())
     body = keep_known_times(get_json(NASDAQ_CAL.format(day=day.isoformat()), NASDAQ_HEADERS), cached)
-    with open(path, 'w', encoding='utf-8') as fh:
-        json.dump(body, fh)
+    rl.write_text(path, json.dumps(body))
     return parse_calendar(body, day.isoformat())
 
 

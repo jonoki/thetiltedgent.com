@@ -20,6 +20,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MIN_PYTHON = (3, 11)   # typing.NotRequired, datetime.UTC
+CHECK_TIMEOUT = 1200   # seconds per check; a hung check fails instead of blocking the push
 
 CHECKS = [
     ('tools unit tests', [sys.executable, '-m', 'unittest', 'discover', '-s', 'tools/tests', '-t', 'tools']),
@@ -54,7 +55,13 @@ def main() -> int:
         if why:
             skipped.append(f'{name}: {why}')
             continue
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace')
+        try:
+            r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                               timeout=CHECK_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            print(f'FAIL {name}: did not finish within {CHECK_TIMEOUT} s')
+            failed.append(name)
+            continue
         out = (r.stdout + r.stderr).strip().splitlines()
         print(f"{'ok  ' if r.returncode == 0 else 'FAIL'} {name}: {out[-1] if out else ''}")
         if r.returncode:

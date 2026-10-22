@@ -8,11 +8,13 @@ title format, a renamed price class) is made once rather than in four scripts th
 import html as htmllib
 import os
 import re
+import time
 from typing import Final, TypedDict
 
 
 # The header price must equal the chart's last point, to the cent: the rule every build and refresh is held to.
 PRICE_EXACT = 0.006
+REPLACE_TRIES = 10   # write_text: attempts at the final replace, 0.2 s apart
 # A looser reconciliation for the manifest: chart series are often rounded (1 dp, or whole dollars on a
 # four-figure price), so a stored series is only flagged when it misses by more than 5 cents and 0.1%.
 PRICE_ROUNDED_ABS, PRICE_ROUNDED_REL = 0.05, 0.001
@@ -35,10 +37,26 @@ def read_text(path: str) -> str:
 
 
 def write_text(path: str, text: str) -> None:
-    """Write text as UTF-8 with LF line endings (the repo's rule), creating the folder if needed."""
+    """Write text as UTF-8 with LF line endings (the repo's rule), creating the folder if needed. Atomic: the text
+    goes to a temp file beside the target, which then replaces it, so a reader (or a run killed mid-write) never
+    sees half a file. Windows refuses the replace while another process has the target open; that is retried
+    for up to about 2 s."""
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(text)
+    tmp = f'{path}.{os.getpid()}.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(text)
+        for attempt in range(REPLACE_TRIES):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == REPLACE_TRIES - 1:
+                    raise
+                time.sleep(0.2)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def normalize_dashes(s: str) -> str:

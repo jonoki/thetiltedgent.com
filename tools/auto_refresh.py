@@ -308,8 +308,7 @@ def claude(agent: str, prompt: str, wt: str, log: str, model: str | None = None)
         res = json.loads(out[out.index('{'):]) if '{' in out else {'is_error': True, 'result': out + p.stderr}
     except (subprocess.TimeoutExpired, ValueError) as e:
         res = {'is_error': True, 'result': f'{type(e).__name__}: {e}'}
-    with open(log, 'w', encoding='utf-8') as fh:
-        json.dump(res, fh, indent=1)
+    rl.write_text(log, json.dumps(res, indent=1))
     return res
 
 
@@ -451,7 +450,7 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: b
 
 def main_checkout() -> str:
     common = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=rd.ROOT,
-                            capture_output=True, text=True, check=True).stdout.strip()
+                            capture_output=True, text=True, check=True, timeout=60).stdout.strip()
     return os.path.dirname(common)
 
 
@@ -540,8 +539,11 @@ def alert(main: str, text: str) -> None:
     with open(path, 'a', encoding='utf-8', newline='\n') as fh:
         fh.write(f"{datetime.datetime.now().isoformat(timespec='minutes')} auto_refresh failed: {text}\n")
     if os.name == 'nt':
-        subprocess.run(['msg', os.environ.get('USERNAME', '*'), '/TIME:0', f'TTG auto refresh failed: {text[:200]}'],
-                       capture_output=True)
+        try:   # ALERT.txt is written; the pop-up is a courtesy and must not hide the failure it reports
+            subprocess.run(['msg', os.environ.get('USERNAME', '*'), '/TIME:0', f'TTG auto refresh failed: {text[:200]}'],
+                           capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f'alert: Windows message not sent ({type(e).__name__}: {e})', file=sys.stderr)
 
 
 def prepare(main: str, base: str) -> str:

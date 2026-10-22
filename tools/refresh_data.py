@@ -156,8 +156,7 @@ def nasdaq(kind: str, url: str, sym: str, today: datetime.date) -> tuple[Json, s
     path = _cache(f'{sym}.{kind}.{today.isoformat()}.json')
     if not os.path.exists(path):
         body = rq.get_json(url, rq.NASDAQ_HEADERS)
-        with open(path, 'w', encoding='utf-8') as fh:
-            json.dump(body, fh)
+        rl.write_text(path, json.dumps(body))
     with open(path, encoding='utf-8') as fh:
         return json.load(fh), _stamp(path)
 

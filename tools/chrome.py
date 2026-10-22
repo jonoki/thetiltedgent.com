@@ -216,8 +216,11 @@ def main(argv: list[str] | None = None) -> int | str:
             print('updated' if write_chrome(path, active, has_footer, repo) else 'unchanged', path)
         except (ValueError, OSError) as e:
             return str(e)
-    built = subprocess.run([sys.executable, os.path.join(repo, 'tables', 'build_tables.py')],
-                           capture_output=True, text=True, encoding='utf-8')
+    try:
+        built = subprocess.run([sys.executable, os.path.join(repo, 'tables', 'build_tables.py')],
+                               capture_output=True, text=True, encoding='utf-8', timeout=600)
+    except subprocess.TimeoutExpired:
+        return 'tables/build_tables.py did not finish within 600 s'
     print(built.stdout.strip())
     return built.returncode and (built.stderr.strip() or f'tables/build_tables.py exited {built.returncode}')
 
