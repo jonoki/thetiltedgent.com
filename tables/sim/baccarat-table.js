@@ -7,7 +7,7 @@ window.BaccaratTable = (function () {
   var BE = window.BaccaratEngine, EB = window.TtgEdgeBands;
   var DEFAULTS = { tiePays: 8, max: 1000, start: 1000, bank: 1000, rebet: true, chip: 25 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-bct') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
-  function save(s) { try { localStorage.setItem('ttg-bct', JSON.stringify(s)); } catch (e) {} }
+  function save(s) { try { localStorage.setItem('ttg-bct', JSON.stringify(s)); } catch (e) { /* storage blocked (private mode): settings last this visit only */ } }
 
   var CHIPS = [1, 5, 25, 100, 500];
   var ORDER = ['banker', 'player', 'tie', 'ppair', 'bpair'];

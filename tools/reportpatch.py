@@ -28,9 +28,6 @@ class PatchError(ValueError):
         self.page, self.field, self.why = page, field, why
 
 
-MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
-               'November', 'December']
 WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 MINUS = '\u2212'   # the library's minus sign
 
@@ -131,14 +128,14 @@ def set_header_change(t: str, change: float, pct: float, page: str = '',
 
 # ---------- dates ----------
 
-_MONTH_RE = '|'.join(FULL_MONTHS + ['Sept'] + MON3)
+_MONTH_RE = '|'.join(rl.FULL_MONTHS + ['Sept'] + rl.MON3)
 _WDAY_RE = '|'.join(WEEKDAYS)
 
 
 def _date_pattern(iso: str) -> re.Pattern[str]:
     """'2026-09-18' -> 'September 18, 2026' / 'Sep 18, 2026' / 'Sept. 18, 2026', any case."""
     d = datetime.date.fromisoformat(iso)
-    names = [FULL_MONTHS[d.month - 1], MON3[d.month - 1]] + (['Sept'] if d.month == 9 else [])
+    names = [rl.FULL_MONTHS[d.month - 1], rl.MON3[d.month - 1]] + (['Sept'] if d.month == 9 else [])
     return re.compile(r'\b(' + '|'.join(names) + r')(\.?) ' + str(d.day) + r', ' + str(d.year) + r'\b', re.I)
 
 
@@ -147,7 +144,7 @@ def render_date(iso: str, like: str, full_if_may: bool = False) -> str:
     full_if_may decides it."""
     d = datetime.date.fromisoformat(iso)
     full = len(like.rstrip('.')) > 4 or like.lower() in ('june', 'july') or (like.lower() == 'may' and full_if_may)
-    name = FULL_MONTHS[d.month - 1] if full else MON3[d.month - 1]
+    name = rl.FULL_MONTHS[d.month - 1] if full else rl.MON3[d.month - 1]
     text = f'{name} {d.day}, {d.year}'
     return text.upper() if like.isupper() and len(like) > 1 else text
 
@@ -216,7 +213,7 @@ class PointLabel(NamedTuple):
 _LABEL_MONTH = re.compile(r"^(?P<mon>[A-Z][a-z]{2})(?P<sep>\s*'|\s+|-)(?P<yr>\d{4}|\d{2})(?P<suf>\*?)$")
 _LABEL_MON_DAY = re.compile(r"^(?P<mon>[A-Z][a-z]{2}) (?P<d>\d{1,2})(?P<sep>,? '?|,? )(?P<yr>\d{4}|\d{2})(?P<suf>.*)$")
 _LABEL_DAY_MON = re.compile(r"^(?P<d>\d{1,2}) (?P<mon>[A-Z][a-z]{2})(?P<sep> '?)(?P<yr>\d{4}|\d{2})(?P<suf>.*)$")
-_MON_INDEX = {m: i + 1 for i, m in enumerate(MON3)}
+_MON_INDEX = {m: i + 1 for i, m in enumerate(rl.MON3)}
 
 
 def point_label(s: str) -> PointLabel | None:
@@ -239,7 +236,7 @@ def point_label(s: str) -> PointLabel | None:
 def format_label(style: LabelStyle, year: int, month: int, day: int | None = None) -> str:
     """A label for (year, month[, day]) in style; a month style given a day writes the month only."""
     yr = f'{year % 100:02d}' if style.year_digits == 2 else str(year)
-    mon = MON3[month - 1]
+    mon = rl.MON3[month - 1]
     if style.kind == 'mon-day' and day:
         return f'{mon} {day}{style.sep}{yr}{style.suffix}'
     if style.kind == 'day-mon' and day:
@@ -498,7 +495,6 @@ def shift_events(t: str, k: int, page: str = '') -> tuple[str, int, list[dict]]:
 
 # ---------- metrics table ----------
 
-_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
 _CELL = re.compile(r'<(t[dh])([^>]*)>(.*?)</t[dh]>', re.S)
 
 
@@ -513,7 +509,7 @@ def fin_cells(t: str, label: str) -> list[tuple[int, int, str]]:
     matches the regex label (re.match, any case)."""
     out = []
     for a, b in _fin_regions(t):
-        for row in _ROW.finditer(t, a, b):
+        for row in rl.TABLE_ROW.finditer(t, a, b):
             cells = list(_CELL.finditer(row.group(1)))
             if len(cells) < 2 or cells[1].group(1) != 'td':
                 continue
@@ -529,7 +525,7 @@ def fin_row_texts(t: str, label: str) -> list[str] | None:
     not exactly one such row."""
     hits = []
     for a, b in _fin_regions(t):
-        for row in _ROW.finditer(t, a, b):
+        for row in rl.TABLE_ROW.finditer(t, a, b):
             cells = [re.sub(r'\s+', ' ', rl.strip_tags(c.group(3))) for c in _CELL.finditer(row.group(1))]
             if len(cells) >= 2 and re.match(label, cells[0], re.I):
                 hits.append(cells)

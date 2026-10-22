@@ -7,7 +7,7 @@ window.TcpTable = (function () {
   var TE = window.TcpEngine;
   var DEFAULTS = { bonus: '541', pp: '40-30-6-3-1', max: 1000, start: 1000, bank: 1000, same: true, chip: 5 };
   function load() { try { var s = JSON.parse(localStorage.getItem('ttg-tcp') || 'null'); return Object.assign({}, DEFAULTS, s || {}); } catch (e) { return Object.assign({}, DEFAULTS); } }
-  function save(s) { try { localStorage.setItem('ttg-tcp', JSON.stringify(s)); } catch (e) {} }
+  function save(s) { try { localStorage.setItem('ttg-tcp', JSON.stringify(s)); } catch (e) { /* storage blocked (private mode): settings last this visit only */ } }
 
   var CHIPS = [1, 5, 25, 100, 500];
   var SUIT_NAME = ['spades', 'hearts', 'diamonds', 'clubs'];

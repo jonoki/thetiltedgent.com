@@ -16,7 +16,7 @@
       var p=new URLSearchParams(location.search);
       if(f==='stocks') p.delete('f'); else { p=new URLSearchParams(); p.set('f',f); }
       var qs=p.toString();
-      try{history.replaceState(null,'',location.pathname+(qs?'?'+qs:''));}catch(e){}
+      try{history.replaceState(null,'',location.pathname+(qs?'?'+qs:''));}catch(e){ /* sandboxed frame or file://: the address bar just doesn't update */ }
     }
   }
   tabs.forEach(function(t,i){
@@ -228,7 +228,7 @@
     if(st.idx) p.push('x='+st.idx);
     if(st.sort!==DEF) p.push('sort='+st.sort);
     if(st.sector!=='all') p.push('s='+st.sector);
-    try{history.replaceState(null,'',location.pathname+(p.length?'?'+p.join('&'):''));}catch(e){}
+    try{history.replaceState(null,'',location.pathname+(p.length?'?'+p.join('&'):''));}catch(e){ /* sandboxed frame or file://: the address bar just doesn't update */ }
   }
 
   // ---- wiring

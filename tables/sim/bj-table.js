@@ -12,7 +12,7 @@ window.BJTable = (function () {
   var DEFAULTS = { decks: 6, h17: true, das: true, surrender: true, penetration: 0.75, bots: 2, seat: 'last', speed: 500, mode: 'play',
                    unit: 25, showCount: false, showAdvice: false, useIndex: false, autoNext: true, system: 'hilo', bustRemove: 2000, rcEvery: 0, tcEvery: 0, bankroll: 1000, startBankroll: 1000, bonus: 'none', mainChips: [], bonusChips: [], unitSize: 10, rampBets: true };
   function loadSettings() { try { var s = JSON.parse(localStorage.getItem('ttg-bjt') || 'null'); return s ? Object.assign({}, DEFAULTS, s) : Object.assign({}, DEFAULTS); } catch (e) { return Object.assign({}, DEFAULTS); } }
-  function saveSettings(s) { try { localStorage.setItem('ttg-bjt', JSON.stringify(s)); } catch (e) {} }
+  function saveSettings(s) { try { localStorage.setItem('ttg-bjt', JSON.stringify(s)); } catch (e) { /* storage blocked (private mode): settings last this visit only */ } }
 
   function mount(sel) {
     var root = typeof sel === 'string' ? document.querySelector(sel) : sel; if (!root) return;

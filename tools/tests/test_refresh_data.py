@@ -293,7 +293,7 @@ class FixPoints(unittest.TestCase):
                          ('close', 3, {'no Yahoo month': ['Jun 22'], 'basis step': ['Mar 22']}))
 
     def test_a_labelled_dividend_adjusted_series_is_compared_with_adjclose(self):
-        labels = [f'{rdt.rp.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
+        labels = [f'{rl.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
         prices = [t_adj(y, m) for y, m in self.MONTHS]
         prices[2] = t_close(2022, 6)          # one point on the close: wrong for an adjusted series
         got = self.fix(labels, prices, labelled=True)
@@ -303,7 +303,7 @@ class FixPoints(unittest.TestCase):
         self.assertIsNone(got['note'])
 
     def test_an_unlabelled_adjusted_series_is_put_on_the_close(self):
-        labels = [f'{rdt.rp.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
+        labels = [f'{rl.MON3[m - 1]} {y % 100}' for y, m in self.MONTHS]
         prices = [t_adj(y, m) for y, m in self.MONTHS]
         got = self.fix(labels, prices, labelled=False)
         self.assertEqual((got['basis'], len(got['fixed'])), ('close', 12))

@@ -60,7 +60,7 @@
         }
       });
       if(found.length) attach(doc,found);
-    }catch(e){}
+    }catch(e){ console.warn('tips: label tooltips skipped on this report', e); }
   }
 
   function attach(doc,found){

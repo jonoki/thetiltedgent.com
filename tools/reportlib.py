@@ -8,19 +8,23 @@ title format, a renamed price class) is made once rather than in four scripts th
 import html as htmllib
 import os
 import re
+import time
 from typing import Final, TypedDict
 
 
 # The header price must equal the chart's last point, to the cent: the rule every build and refresh is held to.
 PRICE_EXACT = 0.006
+REPLACE_TRIES = 10   # write_text: attempts at the final replace, 0.2 s apart
 # A looser reconciliation for the manifest: chart series are often rounded (1 dp, or whole dollars on a
 # four-figure price), so a stored series is only flagged when it misses by more than 5 cents and 0.1%.
 PRICE_ROUNDED_ABS, PRICE_ROUNDED_REL = 0.05, 0.001
 
-_FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December']
-MONTHS = {m: i + 1 for i, m in enumerate(_FULL_MONTHS)}
-MONTHS.update({m[:3]: i + 1 for i, m in enumerate(_FULL_MONTHS)})   # 'Aug 12, 2026'
+FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December']
+MON3 = [m[:3] for m in FULL_MONTHS]                                    # 'Jan' ... 'Dec'
+MON = {m.lower(): i + 1 for i, m in enumerate(MON3)}                  # 'jan' -> 1, for lower-cased input
+MONTHS = {m: i + 1 for i, m in enumerate(FULL_MONTHS)}
+MONTHS.update({m: i + 1 for i, m in enumerate(MON3)})   # 'Aug 12, 2026'
 MONTHS['Sept'] = 9
 
 _DASHES = str.maketrans({'\u2212': '-', '\u2013': '-', '\u2014': '-'})   # minus sign, en dash, em dash
@@ -35,10 +39,26 @@ def read_text(path: str) -> str:
 
 
 def write_text(path: str, text: str) -> None:
-    """Write text as UTF-8 with LF line endings (the repo's rule), creating the folder if needed."""
+    """Write text as UTF-8 with LF line endings (the repo's rule), creating the folder if needed. Atomic: the text
+    goes to a temp file beside the target, which then replaces it, so a reader (or a run killed mid-write) never
+    sees half a file. Windows refuses the replace while another process has the target open; that is retried
+    for up to about 2 s."""
     os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
-    with open(path, 'w', encoding='utf-8', newline='\n') as fh:
-        fh.write(text)
+    tmp = f'{path}.{os.getpid()}.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(text)
+        for attempt in range(REPLACE_TRIES):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == REPLACE_TRIES - 1:
+                    raise
+                time.sleep(0.2)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
 
 
 def normalize_dashes(s: str) -> str:
@@ -189,7 +209,7 @@ def indicator_range(t: str) -> list[float] | None:
     return [lo, hi] if lo is not None and hi is not None else None
 
 
-_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
+TABLE_ROW = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
 _CELL = re.compile(r'<(t[dh])[^>]*>(.*?)</t[dh]>', re.S)
 
 
@@ -199,7 +219,7 @@ def table_rows(t: str) -> list[tuple[str, str]]:
     because metrics labels are often split into tooltip spans ("<span>EPS</span> (<span>TTM</span>)"), and
     whitespace is collapsed. The one reader of report tables: manifest.py, verify.py and style_tags.py use it."""
     rows = []
-    for row in _ROW.findall(t):
+    for row in TABLE_ROW.findall(t):
         cells = _CELL.findall(row)
         if len(cells) >= 2 and cells[1][0] == 'td':
             label, value = (re.sub(r'\s+', ' ', strip_tags(body)) for _, body in cells[:2])
