@@ -541,19 +541,33 @@ else:
         fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
 
 
+# A Windows notification, not a message box: a box takes focus (and out of a full-screen game); a notification waits in
+# the notification centre and Windows holds it back while a game runs (Oki, 25 Oct 2026). PowerShell's app id is one
+# Windows already knows, so nothing is registered. The text travels in environment variables, never in the script.
+TOAST_APP = r'{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+TOAST_PS = ("[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType=WindowsRuntime] "
+            "> $null; $x = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent("
+            "[Windows.UI.Notifications.ToastTemplateType]::ToastText02); $t = $x.GetElementsByTagName('text'); "
+            "$t.Item(0).AppendChild($x.CreateTextNode($env:TTG_TITLE)) > $null; "
+            "$t.Item(1).AppendChild($x.CreateTextNode($env:TTG_BODY)) > $null; "
+            f"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{TOAST_APP}')"
+            ".Show([Windows.UI.Notifications.ToastNotification]::new($x))")
+
+
 def alert(main: str, text: str) -> None:
     """Make a failed run impossible to miss: tasks/queue/ALERT.txt (refresh_queue.py puts it at the top of today.md)
-    and a Windows message to the logged-on user."""
+    and a Windows notification to the logged-on user."""
     path = os.path.join(main, 'tasks', 'queue', 'ALERT.txt')
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'a', encoding='utf-8', newline='\n') as fh:
         fh.write(f"{datetime.datetime.now().isoformat(timespec='minutes')} auto_refresh failed: {text}\n")
     if os.name == 'nt':
-        try:   # ALERT.txt is written; the pop-up is a courtesy and must not hide the failure it reports
-            subprocess.run(['msg', os.environ.get('USERNAME', '*'), '/TIME:0', f'TTG auto refresh failed: {text[:200]}'],
-                           capture_output=True, timeout=30)
+        try:   # ALERT.txt is written; the notification is a courtesy and must not hide the failure it reports
+            subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', TOAST_PS], capture_output=True,
+                           timeout=30, creationflags=subprocess.CREATE_NO_WINDOW,
+                           env={**os.environ, 'TTG_TITLE': 'TTG auto refresh failed', 'TTG_BODY': text[:200]})
         except (OSError, subprocess.TimeoutExpired) as e:
-            print(f'alert: Windows message not sent ({type(e).__name__}: {e})', file=sys.stderr)
+            print(f'alert: Windows notification not sent ({type(e).__name__}: {e})', file=sys.stderr)
 
 
 def prepare(main: str, base: str) -> str:
