@@ -86,6 +86,7 @@ ADJ_LABEL = re.compile(r'(?i)dividend[- ]adjusted|adjusted (close|price)')   # t
 # ...unless the phrase is negated ("not dividend-adjusted", "rather than adjusted closes"), which says the opposite
 ADJ_NEGATED = re.compile(r'(?i)(\bnot|\bnever|\bnor|\bno|\brather than|\binstead of|\bun)[\s,;:(-]*(\w+[\s,]+){0,2}$')
 MIN_COMPARABLE = 30       # fewer comparable points than this usually means the labels did not parse
+DST_MARGIN_S = 6 * 3600   # monthly_closes: past a daylight-saving hour, short of the next day
 MAX_LISTED = 60
 CENTURY = 2000          # two-digit chart years ('Sep '21') are 20xx
 
@@ -180,10 +181,13 @@ Splits = list[tuple[str, float]]                              # (ISO date, ratio
 def monthly_closes(res: dict) -> Monthly:
     """{(year, month): (close, adjclose)} from one Yahoo chart result; months without a close are left out. Rows
     come oldest first and a later row of the same month replaces an earlier one, so a daily result gives each
-    month's last trading day."""
+    month's last trading day. A monthly bar is stamped at local midnight on the 1st, but gmtoffset is the exchange's
+    offset today, so a summer bar read in winter lands an hour early, on the last day of the month before (Paris and
+    Stockholm after 25 Oct 2026); reading every bar 6 hours later keeps it on the 1st under either offset, and a
+    daily bar (stamped at the open or the latest trade) stays on its own day."""
     closes = res['indicators']['quote'][0].get('close') or []
     adj = ((res['indicators'].get('adjclose') or [{}])[0].get('adjclose')) or [None] * len(closes)
-    offset = res['meta'].get('gmtoffset') or 0
+    offset = (res['meta'].get('gmtoffset') or 0) + DST_MARGIN_S
     monthly = {}
     for ts, c, a in zip(res.get('timestamp') or [], closes, adj):
         if c is not None:

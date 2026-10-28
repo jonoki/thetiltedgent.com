@@ -58,6 +58,19 @@ class ChartAudit(unittest.TestCase):
                 with self.assertRaises(chart_audit.YahooError):
                     chart_audit.read_series(p)
 
+    def test_summer_bars_stay_in_their_month_under_the_winter_offset(self):
+        # Paris in November: gmtoffset +1h, but the June bar was stamped at local midnight under +2h (22:00 UTC, May 31)
+        bars = [datetime.datetime(2026, 5, 31, 22, tzinfo=datetime.UTC), datetime.datetime(2026, 6, 30, 22, tzinfo=datetime.UTC),
+                datetime.datetime(2026, 10, 31, 23, tzinfo=datetime.UTC), datetime.datetime(2026, 11, 3, 16, 30, tzinfo=datetime.UTC)]
+        res = {'meta': {'gmtoffset': 3600}, 'timestamp': [int(b.timestamp()) for b in bars],
+               'indicators': {'quote': [{'close': [1.0, 2.0, 3.0, 4.0]}]}}
+        self.assertEqual(chart_audit.monthly_closes(res),
+                         {(2026, 6): (1.0, None), (2026, 7): (2.0, None), (2026, 11): (4.0, None)})   # Nov's bar, then today's
+        # New York after 1 Nov: gmtoffset -5h, the October bar stamped at midnight EDT (04:00 UTC)
+        res = {'meta': {'gmtoffset': -18000}, 'timestamp': [int(datetime.datetime(2026, 10, 1, 4, tzinfo=datetime.UTC).timestamp())],
+               'indicators': {'quote': [{'close': [5.0]}]}}
+        self.assertEqual(chart_audit.monthly_closes(res), {(2026, 10): (5.0, None)})
+
     def test_a_corrupt_empty_or_stale_cache_is_fetched_again(self):
         fresh = self.yahoo_json([(2026, 8), (2026, 9)])
         fetched = []
