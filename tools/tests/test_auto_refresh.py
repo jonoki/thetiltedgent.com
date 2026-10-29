@@ -57,6 +57,9 @@ class Prompts(unittest.TestCase):
         self.assertEqual(ar.built_tier('no tier line', 'T2'), 'T2')
         self.assertIn('no &&', ar.ONE_COMMAND)
         self.assertEqual(ar.pitfall_lines('Result\nPITFALLS: F:x; G:y\nSources'), ['PITFALLS: F:x; G:y'])
+        listed = 'Fixed.\n\n**PITFALLS:**\n\n- D: cut quote\n- F: FCF > OCF\n\nSources: x'   # PNC, 19 Oct 2026
+        self.assertEqual(ar.pitfall_lines(listed), ['**PITFALLS:** · D: cut quote · F: FCF > OCF'])
+        self.assertEqual(ar.pitfall_lines('PITFALLS:\nnone this time'), ['PITFALLS:'])
 
 
 class DataLayer(unittest.TestCase):

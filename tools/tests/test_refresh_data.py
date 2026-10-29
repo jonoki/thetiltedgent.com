@@ -92,6 +92,9 @@ class Computations(unittest.TestCase):
         self.assertEqual(rdt.yield_formula('$0.60 annualised ÷ $25.07. Reinstated at $0.15'), (0.6, 25.07))
         self.assertEqual(rdt.yield_formula('$1.16 × 4 = $4.64 ÷ $1,277.61'), (4.64, 1277.61))
         self.assertIsNone(rdt.yield_formula('Token; buybacks instead.'))
+        payout_first = 'Payout $2.24 ÷ $15.71 EPS = 14%; yield $2.24 a year ÷ $271.79'   # NUE-style cell
+        self.assertEqual(rdt.yield_formula(payout_first, 271.79), (2.24, 271.79))
+        self.assertEqual(rdt.yield_formula(payout_first, 268.10), (2.24, 271.79))   # an old price is still found
         self.assertEqual(rdt.cell_number('24.1x'), (24.1, 1))
         self.assertEqual(rdt.cell_number('99.9× (GAAP)'), (99.9, 1))
         self.assertEqual(rdt.cell_number('2.39%'), (2.39, 2))
@@ -328,6 +331,37 @@ SPIN = ('2026-10-01', 6.665)
 SPIN_SPLITS = [SPIN]
 SPIN_DAYS = bars({'2026-07-31': 10.00, '2026-08-28': 9.50, '2026-08-31': 9.60, '2026-09-30': 9.80,
                   '2026-10-01': 13.10, '2026-10-02': 13.40})
+
+
+class DeclaredCloseStep(unittest.TestCase):
+    """A corporate action Yahoo backs into its close with no split event (EL.PA: 6 May 2024, x1.0219298)."""
+    DAYS = bars({'2024-03-28': 100.00, '2024-04-30': 98.00, '2024-05-31': 99.00})
+
+    def fix(self, steps, prices):
+        with mock.patch.dict(rdt.ca.CLOSE_STEPS, {'x': steps}):
+            splits = rdt.ca.with_close_steps('x', [])
+        return rdt.fix_points(['Mar 24', 'Apr 24', 'May 24'], prices, [0, 1, 2], self.DAYS, 1.0, splits,
+                              '2026-10-29', False, 'u')
+
+    def test_declared_the_real_closes_are_basis_steps(self):
+        prices = [102.19, 100.15, 99.00]   # the exchange's closes: Yahoo's x1.0219298 before the step
+        got = self.fix([('2024-05-06', 1.0219298)], prices)
+        self.assertEqual((got['fixed'], prices, got['skipped']), ([], [102.19, 100.15, 99.0],
+                                                                  {'basis step': ['Mar 24', 'Apr 24']}))
+
+    def test_undeclared_they_are_pulled_down_to_yahoo(self):   # what the declaration prevents (23-24 Oct 2026)
+        prices = [102.19, 100.15, 99.00]
+        self.fix([], prices)
+        self.assertEqual(prices, [100.0, 98.0, 99.0])
+
+    def test_a_real_half_cent_close_is_not_fixed(self):   # IBE.MC, 28 Oct 2026: round(10.2150001, 2) = 10.22
+        days = bars({'2024-03-28': 10.2150001})
+        for page in (10.215, 10.22, 10.21):   # the real close and either rounding of it
+            prices = [page]
+            got = rdt.fix_points(['Mar 24'], prices, [0], days, 1.0, [], '2026-10-29', False, 'u')
+            self.assertEqual((got['fixed'], prices), ([], [page]))
+        prices = [10.23]
+        self.assertEqual(len(rdt.fix_points(['Mar 24'], prices, [0], days, 1.0, [], '2026-10-29', False, 'u')['fixed']), 1)
 
 
 class DeclaredSpinOff(unittest.TestCase):

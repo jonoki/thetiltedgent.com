@@ -277,7 +277,23 @@ def data_layer_cmd(slug: str, out: str, post: bool = False, check: bool = False)
 
 
 def pitfall_lines(text: str) -> list[str]:
-    return [ln.strip() for ln in text.splitlines() if 'PITFALLS:' in ln]
+    """The checker's PITFALLS lines. When the tags follow a bare header as a bulleted list, the list is joined onto
+    the header with ' · ' (12 checker returns lost theirs to the header line alone in Oct 2026)."""
+    lines = text.splitlines()
+    out = []
+    for n, ln in enumerate(lines):
+        if 'PITFALLS:' not in ln:
+            continue
+        tags: list[str] = []
+        if not ln.split('PITFALLS:', 1)[1].strip(' *'):
+            for nxt in lines[n + 1:]:
+                m = re.match(r'\s*[-*•]\s+(.*)', nxt)
+                if not m and (tags or nxt.strip()):
+                    break
+                if m:
+                    tags.append(m.group(1).strip())
+        out.append(' · '.join([ln.strip(), *tags]) if tags else ln.strip())
+    return out
 
 
 def built_tier(text: str, queued: str) -> str:

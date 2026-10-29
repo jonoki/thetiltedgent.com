@@ -315,10 +315,14 @@ def yield_basis(cell_value: float, decimals: int, price: float, div: Json) -> st
 _FORMULA = re.compile(r'\$(\d+(?:\.\d+)?)[^÷$]{0,40}÷\s*\$([\d,]+\.\d+)')
 
 
-def yield_formula(context: str) -> tuple[float, float] | None:
-    """(dividend, price) from a yield context cell that shows its sum: '$0.60 annualised ÷ $25.07'."""
-    m = _FORMULA.search(context)
-    return (float(m.group(1)), float(m.group(2).replace(',', ''))) if m else None
+def yield_formula(context: str, price: float | None = None) -> tuple[float, float] | None:
+    """(dividend, price) from a yield context cell that shows its sum: '$0.60 annualised ÷ $25.07'. With the page's
+    price, the sum whose divisor is nearest it, so a payout sum in the same cell ('$2.24 ÷ $15.71 EPS') is not read
+    as the yield (PEP, GM, NUE, Oct 2026); without, the first."""
+    sums = [(float(m.group(1)), float(m.group(2).replace(',', ''))) for m in _FORMULA.finditer(context)]
+    if price is not None and sums:
+        return min(sums, key=lambda s: abs(s[1] - price))
+    return sums[0] if sums else None
 
 
 # ---------- the chart ----------
@@ -470,7 +474,7 @@ def fix_points(labels: list[str], prices: list[float], idxs: list[int], days: li
             continue
         compared += 1
         new = round(ref, 2)
-        if abs(v - new) >= CENT:
+        if abs(v - ref) > CENT + 1e-6:   # against the source itself: a real 10.215 is not "fixed" to round(10.2150001, 2)
             fixed.append({'month': labels[i], 'date': me.date, 'old': v, 'new': new, 'source': source,
                           'basis': 'Yahoo adjclose (dividend-adjusted)' if adjusted else 'Yahoo close (split-adjusted)'})
             prices[i] = new
@@ -620,6 +624,7 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
         raise ChartError('the page has no readable as-of date or header price')
     if as_of < old['as_of']:
         raise ChartError(f"as-of {as_of} is before the page's own {old['as_of']}")
+    daily = daily._replace(splits=ca.with_close_steps(slug, daily.splits))   # declared Yahoo basis steps (EL.PA)
     factor = ca.splits_after(daily.splits, as_of)
     days = [d for d in daily.days if d.date <= as_of]
     end = days[-1] if days else None
@@ -788,7 +793,7 @@ def build(slug: str, t: str, daily: Daily, as_of: str, bench: dict[str, Daily | 
     # dividend yield on the page's own basis
     yrow = rp.fin_row_texts(t, YIELD_LABEL)
     ycell = cell_number(yrow[1]) if yrow else None
-    formula = yield_formula(yrow[-1]) if yrow else None
+    formula = yield_formula(yrow[-1], old['price']) if yrow else None
     ybasis: str | None = None
     amount: float | None = None
     if formula and abs(formula[1] - old['price']) < rl.PRICE_EXACT:
@@ -1015,7 +1020,7 @@ def postpass(slug: str, repo: str, out: str, check_only: bool) -> int:
             fails.append(f'P/E {pe_now[0]} shown but the EPS cell is not a positive number ({eps_cells and eps_cells[1]!r})')
         yrow = rp.fin_row_texts(new, YIELD_LABEL)
         ycell = cell_number(yrow[1]) if yrow else None
-        formula = yield_formula(yrow[-1]) if yrow else None
+        formula = yield_formula(yrow[-1], price) if yrow else None
         if formula and ycell:
             if abs(formula[1] - price) >= rl.PRICE_EXACT:
                 fails.append(f'the yield context still divides by ${formula[1]} (header ${price})')

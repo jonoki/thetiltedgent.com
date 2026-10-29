@@ -77,6 +77,13 @@ LAUNCH = {'etf/arti': (2024, 3)}
 # every prior-edition month-end x 6.665 = Yahoo's real close to the cent (refresh builder, 9 Oct 2026). Oki, 9 Oct 2026.
 SPINOFFS: dict[str, tuple[str, float]] = {'ctva': ('2026-10-01', 6.665)}
 SPIN_LABEL = re.compile(r'(?i)spin(-?off)?[- ]adjusted')   # the page says its chart is on the post-spin basis
+# Corporate actions Yahoo backs into its close with no split event (Oki, 29 Oct 2026): {slug: [(ISO date, factor)]}.
+# Before the date a real close sits the factor above Yahoo's, as for a small spin, so both this audit and
+# refresh_data add them to Yahoo's splits (with_close_steps) and a chart of the real closes is a basis step, never
+# "fixed" down. Declare one only from Yahoo's daily closes against the exchange's, with the action that explains it.
+CLOSE_STEPS: dict[str, list[tuple[str, float]]] = {
+    'essilor': [('2024-05-06', 1.0219298)],   # EUR 3.95 dividend payable in shares at EUR 180.12: 1 + 3.95/180.12
+}
 
 TOLERANCE = 0.03          # a point is wrong beyond 3% of both Yahoo's close and its adjusted close
 # Spin-offs and capital returns book on Yahoo as small fractional "splits"; 3:2 and up are real splits.
@@ -256,6 +263,11 @@ def monthly_series(slug: str, ticker: str, as_of: str | None) -> tuple[Monthly, 
     return ({ym: v for ym, v in monthly.items() if ym >= launch} if launch else monthly), splits
 
 
+def with_close_steps(slug: str, splits: Splits) -> Splits:
+    """Yahoo's splits plus the report's declared CLOSE_STEPS, oldest first."""
+    return sorted(splits + CLOSE_STEPS.get(slug, []))
+
+
 def splits_after(splits: Splits, as_of: str | None) -> float:
     """Product of the splits dated after the as-of: Yahoo's closes are adjusted for them, the report is not."""
     f = 1.0
@@ -322,7 +334,8 @@ def audit(slug: str, repo: str = rd.ROOT) -> AuditRow:
         series, splits = monthly_series(slug, ticker, as_of)
     except YahooError as e:
         return {'slug': slug, 'err': f'yahoo {e}'}
-    return {**check_points(labels, prices, series, splits, as_of, LAUNCH.get(slug), SPINOFFS.get(slug)), 'slug': slug,
+    return {**check_points(labels, prices, series, with_close_steps(slug, splits), as_of, LAUNCH.get(slug),
+                           SPINOFFS.get(slug)), 'slug': slug,
             'ticker': ticker, 'as_of': as_of, 'adj_labelled': adj_labelled(t), 'spin_labelled': spin_adjusted_labelled(t)}
 
 
