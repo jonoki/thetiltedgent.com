@@ -21,6 +21,10 @@ Record: its as-of date and header price (these become the delta box's "previous 
 
 Treat the previous edition as a claim to check, not a source. Executive bios, company history (splits, IPO, fiscal-year length), index membership and every count or superlative you keep must be re-confirmed on a fetched page or dropped. On 25 Sep 2026 the AZO edition carried a wrong CFO bio, a false "never split" and a wrong 53-week year; errors you find this way make the delta box `tg-d--fix`.
 
+The same goes for holder lists and stakes, peer market caps and bubbles, segment figures and analyst calls carried in the old edition (29 Oct 2026 retro: 56 of 146 checker returns fixed a carried-over item). But a correction needs a fetched page that contradicts the old figure: a silent page or a failed fetch is not grounds, so keep the item and flag it (rule N; MTB dropped a true CPA, VRSN "corrected" right debt and cash). A `fix_points` change from the data layer is checked against a primary print before the delta box calls it a correction (EL.PA, IBE.MC).
+
+Read the company's EDGAR 8-K list and Reuters/WSJ/Bloomberg news from the previous banner date to the new one, not only the release (missed in Oct: DGX's cyber-incident 8-K on the print day, JNJ's reported DePuy Synthes talks, CFO changes at T and CNC, DISH's Chapter 11 on CCI).
+
 ## TASK A — numbers (always)
 New as-of = the most recent settled close (a stockanalysis history row WITH Adj. Close; do not use a row without it). Update:
 - header price/change, banner date ("Static data as of <Month D, YYYY> …"), market cap and every price-derived ratio (recompute at the new close);
@@ -28,6 +32,9 @@ New as-of = the most recent settled close (a stockanalysis history row WITH Adj.
 - metrics table from the new quarter (EPS TTM, margins, FCF, debt, etc.), 52-week range as of the new date, consensus/targets as of the new date (drop anything dated after it);
 - Global listings (in neither the S&P 500 nor the Nasdaq-100): the hero rank row carries home-market ranks/constituencies dated to the banner date from a fetched source; re-check each at every refresh, and drop any you cannot source as of the banner date (Oki, 8 Oct 2026);
 - Section 02 segments, Section 05 analyst calls, Section 06 catalysts (the print moves from "upcoming" to "happened"; add the next one only if dated by the company or labelled estimated).
+- Section 05 comes from a ratings table (StockAnalysis, MarketBeat) read at the banner date: every action from the previous edition to the banner date, post-print calls included; prior → new target from the table, never rebuilt from the old edition; an old call stays only if the table still lists it, and goes only when the table shows it superseded (DOV KMI TDY WRB VRSN, Oct 2026).
+- Peer market caps and bubbles recomputed at the banner-date close; short interest at the latest settlement published on or before the banner date, dated, never dropped for a caveat; the dividend-yield Context cell holds `dividend ÷ header price` and no other `$x ÷ $y` (the post-pass reads the first one as the yield formula: PEP, GM, NUE).
+- After the numbers, grep the page for the previous quarter (its name, period-end date and headline figures) and for "now", "latest", "currently": every such sentence describes the new quarter or carries its date, and metrics rows and pills use the same quarter (FITB, NOC, RF left Q2 statements after Q3). Read the old text as the Reader too, not only what you write: rule M jargon ("re-rating", "operating leverage", unexplained "bps") drew 125 checker fixes in Oct.
 
 ## TASK B — did the business change? (decide the tier honestly)
 - **T1 Rewrite** if ANY: |EPS or revenue surprise| ≥ 10%; earnings-day move ≥ 5% (close-to-close on the first session after the print); guidance changed; OR significant company news since the print (M&A, CEO/CFO change, restructuring, major contract/regulatory/legal event, guidance withdrawal, dividend/buyback policy change). Dow 30 / Nasdaq-100 names default to T1; market cap alone does not (Oki, 8 Oct 2026). T1 = rewrite the narrative sections (overview, moat/vulnerabilities, bull/bear, risks, industry commentary) wherever the quarter changed the story.
@@ -47,12 +54,12 @@ Insert immediately before the `<!-- ... 01 ... OVERVIEW` comment (the Company Ov
   <p class="tg-d-check">Updated at this edition: <sections>. <b>Not re-verified:</b> <list>.</p>
 </section>
 ```
-Use class `tg-d--fix` instead (tag "Corrected in this edition") ONLY if you find and correct an error in the previous edition — say what it was. If the previous edition already had a delta box, replace it (keep the new prior = the old edition's as-of/price).
+Use class `tg-d--fix` instead (tag "Corrected in this edition") ONLY if you find and correct an error in the previous edition — say what it was, and name the page that contradicts the old figure (rule N). Before you return: if your PITFALLS line lists any previous-edition error, the class is `tg-d--fix` (9 October refreshes left it `--print`). If the previous edition already had a delta box, replace it (keep the new prior = the old edition's as-of/price).
 
 Entities: use `&rarr;` `&middot;` `&mdash;` or real UTF-8 characters; never mojibake.
 
 ## Verify
-`py -3 tools/chart_audit.py <slug>` → 0 wrong points; every previous-edition chart point is re-checked, not assumed (11 of 17 refreshes on 22 Sep found the previous chart wrong).
+`py -3 tools/chart_audit.py <slug>` → 0 wrong points; every previous-edition chart point is re-checked, not assumed (11 of 17 refreshes on 22 Sep found the previous chart wrong). On a red or red-orange accent page the moving-average lines and their legend swatches are #cbd5e1, never #ef4444 (JNJ DAL HAL PHM, Oct 2026).
 `py -3 tools/verify.py reports/<slug>_analysis.html` → PASS with pe pair within ±0.1 (or None/None when EPS ≤ 0 and the P/E row reads n/m); `node --check` on the extracted <script>; LF only; no "tg-sitenav"; exactly one `.tg-d` section.
 `py -3 tools/index_rank.py <slug>` after the new banner date is in: it writes the header's "Mkt Cap Ranking" row (S&P 500 / Nasdaq-100 rank on the banner date) and the fine-print date, on member pages only (a global listing's row is re-checked by hand, TASK A). Member ranks are tool-written, never typed (Oki, 8 Oct 2026).
 `py -3 tools/index_stats.py <slug>` after that: it rewrites Section 04's S&P 500 / Nasdaq-100 column for the new banner date from the members' reports, and the methods sentence's date. Never type an index figure; fix by hand any sentence it prints as LEFT (Oki, 8 Oct 2026). Non-US reports carry the same S&P 500 column; their home-index returns stay in the Context column, updated to the new banner date (Oki, 9 Oct 2026).

@@ -10,17 +10,18 @@ The builder rules are in `claude/briefs/BUILD.md` (and `REFRESH.md` for refreshe
 1. Read the whole report.
 2. Read the builder's flags for it — the builder's own list of doubtful claims. Resolve EVERY flag: confirm it on a fetched page, or fix the number, or soften/label it ("reported by …", "not sourced"), or remove it. Never leave an unsourced claim stated as fact.
 3. Independently re-confirm, on pages YOU fetch: identity (company, current S&P 500 member), the header price = the settled close for the banner date (stockanalysis history row with Adj. Close, or Yahoo), the last two month-end chart points, market cap, TTM EPS and that Trailing P/E = price ÷ EPS, the 52-week range, every named executive, every named analyst call. Spot-check at least 5 other figures in the metrics table.
+3a. Refreshes: (i) every correction of the previous edition the builder claims (delta box, PITFALLS, flags) has a fetched page that contradicts the old figure; if not, restore the old item and tag `N:` (Oct 2026: MS, BNY, MTB, FITB, VRSN ×2, EL.PA, IBE.MC). (ii) Section 05 against a ratings table read at the banner date: every post-print action is there, nothing superseded is kept, prior → new targets match the table. (iii) The 8-K list and news since the previous banner date: anything material missing goes in. (iv) The delta box is `tg-d--fix` whenever any previous-edition error was corrected.
 4. Split/spin/reverse-split history: if the chart mixes adjusted and unadjusted series, fix it so the series is consistent with the header price and label the adjustment in the chart note.
 5. New builds: accent must not be red/red-orange. Existing pages keep their accent (Oki, 25 Sep 2026). Where an existing accent is red, the 200-day MA line and its legend swatch are #cbd5e1 so the price line and the MA stay distinct; never recolour the accent itself.
 5a. Run `py -3 tools/chart_audit.py <slug>` — 0 wrong points required; fix the series (and every claim derived from it) if not.
-6a. Read the prose and card titles as the Reader (rule M): rewrite any sentence that needs market jargon to parse, keeping its claim and numbers exactly (no "most" where the page has no majority figure); tag each `M:<example>`.
+6a. Read the prose and card titles as the Reader (rule M), old text included on a refresh: rewrite any sentence that needs market jargon to parse, keeping its claim and numbers exactly (no "most" where the page has no majority figure); tag each `M:<example>`.
 6. Re-run `py -3 tools/verify.py reports/<slug>_analysis.html` (PASS, pe pair within ±0.1) and `node --check` on the extracted script body. LF line endings.
 
 WebFetch needs a domain surfaced by a WebSearch first (one search per new domain). stockanalysis.com blocks curl — use WebFetch.
 PRIVACY: never put the user's email, name or any personal data in any request (headers, user-agents, query strings). Read sec.gov with WebFetch; never add a contact user-agent yourself. If WebFetch can't read a page, use another source.
 
 ## Return (short, no file contents), one block per report
-- PITFALLS: one tag per correction you made, `<letter>:<short example>` using the letters in PITFALL_RULES.md (new class → `NEW:<description>`). Required — the orchestrator tallies these into the log.
+- PITFALLS: one tag per correction you made, `<letter>:<short example>` using the letters in PITFALL_RULES.md (new class → `NEW:<description>`), all on the same line as `PITFALLS:`, separated by ` · ` — not a bulleted list (the runner keeps that one line; 12 lists were lost in Oct 2026). Required — the orchestrator tallies these into the log.
 - A correction to a live report that keeps its banner date (same edition) gets **no note on the page**; return old → new for each change so the orchestrator can add it to `claude/CORRECTIONS.md` (Oki, 10 Oct 2026).
 - VERDICT: PUBLISH or HOLD (+ one-line reason for HOLD)
 - verify line

@@ -124,7 +124,9 @@ numbers (no $, %, commas): the price, or the yield for a bond page.
 ```
 Bond pages show yields (`4.12%` → `4.30%`) and the change in pp (`+0.18 pp`); `up` / `dn` follow the sign of the
 value's change. Use `tg-d--fix` (tag "Corrected in this edition") only when you correct an error in the previous
-edition, and say what it was.
+edition, and say what it was. A correction needs a fetched source that contradicts the old value: a silent page or a
+failed fetch is not grounds, and a data-layer `fix_points` change is checked against the primary print first (rule N;
+stock refreshes in Oct 2026 "corrected" true figures eight times).
 
 ## Verify
 - ETF and crypto: `py -3 tools/chart_audit.py <family>/<slug>` → 0 wrong points.
@@ -157,6 +159,7 @@ Read `claude/PITFALL_RULES.md` and this brief. Never trust the builder's "verifi
 - Grep the page for the previous edition's header value, as-of date, 52-week bounds and the dropped chart months:
   every remaining use must be about that date on purpose (rule A).
 - Delta box: exactly one `.tg-d`, `tg-d--price` (or `tg-d--fix` when the edition corrects the previous one), data
-  attributes equal to the page's values.
+  attributes equal to the page's values. Every claimed correction has a source that contradicts the old value; if
+  not, restore the old value and tag `N:`.
 - Run the checks in "Verify" and report them verbatim. Return in your agent file's format with a `VERDICT:` line
   (PUBLISH, or HOLD with the reason) and a `PITFALLS:` line.
