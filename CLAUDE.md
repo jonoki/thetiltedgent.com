@@ -30,7 +30,7 @@ The previous palette (black, gold, crimson; Sep 3–4 2026) is archived at `asse
 
 **Voice**: story first, math second, lecture never; poker/probability as the lens; every page keeps a disclaimer. Do not rewrite copy without asking. Staleness copy states what happened and the dates, plainly (not in poker voice), and never promises when a refresh will land (Oki, 5 Oct 2026).
 
-**Reader**: a smart adult who doesn't follow markets. Explain finance jargon in a clause; never define everyday words (data center, AI, EV, CEO). User-facing text never carries a doubt caveat ("unconfirmed", "from Wikipedia, not verified"): prefer a primary or reliable source, and use Wikipedia when nothing better exists.
+**Reader**: a smart adult who doesn't follow markets. Explain finance jargon in a clause; never define everyday words (data center, AI, EV, CEO). User-facing text never carries a doubt caveat ("unconfirmed", "from Wikipedia, not verified"): prefer a primary or reliable source, and use Wikipedia when nothing better exists. No "n/v" and no "Not re-verified" list on a page: a missing figure is "—", a competitor bubble missing 2 or more of its 3 figures is swapped for one that reports them or dropped, and live pages change as they refresh (Oki, 29 Oct 2026).
 
 **Gambling operators**: the Tables pages and any promotional content never name or show one. In the report library, listed casino and betting companies (MGM, WYNN, LVS, FLUT, VICI…) are analysed, named and shown with logos like any other company (Oki, 23 Sep 2026).
 
