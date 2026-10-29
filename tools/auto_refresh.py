@@ -1,7 +1,8 @@
 """The unattended earnings refresh run: take the due reports from the refresh queue, have the builder and then an
 independent checker refresh each one (headless Claude Code, the project agents ttg-report-builder and
-ttg-report-checker), re-run the gates here, commit what passes to the review branch and push it. Nothing reaches
-main: Oki merges the branch.   Run: py -3 tools/auto_refresh.py [--dry-run] [--only SLUG ...]
+ttg-report-checker), re-run the gates here, commit what passes to the review branch and push it, then put it live:
+once run_checks passes, main is fast-forwarded to the branch (publish; Oki, 29 Oct 2026). Run: py -3
+tools/auto_refresh.py [--dry-run] [--only SLUG ...]
 
 --assets is the monthly numbers-only refresh of the ETF, crypto, bond & cash and economic-indicator reports (Oki,
 8 Oct 2026): every report under reports/etf, reports/crypto, reports/fixed and reports/indicators whose banner as-of is
@@ -488,6 +489,30 @@ def merge_base(wt: str, base: str) -> None:
         '-m', 'Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>')
 
 
+def publish(wt: str, checks_ok: bool) -> str:
+    """Put the review branch live once everything passed (Oki, 29 Oct 2026: merge and publish after the checks): push
+    it to main on origin as a fast-forward. Only after run_checks passed; when main moved during the run, merge it in
+    (merge_base), re-run the checks and push once more. Never forces: anything else leaves the branch waiting for a
+    person and says why."""
+    if not checks_ok:
+        return 'not published: run_checks failed; the branch waits for a person'
+    for tries in (1, 2):
+        r = run(['git', 'push', '-q', 'origin', 'HEAD:main'], wt)
+        if r.returncode == 0:
+            return 'live: main is now ' + git(wt, 'rev-parse', '--short', 'HEAD').strip()
+        if tries == 2:
+            break
+        try:
+            git(wt, 'fetch', '-q', 'origin')
+            merge_base(wt, 'origin/main')
+        except RuntimeError as e:
+            return f'not published: {e}'
+        if run([sys.executable, 'tools/run_checks.py'], wt, 1800).returncode:
+            return 'not published: run_checks failed after merging main; the branch waits for a person'
+        run(['git', 'push', '-q', 'origin', BRANCH], wt)
+    return f'not published: push to main refused ({r.stderr.strip()})'
+
+
 @contextlib.contextmanager
 def run_lock(main: str, wait_s: int = LOCK_WAIT_S, poll_s: int = LOCK_POLL_S) -> Iterator[None]:
     """One run at a time on the review worktree (the daily T1, weekly T2 and monthly asset runs share it, and the
@@ -604,7 +629,7 @@ def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: li
     """The run's summary (tasks/queue/runs/<run_id>.md): one line per report with its cost and usage, the reports due
     but not run, and the notes (family counts, rebuilt data, checks, push)."""
     head = f'# Asset refresh (monthly, numbers only) — {day}' if assets else f'# Auto refresh — {day}'
-    lines = [head, '', f'Branch `{BRANCH}`; nothing is on main until Oki merges it.', '']
+    lines = [head, '', f'Branch `{BRANCH}`; it goes live on main when run_checks passes (see publish below).', '']
     for o in outcomes:
         lines.append(f"- **{o['ticker']}** {o['tier']} — {o['verdict']}: {o['detail']} · ~${o['cost_usd']:.2f} "
                      "(client-side estimate)" + (f" · {len(o['denials'])} tool denials" if o['denials'] else '')
@@ -660,7 +685,8 @@ def run_all(work: list[dict], wt: str, qdir: str, rid: str, attempts: dict[str, 
 def finish(wt: str, qdir: str, day: str, rid: str, outcomes: list[Outcome], waiting: list[dict], notes: list[str],
            assets: bool = False) -> str:
     """After the reports: rebuild the generated files (the asset cards too in an asset run) and commit them, run the
-    checks, push the review branch; collect the checkers' PITFALLS lines; write the summary and return it."""
+    checks, push the review branch and publish it to main when they pass (an ALERT when it can't); collect the
+    checkers' PITFALLS lines; write the summary and return it."""
     if any(o['verdict'] == 'committed' for o in outcomes):
         tools = (('asset_cards.py',) if assets else ()) + ('manifest.py', 'style_tags.py', 'card_tags.py')
         for tool in tools:
@@ -676,6 +702,10 @@ def finish(wt: str, qdir: str, day: str, rid: str, outcomes: list[Outcome], wait
         notes.append('- run_checks: ' + ' / '.join(ln for ln in checks.stdout.splitlines() if ln[:4] in ('ok  ', 'FAIL', 'SKIP')))
         push = run(['git', 'push', '-q', 'origin', BRANCH], wt)
         notes.append(f"- push {BRANCH}: {'ok' if push.returncode == 0 else push.stderr.strip()}")
+        live = publish(wt, checks.returncode == 0)
+        notes.append(f'- publish: {live}')
+        if not live.startswith('live'):
+            alert(main_checkout(), f'run {rid} committed refreshes but did not publish them: {live}')
     pend = [f"- {day} {o['ticker']}: {ln}" for o in outcomes for ln in o['pitfalls']]
     if pend:
         with open(os.path.join(qdir, 'pitfalls_pending.md'), 'a', encoding='utf-8', newline='\n') as fh:
@@ -688,7 +718,7 @@ def finish(wt: str, qdir: str, day: str, rid: str, outcomes: list[Outcome], wait
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = rd.parser('Unattended earnings refreshes onto the review branch.')
+    ap = rd.parser('Unattended earnings refreshes onto the review branch, published to main when the checks pass.')
     ap.add_argument('--base', default='origin/main', help='what the review branch builds on (default origin/main)')
     ap.add_argument('--t2-cap', type=int, default=T2_CAP)
     ap.add_argument('--jobs', type=int, default=None, help=f'pairs at once (default {JOBS}, up to {MAX_JOBS} with a backlog)')

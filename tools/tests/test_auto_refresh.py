@@ -309,5 +309,57 @@ class MergeBase(unittest.TestCase):
             self.assertEqual(open(os.path.join(d, 'reports', 'x_analysis.html')).read(), 'ours\n')
 
 
+class Publish(unittest.TestCase):
+    """The review branch goes live only after the checks pass, as a fast-forward, never forced (Oki, 29 Oct 2026)."""
+    def setup(self, d, main_edit=None):
+        import subprocess
+        g = lambda cwd, *a: subprocess.run(['git', *a], cwd=cwd, capture_output=True, text=True, check=True).stdout
+        origin, wt, other = (os.path.join(d, n) for n in ('origin.git', 'wt', 'other'))
+        g(d, 'init', '-q', '--bare', '-b', 'main', origin)
+        g(d, 'clone', '-q', origin, wt)
+        g(wt, 'config', 'user.email', 't@t'); g(wt, 'config', 'user.name', 't')
+        os.makedirs(os.path.join(wt, 'tools'))
+        open(os.path.join(wt, 'tools', 'run_checks.py'), 'w').write('pass\n')   # stand-in: the checks pass
+        open(os.path.join(wt, 'reports.txt'), 'w').write('base\n')
+        g(wt, 'add', '-A'); g(wt, 'commit', '-q', '-m', 'base'); g(wt, 'push', '-q', 'origin', 'main')
+        g(wt, 'checkout', '-q', '-b', ar.BRANCH)
+        open(os.path.join(wt, 'reports.txt'), 'w').write('refreshed\n'); g(wt, 'commit', '-qam', 'refresh')
+        if main_edit:   # someone pushes to main while the run works
+            g(d, 'clone', '-q', origin, other)
+            g(other, 'config', 'user.email', 't@t'); g(other, 'config', 'user.name', 't')
+            path, text = main_edit
+            open(os.path.join(other, path), 'w').write(text); g(other, 'add', '-A'); g(other, 'commit', '-qm', 'main moved')
+            g(other, 'push', '-q', 'origin', 'main')
+        main_tip = lambda: g(origin, 'rev-parse', 'main').strip()
+        return wt, main_tip, lambda: g(wt, 'rev-parse', 'HEAD').strip()
+
+    def test_fast_forward(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt, main_tip, head = self.setup(d)
+            self.assertTrue(ar.publish(wt, True).startswith('live'))
+            self.assertEqual(main_tip(), head())
+
+    def test_failed_checks_never_publish(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt, main_tip, head = self.setup(d)
+            before = main_tip()
+            self.assertIn('run_checks failed', ar.publish(wt, False))
+            self.assertEqual(main_tip(), before)
+
+    def test_main_moved_is_merged_then_published(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt, main_tip, head = self.setup(d, ('notes.txt', 'new page\n'))
+            self.assertTrue(ar.publish(wt, True).startswith('live'))
+            self.assertEqual(main_tip(), head())
+            self.assertEqual(open(os.path.join(wt, 'notes.txt')).read(), 'new page\n')   # main's commit kept
+
+    def test_a_real_conflict_leaves_main_alone(self):
+        with tempfile.TemporaryDirectory() as d:
+            wt, main_tip, head = self.setup(d, ('reports.txt', 'hand fix\n'))
+            before = main_tip()
+            self.assertIn('not published', ar.publish(wt, True))
+            self.assertEqual(main_tip(), before)
+
+
 if __name__ == '__main__':
     unittest.main()

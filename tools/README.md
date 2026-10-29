@@ -16,7 +16,7 @@ Each finds the repo from its own location, so the working directory only matters
 | `chart_audit.py` | every chart point against Yahoo month-end closes | nothing in the repo |
 | `indicator_audit.py` | every chart point of an economic-indicator report against its official series (FRED, Bank of Canada Valet; `SERIES`) | nothing in the repo |
 | `index_rank.py` | each S&P 500 / Nasdaq-100 member report's market-cap rank on its banner date (shares × Yahoo close for every member); global listings are left alone; `--check`: a member row out of date | the "Mkt Cap Ranking" row and the rank sentence of the fine print in member `reports/*_analysis.html` |
-| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch; `--assets`: the monthly numbers-only refresh of the ETF, crypto, bond & cash and indicator reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
+| `auto_refresh.py` | unattended refreshes of the due reports (headless builder + checker), onto a review branch, published to main when the checks pass; `--assets`: the monthly numbers-only refresh of the ETF, crypto, bond & cash and indicator reports | branch `claude/auto-refresh`, `tasks/queue/runs/` |
 | `index_stats.py` | Section 04's S&P 500 / Nasdaq-100 column: each row's market-cap-weighted aggregate of the members' own reports on the page's banner date (formulas in its docstring); a non-US report's home-index column (Nikkei 225, DAX …) becomes the S&P 500 column; `--check`: a page out of date; `--stats DATE`: both indexes' figures | the index column (header and cells), the methods sentence and the old column's descriptions in the fine print of `reports/*_analysis.html` |
 | `refresh_queue.py` | which reports went stale on an earnings print, when each refresh is due, its tier | `tasks/queue/` (git-excluded) |
 | `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
@@ -191,7 +191,7 @@ calendar, not the home market's. Coverage on 8 Oct 2026: all 63 home listings an
 (dates from stockanalysis for 59 home listings, the IR file for 5, HKEX for 2, some from more than one; 15 home
 listings had only an estimated next date).
 
-## `auto_refresh.py` — unattended refreshes onto the review branch
+## `auto_refresh.py` — unattended refreshes, published when the checks pass
 
     py -3 tools/auto_refresh.py --dry-run          # what would run today, and the first builder prompt
     py -3 tools/auto_refresh.py                    # the scheduled run (--base origin/main by default)
@@ -204,7 +204,7 @@ both in `dontAsk` mode with the tool allow-list in the script (no git, no delete
 re-runs `verify.py` and `chart_audit.py` itself and commits the report only if both pass, LF only, and the checker
 did not say HOLD; anything else is reverted, with the rejected page and both agents' JSON results kept in
 `tasks/queue/runs/<date>/`. After the reports: manifest, style and card tags, `run_checks.py`, push of the review
-branch. Nothing reaches main until Oki merges it. The checkers' PITFALLS lines collect in
+branch, then publish: when `run_checks.py` passed, the branch is pushed to main as a fast-forward and goes live (Oki, 29 Oct 2026). If main moved during the run it merges main in, re-runs the checks and pushes once more; it never forces, and a failed check or a conflict leaves the branch for a person with an ALERT. The checkers' PITFALLS lines collect in
 `tasks/queue/pitfalls_pending.md` for the next retro. One run at a time: every run except a dry run takes an OS lock
 on `tasks/queue/run.lock` in the main checkout, and a run that finds it held waits (polling each minute, up to 12
 hours, then ALERT); the OS drops the lock when a run's process ends, so a crash never leaves it held.
