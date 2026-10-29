@@ -105,7 +105,7 @@ new indicator needs a row there and in `INDICATOR_HUB` in `tools/asset_cards.py`
   "https://fred.stlouisfed.org/graph/fredgraph.csv?id=<ID>&cosd=<YYYY-MM-DD>"` and no custom User-Agent (a browser
   or custom User-Agent hangs); Valet with `https://www.bankofcanada.ca/valet/observations/<ID>/json?start_date=<date>`.
 - Tone: plain and functional; describe, never recommend. Explain jargon in a clause (basis point, seasonal
-  adjustment, core). No doubt caveats on the page: a figure you cannot source is "n/v", a sentence you cannot source
+  adjustment, core). No doubt caveats on the page: a figure you cannot source is "—" (never "n/v"; Oki, 29 Oct 2026), a sentence you cannot source
   is removed.
 
 ## Gates (run all; report each output verbatim)

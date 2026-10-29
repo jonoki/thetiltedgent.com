@@ -21,7 +21,7 @@ Never put the owner's name, email or any personal data in any request: not in Us
 
 ## Rules from the pilot checker rounds (23–24 Sep 2026 — hard rules, all families)
 - **No hedge caveats in user-facing text** (Oki, 22 Sep): never "not confirmed", "unconfirmed", "not checked", "could not be fetched", "no later … found". A figure you cannot confirm on a fetched page is "n/v"; a statement you cannot confirm is removed. Process notes go in your Return, not on the page.
-- **Nothing read after the banner date.** If a figure (e.g. a rich list) can only be read after it, it is n/v.
+- **Nothing read after the banner date.** If a figure (e.g. a rich list) can only be read after it, it is "—" (never "n/v" on a page; Oki, 29 Oct 2026).
 - **Sharpe (house formula):** e = r − rf monthly; Sharpe = mean(e) / sd(e) × √12 (sd of EXCESS returns). State it in the metrics note with the rf series.
 - **Holdings and disclosures:** each holder's latest figure dated on or before the banner date, the date shown next to it. Check for 8-Ks and company/issuer releases AFTER the last 10-Q — treasury holdings change weekly. Filed figures beat on-chain press reports. Search snippets are never a source.
 - **Fees:** every MER / expense ratio with its source document and period; label US "expense ratio / sponsor fee" vs Canadian "MER".
@@ -48,7 +48,7 @@ Hero meta: MER · AUM (net assets) · Holdings · Distribution yield (state whic
 - 02 What It Holds — seg-bar: asset-class mix; biz-cards: one per underlying fund if fund-of-funds (target/actual weight, that fund's MER, holdings count, region), else top sectors; CSS horizontal bars: sector weights; seg-bar: region/country mix; table: top-10 underlying stock holdings with weights (look-through if the issuer publishes it; say which). h3 "The two numbers that matter": holdings count and top-10 share.
 - 03 Structural Strengths & Vulnerabilities — moat-list style strengths; "Key Vulnerabilities" risk-list (concentration, currency, fund-of-funds fee layering, hedging, index quirks).
 - 04 Key Fund Metrics — fin-table: MER, management fee, AUM, holdings, distribution yield + frequency, 1/3/5-yr annualised total return (issuer's published NAV returns, with their as-of date), 5-yr annualised volatility and Sharpe (your calculation from monthly total returns — formula and risk-free series in a table note), beta vs S&P 500 (your calculation or sourced, say which). h3 "Notable Fund Events" (MER changes, splits, mergers, index changes).
-- 05 Cost & Peer Comparison — table of 3–4 comparable funds: MER, AUM, holdings, and overlap where it can be computed from published holdings (else "n/v"). CSS bars: MER vs peers. Stat row: fee per $10,000 per year; 10- and 25-year fee drag as (1 − MER)^n on an unchanged balance (formula shown). No verdict on which fund is better.
+- 05 Cost & Peer Comparison — table of 3–4 comparable funds: MER, AUM, holdings, and overlap where it can be computed from published holdings (else "—"). CSS bars: MER vs peers. Stat row: fee per $10,000 per year; 10- and 25-year fee drag as (1 − MER)^n on an unchanged balance (formula shown). No verdict on which fund is better.
 - 06 Upcoming Events & News — next distribution dates, index rebalances, fund changes (sourced, dated ≤ banner date).
 - 07 5-Year Price Analysis — Chart 1 `priceChart`: ~60 monthly closes (price) + MAs, plus a dataset of total-return (dividend-adjusted) closes if available, labelled. Chart 2 `drawdownChart`: % below running peak of the total-return series (computed in the script). h3 Inflection points; h3 Relative performance (vs its index / S&P 500 over the same window, your calculation).
 - 08 Summary & Key Risks — case-cards "What helps it" / "What hurts it" (market conditions, not forecasts); Top 3 Risks.
@@ -109,7 +109,7 @@ Hero meta: Yield · Maturity/tenor · Modified duration · Credit rating (name t
 - **T-bill**: no coupon — show the auction's discount rate and investment rate (bond-equivalent) from TreasuryDirect, and the par yield from the daily curve (header); duration ≈ time to maturity, convexity negligible — say so; sensChart still drawn.
 - **TIPS**: header = the par REAL yield (Treasury daily par real yield curve); also nominal and breakeven for the banner date; CPI indexation and the deflation floor from TreasuryDirect's own pages; on-the-run TIPS from TreasuryDirect.
 - **Government of Canada**: Bank of Canada Valet benchmark bond yields (name the series id), GoC auction results from the Bank of Canada, currency CAD; policy expectations = the latest Monetary Policy Report (no dot plot); ratings n/v unless the agency's own page is readable; Canadian tax facts only if sourced (CRA).
-- Ratings: n/v unless the agency's own page is readable (Moody's usually is). No press-report ratings. U.S. Treasury and savings-bond pages all show "Aa1, stable (Moody's)", since May 16, 2025, sourced to Moody's U.S. rating page (Oki, 8 Oct 2026); S&P and Fitch n/v unless read.
+- Ratings: "—" unless the agency's own page is readable (Moody's usually is). No press-report ratings. U.S. Treasury and savings-bond pages all show "Aa1, stable (Moody's)", since May 16, 2025, sourced to Moody's U.S. rating page (Oki, 8 Oct 2026); S&P and Fitch "—" unless read.
 - verify.py accepts 3 canvases for files under `reports/fixed/` (2 or 3 under `reports/indicators/`).
 
 ## Verify

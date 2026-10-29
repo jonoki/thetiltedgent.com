@@ -51,9 +51,10 @@ Insert immediately before the `<!-- ... 01 ... OVERVIEW` comment (the Company Ov
   <div class="tg-d-move"><div class="tg-d-px">$P0<span>PREVIOUS EDITION</span></div><div class="tg-d-arw">&rarr;</div><div class="tg-d-px">$P1<span>THIS EDITION</span></div><div class="tg-d-pct up|dn">+x.x%</div></div>
   <p><b>Quarter</b>: the headline figures vs consensus, guidance change, first-session reaction (close-to-close %).</p>
   <p>What happened since (news, analyst moves) — only sourced items.</p>
-  <p class="tg-d-check">Updated at this edition: <sections>. <b>Not re-verified:</b> <list>.</p>
+  <p class="tg-d-check">Updated at this edition: <sections>.</p>
 </section>
 ```
+Anything you did not re-verify goes in your flags, never on the page: no "Not re-verified" list (Oki, 29 Oct 2026). Replace every "n/v" on the page as BUILD.md says ("—" in a metrics cell; a competitor bubble missing 2+ of its 3 figures is swapped or dropped).
 Use class `tg-d--fix` instead (tag "Corrected in this edition") ONLY if you find and correct an error in the previous edition — say what it was, and name the page that contradicts the old figure (rule N). Before you return: if your PITFALLS line lists any previous-edition error, the class is `tg-d--fix` (9 October refreshes left it `--print`). If the previous edition already had a delta box, replace it (keep the new prior = the old edition's as-of/price).
 
 Entities: use `&rarr;` `&middot;` `&mdash;` or real UTF-8 characters; never mojibake.
