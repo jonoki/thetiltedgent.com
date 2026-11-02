@@ -7,13 +7,16 @@
                     tables are labelled as such in the UI.
    Per-bet edges are the standard published figures (Wizard of Odds, fetched Sep 2026).
    Note: for compound bets (pass + odds, ante/play, UTH) "unit" is the FIRST bet; the money at
-   risk per round is larger, and `avgWager` says by how much. */
+   risk per round is larger, and `avgWager` says by how much.
+   min: the smallest unit the simulator takes, as a real table would (Oki, 2 Nov 2026): $10 at every table, as on
+   the trainers; a bet's own `min` overrides it ($1 craps one-roll props and hardways, $12 place 6/8, $5 insurance);
+   video poker $0.25 a hand. */
 window.TTG_GAMES = (function () {
   var G = {};
 
   /* ---------- CRAPS (per bet resolved) ---------- */
   G.craps = {
-    name: "Craps", pace: 30, paceNote: "line bets resolved per hour at a moderately busy table (~100 rolls)",
+    name: "Craps", pace: 30, min: 10, paceNote: "line bets resolved per hour at a moderately busy table (~100 rolls)",
     unit: 10, defaultBet: "pass-odds-345",
     bets: {
       "pass-odds-345": { name: "Pass line + 3-4-5x odds", edge: 0.01414, edgeNote: "1.41% of the line bet; 0.37% of all money wagered", kind: "exact", avgWager: 3.78,
@@ -25,7 +28,7 @@ window.TTG_GAMES = (function () {
         rows: [ {p: 244/495, x: 1}, {p: 251/495, x: -1} ] },
       "dont-pass": { name: "Don't pass", edge: 0.01364, kind: "exact",
         rows: [ {p: 949/1980, x: 1}, {p: 976/1980, x: -1}, {p: 55/1980, x: 0} ] },
-      "place-6-8": { name: "Place 6 or 8", edge: 0.01515, kind: "exact",
+      "place-6-8": { min: 12, name: "Place 6 or 8", edge: 0.01515, kind: "exact",
         rows: [ {p: 5/11, x: 7/6}, {p: 6/11, x: -1} ] },
       "place-5-9": { name: "Place 5 or 9", edge: 0.04, kind: "exact",
         rows: [ {p: 4/10, x: 1.4}, {p: 6/10, x: -1} ] },
@@ -35,19 +38,19 @@ window.TTG_GAMES = (function () {
         rows: [ {p: 1/36, x: 2}, {p: 1/36, x: 3}, {p: 14/36, x: 1}, {p: 20/36, x: -1} ] },
       "field-2x": { name: "Field (2x on 2 and 12)", edge: 0.0556, kind: "exact",
         rows: [ {p: 2/36, x: 2}, {p: 14/36, x: 1}, {p: 20/36, x: -1} ] },
-      "hard-6-8": { name: "Hard 6 / Hard 8", edge: 0.0909, kind: "exact",
+      "hard-6-8": { min: 1, name: "Hard 6 / Hard 8", edge: 0.0909, kind: "exact",
         rows: [ {p: 1/11, x: 9}, {p: 10/11, x: -1} ] },
       "big-6-8": { name: "Big 6 / Big 8", edge: 0.0909, kind: "exact",
         rows: [ {p: 5/11, x: 1}, {p: 6/11, x: -1} ] },
-      "hard-4-10": { name: "Hard 4 / Hard 10", edge: 0.1111, kind: "exact",
+      "hard-4-10": { min: 1, name: "Hard 4 / Hard 10", edge: 0.1111, kind: "exact",
         rows: [ {p: 1/9, x: 7}, {p: 8/9, x: -1} ] },
-      "any-craps": { name: "Any craps", edge: 0.1111, kind: "exact",
+      "any-craps": { min: 1, name: "Any craps", edge: 0.1111, kind: "exact",
         rows: [ {p: 4/36, x: 7}, {p: 32/36, x: -1} ] },
-      "3-or-11": { name: "3 or 11 (15:1)", edge: 0.1111, kind: "exact",
+      "3-or-11": { min: 1, name: "3 or 11 (15:1)", edge: 0.1111, kind: "exact",
         rows: [ {p: 2/36, x: 15}, {p: 34/36, x: -1} ] },
-      "2-or-12": { name: "2 or 12 (30:1)", edge: 0.1389, kind: "exact",
+      "2-or-12": { min: 1, name: "2 or 12 (30:1)", edge: 0.1389, kind: "exact",
         rows: [ {p: 1/36, x: 30}, {p: 35/36, x: -1} ] },
-      "any-seven": { name: "Any seven", edge: 0.1667, kind: "exact",
+      "any-seven": { min: 1, name: "Any seven", edge: 0.1667, kind: "exact",
         rows: [ {p: 1/6, x: 4}, {p: 5/6, x: -1} ] }
     }
   };
@@ -70,7 +73,7 @@ window.TTG_GAMES = (function () {
   }
   var r0 = wheel(37, "Single zero"), r00 = wheel(38, "Double zero"), r000 = wheel(39, "Triple zero");
   G.roulette = {
-    name: "Roulette", pace: 40, paceNote: "spins per hour at a live table (electronic wheels run 60–80)",
+    name: "Roulette", pace: 40, min: 10, paceNote: "spins per hour at a live table (electronic wheels run 60–80)",
     unit: 10, defaultBet: "00-even",
     bets: {
       "0-even-partage": { name: "Single zero, la partage — even money", edge: 0.0135, kind: "exact",
@@ -86,7 +89,7 @@ window.TTG_GAMES = (function () {
   /* ---------- BACCARAT (8 decks, per hand) ---------- */
   var pB = 0.458597, pP = 0.446247, pT = 0.095156; // Wizard of Odds, 8 decks
   G.baccarat = {
-    name: "Baccarat", pace: 70, paceNote: "hands per hour at a full big table (mini-bacc runs 120–150)",
+    name: "Baccarat", pace: 70, min: 10, paceNote: "hands per hour at a full big table (mini-bacc runs 120–150)",
     unit: 25, defaultBet: "banker",
     bets: {
       "banker": { name: "Banker (5% commission)", edge: 0.0106, kind: "exact",
@@ -111,7 +114,7 @@ window.TTG_GAMES = (function () {
              {p: f.st, x: 3}, {p: f.trips, x: 2}, {p: f.twopair, x: 1}, {p: f.jacks, x: 0}, {p: none, x: -1} ];
   }
   G["video-poker"] = {
-    name: "Video Poker", pace: 500, paceNote: "hands per hour at a steady pace (fast players hit 800+)",
+    name: "Video Poker", pace: 500, min: 0.25, paceNote: "hands per hour at a steady pace (fast players hit 800+)",
     unit: 1.25, defaultBet: "job-96",
     bets: {
       "job-96": { name: "Jacks or Better 9/6 (full pay)", edge: 0.0046, kind: "exact", rows: jobRows(9, 6) },
@@ -125,19 +128,21 @@ window.TTG_GAMES = (function () {
   };
 
   /* ---------- THREE CARD POKER ---------- */
-  // Pair Plus is exact (22,100 three-card hands). Ante/Play is an approximate shape calibrated to 3.37%.
-  var T = 22100;
+  // Pair Plus is exact (22,100 three-card hands). Ante/Play is exact too: every player hand against every dealer hand
+  // from the other 49 cards (22,100 x 18,424 = 407,170,400 deals), counted by tables/sim/tcp-engine.js, net result per
+  // unit Ante with the 5-4-1 ante bonus joined to the hand it pays on: -1 fold (below Q-6-4); played hands -2 lose,
+  // 0 tie, +1 dealer doesn't qualify, +2 win, plus the bonus (straight +1, trips +4, straight flush +5).
+  var T = 22100, TP = 407170400;
   function pairPlus(sf, tk, st, fl, pr) {
     return [ {p: 48/T, x: sf}, {p: 52/T, x: tk}, {p: 720/T, x: st}, {p: 1096/T, x: fl}, {p: 3744/T, x: pr}, {p: 16440/T, x: -1} ];
   }
   G["three-card-poker"] = {
-    name: "Three Card Poker", pace: 70, paceNote: "hands per hour at a moderately busy table",
+    name: "Three Card Poker", pace: 70, min: 10, paceNote: "hands per hour at a moderately busy table",
     unit: 10, defaultBet: "ante-play",
     bets: {
-      "ante-play": { name: "Ante & Play (Q-6-4 strategy, 5-4-1 bonus)", edge: 0.0337, edgeNote: "3.37% of the ante; 2.01% of all money wagered", kind: "approx", avgWager: 1.674, sd: 1.64,
-        // fold 32.6% of hands (below Q-6-4); dealer fails to qualify on 30.4%; ante bonus on straight or better.
-        rows: [ {p: 0.3258, x: -1}, {p: 0.2050, x: 1}, {p: 0.2431, x: 2}, {p: 0.2261, x: -2} ],
-        bonusRows: [ {p: 0.0326, add: 1}, {p: 0.00235, add: 4}, {p: 0.00217, add: 5} ] },
+      "ante-play": { name: "Ante & Play (Q-6-4 strategy, 5-4-1 bonus)", edge: 0.033730, edgeNote: "3.37% of the ante; 2.01% of all money wagered", kind: "exact", avgWager: 1.674, sd: 1.64,
+        rows: [ {p: 91126832/TP, x: -2}, {p: 132923304/TP, x: -1}, {p: 249216/TP, x: 0}, {p: 80955780/TP, x: 1}, {p: 91100696/TP, x: 2},
+                {p: 8976452/TP, x: 3}, {p: 289104/TP, x: 5}, {p: 931972/TP, x: 6}, {p: 617044/TP, x: 7} ] },
       "pair-plus-40-30-6-4-1": { name: "Pair Plus 40-30-6-4-1", edge: 0.0232, kind: "exact", rows: pairPlus(40, 30, 6, 4, 1) },
       "pair-plus-40-30-6-3-1": { name: "Pair Plus 40-30-6-3-1 (the common one)", edge: 0.0728, kind: "exact", rows: pairPlus(40, 30, 6, 3, 1) },
       "pair-plus-50-30-6-3-1": { name: "Pair Plus 50-30-6-3-1", edge: 0.0510, kind: "exact", rows: pairPlus(50, 30, 6, 3, 1) }
@@ -164,7 +169,7 @@ window.TTG_GAMES = (function () {
              {p: 6180020/N7, x: st}, {p: 6461620/N7, x: tk}, {p: 113355660/N7, x: -1} ];
   }
   G["ultimate-texas-holdem"] = {
-    name: "Ultimate Texas Hold'em", pace: 40, paceNote: "hands per hour at a moderately busy table",
+    name: "Ultimate Texas Hold'em", pace: 40, min: 10, paceNote: "hands per hour at a moderately busy table",
     unit: 10, defaultBet: "ante-blind",
     bets: {
       "ante-blind": { name: "Ante + Blind, optimal strategy", edge: 0.02185, edgeNote: "2.19% of the ante; 0.53% of all money wagered", kind: "approx", avgWager: 4.15, sd: 4.9,
@@ -192,7 +197,7 @@ window.TTG_GAMES = (function () {
       rows: [ {p: 0.0453, x: bjPay}, {p: 0.0600, x: 2}, {p: 0.3300, x: 1}, {p: 0.0880, x: 0}, {p: 0.4260, x: -1}, {p: 0.0507, x: -2} ] };
   }
   G.blackjack = {
-    name: "Blackjack", pace: 70, paceNote: "hands per hour with four or five players at the table (heads-up: 200+)",
+    name: "Blackjack", pace: 70, min: 10, paceNote: "hands per hour with four or five players at the table (heads-up: 200+)",
     unit: 25, defaultBet: "bs-32",
     bets: {
       "bs-32": Object.assign({ name: "Basic strategy, 3:2 blackjack, 6 decks H17 DAS" }, bj(1.5, 0.0055)),
@@ -200,7 +205,7 @@ window.TTG_GAMES = (function () {
       "bs-65": Object.assign({ name: "Basic strategy, 6:5 blackjack" }, bj(1.2, 0.0194)),
       "feel-32": Object.assign({ name: "Playing by feel, 3:2 table" }, bj(1.5, 0.0200)),
       "feel-65": Object.assign({ name: "Playing by feel, 6:5 table" }, bj(1.2, 0.0340)),
-      "insurance": { name: "Insurance (6 decks)", edge: 0.0740, kind: "exact",
+      "insurance": { min: 5, name: "Insurance (6 decks)", edge: 0.0740, kind: "exact",
         rows: [ {p: 96/311, x: 2}, {p: 215/311, x: -1} ] },
       "lucky-ladies": { name: "Lucky Ladies side bet (typical paytable)", edge: 0.2469, kind: "approx", sd: 5.0,
         rows: [ {p: 0.00001, x: 1000}, {p: 0.0002, x: 125}, {p: 0.004, x: 19}, {p: 0.0045, x: 9}, {p: 0.075, x: 4}, {p: 0.9163, x: -1} ] }
@@ -214,7 +219,7 @@ window.TTG_GAMES = (function () {
     return { name: name, edge: edge, kind: "approx", sd: sd, rows: rows };
   }
   G["blackjack-variants"] = {
-    name: "Blackjack variants", pace: 70, paceNote: "hands per hour at a moderately busy table (Switch: two hands each)",
+    name: "Blackjack variants", pace: 70, min: 10, paceNote: "hands per hour at a moderately busy table (Switch: two hands each)",
     unit: 25, defaultBet: "spanish21-s17",
     bets: {
       "spanish21-s17": bjv("Spanish 21, dealer stands on soft 17", 0.0040, 1.25, 1.5, [ {p: 0.004, x: 3}, {p: 0.002, x: 1.5} ]),

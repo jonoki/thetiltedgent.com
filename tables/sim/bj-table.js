@@ -435,7 +435,7 @@ window.BJTable = (function () {
       if (wantRC || wantTC) { promptCount(wantRC ? 'rc' : 'tc', function () { if (wantRC && wantTC) promptCount('tc', function () { rebet(); if (S.autoNext) wait(startRoundIfBet, 600); }); else { rebet(); if (S.autoNext) wait(startRoundIfBet, 600); } }); return; }
       wait(function () { rebet(); if (S.autoNext) wait(startRoundIfBet, Math.max(S.speed * 2, 600)); }, 1500);
     }
-    function startRoundIfBet() { if (sum(S.mainChips) > 0) startRound(); }
+    function startRoundIfBet() { if (sum(S.mainChips) >= MIN_BET) startRound(); }
     function rebet() {
       if (sum(S.mainChips) > 0 || betLocked()) return sum(S.mainChips) > 0;
       var mainAmt, bonusAmt = 0;
@@ -508,8 +508,13 @@ window.BJTable = (function () {
         tile('Your actual edge', n ? pc(sumBet ? W.mine.you / sumBet : 0) : '—', W.mine.you > 0 ? 'up' : 'dn', n ? 'your bets, your plays' : '') +
         '</div>';
       if (n) {
-        h += '<h4>Expected value three ways</h4><div class="tw"><table class="bjt-tags bjt-ev3"><tr><th>Bet sizing</th><th>Wagered</th><th>Book play</th><th>Your play</th><th>Edge</th></tr>';
-        [['1 unit flat (' + money(S.unitSize) + ')', W.flat], ['Count-optimal ramp', W.ramp], ['Your sizing', W.mine]].forEach(function (r) { var o = r[1]; h += '<tr><td>' + r[0] + '</td><td>' + money(o.bet) + '</td><td class="' + (o.book >= 0 ? 'up' : 'dn') + '">' + money(o.book) + '</td><td class="' + (o.you >= 0 ? 'up' : 'dn') + '">' + money(o.you) + '</td><td>' + pc(o.bet ? o.you / o.bet : 0) + '</td></tr>'; });
+        h += '<h4>Expected value three ways</h4><div class="tw"><table class="bjt-tags bjt-ev3"><tr><th></th><th>1 unit flat (' + money(S.unitSize) + ')</th><th>Count-optimal ramp</th><th>Your sizing</th></tr>';
+        // one column per way of betting, so the table fits the side pane (five columns ran off it at desktop width)
+        var ways = [W.flat, W.ramp, W.mine], upDn = function (v) { return v >= 0 ? 'up' : 'dn'; };
+        h += '<tr><td>Wagered</td>' + ways.map(function (o) { return '<td>' + money(o.bet) + '</td>'; }).join('') + '</tr>';
+        h += '<tr><td>Book play</td>' + ways.map(function (o) { return '<td class="' + upDn(o.book) + '">' + money(o.book) + '</td>'; }).join('') + '</tr>';
+        h += '<tr><td>Your play</td>' + ways.map(function (o) { return '<td class="' + upDn(o.you) + '">' + money(o.you) + '</td>'; }).join('') + '</tr>';
+        h += '<tr><td>Edge, your play</td>' + ways.map(function (o) { return '<td>' + pc(o.bet ? o.you / o.bet : 0) + '</td>'; }).join('') + '</tr>';
         h += '</table></div><p class="bjt-help">Same shoe, same counts, three ways of betting into it. <b>Book play</b> is the count-optimal play on every hand; <b>your play</b> charges each hand the EV your decisions gave up, scaled to that bet size. Counting pays in two places: the gap between the flat row and the ramp row is bet sizing; the gap between book play and your play is decisions.</p>';
         h += '<h4>Where the money went</h4><div class="bjt-stats">' +
           tile('Expected, your bets & plays', money(W.mine.you), W.mine.you >= 0 ? 'up' : 'dn', 'shoe ' + money(W.mine.book) + ' − decisions ' + money(cost)) +
@@ -581,7 +586,8 @@ window.BJTable = (function () {
     function toChips(amount) { var out = [], i; for (i = DENOMS.length - 1; i >= 0; i--) { while (amount >= DENOMS[i] - 1e-9) { out.push(DENOMS[i]); amount -= DENOMS[i]; } } if (amount > 0.01) out.push(1); return out; }
     function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
     var target = 'main';
-    function suggestUnit(bank) { var raw = bank / 100, steps = [1, 2, 5, 10, 25, 50, 100, 250, 500], best = steps[0], i; for (i = 0; i < steps.length; i++) if (steps[i] <= raw) best = steps[i]; return best; }
+    var MIN_BET = 10;   // table minimum on the main bet, as at the other trainers (Oki, 2 Nov 2026)
+    function suggestUnit(bank) { var raw = bank / 100, steps = [10, 25, 50, 100, 250, 500], best = steps[0], i; for (i = 0; i < steps.length; i++) if (steps[i] <= raw) best = steps[i]; return best; }
     function rampUnits(tc) { var ramp = game.system.betRamp, u = ramp[0][1], i; for (i = 0; i < ramp.length; i++) if (tc >= ramp[i][0]) u = ramp[i][1]; return u; }
     function returnChips(which) { var arr = which === 'main' ? S.mainChips : S.bonusChips; S.bankroll += sum(arr); arr.length = 0; saveSettings(S); }
     function betLocked() { return !!(round && round.stage !== 'done'); }
@@ -591,7 +597,8 @@ window.BJTable = (function () {
     var betctl = el('div', 'bjt-betctl'); bank.appendChild(betctl);
     var feedback = el('div', 'bjt-feedback'); bank.appendChild(feedback);
     var dealBtn = el('button', 'bjt-btn gold', 'Deal'); dealBtn.type = 'button';
-    dealBtn.addEventListener('click', function () { if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; if (sum(S.mainChips) <= 0) { feedback.innerHTML = '<span class="bad">Put chips in the betting circle first — click a chip in your rack.</span>'; return; } startRound(); });
+    dealBtn.addEventListener('click', function () { if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; if (sum(S.mainChips) <= 0) { feedback.innerHTML = '<span class="bad">Put chips in the betting circle first — click a chip in your rack.</span>'; return; }
+      if (sum(S.mainChips) < MIN_BET) { feedback.innerHTML = '<span class="bad">The table minimum is $' + MIN_BET + '. Add chips to the betting circle.</span>'; return; } startRound(); });
     var rebuy = el('button', 'bjt-btn ghost', 'Rebuy'); rebuy.type = 'button'; rebuy.hidden = true;
     rebuy.addEventListener('click', function () { S.bankroll += S.startBankroll; saveSettings(S); renderBank(); feedback.innerHTML = '<span class="ok">Rebought for $' + S.startBankroll.toLocaleString() + '. The trainer keeps score of how often that happens.</span>'; });
     var btnrow = el('div', 'bjt-bankbtns'); btnrow.appendChild(dealBtn); btnrow.appendChild(rebuy); bank.appendChild(btnrow);
@@ -611,8 +618,8 @@ window.BJTable = (function () {
       var mainSum = sum(S.mainChips), bonusSum = sum(S.bonusChips);
       betctl.innerHTML = '';
       var unitLab = el('label', 'bjt-field'); unitLab.appendChild(el('span', 'k', '1 unit ($)'));
-      var unitIn = el('input'); unitIn.type = 'number'; unitIn.min = '1'; unitIn.step = '1'; unitIn.value = S.unitSize; unitIn.disabled = locked;
-      unitIn.addEventListener('change', function () { S.unitSize = Math.max(1, Math.round(+unitIn.value || suggestUnit(S.startBankroll))); saveSettings(S); renderBank(); });
+      var unitIn = el('input'); unitIn.type = 'number'; unitIn.min = String(MIN_BET); unitIn.step = '1'; unitIn.value = S.unitSize; unitIn.disabled = locked;
+      unitIn.addEventListener('change', function () { S.unitSize = Math.max(MIN_BET, Math.round(+unitIn.value || suggestUnit(S.startBankroll))); saveSettings(S); renderBank(); });
       unitLab.appendChild(unitIn); betctl.appendChild(unitLab);
       var tc = Math.floor(game.trueCount()), units = rampUnits(tc), rampAmt = units * S.unitSize;
       var rampInfo = el('div', 'bjt-rampinfo', S.rampBets
@@ -628,7 +635,7 @@ window.BJTable = (function () {
       clear.addEventListener('click', function () { returnChips('main'); returnChips('bonus'); renderFelt(); renderBank(); });
       bb.appendChild(rampBtn); bb.appendChild(rep); bb.appendChild(clear); betctl.appendChild(bb);
       dealBtn.disabled = locked || mainSum <= 0;
-      rebuy.hidden = !(S.bankroll < 1 && mainSum <= 0);
+      rebuy.hidden = !(S.bankroll < MIN_BET && mainSum < MIN_BET);
     }
     var lastBet = null;
     // payout animation: chips appear beside the circle, then flow to the rack (or the bet flows to the dealer)
@@ -683,7 +690,7 @@ window.BJTable = (function () {
     function rebuild(keepNothing) {
       if (timer) clearTimeout(timer); timer = null; paused = false; pendingCheck = false; pauseBtn.textContent = 'Pause';
       game = new B.Game({ rules: { decks: S.decks, h17: S.h17, das: S.das, surrender: S.surrender, penetration: S.penetration }, system: S.system });
-      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; if (!S.unitSize) S.unitSize = suggestUnit(S.startBankroll); renderBank();
+      round = null; feedback.innerHTML = ''; checkOut.innerHTML = ''; root.__game = game; if (typeof S.bankroll !== 'number' || isNaN(S.bankroll)) S.bankroll = S.startBankroll; if (!Array.isArray(S.mainChips)) S.mainChips = []; if (!Array.isArray(S.bonusChips)) S.bonusChips = []; if (!(S.unitSize >= MIN_BET)) S.unitSize = suggestUnit(S.startBankroll); renderBank();
       renderGuide(); renderStrategy(); renderValues(); renderStats(); renderEdge(); renderFelt();
       say(S.mode === 'play' ? 'Set your bet and press Deal. Keys: H, S, D, P, R; space pauses.' : 'Count drill: press Deal and everyone plays basic strategy on their own — just keep the count. Space pauses; check your count from the Count tab.', 'info');
     }

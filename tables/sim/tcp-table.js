@@ -375,14 +375,16 @@ window.TcpTable = (function () {
     function tile(k, v, c, s) { return '<div class="st"><div class="k">' + k + '</div><div class="v ' + (c || '') + '">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
     function renderSession() {
       var L = T.ledger, pane = $('.tcp-pane[data-p="session"]');
+      // the tiles show cents; round three terms and let dealer luck take the remainder so the shown terms add up to the shown Actual
+      var r2 = function (x) { return Math.round(x * 100) / 100; }, rE = r2(L.expected), rD = r2(L.dealLuck), rC = r2(L.decisionCost), rR = r2(r2(L.actual) - rE - rD + rC);
       var h = '<div class="tcp-stats">' +
         tile('Hands', L.hands.toLocaleString('en-US'), '', L.decisions ? L.plays + ' played · ' + L.folds + ' folded' : '') +
         tile('Money put up', usd(L.wagered), '', 'Antes, Plays and Pair Plus') +
-        tile('Expected result', signed(L.expected, true), cls(L.expected), 'the house edge on each bet as it was dealt') +
+        tile('Expected result', signed(rE, true), cls(rE), 'the house edge on each bet as it was dealt') +
         tile('Actual result', signed(L.actual), cls(L.actual), 'what the rack says') +
-        tile('Deal luck', signed(L.dealLuck, true), cls(L.dealLuck), 'the cards you got: value once seen, minus value before') +
-        tile('Dealer luck', signed(L.dealerLuck, true), cls(L.dealerLuck), 'the dealer’s cards: result, minus value after your decision') +
-        tile('Decision cost', usd(L.decisionCost, true), L.decisionCost > 0.005 ? 'dn' : '', L.decisions ? (L.decisions - L.mistakes) + ' of ' + L.decisions + ' decisions right' + (L.forced ? ' · ' + L.forced + ' forced by a short rack' : '') : 'value given up by a wrong Play or fold') +
+        tile('Deal luck', signed(rD, true), cls(rD), 'the cards you got: value once seen, minus value before') +
+        tile('Dealer luck', signed(rR, true), cls(rR), 'the dealer’s cards: result, minus value after your decision') +
+        tile('Decision cost', usd(rC, true), rC > 0.005 ? 'dn' : '', L.decisions ? (L.decisions - L.mistakes) + ' of ' + L.decisions + ' decisions right' + (L.forced ? ' · ' + L.forced + ' forced by a short rack' : '') : 'value given up by a wrong Play or fold') +
         tile('Q-6-4 rule', L.decisions ? L.q64Agree + ' of ' + L.decisions : '—', '', 'decisions that matched it') + '</div>' +
         '<p class="tcp-help"><b>Actual = expected + deal luck − decision cost + dealer luck.</b> Expected is fixed when the cards are dealt. Deal luck is what your three cards turned the bets into; decision cost is what a wrong Play or fold gave back; dealer luck is everything the dealer’s three cards did after that.</p>';
       var K = L.byKey, rows = [['Ante & Play', K.ante, eA(), 'Ante, Play and bonus'], ['Pair Plus', K.pp, eP(), G.rules.pp]].filter(function (r) { return r[1].bets; });

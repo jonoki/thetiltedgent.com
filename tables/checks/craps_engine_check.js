@@ -75,7 +75,9 @@ var MAP = [
   [/^Place 6 or 8/, g.byKey.place6.edge], [/^Buy 4 or 10/, g.byKey.buy4.edge], [/^Lay 4 or 10/, g.byKey.lay4.edge],
   [/^Field \(2x on 2, 3x/, g.byKey.field.edge], [/^Place 5 or 9/, g.byKey.place5.edge], [/^Field \(2x on both/, g2.byKey.field.edge],
   [/^Place 4 or 10/, g.byKey.place4.edge], [/^Hard 6/, g.byKey.hard6.edge], [/^Big 6/, g.byKey.big6.edge], [/^Hard 4/, g.byKey.hard4.edge],
-  [/^Any craps/, g.byKey.anycraps.edge], [/^Horn/, horn], [/^2 or 12/, g.byKey.two.edge], [/^Any seven/, g.byKey.any7.edge]];
+  [/^Any craps/, g.byKey.anycraps.edge], [/^Horn/, horn], [/^2 or 12/, g.byKey.two.edge], [/^Any seven/, g.byKey.any7.edge],
+  [/^Put bet 6 or 8 \+ 5x/, g.putCombo(6).edge], [/^Put bet 5 or 9 \+ 4x/, g.putCombo(5).edge], [/^Put bet 4 or 10 \+ 3x/, g.putCombo(4).edge],
+  [/^Put bet 6 or 8 \(alone/, g.edge('put', 6)], [/^Put bet 5 or 9 \(alone/, g.edge('put', 5)], [/^Put bet 4 or 10 \(alone/, g.edge('put', 4)]];
 ok(rows.length === MAP.length, 'craps.html has ' + rows.length + ' edge rows, expected ' + MAP.length);
 rows.forEach(function (r) {
   var hit = MAP.filter(function (x) { return x[0].test(r.name); })[0];

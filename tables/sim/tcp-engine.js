@@ -275,6 +275,8 @@
   Table.prototype.deal = function (cards) {
     if (this.phase !== 'bet') return { ok: false, reason: 'Finish this hand first: Play or fold.' };
     var b = this.bets; if (!b.ante && !b.pp) return { ok: false, reason: 'Put a bet down first: an Ante, a Pair Plus, or both.' };
+    // a real table won't deal you an Ante you can't back with a Play, so a good hand is never folded for want of chips
+    if (b.ante > this.bank) return { ok: false, reason: 'Keep enough in the rack to Play: the Play bet matches your ' + usd(b.ante) + ' Ante, and the rack holds ' + usd(this.bank) + '. Lower the Ante or the Pair Plus.' };
     var g = this.g, c = cards || dealSix(this.rng), L = this.ledger;
     var player = c.slice(0, 3), dealer = c.slice(3, 6), d = g.decision(player);
     var eA = g.ante().edge, eP = g.pairPlus().edge;

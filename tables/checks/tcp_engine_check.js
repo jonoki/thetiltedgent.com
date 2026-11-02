@@ -103,8 +103,18 @@ var pubAnte = [['games.js ante-play edge', GJ.bets['ante-play'].edge, A541.edge,
                ['games.js ante-play avgWager', GJ.bets['ante-play'].avgWager, A541.avgWager, 5e-4]];
 console.log('\n   vs tables/sim/games.js');
 pubAnte.forEach(function (x) { if (ok(Math.abs(x[1] - x[2]) <= x[3], x[0] + ': ' + x[1] + ' vs ' + x[2])) console.log('   ok   ' + pad(x[0], 30) + lpad(x[1], 8) + '  engine ' + x[2].toFixed(5)); });
-var foldPub = GJ.bets['ante-play'].rows[0].p;      // the fold row of the calibrated shape
-if (ok(Math.abs(foldPub - A541.pFold) < 5e-4, 'games.js fold share ' + foldPub + ' vs ' + A541.pFold)) console.log('   ok   ' + pad('games.js fold share (x = -1 row)', 30) + lpad(foldPub, 8) + '  engine ' + A541.pFold.toFixed(5));
+// the exact outcome table: net per Ante under Q-6-4 with the 5-4-1 bonus on the hand it pays on, from the classes
+var joint = {}, TPD = E.N_HANDS * E.N_DEALER;
+function jadd(x, k) { if (k) joint[x] = (joint[x] || 0) + k; }
+E.classes().forEach(function (e) {
+  if (!E.q64(e.score)) { jadd(-1, e.count * E.N_DEALER); return; }
+  var b = E.BONUS['541'][E.catOf(e.score)] || 0;
+  jadd(1 + b, e.count * e.nq); jadd(2 + b, e.count * e.w); jadd(-2 + b, e.count * e.l); jadd(b, e.count * e.t);
+});
+var gjRows = GJ.bets['ante-play'].rows, rowsOk = GJ.bets['ante-play'].kind === 'exact' && !GJ.bets['ante-play'].bonusRows &&
+  gjRows.length === Object.keys(joint).length && gjRows.every(function (r) { return Math.abs(r.p - joint[r.x] / TPD) < 1e-15; });
+if (ok(rowsOk, 'games.js ante-play rows are not the exact outcome table ' + JSON.stringify(joint) + ' / ' + TPD))
+  console.log('   ok   ' + pad('games.js ante-play rows', 30) + lpad(gjRows.length, 8) + '  engine: every row exact (fold share ' + A541.pFold.toFixed(5) + ')');
 var PPMAP = { 'pair-plus-40-30-6-3-1': '40-30-6-3-1', 'pair-plus-40-30-6-4-1': '40-30-6-4-1', 'pair-plus-50-30-6-3-1': '50-30-6-3-1' };
 Object.keys(PPMAP).forEach(function (k) {
   var mine = E.create({ pp: PPMAP[k] }).pairPlus(), pub = GJ.bets[k].edge;
@@ -270,7 +280,7 @@ var SIZES = [1, 5, 10, 10, 15, 25, 25, 50, 100, 100, 250, 500, 999, 1000, 1001, 
 var maxes = E.MAXES, sess = [];
 function runSession(rules, hands, seed, bankroll) {
   var g = E.create(rules), X = g.Table({ seed: seed, bankroll: bankroll });
-  var st = { hands: 0, booked: 0, refused: 0, plays: 0, folds: 0, refusedPlay: 0, audits: 0, illegal: [], identWorst: 0, dl: 0, dl2: 0, rl: 0, rl2: 0, nr: 0, bal: 0 };
+  var st = { hands: 0, booked: 0, refused: 0, plays: 0, folds: 0, refusedPlay: 0, refusedDeal: 0, audits: 0, illegal: [], identWorst: 0, dl: 0, dl2: 0, rl: 0, rl2: 0, nr: 0, bal: 0 };
   function check(where) { st.audits++; var w = audit(X); if (w.length && st.illegal.length < 5) st.illegal.push(where + ': ' + w.join('; ')); }
   for (var n = 0; n < hands; n++) {
     var tries = 1 + Math.floor(srng() * 4);
@@ -283,6 +293,11 @@ function runSession(rules, hands, seed, bankroll) {
     if (srng() < 0.1 && X.bets.ante) X.remove('ante');
     if (!X.bets.ante && !X.bets.pp) { if (!X.place({ type: 'pp', amount: 10 }).ok) { X.bank += 1000; X.rebuys = (X.rebuys || 0) + 1000; X.place({ type: 'pp', amount: 10 }); } }
     var bankBefore = X.bank + X.onFelt(), dr = X.deal();
+    if (!dr.ok && X.bets.ante > X.bank) {          // an Ante the rack can't match with a Play: refused, so take it back
+      st.refusedDeal++; X.remove('ante');
+      if (!X.bets.pp && !X.place({ type: 'pp', amount: 10 }).ok) { X.bank += 1000; X.rebuys = (X.rebuys || 0) + 1000; X.place({ type: 'pp', amount: 10 }); }
+      bankBefore = X.bank + X.onFelt(); dr = X.deal();
+    }
     if (!ok(dr.ok, 'deal refused: ' + dr.reason)) break;
     check('hand ' + n + ' after the deal');
     var h = dr.hand;
@@ -317,13 +332,13 @@ function runSession(rules, hands, seed, bankroll) {
 var t3 = Date.now();
 var S1 = runSession({ max: 1000 }, HANDS, 77, START);
 var S2 = runSession({ max: 500, bonus: '321', pp: '50-30-6-3-1' }, 20000, 78, START);
-var S3 = runSession({ max: 5000, bonus: '431', pp: '40-30-6-4-1' }, 20000, 79, 300);    // a short rack: Play is often unaffordable
+var S3 = runSession({ max: 5000, bonus: '431', pp: '40-30-6-4-1' }, 20000, 79, 300);    // a short rack: deals are often refused until the Ante can be matched
 console.log('\n3. Random sessions (' + (Date.now() - t3) + ' ms)');
 [['default table, $1,000 max', S1, START], ['3-2-1 / 50-30-6-3-1, $500 max', S2, START], ['4-3-1 / 40-30-6-4-1, $5,000 max, $300 rack', S3, 300]].forEach(function (x) {
   var s = x[1], L = s.L, zd = (s.dl / s.hands) / Math.sqrt((s.dl2 / s.hands - Math.pow(s.dl / s.hands, 2)) / s.hands),
       zr = (s.rl / s.nr) / Math.sqrt((s.rl2 / s.nr - Math.pow(s.rl / s.nr, 2)) / s.nr);
   console.log('   ' + x[0] + ': ' + fmt(s.hands) + ' hands, ' + fmt(s.booked) + ' bets booked, ' + fmt(s.refused) + ' refused; ' + fmt(s.plays) + ' played, ' + fmt(s.folds) + ' folded' +
-              (s.refusedPlay ? ' (' + fmt(s.refusedPlay) + ' Play refused: rack short)' : ''));
+              (s.refusedDeal ? ' (' + fmt(s.refusedDeal) + ' deals refused: rack too short to Play the Ante)' : ''));
   console.log('     wagered $' + fmt(Math.round(L.wagered)) + ' · expected $' + L.expected.toFixed(2) + ' · actual $' + L.actual.toFixed(2) + ' · deal luck $' + L.dealLuck.toFixed(2) +
               ' · dealer luck $' + L.dealerLuck.toFixed(2) + ' · decision cost $' + L.decisionCost.toFixed(2));
   console.log('     actual - (expected + deal luck - decision cost + dealer luck) = ' + s.cum.toExponential(2) + ' (worst single hand ' + s.identWorst.toExponential(2) + ')');
@@ -339,7 +354,8 @@ console.log('\n3. Random sessions (' + (Date.now() - t3) + ' ms)');
   ok(Math.abs(zr) < 3.29, x[0] + ': dealer luck mean z ' + zr);
   s.illegal.forEach(function (w) { ok(false, x[0] + ' ' + w); });
 });
-ok(S3.refusedPlay > 0, 'the short-rack session exercised an unaffordable Play');
+ok(S3.refusedDeal > 0, 'the short-rack session exercised a deal refused for an Ante the rack can’t Play');
+ok(S1.refusedPlay + S2.refusedPlay + S3.refusedPlay === 0, 'a Play was refused for want of chips after the deal');
 
 /* ---------- 4. the table refuses every illegal bet ---------- */
 function refuses(rules, setup, spec, why) {
@@ -377,7 +393,7 @@ var Y = E.create().Table({ seed: 3, bankroll: 1e6 });
 var other = [['deal with no bets', !Y.deal().ok], ['decide with no hand', !Y.act('fold').ok]];
 Y.place({ type: 'ante', amount: 10 }); Y.deal(); other.push(['deal again before the decision', !Y.deal().ok]); other.push(['an unknown decision', !Y.act('raise').ok]);
 var Z = E.create().Table({ seed: 3, bankroll: 1010 }); Z.place({ type: 'ante', amount: 1000 }); Z.deal(H('As Kh 9d Js Th 8d'));
-other.push(['a short rack can still fold', Z.act('fold').ok && Z.bank === 10]);
+other.push(['no deal on an Ante the rack can’t match with a Play', Z.phase === 'bet' && !Z.hand && Z.bank === 10 && Z.bets.ante === 1000]);
 var Q = E.create().Table({ seed: 3, bankroll: 100 }); Q.place({ type: 'ante', amount: 50 }); Q.place({ type: 'pp', amount: 10 });
 other.push(['taking a bet back before the deal', Q.remove('ante').ok && Q.bank === 90]); Q.deal(H('As Kh 9d Js Th 8d'));
 other.push(['no taking bets back after the deal', !Q.remove('pp').ok]);

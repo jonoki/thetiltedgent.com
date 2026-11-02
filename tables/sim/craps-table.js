@@ -151,7 +151,7 @@ window.CrapsTable = (function () {
         sel('max', 'Table maximum', [[500, '$500'], [1000, '$1,000'], [2000, '$2,000'], [5000, '$5,000']], S.max) +
         sel('start', 'Buy-in', [[500, '$500'], [1000, '$1,000'], [5000, '$5,000']], S.start) +
         '<label class="cpt-toggle"><input type="checkbox" data-k="stayUp"' + (S.stayUp ? ' checked' : '') + '> Winning bets stay up</label>' +
-        '<p class="cpt-note">Changing a table rule clears the felt and starts a new session.</p>' +
+        '<p class="cpt-note">$10 minimum on line, come, field, Big 6/8 and place bets ($12 on the 6 and 8). Hardways and one-roll bets start at $1. Each bet’s card shows its own minimum. Changing a table rule clears the felt and starts a new session.</p>' +
       '</div>' +
       '<div class="cpt-grid"><div class="cpt-main">' +
         '<div class="cpt-tray">' +

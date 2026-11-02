@@ -127,22 +127,26 @@ window.TTGSim = (function () {
     canvas.width = W * dpr; canvas.height = H * dpr;
     var g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
-    var padL = 64, padR = 16, padT = 18, padB = 34, pw = W - padL - padR, ph = H - padT - padB;
     var K = sim.K, n = sim.n, i;
     // y range: cover the 95% band, the sample paths, and zero, with a little headroom
     var lo = 0, hi = 0;
     for (i = 0; i < K; i++) { lo = Math.min(lo, sim.bands[0][i]); hi = Math.max(hi, sim.bands[4][i]); }
     sim.samples.concat([sim.bestPath, sim.worstPath]).forEach(function (s) { for (i = 0; i < s.length; i++) { lo = Math.min(lo, s[i]); hi = Math.max(hi, s[i]); } });
     var span = Math.max(hi - lo, 1) * 1.06; lo -= (span - (hi - lo)) / 2; hi = lo + span;
+    // the left margin fits the widest money label plus the rotated axis title, so the two never overlap
+    var ticks = niceTicks(lo * unit, hi * unit, 5), tickTxt = ticks.map(function (t) { return money(t / unit, unit, 0).replace('+', ''); });
+    g.font = '12px "JetBrains Mono", monospace';
+    var labW = 0; tickTxt.forEach(function (s) { labW = Math.max(labW, g.measureText(s).width); });
+    var padL = Math.max(64, Math.ceil(labW) + 32), padR = 16, padT = 18, padB = 44, pw = W - padL - padR, ph = H - padT - padB;
     function X(k) { return padL + (k / K) * pw; }           // k = checkpoint index 0..K (0 = start)
     function Y(v) { return padT + (hi - v) / (hi - lo) * ph; }
     // gridlines
-    var ticks = niceTicks(lo * unit, hi * unit, 5);
-    g.strokeStyle = C.line; g.lineWidth = 1; g.font = '11px "JetBrains Mono", monospace'; g.fillStyle = C.dim2; g.textAlign = 'right';
-    ticks.forEach(function (t) { var y = Y(t / unit); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(money(t / unit, unit, 0).replace('+', ''), padL - 8, y + 4); });
+    g.strokeStyle = C.line; g.lineWidth = 1; g.fillStyle = C.dim2; g.textAlign = 'right';
+    ticks.forEach(function (t, j) { var y = Y(t / unit); g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(tickTxt[j], padL - 8, y + 4); });
     g.textAlign = 'center';
     var xt = niceTicks(0, n, 6);
-    xt.forEach(function (t) { var x = X(t / sim.step); g.fillText(num(t), x, H - padB + 18); });
+    // a tick label near the right edge is pulled in so it isn't clipped
+    xt.forEach(function (t) { var s = num(t), w = g.measureText(s).width, x = Math.min(X(t / sim.step), W - 2 - w / 2); g.fillText(s, x, H - padB + 18); });
     // bands
     function band(loB, hiB, alpha) {
       g.beginPath(); g.moveTo(X(0), Y(0));
@@ -165,13 +169,13 @@ window.TTGSim = (function () {
     // median path
     g.strokeStyle = C.gold; g.lineWidth = 2.2; g.beginPath(); g.moveTo(X(0), Y(0)); for (i = 0; i < K; i++) g.lineTo(X(i + 1), Y(sim.bands[2][i])); g.stroke();
     // end labels for best and worst
-    g.font = '600 11px "JetBrains Mono", monospace'; g.textAlign = 'right';
+    g.font = '600 12px "JetBrains Mono", monospace'; g.textAlign = 'right';
     function endLabel(arr, color, text) { var y = Y(arr[arr.length - 1]), x = X(K) - 4; var w = g.measureText(text).width + 10; g.fillStyle = 'rgba(6,5,11,.8)'; g.fillRect(x - w, y - 9, w, 18); g.fillStyle = color; g.fillText(text, x - 5, y + 4); }
     var bLab = 'BEST ' + money(sim.bestPath[sim.bestPath.length - 1], unit, 0), wLab = 'WORST ' + money(sim.worstPath[sim.worstPath.length - 1], unit, 0);
     endLabel(sim.bestPath, C.green, bLab); endLabel(sim.worstPath, C.red, wLab);
-    // axes labels
-    g.fillStyle = C.dim; g.textAlign = 'right'; g.font = '10.5px "JetBrains Mono", monospace';
-    g.fillText('BETS →', W - padR, H - 6);
+    // axes labels: the x title on its own line under the tick labels
+    g.fillStyle = C.dim; g.textAlign = 'right'; g.font = '12px "JetBrains Mono", monospace';
+    g.fillText('BETS →', W - padR, H - 4);
     g.save(); g.translate(12, padT + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.fillText('PROFIT / LOSS', 0, 0); g.restore();
   }
   function niceTicks(lo, hi, count) {
@@ -205,14 +209,17 @@ window.TTGSim = (function () {
     var form = el('div', 'simform');
     var betSel = el('select'); Object.keys(game.bets).forEach(function (k) { var o = el('option', null, game.bets[k].name); o.value = k; betSel.appendChild(o); });
     betSel.value = state.bet;
-    var unitIn = el('input'); unitIn.type = 'number'; unitIn.min = '0.05'; unitIn.step = 'any'; unitIn.value = state.unit;
+    var unitIn = el('input'); unitIn.type = 'number'; unitIn.step = 'any'; unitIn.value = state.unit;
+    var minOut = el('span', 'simhours');
+    // the smallest bet a real table takes on this bet: the bet's own floor, else the game's (games.js `min`)
+    function minFor(k) { var b = game.bets[k]; return b.min != null ? b.min : (game.min != null ? game.min : 0.05); }
     var nIn = el('input'); nIn.type = 'number'; nIn.min = '10'; nIn.max = '20000'; nIn.step = '10'; nIn.value = state.n;
     var hoursOut = el('span', 'simhours');
     var run = el('button', 'simrun', 'Run 1,000 sessions'); run.type = 'button';
     var reroll = el('button', 'simroll', '↻ New dice'); reroll.type = 'button';
     function field(label, node, extra) { var f = el('label', 'simfield'); f.appendChild(el('span', 'k', label)); f.appendChild(node); if (extra) f.appendChild(extra); return f; }
     form.appendChild(field('Bet', betSel));
-    form.appendChild(field('Unit ($)', unitIn));
+    form.appendChild(field('Unit ($)', unitIn, minOut));
     form.appendChild(field('Bets', nIn, hoursOut));
     var btns = el('div', 'simbtns'); btns.appendChild(run); btns.appendChild(reroll); form.appendChild(btns);
     wrap.appendChild(form);
@@ -228,8 +235,11 @@ window.TTGSim = (function () {
     function updateHours() { var hrs = state.n / game.pace; hoursOut.textContent = '≈ ' + (hrs < 10 ? hrs.toFixed(1) : Math.round(hrs)) + ' hr at ' + game.pace + '/hr'; }
     function tile(k, v, cls, sub) { return '<div class="st' + (cls ? ' ' + cls : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>'; }
     function render() {
-      state.bet = betSel.value; state.unit = Math.max(0.05, +unitIn.value || game.unit); state.n = Math.max(10, Math.min(20000, Math.round(+nIn.value || 500)));
-      unitIn.value = state.unit; nIn.value = state.n; updateHours();
+      state.bet = betSel.value;
+      var mn = minFor(state.bet), asked = +unitIn.value || game.unit;
+      state.unit = Math.max(mn, asked); state.n = Math.max(10, Math.min(20000, Math.round(+nIn.value || 500)));
+      unitIn.min = String(mn); unitIn.value = state.unit; nIn.value = state.n; updateHours();
+      minOut.textContent = (asked < mn ? 'raised to the ' : '') + 'table minimum ' + money(1, mn, mn % 1 ? 2 : 0).replace('+', '');
       var bet = game.bets[state.bet], prep = prepare(bet), n = state.n, unit = state.unit;
       var paths = 1000, K = Math.min(n, 200);
       var sim = simulate(prep, n, paths, state.seed, K, 20);
@@ -256,6 +266,7 @@ window.TTGSim = (function () {
       var story = el('p', 'simstory'); story.innerHTML = '<b>Best and worst of the thousand.</b> Playing ' + num(n) + ' bets of ' + money(1, unit, unit % 1 ? 2 : 0).replace('+', '') + ' on <b>' + bet.name + '</b>, the luckiest of the 1,000 sessions finished at <b class="up">' + money(sim.best, unit, 0) + '</b> and the unluckiest at <b class="dn">' + money(sim.worst, unit, 0) + '</b>; the typical session landed at ' + money(sim.median, unit, 0) + ' against an expectation of ' + money(evTot, unit, 0) + '. ' + (sim.best > 0 ? 'Someone in that room walked away a winner and will tell you the game is beatable — ' + pctf(1 - sim.pLoss) + ' of sessions ended ahead. ' : 'Not one session of the thousand ended ahead. ') + 'The spread between the best and worst is ' + money(sim.best - sim.worst, unit, 0).replace('+', '') + ' wide, which is why the edge is invisible from inside a single night.';
       foot.innerHTML = ''; foot.appendChild(story);
       var fine = el('span'); fine.textContent = '1,000 simulated sessions of ' + num(n) + ' bets, drawn from the bet’s actual outcome table (not a normal approximation). Bands are the empirical 15th–85th and 2.5th–97.5th percentiles across sessions at each point. Seed ' + state.seed + ' — the link in your address bar reproduces this exact chart. Education, not advice: the point is to see what the edge looks like from inside a session.'; foot.appendChild(fine);
+      if (window.tgTerms) window.tgTerms(document);   // concept tooltips on the redrawn tiles (assets/site.js); the first render runs before site.js
     }
     run.addEventListener('click', render);
     reroll.addEventListener('click', function () { state.seed = Math.floor(Math.random() * 1e9) + 1; render(); });

@@ -70,10 +70,13 @@ def variant_sim(p: FamilyPage) -> str:
                        'The simulator needs JavaScript. The house edge on every variant is in the table above.')
 
 
+SIM_V = '20261102'   # ?v= on the simulator scripts: bump whenever games.js or ttg-sim.js changes (Pages caches for ten minutes)
+
+
 def sim_scripts(game: str, bets_per_session: int) -> str:
     return f'''
-<script src="sim/games.js"></script>
-<script src="sim/ttg-sim.js"></script>
+<script src="sim/games.js?v={SIM_V}"></script>
+<script src="sim/ttg-sim.js?v={SIM_V}"></script>
 <script>TTGSim.mount('#simmount', {{game: '{game}', n: {bets_per_session}}});</script>'''
 
 
