@@ -8,6 +8,8 @@ Runs, from the repo root:
   the tools unit tests         py -3 -m unittest discover -s tools/tests -t tools
   the Tables builder tests     py -3 -m unittest discover -s tables/checks -t tables  (incl. committed pages == build)
   the Tables engine checks     node tables/checks/{craps_engine_check,games_check,uth_trips_check,bj_engine_check,baccarat_engine_check,tcp_engine_check}.js
+  the analyzer core tests      node --test "analyzer/test/*.test.js"
+  the analyzer reference data  py -3 tools/verify_analyzer_ref.py   (and analyzer/test/fixture_ref.json)
   the type check               py -3 -m mypy   (skipped, and said so, when mypy is not installed)
 Exits 1 when any of them fails. The report-content gates (verify.py, chart_audit.py) are separate: they
 check the published reports, not this code.
@@ -31,6 +33,9 @@ CHECKS = [
     ('blackjack engine', ['node', 'tables/checks/bj_engine_check.js']),
     ('baccarat engine', ['node', 'tables/checks/baccarat_engine_check.js']),
     ('three card poker engine', ['node', 'tables/checks/tcp_engine_check.js']),
+    ('analyzer core', ['node', '--test', '--test-reporter=tap', 'analyzer/test/*.test.js']),
+    ('analyzer reference data', [sys.executable, 'tools/verify_analyzer_ref.py']),
+    ('analyzer test fixture', [sys.executable, 'tools/verify_analyzer_ref.py', 'analyzer/test/fixture_ref.json']),
     ('glossary pages', [sys.executable, 'tools/glossary.py', '--check']),
     ('lesson key terms', [sys.executable, 'tools/lesson_terms.py', '--check']),
     ('type check', [sys.executable, '-m', 'mypy']),

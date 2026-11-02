@@ -22,6 +22,8 @@ Each finds the repo from its own location, so the working directory only matters
 | `global_calendar.py` | earnings dates the Nasdaq calendar misses (home listings abroad, US-listed global names it has no print for), from stockanalysis.com, HKEX board meetings and `data/ir_calendar.json`; run by `refresh_queue.py` | `global-<date>.json` in the queue's calendar cache |
 | `refresh_data.py` | the number layer of a refresh: settled close, chart, 52-week range, returns, P/E, yield, short interest, EPS surprise | `facts.json`, `stale_hits.txt`; with `--write` the report's structured fields |
 | `build_chips.py` | the chip and card-back SVG masters | `assets/chips/`, `assets/cards/` |
+| `analyzer_ref.py` | the Portfolio Analyzer's reference data (stocks so far: manifest + card-tag head office; schema and formulas in `analyzer/README.md`); `--check`: the file out of date | `data/analyzer_ref.json` |
+| `verify_analyzer_ref.py` | schema and sanity checks on an analyzer reference file; the stock count must equal the manifest's | nothing |
 
 Three shared modules are not run on their own. `reportlib.py` is how a report page is read (the title, as-of
 date, header price, chart series, 52-week range, metrics table, page skeleton); `reportpatch.py` is its mirror,
