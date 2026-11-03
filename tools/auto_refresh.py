@@ -38,6 +38,9 @@ import repodata as rd
 
 BRANCH = 'claude/auto-refresh'
 WORKTREE = os.path.join('.claude', 'worktrees', 'auto-refresh')   # under the main checkout; .claude/ is git-ignored
+LOCK_NAME = 'run.lock'
+# --lane NAME (Oki, 2 Nov 2026: start a price-move run now, alongside the scheduled ones): its own worktree, branch
+# and lock (BRANCH-NAME, WORKTREE-NAME, run-NAME.lock); publish() still lands it on main, merging main in when it moved.
 T2_CAP = 0           # T2 refreshes started per run, 0 = no cap; every due T1 always runs (Oki, 8 Oct 2026: no T2 cap)
 JOBS = 4             # builder/checker pairs run at once; more when there is a backlog (jobs_for)
 MAX_JOBS = 8         # Oki, 8 Oct 2026: "can do more in parallel if required"
@@ -525,6 +528,16 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: b
 
 # ---- the worktree ----
 
+def use_lane(name: str) -> None:
+    """--lane: this run's own worktree, branch and lock, so it runs beside the scheduled runs instead of after them."""
+    global BRANCH, WORKTREE, LOCK_NAME
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,30}', name):
+        raise ValueError(f'--lane {name!r}: use lowercase letters, digits and dashes')
+    BRANCH = f'claude/auto-refresh-{name}'
+    WORKTREE = os.path.join('.claude', 'worktrees', f'auto-refresh-{name}')
+    LOCK_NAME = f'run-{name}.lock'
+
+
 def main_checkout() -> str:
     common = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=rd.ROOT,
                             capture_output=True, text=True, check=True, timeout=60).stdout.strip()
@@ -585,7 +598,7 @@ def run_lock(main: str, wait_s: int = LOCK_WAIT_S, poll_s: int = LOCK_POLL_S) ->
     first Monday has both a T2 and an asset run at 17:30): an OS lock on tasks/queue/run.lock in the main checkout.
     A run that finds it held waits, polling every poll_s, up to wait_s, then raises. The OS drops the lock when the
     process ends, so a crashed run never leaves it held."""
-    path = os.path.join(main, 'tasks', 'queue', 'run.lock')
+    path = os.path.join(main, 'tasks', 'queue', LOCK_NAME)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fh = open(path, 'a+')
     deadline = time.monotonic() + wait_s
@@ -801,12 +814,16 @@ def main(argv: list[str] | None = None) -> int:
                     f'& cash and indicator reports whose as-of is --min-age days old or more ({ASSET_BRIEF})')
     ap.add_argument('--moves', help='a price-move T1 run of the reports listed in this JSON file instead of the '
                     'earnings queue (Oki, 2 Nov 2026)')
+    ap.add_argument('--lane', help='run in its own worktree, branch and lock (e.g. moves) so it need not wait for '
+                    'the scheduled runs')
     ap.add_argument('--families', default=','.join(rd.ASSET_FAMILIES), help='with --assets: the families to take')
     ap.add_argument('--min-age', type=int, default=ASSET_MIN_AGE_DAYS, help='with --assets: days since the as-of')
     ap.add_argument('--today', help='with --assets: the run date YYYY-MM-DD for the selection and the prompts '
                     '(default today); with --dry-run, to see what a later run would take')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]
+    if args.lane:
+        use_lane(args.lane)
     if args.assets:
         today = datetime.date.fromisoformat(args.today) if args.today else datetime.date.today()
         if args.dry_run:   # reads this checkout; prepares no worktree, takes no lock

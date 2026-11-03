@@ -96,6 +96,17 @@ class Moves(unittest.TestCase):   # price-move T1 run outside the earnings queue
         self.assertNotIn('price-move', ar.checker_prompt(item('gis', 'T2'), 'C:/wt', 'r'))   # earnings runs unchanged
         self.assertEqual(ar.run_id('2026-11-02', ('T1',), moves=True), '2026-11-02-moves')
 
+    def test_lane(self):   # its own worktree, branch and lock; the scheduled runs keep theirs
+        saved = (ar.BRANCH, ar.WORKTREE, ar.LOCK_NAME)
+        try:
+            ar.use_lane('moves')
+            self.assertEqual((ar.BRANCH, ar.LOCK_NAME), ('claude/auto-refresh-moves', 'run-moves.lock'))
+            self.assertTrue(ar.WORKTREE.endswith('auto-refresh-moves'))
+            with self.assertRaises(ValueError):
+                ar.use_lane('../x')
+        finally:
+            ar.BRANCH, ar.WORKTREE, ar.LOCK_NAME = saved
+
 
 class DataLayer(unittest.TestCase):
     """--data-layer (opt-in): the pre-pass before the builder, the post-pass before the checker, the facts gate."""
