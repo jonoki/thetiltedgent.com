@@ -11,7 +11,7 @@ Also read and obey every data rule in `claude/briefs/BUILD.md`, including its "L
   Why: by T+2 the call transcript is published, the day-1 reaction and day-2 follow-through are both in, the wave of analyst target changes (almost all land on days 1–2) has landed, and consensus pages have rolled forward. Building on the release day produced most of the "read next day", after-hours-vs-close and missing-analyst-call errors in the pitfalls log.
 - **10-Q / 10-K details** often file 1–5 business days after the release. If the page needs a filing-only figure that isn't out yet, label it "per the release; 10-Q not yet filed" rather than waiting.
 - **Material news without earnings** (M&A, CEO/CFO change, guidance change, recall/regulatory/legal event): as-of = settled close of the **first full session after the news**, built the next morning; if the news broke intraday, that day's session does not count.
-- **Price move with no news found:** do not refresh; log "price only" in the queue.
+- **Price move with no news found:** do not refresh; log "price only" in the queue. Exception: a price-move T1 that Oki orders (`tools/auto_refresh.py --moves FILE`, first run 2 Nov 2026); the run's prompt gives its rules (no new print, delta box `tg-d--price`).
 
 ## Why this refresh exists
 The company reported earnings, or had material news, after this report's as-of date. The rule (TTG Reports Refresh Policy, 2 Sep 2026): a report is stale when the company reports, not when the price moves.

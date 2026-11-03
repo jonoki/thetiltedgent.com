@@ -9,6 +9,10 @@ tools/auto_refresh.py [--dry-run] [--only SLUG ...]
 ASSET_MIN_AGE_DAYS old or more, same agents, gates, branch and commit-or-revert, brief claude/briefs/REFRESH_ASSETS.md;
 summary tasks/queue/runs/<date>-assets.md.
 
+--moves FILE is a price-move T1 run (Oki, 2 Nov 2026): the reports listed in FILE (JSON {"items": [{"slug", "move_pct",
+"price_date"}]}) moved a lot since their banner date with no print due, and get a T1 refresh outside the earnings
+queue; summary tasks/queue/runs/<date>-moves.md.
+
 Works in its own git worktree (.claude/worktrees/auto-refresh of the main checkout, branch claude/auto-refresh).
 Writes a summary to tasks/queue/runs/<date>.md there (git-excluded), each agent's JSON result beside it, and the
 checkers' PITFALLS lines to tasks/queue/pitfalls_pending.md for the next retro. One run at a time: a run that starts
@@ -34,6 +38,9 @@ import repodata as rd
 
 BRANCH = 'claude/auto-refresh'
 WORKTREE = os.path.join('.claude', 'worktrees', 'auto-refresh')   # under the main checkout; .claude/ is git-ignored
+LOCK_NAME = 'run.lock'
+# --lane NAME (Oki, 2 Nov 2026: start a price-move run now, alongside the scheduled ones): its own worktree, branch
+# and lock (BRANCH-NAME, WORKTREE-NAME, run-NAME.lock); publish() still lands it on main, merging main in when it moved.
 T2_CAP = 0           # T2 refreshes started per run, 0 = no cap; every due T1 always runs (Oki, 8 Oct 2026: no T2 cap)
 JOBS = 4             # builder/checker pairs run at once; more when there is a backlog (jobs_for)
 MAX_JOBS = 8         # Oki, 8 Oct 2026: "can do more in parallel if required"
@@ -113,6 +120,24 @@ def select(items: list[dict], attempts: dict[str, dict[str, int]], t2_cap: int =
     return t1 + (t2[:t2_cap] if t2_cap else t2)
 
 
+def move_items(path: str, records: dict[str, rd.ReportRecord]) -> list[dict]:
+    """The --moves reports as queue-shaped T1 items (Oki, 2 Nov 2026: a T1 for every report that moved a lot with no
+    print due). 'release', the attempts key, is the edition's as-of, so a later move on a newer edition is tried again."""
+    with open(path, encoding='utf-8') as fh:
+        listed = json.load(fh)['items']
+    items = []
+    for m in listed:
+        r = records.get(m['slug'])
+        if r is None or m['slug'] in rd.ARCHIVED:
+            raise ValueError(f"--moves: {m['slug']} is not a live stock report in the manifest")
+        items.append({'slug': m['slug'], 'ticker': r['ticker'], 'tier': 'T1', 'status': 'due', 'kind': 'move',
+                      'as_of': r['as_of'], 'release': f"move-{r['as_of']}", 'move_pct': m['move_pct'],
+                      'price_date': m['price_date'], 'banner_price': r['price'],
+                      'triggers': [f"price move {m['move_pct']:+.1f}% since the {r['as_of']} edition, no print due "
+                                   "(Oki, 2 Nov 2026)"]})
+    return items
+
+
 def jobs_for(n: int, asked: int | None = None) -> int:
     """Pairs to run at once: what was asked for, else JOBS, rising to MAX_JOBS when more than 2 x JOBS reports are due."""
     if asked:
@@ -154,22 +179,42 @@ def file_key(slug: str) -> str:
     return slug.replace('/', '_')
 
 
+def move_brief(i: dict) -> str:
+    """The builder's 'why this refresh' paragraph for a --moves report, in place of the print paragraph."""
+    return (f"No print: the company has not reported since this edition and has none due in the next 14 days, but the "
+            f"shares moved {i['move_pct']:+.1f}% from the banner price ({i['banner_price']} at the {i['as_of']} close) "
+            f"to the {i['price_date']} close per Yahoo. Oki ordered a T1 refresh for these (2 Nov 2026): this overrides "
+            "REFRESH.md's 'price move with no news found: do not refresh'. Do TASK A to the most recent settled close "
+            "with an Adj. Close row. Then find what moved the stock since the banner date (EDGAR 8-Ks, company "
+            "releases, Reuters/WSJ/Bloomberg, peer and sector news, analyst moves) and rewrite the narrative sections "
+            "wherever the story changed (T1). If no sourced news explains the move, say exactly that in the delta box "
+            "and update what the new price changes (valuation, returns, the bull/bear framing, risks). The last "
+            "print's figures stay as they are. Delta box: class `tg-d--price` (`tg-d--fix` only if you correct an "
+            "error in the previous edition), tag \"Updated after the move\", and in place of the Quarter paragraph "
+            "one paragraph on the move: its size, its dates and what drove it, sourced. The tier is T1.")
+
+
 def builder_prompt(i: dict, wt: str, data: DataLayer | None = None) -> str:
-    surprise = ('' if i['eps'] is None else
-                f"Nasdaq calendar: EPS {i['eps']} vs consensus {i['eps_forecast']} (surprise {i['surprise_pct']}%) - "
-                'calendar data, re-confirm on the company release. ')
-    move = '' if i['first_move_pct'] is None else f"First-session move per the queue: {i['first_move_pct']:+.2f}%. "
-    why = (f"The queue tiers it {i['tier']} ({', '.join(i['triggers'])})." if i['triggers'] else
-           f"The queue tiers it {i['tier']}; decide T1 vs T2 honestly per REFRESH.md TASK B (guidance, news).")
-    return (f"Earnings refresh of ONE report: {i['ticker']}, slug `{i['slug']}`, file reports/{i['slug']}_analysis.html "
+    if i.get('kind') == 'move':
+        what, why_now = 'Price-move refresh', move_brief(i)
+    else:
+        surprise = ('' if i['eps'] is None else
+                    f"Nasdaq calendar: EPS {i['eps']} vs consensus {i['eps_forecast']} (surprise {i['surprise_pct']}%) - "
+                    'calendar data, re-confirm on the company release. ')
+        move = '' if i['first_move_pct'] is None else f"First-session move per the queue: {i['first_move_pct']:+.2f}%. "
+        why = (f"The queue tiers it {i['tier']} ({', '.join(i['triggers'])})." if i['triggers'] else
+               f"The queue tiers it {i['tier']}; decide T1 vs T2 honestly per REFRESH.md TASK B (guidance, news).")
+        what = 'Earnings refresh'
+        why_now = (f"Print: released {i['release']} ({i['timing']} per Nasdaq; confirm the time yourself), fiscal "
+                   f"quarter {i['fiscal_quarter']}. {surprise}{move}{why} The T+2 close ({i['t2']}) has settled; use "
+                   "the most recent settled close with an Adj. Close row as the new as-of.")
+    return (f"{what} of ONE report: {i['ticker']}, slug `{i['slug']}`, file reports/{i['slug']}_analysis.html "
             f"(current as-of {i['as_of']}). This is an unattended run: no person will answer questions, so stop "
             f"and report anything that blocks you instead of guessing. {UNATTENDED}\n\n"
             f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Read and edit files only under it; run "
             "tools from it.\n\nSpec: read claude/PITFALL_RULES.md, then claude/briefs/REFRESH.md and "
             "claude/briefs/BUILD.md, and follow them exactly.\n\n"
-            f"Print: released {i['release']} ({i['timing']} per Nasdaq; confirm the time yourself), fiscal quarter "
-            f"{i['fiscal_quarter']}. {surprise}{move}{why} The T+2 close ({i['t2']}) has settled; use the most "
-            "recent settled close with an Adj. Close row as the new as-of.\n\n"
+            f"{why_now}\n\n"
             "Privacy: never put personal data (names, emails) in any request or User-Agent; read sec.gov with "
             f"WebFetch only. No git commands. {ONE_COMMAND} {scratch('ttgref', i['slug'])} Run "
             f"`py -3 tools/chart_audit.py {i['slug']}` and `py -3 tools/verify.py reports/{i['slug']}_analysis.html` "
@@ -200,9 +245,14 @@ def data_layer_brief(data: DataLayer) -> str:
 
 def checker_prompt(i: dict, wt: str, builder_result: str, post: str | None = None) -> str:
     return (f"Independent check of ONE refreshed report: reports/{i['slug']}_analysis.html ({i['ticker']}), "
-            f"{i['tier']} earnings refresh (previous as-of {i['as_of']}). This is an unattended run: no person will "
+            f"{i['tier']} {'price-move' if i.get('kind') == 'move' else 'earnings'} refresh (previous as-of {i['as_of']}). "
+            "This is an unattended run: no person will "
             f"answer questions; fix what you can prove, cut what you cannot source, and list the rest. {UNATTENDED}\n\n"
-            f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. {ONE_COMMAND} "
+            + ("Price-move refresh ordered by Oki (2 Nov 2026): there is no new print, REFRESH.md's 'price move with "
+               "no news found: do not refresh' does not apply, the delta box is `tg-d--price` (or `tg-d--fix`) with a "
+               "sourced paragraph on the move in place of the Quarter paragraph, and the tier is T1.\n\n"
+               if i.get('kind') == 'move' else '')
+            + f"WORKING REPO (overrides the REPO line in the briefs): {wt}. Edit only that report. No git commands. {ONE_COMMAND} "
             f"{scratch('ttgchk', i['slug'])}\n\nSpec: claude/PITFALL_RULES.md first, then "
             "claude/briefs/CHECK.md (which points to REFRESH.md and BUILD.md). Never trust the builder's "
             "\"verified\": re-confirm on pages you fetch yourself. House rules: nothing dated after the banner "
@@ -458,6 +508,9 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: b
                            f"{new_as_of}), unattended: builder + independent checker, verify PASS, node --check ok"
                            + (', chart_audit 0 wrong' if family in AUDITED_FAMILIES else
                               ', indicator_audit 0 wrong' if family == INDICATOR_FAMILY else ''))
+                elif i.get('kind') == 'move':
+                    msg = (f"{i['ticker']} price-move refresh (T1, {i['move_pct']:+.1f}% since {i['as_of']}, no print "
+                           "due; Oki, 2 Nov 2026), unattended: builder + independent checker, verify PASS, chart_audit 0 wrong")
                 else:
                     out['tier'] = built_tier(str(b.get('result', '')), i['tier'])
                     msg = (f"{i['ticker']} earnings refresh ({out['tier']}, print {i['release']}), "
@@ -474,6 +527,16 @@ def refresh_one(i: dict, wt: str, logs: str, lock: threading.Lock, data_layer: b
 
 
 # ---- the worktree ----
+
+def use_lane(name: str) -> None:
+    """--lane: this run's own worktree, branch and lock, so it runs beside the scheduled runs instead of after them."""
+    global BRANCH, WORKTREE, LOCK_NAME
+    if not re.fullmatch(r'[a-z0-9][a-z0-9-]{0,30}', name):
+        raise ValueError(f'--lane {name!r}: use lowercase letters, digits and dashes')
+    BRANCH = f'claude/auto-refresh-{name}'
+    WORKTREE = os.path.join('.claude', 'worktrees', f'auto-refresh-{name}')
+    LOCK_NAME = f'run-{name}.lock'
+
 
 def main_checkout() -> str:
     common = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd=rd.ROOT,
@@ -535,7 +598,7 @@ def run_lock(main: str, wait_s: int = LOCK_WAIT_S, poll_s: int = LOCK_POLL_S) ->
     first Monday has both a T2 and an asset run at 17:30): an OS lock on tasks/queue/run.lock in the main checkout.
     A run that finds it held waits, polling every poll_s, up to wait_s, then raises. The OS drops the lock when the
     process ends, so a crashed run never leaves it held."""
-    path = os.path.join(main, 'tasks', 'queue', 'run.lock')
+    path = os.path.join(main, 'tasks', 'queue', LOCK_NAME)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fh = open(path, 'a+')
     deadline = time.monotonic() + wait_s
@@ -667,11 +730,13 @@ def summary_md(day: str, outcomes: list[Outcome], waiting: list[dict], notes: li
     return '\n'.join(lines + [''] + notes) + '\n'
 
 
-def run_id(day: str, tiers: tuple[str, ...] = ('T1', 'T2'), assets: bool = False) -> str:
-    """The name of a run's summary (runs/<id>.md) and log folder: the date, then -assets for the monthly asset run, or
-    the tiers when a run takes only some of them (Mondays run T1 and T2 separately)."""
+def run_id(day: str, tiers: tuple[str, ...] = ('T1', 'T2'), assets: bool = False, moves: bool = False) -> str:
+    """The name of a run's summary (runs/<id>.md) and log folder: the date, then -assets for the monthly asset run,
+    -moves for a price-move run, or the tiers when a run takes only some of them (Mondays run T1 and T2 separately)."""
     if assets:
         return f'{day}-assets'
+    if moves:
+        return f'{day}-moves'
     return day if set(tiers) >= {'T1', 'T2'} else day + '-' + '-'.join(tiers)
 
 
@@ -747,12 +812,18 @@ def main(argv: list[str] | None = None) -> int:
                     'numbers written from facts.json) and after it (--post), and gate on --post --check (opt-in)')
     ap.add_argument('--assets', action='store_true', help='the monthly numbers-only refresh of the ETF, crypto, bond '
                     f'& cash and indicator reports whose as-of is --min-age days old or more ({ASSET_BRIEF})')
+    ap.add_argument('--moves', help='a price-move T1 run of the reports listed in this JSON file instead of the '
+                    'earnings queue (Oki, 2 Nov 2026)')
+    ap.add_argument('--lane', help='run in its own worktree, branch and lock (e.g. moves) so it need not wait for '
+                    'the scheduled runs')
     ap.add_argument('--families', default=','.join(rd.ASSET_FAMILIES), help='with --assets: the families to take')
     ap.add_argument('--min-age', type=int, default=ASSET_MIN_AGE_DAYS, help='with --assets: days since the as-of')
     ap.add_argument('--today', help='with --assets: the run date YYYY-MM-DD for the selection and the prompts '
                     '(default today); with --dry-run, to see what a later run would take')
     args = ap.parse_args(argv)
     sys.stdout.reconfigure(encoding='utf-8')   # type: ignore[union-attr]
+    if args.lane:
+        use_lane(args.lane)
     if args.assets:
         today = datetime.date.fromisoformat(args.today) if args.today else datetime.date.today()
         if args.dry_run:   # reads this checkout; prepares no worktree, takes no lock
@@ -768,7 +839,8 @@ def main(argv: list[str] | None = None) -> int:
 def run_stocks(args: argparse.Namespace) -> int:
     """The earnings refresh run: the due reports from the refresh queue."""
     day = datetime.date.today().isoformat()
-    wt = prepare(main_checkout(), args.base)
+    # a dry run reads the main checkout: preparing the review worktree mid-run raised a false ALERT (2 Nov 2026)
+    wt = main_checkout() if args.dry_run else prepare(main_checkout(), args.base)
     q = run([sys.executable, 'tools/refresh_queue.py', '--repo', wt], wt, 1800)
     print(q.stdout.strip())
     qdir = os.path.join(wt, 'tasks', 'queue')
@@ -776,8 +848,13 @@ def run_stocks(args: argparse.Namespace) -> int:
         items = json.load(fh)['items']
     attempts = load_attempts(qdir)
     tiers = tuple(t.strip().upper() for t in args.tiers.split(',') if t.strip())
-    work = select(items, attempts, args.t2_cap, args.only, tiers)
-    waiting = [i for i in items if i['status'] in TIER_ORDER and i not in work and (not args.only or i['slug'] in args.only)]
+    if args.moves:
+        tiers = ('T1',)
+        work = select(move_items(args.moves, rd.load_report_records(wt)), attempts, 0, args.only, tiers)
+        waiting: list[dict] = []
+    else:
+        work = select(items, attempts, args.t2_cap, args.only, tiers)
+        waiting = [i for i in items if i['status'] in TIER_ORDER and i not in work and (not args.only or i['slug'] in args.only)]
     print(f'run {day}: ' + (', '.join(f"{i['ticker']} {i['tier']}" for i in work) or 'nothing due'))
     if args.dry_run:
         for i in work[:1]:
@@ -785,7 +862,7 @@ def run_stocks(args: argparse.Namespace) -> int:
                                'summary': '<the pre-pass output>'}
             print('\n--- builder prompt ---\n' + builder_prompt(i, wt, demo if args.data_layer else None))
         return 0
-    rid = run_id(day, tiers)
+    rid = run_id(day, tiers, moves=bool(args.moves))
     outcomes = run_all(work, wt, qdir, rid, attempts, args)
     print(finish(wt, qdir, day, rid, outcomes, waiting, []))
     return 0 if all(o['verdict'] == 'committed' for o in outcomes) else 1
