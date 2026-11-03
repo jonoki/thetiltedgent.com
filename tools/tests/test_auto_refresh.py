@@ -1,5 +1,6 @@
 """Unit tests for auto_refresh.py: choosing the work, the prompts, reading the checker's return.
 Run: py -3 tools/run_checks.py"""
+import json
 import os
 import subprocess
 import tempfile
@@ -60,6 +61,40 @@ class Prompts(unittest.TestCase):
         listed = 'Fixed.\n\n**PITFALLS:**\n\n- D: cut quote\n- F: FCF > OCF\n\nSources: x'   # PNC, 19 Oct 2026
         self.assertEqual(ar.pitfall_lines(listed), ['**PITFALLS:** · D: cut quote · F: FCF > OCF'])
         self.assertEqual(ar.pitfall_lines('PITFALLS:\nnone this time'), ['PITFALLS:'])
+
+
+class Moves(unittest.TestCase):   # price-move T1 run outside the earnings queue (Oki, 2 Nov 2026)
+    RECORDS = {'mrvl': {'slug': 'mrvl', 'ticker': 'MRVL', 'as_of': '2026-09-21', 'price': 257.38},
+               'acn': {'slug': 'acn', 'ticker': 'ACN', 'as_of': '2026-10-02', 'price': 198.9}}
+
+    def items(self, listed):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'moves.json')
+            with open(path, 'w', encoding='utf-8') as fh:
+                json.dump({'items': listed}, fh)
+            return ar.move_items(path, self.RECORDS)
+
+    def test_items_select_as_t1(self):
+        its = self.items([{'slug': 'mrvl', 'move_pct': -33.4, 'price_date': '2026-11-02'},
+                          {'slug': 'acn', 'move_pct': 31.2, 'price_date': '2026-11-02'}])
+        self.assertEqual([(i['ticker'], i['tier'], i['release']) for i in its],
+                         [('MRVL', 'T1', 'move-2026-09-21'), ('ACN', 'T1', 'move-2026-10-02')])
+        self.assertEqual([i['slug'] for i in ar.select(its, {'acn': {'move-2026-10-02': 2}}, tiers=('T1',))], ['mrvl'])
+        with self.assertRaises(ValueError):
+            self.items([{'slug': 'nope', 'move_pct': 20.0, 'price_date': '2026-11-02'}])
+
+    def test_prompts(self):
+        i = self.items([{'slug': 'mrvl', 'move_pct': -33.4, 'price_date': '2026-11-02'}])[0]
+        b = ar.builder_prompt(i, 'C:/wt')
+        for s in ('Price-move refresh of ONE report: MRVL', '-33.4%', '257.38 at the 2026-09-21 close', 'tg-d--price',
+                  'Updated after the move', 'The tier is T1', 'WORKING REPO (overrides the REPO line in the briefs): C:/wt'):
+            self.assertIn(s, b)
+        self.assertNotIn('Print: released', b)
+        c = ar.checker_prompt(i, 'C:/wt', 'result')
+        self.assertIn('T1 price-move refresh (previous as-of 2026-09-21)', c)
+        self.assertIn("'price move with no news found: do not refresh' does not apply", c)
+        self.assertNotIn('price-move', ar.checker_prompt(item('gis', 'T2'), 'C:/wt', 'r'))   # earnings runs unchanged
+        self.assertEqual(ar.run_id('2026-11-02', ('T1',), moves=True), '2026-11-02-moves')
 
 
 class DataLayer(unittest.TestCase):
