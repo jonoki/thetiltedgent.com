@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import tempfile
 import unittest
 from typing import Any, cast
@@ -198,6 +199,14 @@ class TagPipeline(unittest.TestCase):
         card = card_tags.card_for('acme', style=StyleTagRules.inputs(), record={}, text='', line=None, hand={}, logo=None)
         self.assertNotIn('mc', card)                       # no cap: the card sorts last
         self.assertNotIn('ao', card)
+
+    def test_a_company_that_stopped_trading_carries_its_note(self):
+        card = card_tags.card_for('kvue', style=StyleTagRules.inputs(), record={}, text='', line=None, hand={}, logo=None)
+        self.assertEqual(card['gn'], rd.GONE_CARDS['kvue'])
+        tag, note, start = card['gn']
+        self.assertTrue(tag and note and re.fullmatch(r'\d{4}-\d{2}-\d{2}', start))
+        self.assertNotIn('gn', card_tags.card_for('acme', style=StyleTagRules.inputs(), record={}, text='', line=None,
+                                                  hand={}, logo=None))
 
 
 class NewResults(unittest.TestCase):

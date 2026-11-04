@@ -14,6 +14,8 @@ Per report slug:
   mc   market cap in US dollars, whole dollars, from the manifest's market_cap_usd (the report header's "Mkt Cap:",
        read by reportlib.header_mcap); missing when the header has none, and that card sorts last
   ao   the report's as-of date (YYYY-MM-DD), from the manifest
+  gn   [tag, note, note from YYYY-MM-DD] for a company that stopped trading (repodata.GONE_CARDS): the card carries the
+       tag (tooltip: the note) until that date, then becomes the note itself, still opening the report
   mc and ao are the Stocks tab's sort keys (reports/index.js: largest first by default, or latest update first).
   They live here, not as attributes on reports/index.html, so every refresh run's card_tags.py keeps them in step
   and a clash between two runs heals by regenerating data/ (auto_refresh.py GENERATED).
@@ -57,6 +59,7 @@ class CardTags(TypedDict, total=False):
     lg: str
     mc: int                                  # market cap, US dollars
     ao: str                                  # as-of, YYYY-MM-DD
+    gn: tuple[str, str, str]                 # (tag, note, card becomes the note from YYYY-MM-DD)
 
 
 class HandTags(TypedDict, total=False):
@@ -122,6 +125,8 @@ def card_for(slug: str, *, style: rd.TagInputs, record: rd.ReportRecord | None, 
         c['mc'] = round(cap)
     if record and record.get('as_of'):
         c['ao'] = record['as_of']
+    if slug in rd.GONE_CARDS:
+        c['gn'] = rd.GONE_CARDS[slug]
     return c
 
 

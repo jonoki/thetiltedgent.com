@@ -376,6 +376,15 @@
       if(tk) tk.insertAdjacentHTML('afterend','<span class="logo" aria-hidden="true"><img alt="" loading="lazy" src="'+esc(c.lg)+'"></span>');
       card.classList.add('has-logo');
     }
+    // a company that stopped trading (card_tags 'gn': [tag, note, from]): from that date the card is the note, in the
+    // one-liner's panel, with no tags or index badges; it still opens the report
+    if(c.gn && TODAY>=c.gn[2]){
+      var row_=card.querySelector('.ixrow'), sect_=card.querySelector('.sect');
+      if(row_) row_.remove();
+      card.classList.add('gone');
+      if(sect_) sect_.insertAdjacentHTML('afterend','<div class="play"><span class="play-k">'+esc(c.gn[0])+'</span><p class="line">'+esc(c.gn[1])+'</p></div>');
+      return;
+    }
     if(c.ln){
       var sect=card.querySelector('.sect');
       if(sect) sect.insertAdjacentHTML('afterend','<div class="play"><span class="play-k"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.2" y="5" width="10.5" height="14.5" rx="1.8" transform="rotate(-13 8.5 12.2)"/><rect x="10" y="3.6" width="10.5" height="14.5" rx="1.8" transform="rotate(11 15.2 10.8)" class="f"/></svg>Their hand</span><p class="line">'+esc(c.ln)+'</p></div>');
@@ -389,8 +398,10 @@
       if(x[0]==='New CEO' && x[2] && (NOW-Date.parse(x[2]+'-01T00:00:00Z'))/864e5>730) return;
       fams.who.push(tagHtml('who',x[0],x[1]));
     });
+    // until then it carries the tag, ahead of "New results" and "Updated"
+    if(c.gn) fams['new'].push(tagHtml('new',c.gn[0],c.gn[1]));
     // a print after this edition replaces "Updated": [release, show from, page as-of, name]
-    if(nr && TODAY>=nr[1]){
+    else if(nr && TODAY>=nr[1]){
       var sameYr=nr[0].slice(0,4)===nr[2].slice(0,4);
       var asof=sameYr?new Date(nr[2]+'T00:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}):nice(nr[2]);
       fams['new'].push(tagHtml('new','New results','Reported '+nice(nr[0])+', after this edition (data as of '+asof+'). The new numbers aren’t in it yet.'));

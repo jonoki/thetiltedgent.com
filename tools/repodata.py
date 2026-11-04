@@ -37,6 +37,12 @@ ARCHIVED: dict[str, str] = {
 LEFT_INDEX: dict[str, str] = {
     'kvue': '2026-11-02',   # Kimberly-Clark completed the acquisition on Nov 2, 2026 (KMB 8-K); last close Oct 30
 }
+# Its card on reports/index.html (Oki, 3 Nov 2026): a tag whose tooltip is the note, then from the date given the card
+# becomes the note itself, still opening the report (reports/index.js; written to data/card_tags.json 'gn' by
+# card_tags.py). slug -> (tag, note, note from YYYY-MM-DD).
+GONE_CARDS: dict[str, tuple[str, str, str]] = {
+    'kvue': ('Acquired', 'Kimberly-Clark completed its acquisition of Kenvue on Nov 2, 2026.', '2026-11-16'),
+}
 RENAMED: dict[str, str] = {
     'psky': 'skyd',   # Paramount Skydance (Nasdaq: PSKY) -> Skydance Corporation (NYSE: SKYD), 6 Oct 2026 (Oki, 8 Oct)
 }
