@@ -31,6 +31,12 @@ ARCHIVED: dict[str, str] = {
 }
 # Renamed stock reports, old slug -> new: the old file is a redirect stub (not a report) and reports/view.html maps
 # ?r=<old> to the new slug in its `moved` map; tools/tests/test_site.py keeps the two in step.
+# Index members that stopped trading but stay in the library (Oki, 3 Nov 2026): the card and report stay, a note line
+# above the report's banner says what happened, and index_rank.py / index_stats.py leave the company out of the S&P 500
+# and the Nasdaq-100 from this date (its first session without a close). slug -> YYYY-MM-DD.
+LEFT_INDEX: dict[str, str] = {
+    'kvue': '2026-11-02',   # Kimberly-Clark completed the acquisition on Nov 2, 2026 (KMB 8-K); last close Oct 30
+}
 RENAMED: dict[str, str] = {
     'psky': 'skyd',   # Paramount Skydance (Nasdaq: PSKY) -> Skydance Corporation (NYSE: SKYD), 6 Oct 2026 (Oki, 8 Oct)
 }

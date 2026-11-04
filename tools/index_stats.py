@@ -769,7 +769,7 @@ def load_library(repo: str, dates: list[str]) -> tuple[Library, list[str]]:
     series: dict[str, rf.Daily] = {}
     for s, m in sorted(members.items()):
         try:
-            series[s] = ir.daily_closes(m.symbol, need[0], need[-1])
+            series[s] = ir.daily_closes(m.symbol, need[0], ir.series_end(m, need))
         except ca.YahooError as e:
             errs.append(f'{s} ({m.symbol}): yahoo {e}')
     return Library(members, fl, series, sorted(flags)), errs

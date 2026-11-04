@@ -16,7 +16,8 @@ splits Yahoo booked after the member's as-of (Yahoo back-adjusts every close for
 on its as-of basis). Market cap on D = shares x that close.
 Rank on D: 1 + the number of the index's members with a larger market cap on D. A member with no Yahoo close on or
 before D whose card's S&P 500 join date (data-sp) is after D had not listed yet (VYLR, spun off and added 1 Oct 2026)
-and is left out on D; any other member with no close on D is an error.
+and is left out on D; so is a member that left both indexes on or before D (repodata.LEFT_INDEX: KVUE, acquired 2 Nov
+2026, whose card and report stay); any other member with no close on D is an error.
 The row: "Mkt Cap Ranking:" then "S&P 500: #N" and/or "Nasdaq-100: #N", first pill in the page's accent pill style, the
 second dim; a member page without one gets it under the ticker line.
 Member pages only: a page in neither index (a global listing) is never written and --check never flags it. Its rank
@@ -77,6 +78,7 @@ class Member(NamedTuple):
     sp500: bool
     ndx: bool
     sp500_added: str | None = None   # the card's data-sp join date (YYYY-MM-DD)
+    left: str | None = None          # repodata.LEFT_INDEX: out of both indexes from this date (YYYY-MM-DD)
 
 
 class RankError(Exception):
@@ -143,7 +145,15 @@ def read_member(slug: str, card: rd.IndexCard, repo: str) -> Member:
         raise RankError(f'{slug}: as-of {as_of}, header price {price}, Mkt Cap {mcap and mcap[0]}: one is unreadable')
     stated = parse_shares(shares_cell(t))
     return Member(slug, ca.yahoo_symbol(slug, ticker), as_of, price, mcap[1], mcap[1] / price, stated,
-                  bool(card['indices']['sp500_added']), card['indices']['ndx'], card['indices']['sp500_added'])
+                  bool(card['indices']['sp500_added']), card['indices']['ndx'], card['indices']['sp500_added'],
+                  rd.LEFT_INDEX.get(slug))
+
+
+def series_end(m: Member, need: list[str]) -> str:
+    """The last date a member's Yahoo series must reach: the latest date needed, or for a member that left the indexes
+    (repodata.LEFT_INDEX) the latest one before it left, since it has no closes after."""
+    before = [d for d in need if not m.left or d < m.left]
+    return before[-1] if before else need[0]
 
 
 def index_members(repo: str) -> tuple[dict[str, Member], list[str]]:
@@ -219,10 +229,11 @@ def rank_of(caps: Mapping[str, float], slug: str) -> int:
 def index_caps(key: str, iso: str, members: Mapping[str, Member], series: Mapping[str, rf.Daily]) -> dict[str, float]:
     """Every member of index key ('sp500', 'ndx') with its market cap on iso. RankError when a member has no close,
     except an S&P 500 member that joined after iso and had not traded by then (a spin-off listed on its join date,
-    VYLR 1 Oct 2026): it was in neither index on iso, so it is left out of that date's caps."""
+    VYLR 1 Oct 2026): it was in neither index on iso, so it is left out of that date's caps. A member that left the
+    indexes on or before iso (repodata.LEFT_INDEX: KVUE, acquired 2 Nov 2026) is left out too."""
     caps = {}
     for s, m in members.items():
-        if getattr(m, key):
+        if getattr(m, key) and not (m.left and m.left <= iso):
             cap = cap_on(m, series[s], iso)
             if cap is None and m.sp500_added and m.sp500_added > iso:
                 continue
@@ -840,7 +851,7 @@ def main(argv: list[str] | None = None) -> int | str:
     series: dict[str, rf.Daily] = {}
     for slug, m in sorted(members.items()):
         try:
-            series[slug] = daily_closes(m.symbol, need[0], need[-1])
+            series[slug] = daily_closes(m.symbol, need[0], series_end(m, need))
         except ca.YahooError as e:
             errs.append(f'{slug} ({m.symbol}): yahoo {e}')
     flags = [f for s, m in sorted(members.items()) if s in series for f in member_flags(m, series[s])]

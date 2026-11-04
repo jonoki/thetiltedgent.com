@@ -89,6 +89,18 @@ class Ranking(unittest.TestCase):
         with self.assertRaises(ir.RankError):
             ir.index_caps('sp500', '2026-09-21', {'spin': spin._replace(sp500_added=None), 'old': old}, series)
 
+    def test_member_that_left_is_left_out_from_its_leave_date(self):
+        # acquired: last close Oct 30, out of the index from Nov 2 (repodata.LEFT_INDEX)
+        gone = member('gone', 500.0, 50.0)._replace(left='2026-11-02')
+        old = member('old', 200.0, 20.0)
+        series = {'gone': daily(('2026-10-30', 50.0)), 'old': daily(('2026-10-30', 20.0), ('2026-11-02', 20.0))}
+        self.assertEqual(ir.ranks_on('old', '2026-10-30', {'gone': gone, 'old': old}, series), {'sp500': 2})
+        self.assertEqual(ir.index_caps('sp500', '2026-11-02', {'gone': gone, 'old': old}, series), {'old': 200.0})
+        self.assertEqual(ir.ranks_on('old', '2026-11-02', {'gone': gone, 'old': old}, series), {'sp500': 1})
+        # its series only has to reach the last date needed before it left
+        self.assertEqual(ir.series_end(gone, ['2026-09-10', '2026-10-30', '2026-11-02']), '2026-10-30')
+        self.assertEqual(ir.series_end(old, ['2026-09-10', '2026-10-30', '2026-11-02']), '2026-11-02')
+
     def test_dual_class_company_ranks_once_at_its_whole_market_cap(self):
         # one card per company: Alphabet's report states A+B+C together; its shares are counted in GOOGL units
         goog = member('googl', 4.33e12, 354.30)
