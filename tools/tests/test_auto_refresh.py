@@ -1,5 +1,7 @@
 """Unit tests for auto_refresh.py: choosing the work, the prompts, reading the checker's return.
 Run: py -3 tools/run_checks.py"""
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -332,6 +334,22 @@ class MergeBase(unittest.TestCase):
         g('checkout', '-q', 'main'); open(os.path.join(d, path), 'w').write(theirs + '\n'); g('commit', '-qam', 'theirs')
         g('checkout', '-q', 'review')
         return g
+
+    def test_a_crashed_runs_pages_are_cleared_but_other_work_stops_the_run(self):
+        with tempfile.TemporaryDirectory() as d:
+            g = self.repo(d, 'reports/x_analysis.html', 'ours', 'theirs')
+            page, tool = os.path.join(d, 'reports', 'x_analysis.html'), os.path.join(d, 'tools', 'manifest.py')
+            ar.clear_crashed_run(d)                            # a clean worktree: nothing to do
+            open(page, 'w').write('half a refresh\n')
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                ar.clear_crashed_run(d)
+            self.assertIn('reports/x_analysis.html', out.getvalue())
+            self.assertEqual(open(page).read(), 'ours\n')
+            self.assertEqual(g('status', '--porcelain').stdout, '')
+            open(page, 'w').write('half a refresh\n'); open(tool, 'w').write('someone is working\n')
+            with self.assertRaises(RuntimeError):
+                ar.clear_crashed_run(d)
+            self.assertEqual(open(page).read(), 'half a refresh\n')   # nothing is dropped when the run stops
 
     def test_generated_data_conflict_is_healed(self):
         with tempfile.TemporaryDirectory() as d:

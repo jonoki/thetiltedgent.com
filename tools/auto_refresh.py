@@ -674,15 +674,29 @@ def alert(main: str, text: str) -> None:
             print(f'alert: Windows notification not sent ({type(e).__name__}: {e})', file=sys.stderr)
 
 
+def clear_crashed_run(wt: str) -> None:
+    """A run holds the lock while it works, so uncommitted pages found under the lock were left by a run that died; they
+    were never checked, so drop them (a Windows restart killed the 6 Nov 2026 run and its leftovers blocked every later
+    run; Oki, 9 Nov 2026). Changes outside reports/ and data/ are someone's work and stop the run."""
+    dirty = git(wt, 'diff', '--name-only', 'HEAD').splitlines()
+    other = [p for p in dirty if not p.startswith(('reports/', 'data/'))]
+    if other:
+        raise RuntimeError(f"{wt} has uncommitted changes outside reports/ and data/ ({', '.join(other[:5])}); "
+                           'look before running again')
+    if dirty:
+        git(wt, 'restore', '--staged', '--worktree', '--', *dirty)
+        print(f"cleared {len(dirty)} unfinished file(s) left by a crashed run: {', '.join(dirty)}")
+
+
 def prepare(main: str, base: str) -> str:
-    """The review worktree, up to date with base, clean, with the private agent files copied in."""
+    """The review worktree, up to date with base, clean (a crashed run's unfinished pages dropped), with the private
+    agent files copied in. Call it only while holding run_lock."""
     wt = os.path.join(main, WORKTREE)
     git(main, 'fetch', '-q', 'origin')
     if not os.path.isdir(wt):
         have = run(['git', 'rev-parse', '--verify', '-q', BRANCH], main).returncode == 0
         git(main, 'worktree', 'add', '-q', *([wt, BRANCH] if have else ['--no-track', '-b', BRANCH, wt, base]))
-    if git(wt, 'status', '--porcelain', '--untracked-files=no').strip():
-        raise RuntimeError(f'{wt} has uncommitted changes (a crashed run?); look before running again')
+    clear_crashed_run(wt)
     if run(['git', 'merge-base', '--is-ancestor', base, 'HEAD'], wt).returncode:
         merge_base(wt, base)
     shutil.copytree(os.path.join(main, '.claude', 'agents'), os.path.join(wt, '.claude', 'agents'),
